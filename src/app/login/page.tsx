@@ -408,7 +408,7 @@ function LoginContent() {
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const { language: lang, setLanguage: setLang } = useApp();
+  const { language: lang, setLanguage: setLang, setUserProfile } = useApp();
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [showPasswordStrength, setShowPasswordStrength] = useState(false);
   const [csrfToken, setCsrfToken] = useState<string | null>(null);
@@ -712,6 +712,16 @@ function LoginContent() {
           setConfirmPassword("");
           setCsrfToken(null);
 
+          // Update user profile with actual email
+          const userEmail = email.trim().toLowerCase();
+          const initials = userEmail.substring(0, 2).toUpperCase();
+          localStorage.setItem("remembered-email", userEmail);
+          setUserProfile({
+            email: userEmail,
+            initials,
+            avatarUrl: `https://api.dicebear.com/7.x/identicon/svg?seed=${userEmail}&backgroundColor=1C1B1B`,
+          });
+
           // Login success - redirect
           const returnUrl = searchParams.get("returnUrl") || "/dashboard";
           // Validate returnUrl to prevent open redirect
@@ -788,6 +798,14 @@ function LoginContent() {
       });
 
       // If we get here, it means redirect didn't happen (an error occurred)
+      // Check if result exists (server action might have crashed)
+      if (!result) {
+        recordFailedAttempt();
+        setError(t.errorGoogle);
+        setErrorCode("SERVER_NO_RESPONSE");
+        return;
+      }
+
       if (!result.success) {
         recordFailedAttempt();
         setError(result.error || t.errorGoogle);
