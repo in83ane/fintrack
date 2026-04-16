@@ -787,13 +787,27 @@ function LoginContent() {
         lang,
       });
 
+      // If we get here, it means redirect didn't happen (an error occurred)
       if (!result.success) {
         recordFailedAttempt();
         setError(result.error || t.errorGoogle);
         if (result.errorCode) setErrorCode(result.errorCode);
       }
-      // On success, redirects happen automatically
     } catch (err: unknown) {
+      // Check if this is a redirect error (which means success for OAuth)
+      // Next.js redirect() throws an error with specific properties
+      const errorObj = err as { name?: string; message?: string; digest?: string };
+      if (
+        errorObj?.name === "NEXT_REDIRECT" ||
+        errorObj?.digest?.startsWith("NEXT_") ||
+        errorObj?.message?.includes("redirect") ||
+        errorObj?.message?.includes("NEXT_REDIRECT")
+      ) {
+        // This is expected - OAuth redirect is happening
+        // Don't show error, the redirect will happen automatically
+        return;
+      }
+
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
       setError(t.errorGoogle);
       setErrorCode(`CLIENT_EXCEPTION: ${errorMessage}`);
