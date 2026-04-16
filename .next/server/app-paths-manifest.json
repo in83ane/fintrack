@@ -1,9 +1,0 @@
-{
-  "/api/market/route": "app/api/market/route.js",
-  "/page": "app/page.js",
-  "/login/page": "app/login/page.js",
-  "/(app)/portfolio/page": "app/(app)/portfolio/page.js",
-  "/(app)/dashboard/page": "app/(app)/dashboard/page.js",
-  "/(app)/portfolio/[symbol]/page": "app/(app)/portfolio/[symbol]/page.js",
-  "/(app)/calendar/page": "app/(app)/calendar/page.js"
-}

@@ -306,7 +306,7 @@ export default function PortfolioPage() {
                         <div className="text-[10px] text-gray-500 font-medium">{shares.toLocaleString('en-US', { maximumFractionDigits: 4 })} {t("holdings")}</div>
                       </td>
                       <td className="px-6 py-2">
-                        <div className="h-[50px] w-full">
+                        <div className="h-[50px] w-full" style={{ minHeight: 50 }}>
                           {hasIntradayData ? (
                             <SparklineChart
                               data={intradayData}
@@ -501,13 +501,13 @@ export default function PortfolioPage() {
                   ))}
                 </div>
               </div>
-              <div className="h-[180px] w-full bg-[#1C1B1B] rounded-2xl border border-white/5 p-4">
+              <div className="h-[180px] w-full bg-[#1C1B1B] rounded-2xl border border-white/5 p-4" style={{ minHeight: 180 }}>
                 {(() => {
                   const filteredData = filterChartDataByPeriod(selectedAsset.chartData, selectedPeriod);
                   const dataToShow = filteredData.length > 0 ? filteredData : selectedAsset.chartData;
 
                   return dataToShow && dataToShow.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minHeight={148}>
                       <AreaChart data={dataToShow}>
                         <defs>
                           <linearGradient id={`colorPrice-${selectedAsset.symbol}`} x1="0" y1="0" x2="0" y2="1">
@@ -651,7 +651,7 @@ function SparklineChart({ data, isPositive }: { data: { time: number; price: num
   const sortedData = [...data].sort((a, b) => a.time - b.time);
 
   return (
-    <ResponsiveContainer width="100%" height="100%">
+    <ResponsiveContainer width="100%" height="100%" minHeight={50}>
       <LineChart data={sortedData}>
         <Line
           type="monotone"

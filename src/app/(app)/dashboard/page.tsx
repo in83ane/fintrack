@@ -109,8 +109,8 @@ export default function DashboardPage() {
           </div>
 
           {/* Recharts Area Chart */}
-          <div className="h-48 mt-4 min-w-0">
-            <ResponsiveContainer width="100%" height="100%" minWidth={300}>
+          <div className="h-48 mt-4 min-w-0" style={{ minHeight: 192 }}>
+            <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={192}>
               <AreaChart data={netWorthHistory}>
                 <defs>
                   <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
@@ -200,8 +200,8 @@ export default function DashboardPage() {
               <Edit3 size={14} className="text-gray-400" />
             </div>
           </div>
-          <div className="w-full h-48 relative mt-4 min-w-0">
-            <ResponsiveContainer width="100%" height="100%" minWidth={300}>
+          <div className="w-full h-48 relative mt-4 min-w-0" style={{ minHeight: 192 }}>
+            <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={192}>
               <AreaChart data={netWorthHistory}>
                 <defs>
                   <linearGradient id="velocityGradient" x1="0" y1="0" x2="0" y2="1">
