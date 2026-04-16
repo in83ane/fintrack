@@ -712,8 +712,8 @@ function LoginContent() {
           setConfirmPassword("");
           setCsrfToken(null);
 
-          // Update user profile with actual email
-          const userEmail = email.trim().toLowerCase();
+          // Update user profile with actual email from server response
+          const userEmail = result.email || email.trim().toLowerCase();
           const initials = userEmail.substring(0, 2).toUpperCase();
           localStorage.setItem("remembered-email", userEmail);
           setUserProfile({
@@ -798,18 +798,23 @@ function LoginContent() {
       });
 
       // If we get here, it means redirect didn't happen (an error occurred)
-      // Check if result exists (server action might have crashed)
-      if (!result) {
+      // Check if result exists and is a valid object (server action might have crashed)
+      if (!result || typeof result !== "object") {
         recordFailedAttempt();
         setError(t.errorGoogle);
         setErrorCode("SERVER_NO_RESPONSE");
         return;
       }
 
-      if (!result.success) {
+      // Safely check result.success
+      if (result.success === false) {
         recordFailedAttempt();
         setError(result.error || t.errorGoogle);
         if (result.errorCode) setErrorCode(result.errorCode);
+      }
+      // If result.success is true but we got here, something unexpected happened
+      else if (result.success === true) {
+        console.warn("Google auth returned success but didn't redirect");
       }
     } catch (err: unknown) {
       // Check if this is a redirect error (which means success for OAuth)

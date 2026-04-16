@@ -483,17 +483,40 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const [userProfile, setUserProfile] = useState<{ email: string; avatarUrl: string; initials: string } | undefined>();
 
+  // Helper to read cookie by name
+  const getCookie = (name: string): string | null => {
+    if (typeof document === "undefined") return null;
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop()?.split(";").shift() || null;
+    return null;
+  };
+
   // Use useEffect to try to get the user email securely, or generate default avatarUrl
   useEffect(() => {
     try {
+      // Priority 1: Check for user_email cookie (set by OAuth callback)
+      const userEmailCookie = getCookie("user_email");
+      // Priority 2: Check localStorage for remembered email
       const rememberedEmail = localStorage.getItem("remembered-email");
-      if (rememberedEmail) {
-        const initials = rememberedEmail.substring(0, 2).toUpperCase();
+
+      const email = userEmailCookie || rememberedEmail;
+
+      if (email) {
+        const initials = email.substring(0, 2).toUpperCase();
         setUserProfile({
-          email: rememberedEmail,
+          email: email,
           initials,
-          avatarUrl: `https://api.dicebear.com/7.x/identicon/svg?seed=${rememberedEmail}&backgroundColor=1C1B1B`,
+          avatarUrl: `https://api.dicebear.com/7.x/identicon/svg?seed=${email}&backgroundColor=1C1B1B`,
         });
+        // Sync to localStorage for future page loads
+        if (userEmailCookie && !rememberedEmail) {
+          localStorage.setItem("remembered-email", userEmailCookie);
+        }
+        // Clear the cookie after reading (one-time use)
+        if (userEmailCookie) {
+          document.cookie = "user_email=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+        }
       } else {
         setUserProfile({
           email: "user@fintrack.app",

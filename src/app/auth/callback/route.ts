@@ -122,6 +122,17 @@ export async function GET(request: NextRequest) {
     const returnUrl = searchParams.get("returnUrl");
     const redirectPath = returnUrl && returnUrl.startsWith("/") ? returnUrl : "/dashboard";
 
+    // Store user email in a short-lived cookie for the client to pick up
+    if (data.user?.email) {
+      cookieStore.set("user_email", data.user.email, {
+        httpOnly: false, // Client needs to read this
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 60, // 1 minute - just enough for the client to pick it up
+        path: "/",
+      });
+    }
+
     return NextResponse.redirect(new URL(redirectPath, request.url));
   } catch (err) {
     console.error("OAuth callback error:", err);

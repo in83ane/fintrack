@@ -136,6 +136,7 @@ export interface ActionResult {
   errorCode?: string;
   message?: string;
   requiresEmailConfirmation?: boolean;
+  email?: string;
   rateLimitInfo?: {
     remaining: number;
     resetTime: number;
@@ -384,7 +385,7 @@ export async function signInAction(credentials: SignInCredentials): Promise<Acti
       });
     }
 
-    return { success: true };
+    return { success: true, email: sanitizedEmail };
   } catch (err) {
     console.error("Sign in error:", err);
     // Log more details for debugging
@@ -738,8 +739,9 @@ export async function signOutAction(): Promise<void> {
   const sessionToken = cookieStore.get("session")?.value;
 
   try {
+    const url = getLazySupabaseUrl();
     const supabase = createClient(
-      supabaseUrl,
+      url,
       getSupabaseAnonKey()
     );
 
@@ -894,7 +896,7 @@ export async function refreshSession(): Promise<ActionResult> {
       url = getSupabaseUrl();
     } catch (envErr) {
       console.error("Supabase URL error:", envErr);
-      return { success: false, error: getMessage("SERVER_ERROR", lang), errorCode: "ENV_CONFIG_ERROR" };
+      return { success: false, error: "An error occurred. Please try again later", errorCode: "ENV_CONFIG_ERROR" };
     }
 
     const supabase = createClient(
