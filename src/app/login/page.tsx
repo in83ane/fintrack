@@ -797,24 +797,27 @@ function LoginContent() {
         lang,
       });
 
-      // If we get here, it means redirect didn't happen (an error occurred)
-      // Check if result exists and is a valid object (server action might have crashed)
+      // Check if result exists and is a valid object
       if (!result || typeof result !== "object") {
         recordFailedAttempt();
         setError(t.errorGoogle);
         setErrorCode("SERVER_NO_RESPONSE");
+        setLoading(false);
         return;
       }
 
-      // Safely check result.success
+      // Handle successful OAuth URL return
+      if (result.success && result.redirectUrl) {
+        // Redirect to Google OAuth
+        window.location.href = result.redirectUrl;
+        return; // Don't set loading to false, we're redirecting
+      }
+
+      // Handle error response
       if (result.success === false) {
         recordFailedAttempt();
         setError(result.error || t.errorGoogle);
         if (result.errorCode) setErrorCode(result.errorCode);
-      }
-      // If result.success is true but we got here, something unexpected happened
-      else if (result.success === true) {
-        console.warn("Google auth returned success but didn't redirect");
       }
     } catch (err: unknown) {
       // Check if this is a redirect error (which means success for OAuth)

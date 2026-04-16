@@ -137,6 +137,7 @@ export interface ActionResult {
   message?: string;
   requiresEmailConfirmation?: boolean;
   email?: string;
+  redirectUrl?: string;
   rateLimitInfo?: {
     remaining: number;
     resetTime: number;
@@ -856,7 +857,9 @@ export async function initiateGoogleAuth(data: GoogleAuthData): Promise<ActionRe
   }
 
   if (redirectUrl) {
-    redirect(redirectUrl);
+    // Return URL instead of calling redirect() to avoid NEXT_REDIRECT error
+    // Client will handle the redirect
+    return { success: true, redirectUrl };
   }
 
   return { success: false, error: getMessage("SERVER_ERROR", lang) };
