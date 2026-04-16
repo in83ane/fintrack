@@ -284,13 +284,16 @@ export async function signInAction(credentials: SignInCredentials): Promise<Acti
 
     // Create Supabase client
     // Debug: Check env vars
-    if (!supabaseUrl || !getSupabaseAnonKey()) {
-      console.error("Missing Supabase credentials:", { url: !!supabaseUrl, key: !!getSupabaseAnonKey() });
+    let url: string;
+    try {
+      url = getSupabaseUrl();
+    } catch (envErr) {
+      console.error("Missing Supabase credentials:", envErr);
       return { success: false, error: getMessage("SERVER_ERROR", lang), errorCode: "MISSING_SUPABASE_CONFIG" };
     }
 
     const supabase = createClient(
-      supabaseUrl,
+      url,
       getSupabaseAnonKey(),
       {
         auth: {
@@ -476,8 +479,20 @@ export async function signUpAction(data: SignUpData): Promise<ActionResult> {
     }
 
     // Create Supabase client
+    let url: string;
+    try {
+      url = getSupabaseUrl();
+    } catch (envErr) {
+      console.error("Environment variable error:", envErr);
+      return {
+        success: false,
+        error: lang === "th" ? "การตั้งค่า Supabase ไม่สมบูรณ์" : "Supabase configuration incomplete",
+        errorCode: "ENV_CONFIG_ERROR"
+      };
+    }
+
     const supabase = createClient(
-      supabaseUrl,
+      url,
       getSupabaseAnonKey(),
       {
         auth: {
@@ -669,8 +684,16 @@ export async function forgotPasswordAction(data: ForgotPasswordData): Promise<Ac
       return { success: true, message: getMessage("PASSWORD_RESET_SENT", lang) };
     }
 
+    let url: string;
+    try {
+      url = getSupabaseUrl();
+    } catch (envErr) {
+      console.error("Supabase URL error:", envErr);
+      return { success: false, error: getMessage("SERVER_ERROR", lang), errorCode: "ENV_CONFIG_ERROR" };
+    }
+
     const supabase = createClient(
-      supabaseUrl,
+      url,
       getSupabaseAnonKey(),
       {
         auth: {
@@ -866,8 +889,16 @@ export async function refreshSession(): Promise<ActionResult> {
   }
 
   try {
+    let url: string;
+    try {
+      url = getSupabaseUrl();
+    } catch (envErr) {
+      console.error("Supabase URL error:", envErr);
+      return { success: false, error: getMessage("SERVER_ERROR", lang), errorCode: "ENV_CONFIG_ERROR" };
+    }
+
     const supabase = createClient(
-      supabaseUrl,
+      url,
       getSupabaseAnonKey(),
       {
         auth: {
