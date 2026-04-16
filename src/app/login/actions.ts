@@ -21,15 +21,42 @@ import { getAppUrl, getSupabaseUrl, getSupabaseAnonKey, getSupabaseServiceKey } 
 
 // ─── Initialize Supabase Admin Client ──────────────────────────────────────
 // Note: Use service role key only in server actions, never expose to client
-const supabaseUrl = getSupabaseUrl();
-const supabaseServiceKey = getSupabaseServiceKey();
+// Lazy initialization to prevent crashes at module load time
+let supabaseUrl: string | null = null;
+let supabaseServiceKey: string | null = null;
+
+function getLazySupabaseUrl(): string {
+  if (!supabaseUrl) {
+    try {
+      supabaseUrl = getSupabaseUrl();
+    } catch (e) {
+      console.error("Failed to get Supabase URL:", e);
+      throw new Error("Supabase URL not configured");
+    }
+  }
+  return supabaseUrl;
+}
+
+function getLazySupabaseServiceKey(): string {
+  if (!supabaseServiceKey) {
+    try {
+      supabaseServiceKey = getSupabaseServiceKey();
+    } catch (e) {
+      console.error("Failed to get Supabase service key:", e);
+      throw new Error("Supabase service key not configured");
+    }
+  }
+  return supabaseServiceKey;
+}
 
 // Create admin client (has bypass email confirmation privileges)
 const createAdminClient = () => {
-  if (!supabaseUrl || !supabaseServiceKey) {
+  const url = getLazySupabaseUrl();
+  const key = getLazySupabaseServiceKey();
+  if (!url || !key) {
     throw new Error("Supabase credentials not configured");
   }
-  return createClient(supabaseUrl, supabaseServiceKey, {
+  return createClient(url, key, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
@@ -745,15 +772,36 @@ export async function initiateGoogleAuth(data: GoogleAuthData): Promise<ActionRe
   let redirectUrl: string | null = null;
 
   try {
-    const supabase = createClient(
-      supabaseUrl,
-      getSupabaseAnonKey()
-    );
+    // Get Supabase credentials with better error handling
+    let url: string;
+    let anonKey: string;
+    try {
+      url = getSupabaseUrl();
+      anonKey = getSupabaseAnonKey();
+    } catch (envErr) {
+      console.error("Environment variable error:", envErr);
+      return {
+        success: false,
+        error: lang === "th" ? "การตั้งค่า Supabase ไม่สมบูรณ์" : "Supabase configuration incomplete",
+        errorCode: "ENV_CONFIG_ERROR"
+      };
+    }
+
+    const supabase = createClient(url, anonKey);
+
+    // Get app URL with fallback
+    let appUrl: string;
+    try {
+      appUrl = getAppUrl();
+    } catch (appUrlErr) {
+      console.warn("App URL error, using fallback:", appUrlErr);
+      appUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000";
+    }
 
     const { data: authData, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${getAppUrl()}/auth/callback`,
+        redirectTo: `${appUrl}/auth/callback`,
         queryParams: {
           access_type: "offline",
           prompt: "consent",
@@ -762,7 +810,10 @@ export async function initiateGoogleAuth(data: GoogleAuthData): Promise<ActionRe
       },
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error("Supabase OAuth error:", error);
+      throw error;
+    }
 
     if (authData.url) {
       redirectUrl = authData.url;
@@ -771,13 +822,18 @@ export async function initiateGoogleAuth(data: GoogleAuthData): Promise<ActionRe
     }
   } catch (err) {
     console.error("Google auth error:", err);
-    return { success: false, error: getMessage("SERVER_ERROR", lang) };
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    return {
+      success: false,
+      error: getMessage("SERVER_ERROR", lang),
+      errorCode: `OAUTH_ERROR: ${errorMessage.slice(0, 100)}`
+    };
   }
 
   if (redirectUrl) {
     redirect(redirectUrl);
   }
-  
+
   return { success: false, error: getMessage("SERVER_ERROR", lang) };
 }
 
