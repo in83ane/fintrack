@@ -831,7 +831,8 @@ export async function initiateGoogleAuth(data: GoogleAuthData): Promise<ActionRe
         queryParams: {
           access_type: "offline",
           prompt: "consent",
-          state: csrfToken, // Include CSRF in OAuth state
+          // Note: Don't include state here - Supabase manages it automatically
+          // and validates it during exchangeCodeForSession
         },
       },
     });
