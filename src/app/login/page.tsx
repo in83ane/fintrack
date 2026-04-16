@@ -483,8 +483,17 @@ function LoginContent() {
 
     initSecurity();
 
-    // Handle Implicit Grant Flow tokens embedded in the hash (e.g. from Supabase Email Verifications)
+    // Handle Implicit Grant Flow tokens embedded in the hash (e.g. from Supabase OAuth/Google)
+    // This MUST run before checking query params errors, as OAuth may return tokens in hash
+    // even when there are errors in query params (e.g. state validation issues that we can ignore)
     if (typeof window !== "undefined" && window.location.hash.includes("access_token=")) {
+      // Clear any query params errors since we have a valid token in hash
+      // Remove error from URL without reloading
+      if (window.location.search) {
+        const cleanUrl = window.location.pathname + window.location.hash;
+        window.history.replaceState({}, "", cleanUrl);
+      }
+
       // Small delay to ensure UI mounts and doesn't flicker randomly
       setTimeout(() => {
         setLoading(true);
