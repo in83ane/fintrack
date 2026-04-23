@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { LayoutDashboard, Wallet, Settings, HelpCircle, Crown, Calendar, User, LineChart } from "lucide-react";
+import { LayoutDashboard, Wallet, Settings, HelpCircle, Crown, Calendar, User, LineChart, Banknote, PiggyBank } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 import { useApp } from "@/src/context/AppContext";
 import Link from "next/link";
@@ -23,6 +23,8 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
     { icon: Wallet, label: t("portfolio"), href: "/portfolio" },
     { icon: Calendar, label: t("calendar"), href: "/calendar" },
     { icon: LineChart, label: t("transactions") || "Transactions", href: "/transactions" },
+    { icon: Banknote, label: t("cashflowOverview"), href: "/cashflow" },
+    { icon: PiggyBank, label: t("budgetPage"), href: "/budget" },
     { icon: Crown, label: t("pricing") || "Pricing", href: "/#pricing" },
     { icon: Settings, label: t("settings"), href: "/settings" },
   ];
@@ -52,7 +54,7 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
             FinTrack
           </h2>
         </Link>
-        <p className="text-xs text-gray-500 font-medium tracking-wide uppercase mt-1">{t("premium_tier") || "Premium Tier"}</p>
+        <p className="text-xs text-gray-500 font-medium tracking-wide uppercase mt-1">{t("premiumTier") || "Premium Tier"}</p>
       </div>
 
       <nav className="flex-1 space-y-1">
@@ -81,13 +83,13 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
         <div className="bg-[#4EDEA3] p-4 rounded-2xl mb-6 shadow-lg shadow-[#4EDEA3]/10">
           <div className="flex items-center gap-2 mb-1">
             <Crown size={14} className="text-[#0E0E0E]" />
-            <span className="text-xs font-black uppercase tracking-wide text-[#0E0E0E]">{t("elite_access") || "Elite Access"}</span>
+            <span className="text-xs font-black uppercase tracking-wide text-[#0E0E0E]">{t("eliteAccess") || "Elite Access"}</span>
           </div>
           <p className="text-sm font-medium text-[#0E0E0E] leading-tight">
-            {t("upgrade_desc") || "Upgrade to Gold for AI-powered insights."}
+            {t("upgradeDesc") || "Upgrade to Gold for AI-powered insights."}
           </p>
           <button className="w-full mt-3 py-2 bg-[#0E0E0E] text-[#4EDEA3] rounded-xl font-bold text-xs uppercase tracking-wide hover:brightness-125 transition-all">
-            {t("upgrade_now") || "Upgrade Now"}
+            {t("upgradeNow") || "Upgrade Now"}
           </button>
         </div>
         

@@ -12,6 +12,4 @@ export async function logoutAction() {
   const cookieStore = await cookies();
   cookieStore.set("session", "", { path: "/", maxAge: 0, expires: new Date(0) });
   cookieStore.set("refresh_token", "", { path: "/", maxAge: 0, expires: new Date(0) });
-  
-  return { success: true };
 }

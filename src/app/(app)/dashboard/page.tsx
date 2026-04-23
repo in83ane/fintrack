@@ -1,18 +1,315 @@
 "use client";
 
-import React from "react";
-import { TrendingUp, TrendingDown, ArrowRight, Edit3, Info, History, Plus, Download, FileText, CheckCircle2 } from "lucide-react";
+import React, { useState, useMemo, useRef, useCallback } from "react";
+import { TrendingUp, PlusCircle, MinusCircle, ArrowRight, Edit3, Info, History, Plus, Download, FileText, CheckCircle2, Trash2, Pencil, ArrowDownToLine, ArrowUpFromLine, PiggyBank } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/src/lib/utils";
 import { useApp } from "@/src/context/AppContext";
 import { Modal } from "@/src/components/Modal";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { AddAssetModal } from "@/src/components/AddAssetModal";
+import { AddCashflowModal } from "@/src/components/AddCashflowModal";
 import Papa from "papaparse";
 
+interface NetWorthPoint {
+  date: string;
+  value: number;
+}
+
+interface DashboardChartProps {
+  data: NetWorthPoint[];
+  currency: string;
+  exchangeRates: Record<string, number>;
+  formatMoney: (amount: number, originalCurrency?: any, originalRate?: number) => string;
+  t: (key: string) => string;
+}
+
+function DashboardChart({ data, currency, exchangeRates, formatMoney, t }: DashboardChartProps) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [dimensions, setDimensions] = React.useState({ width: 800, height: 192 });
+
+  const W = dimensions.width;
+  const H = dimensions.height;
+  const PAD = { top: 10, right: 20, bottom: 30, left: 60 };
+
+  React.useEffect(() => {
+    const updateDimensions = () => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setDimensions({ width: rect.width, height: rect.height });
+      }
+    };
+
+    updateDimensions();
+    window.addEventListener('resize', updateDimensions);
+    return () => window.removeEventListener('resize', updateDimensions);
+  }, []);
+
+  const { minP, maxP, yTicks, pathD, areaD, cx, cy, xTicks, isPositive } = useMemo(() => {
+    if (data.length < 2) return { minP: 0, maxP: 0, yTicks: [], pathD: "", areaD: "", cx: () => 0, cy: () => 0, xTicks: [], isPositive: true };
+
+    const values = data.map(d => d.value);
+    const minP = Math.min(...values);
+    const maxP = Math.max(...values);
+    const paddingP = (maxP - minP) * 0.1;
+    const adjustedMinP = Math.max(0, minP - paddingP);
+    const adjustedMaxP = maxP + paddingP;
+    const rangeP = adjustedMaxP - adjustedMinP || 1;
+
+    const dataCount = data.length;
+    const cx = (index: number) => PAD.left + (index / (dataCount - 1)) * (W - PAD.left - PAD.right);
+    const cy = (p: number) => PAD.top + (1 - (p - adjustedMinP) / rangeP) * (H - PAD.top - PAD.bottom);
+
+    // Y-axis ticks
+    const yTickCount = 4;
+    const yTicks = Array.from({ length: yTickCount }, (_, i) => adjustedMinP + (i / (yTickCount - 1)) * rangeP);
+
+    // X-axis ticks
+    const xTickCount = Math.min(6, dataCount);
+    const indexStep = Math.floor((dataCount - 1) / (xTickCount - 1)) || 1;
+    const xTicks = Array.from({ length: xTickCount }, (_, i) => {
+      const index = Math.min(i * indexStep, dataCount - 1);
+      return { ...data[index], index };
+    });
+
+    // Smooth line path
+    const points = data.map((d, i) => ({ x: cx(i), y: cy(d.value), i }));
+    let pathD = `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
+
+    for (let i = 1; i < points.length; i++) {
+      const prev = points[i - 1];
+      const curr = points[i];
+      const next = points[i + 1];
+
+      let cp1x, cp1y, cp2x, cp2y;
+
+      if (i === 1) {
+        cp1x = prev.x + (curr.x - prev.x) * 0.3;
+        cp1y = prev.y;
+      } else {
+        const prev2 = points[i - 2];
+        cp1x = prev.x + (curr.x - prev2.x) * 0.15;
+        cp1y = prev.y + (curr.y - prev2.y) * 0.15;
+      }
+
+      if (i === points.length - 1) {
+        cp2x = curr.x - (curr.x - prev.x) * 0.3;
+        cp2y = curr.y;
+      } else {
+        cp2x = curr.x - (next.x - prev.x) * 0.15;
+        cp2y = curr.y - (next.y - prev.y) * 0.15;
+      }
+
+      pathD += ` C ${cp1x.toFixed(2)} ${cp1y.toFixed(2)}, ${cp2x.toFixed(2)} ${cp2y.toFixed(2)}, ${curr.x.toFixed(2)} ${curr.y.toFixed(2)}`;
+    }
+
+    const areaD = `${pathD} L ${points[points.length - 1].x.toFixed(2)} ${(H - PAD.bottom).toFixed(2)} L ${points[0].x.toFixed(2)} ${(H - PAD.bottom).toFixed(2)} Z`;
+
+    const isPositive = data[data.length - 1].value >= data[0].value;
+
+    return { minP, maxP, yTicks, pathD, areaD, cx, cy, xTicks, isPositive };
+  }, [data, W, H]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    if (!svgRef.current || data.length < 2) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const scaleX = W / rect.width;
+    const mouseX = (e.clientX - rect.left) * scaleX;
+
+    const chartWidth = W - PAD.left - PAD.right;
+    const relativeX = Math.max(0, Math.min(mouseX - PAD.left, chartWidth));
+    const indexFloat = (relativeX / chartWidth) * (data.length - 1);
+    const closest = Math.round(Math.max(0, Math.min(indexFloat, data.length - 1)));
+
+    setHoveredIndex(closest);
+  }, [data.length, W]);
+
+  const strokeColor = isPositive ? "#4EDEA3" : "#FFB4AB";
+  const fillGradientId = `dashboard-gradient-${isPositive ? "pos" : "neg"}`;
+
+  if (data.length < 2) {
+    return (
+      <div ref={containerRef} className="w-full h-full flex items-center justify-center">
+        <span className="text-gray-500 text-sm">{t("noChartData")}</span>
+      </div>
+    );
+  }
+
+  const hov = hoveredIndex != null ? data[hoveredIndex] : null;
+
+  return (
+    <div ref={containerRef} className="w-full h-full relative">
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${W} ${H}`}
+        className="w-full h-full cursor-crosshair"
+        onMouseMove={handleMouseMove}
+        onMouseLeave={() => setHoveredIndex(null)}
+        style={{ overflow: 'visible' }}
+      >
+        <defs>
+          <linearGradient id={fillGradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={strokeColor} stopOpacity={0.4} />
+            <stop offset="50%" stopColor={strokeColor} stopOpacity={0.1} />
+            <stop offset="100%" stopColor={strokeColor} stopOpacity={0} />
+          </linearGradient>
+          <filter id="dashboard-glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+            <feMerge>
+              <feMergeNode in="coloredBlur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+
+        {/* Grid lines */}
+        {yTicks.map((v, i) => (
+          <line
+            key={`grid-${i}`}
+            x1={PAD.left}
+            y1={cy(v)}
+            x2={W - PAD.right}
+            y2={cy(v)}
+            stroke="rgba(255,255,255,0.05)"
+            strokeWidth={1}
+            strokeDasharray={i === 0 || i === yTicks.length - 1 ? "0" : "4,4"}
+          />
+        ))}
+
+        {/* Y-axis labels */}
+        {yTicks.map((v, i) => (
+          <text
+            key={`y-${i}`}
+            x={PAD.left - 8}
+            y={cy(v) + 4}
+            textAnchor="end"
+            fill="#6B7280"
+            fontSize={10}
+            fontWeight={500}
+          >
+            {formatMoney(v).replace(/[฿$]\s*/, '')}
+          </text>
+        ))}
+
+        {/* X-axis labels */}
+        {xTicks.map((d, i) => (
+          <text
+            key={`x-${i}`}
+            x={cx(d.index)}
+            y={H - 8}
+            textAnchor={i === 0 ? "start" : i === xTicks.length - 1 ? "end" : "middle"}
+            fill="#6B7280"
+            fontSize={10}
+            fontWeight={500}
+          >
+            {d.date}
+          </text>
+        ))}
+
+        {/* Area fill */}
+        <path d={areaD} fill={`url(#${fillGradientId})`} />
+
+        {/* Line */}
+        <path
+          d={pathD}
+          fill="none"
+          stroke={strokeColor}
+          strokeWidth={2.5}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          filter="url(#dashboard-glow)"
+        />
+
+        {/* Hover crosshair */}
+        <AnimatePresence>
+          {hov && hoveredIndex !== null && (
+            <motion.g
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+            >
+              <line
+                x1={cx(hoveredIndex)}
+                y1={PAD.top}
+                x2={cx(hoveredIndex)}
+                y2={H - PAD.bottom}
+                stroke="rgba(173, 198, 255, 0.3)"
+                strokeWidth={1}
+                strokeDasharray="4,4"
+              />
+              <line
+                x1={PAD.left}
+                y1={cy(hov.value)}
+                x2={W - PAD.right}
+                y2={cy(hov.value)}
+                stroke="rgba(173, 198, 255, 0.2)"
+                strokeWidth={1}
+                strokeDasharray="4,4"
+              />
+              <circle
+                cx={cx(hoveredIndex)}
+                cy={cy(hov.value)}
+                r={6}
+                fill={strokeColor}
+                opacity={0.3}
+              />
+              <circle
+                cx={cx(hoveredIndex)}
+                cy={cy(hov.value)}
+                r={4}
+                fill={strokeColor}
+                stroke="#1C1B1B"
+                strokeWidth={2}
+              />
+            </motion.g>
+          )}
+        </AnimatePresence>
+      </svg>
+
+      {/* Floating tooltip */}
+      <AnimatePresence>
+        {hov && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            transition={{ duration: 0.15 }}
+            className="absolute top-2 left-1/2 -translate-x-1/2 bg-[#2A2A2A]/95 backdrop-blur-sm border border-white/10 rounded-xl px-3 py-1.5 shadow-2xl pointer-events-none z-10"
+          >
+            <div className="text-xs text-gray-400 mb-0.5">{hov.date}</div>
+            <div className="text-sm font-bold text-white">
+              {formatMoney(hov.value)}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// Helper to translate asset class labels
+const assetClassKeyMap: Record<string, string> = {
+  Equities: "equities",
+  "Fixed Income": "fixedIncome",
+  Alternatives: "alternatives",
+  Cash: "cash",
+};
+
 export default function DashboardPage() {
-  const { t, formatMoney, currency, exchangeRates, trades, addTrade, bulkAddTrades, allocations, netWorthHistory } = useApp();
+  const { t, formatMoney, currency, exchangeRates, trades, addTrade, bulkAddTrades, allocations, updateAllocation, netWorthHistory, assets, addToast, addNotification, language, cashActivities, moneyBuckets } = useApp();
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [isCSVModalOpen, setIsCSVModalOpen] = React.useState(false);
+  const [isAddAssetOpen, setIsAddAssetOpen] = React.useState(false);
+  const [isAllocEditOpen, setIsAllocEditOpen] = React.useState(false);
+  const [isAddCashflowOpen, setIsAddCashflowOpen] = React.useState(false);
+  const [editAllocValues, setEditAllocValues] = React.useState<Record<string, number>>({});
+
+  const translateLabel = (label: string) => {
+    const key = assetClassKeyMap[label];
+    return key ? t(key) : label;
+  };
   const [newTrade, setNewTrade] = React.useState<{ asset: string; amountUSD: string; type: "BUY" | "SELL" }>({ asset: "", amountUSD: "", type: "BUY" });
   const [importStatus, setImportStatus] = React.useState<{ type: 'idle' | 'success' | 'error', message: string }>({ type: 'idle', message: '' });
 
@@ -31,6 +328,82 @@ export default function DashboardPage() {
 
     setNewTrade({ asset: "", amountUSD: "", type: "BUY" });
     setIsModalOpen(false);
+  };
+
+  // Automated Rebalancing Engine Logic
+  const totalPortfolioUSD = useMemo(() => assets.reduce((acc, a) => acc + a.valueUSD, 0), [assets]);
+
+  const driftData = useMemo(() => {
+    return allocations.map(item => {
+      const categoryAssets = assets.filter(a => (a.allocation || "Other") === item.label);
+      const categoryUSD = categoryAssets.reduce((acc, a) => acc + a.valueUSD, 0);
+      const currentPct = totalPortfolioUSD > 0 ? (categoryUSD / totalPortfolioUSD) * 100 : 0;
+      const targetPct = item.value;
+      const delta = currentPct - targetPct;
+      
+      return {
+        ...item,
+        currentPct,
+        targetPct,
+        delta,
+        categoryUSD,
+        targetUSD: totalPortfolioUSD * (targetPct / 100),
+        assets: categoryAssets
+      };
+    });
+  }, [allocations, assets, totalPortfolioUSD]);
+
+  const { suggestedTrades, totalImpact } = useMemo(() => {
+    const trades: any[] = [];
+    let impact = 0;
+
+    driftData.forEach(d => {
+      // Suggest trades if drift is > 2% absolute
+      if (Math.abs(d.delta) > 2) {
+        const diffUSD = Math.abs(d.categoryUSD - d.targetUSD);
+        impact += diffUSD;
+        
+        let assetName = d.label;
+        if (d.assets.length > 0) {
+          const largestAsset = [...d.assets].sort((a,b) => b.valueUSD - a.valueUSD)[0];
+          assetName = largestAsset.symbol;
+        }
+
+        trades.push({
+           id: d.label,
+           rawType: d.delta > 0 ? "SELL" : "BUY",
+           type: d.delta > 0 ? t("sell") : t("buy"),
+           asset: assetName,
+           diffUSD: diffUSD,
+           desc: d.delta > 0 ? t("reduceOverExposure") : t("increaseAllocation"),
+           icon: d.delta > 0 ? MinusCircle : PlusCircle,
+           color: d.delta > 0 ? "#FFB4AB" : "#4EDEA3"
+        });
+      }
+    });
+    
+    return { suggestedTrades: trades, totalImpact: impact };
+  }, [driftData, t]);
+
+  const executeAllSuggestedTrades = () => {
+    if (suggestedTrades.length === 0) return;
+    
+    const newTrades = suggestedTrades.map(trade => ({
+      asset: trade.asset.toUpperCase(),
+      type: trade.rawType as "BUY" | "SELL",
+      amountUSD: trade.diffUSD,
+      date: new Date().toISOString().split("T")[0],
+      rateAtTime: exchangeRates[currency],
+      currency: currency,
+    }));
+
+    bulkAddTrades(newTrades);
+    addToast(t("importSuccess"), 'success');
+    addNotification(
+      t("executeAll"),
+      `${suggestedTrades.length} ${t("tradesExecuted")} — ${formatMoney(totalImpact)}`,
+      'trade'
+    );
   };
 
   const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -53,11 +426,11 @@ export default function DashboardPage() {
 
           if (parsedTrades.length > 0) {
             bulkAddTrades(parsedTrades);
-            setImportStatus({ type: 'success', message: t("import_success") });
+            setImportStatus({ type: 'success', message: t("importSuccess") });
             setTimeout(() => {
               setIsCSVModalOpen(false);
               setImportStatus({ type: 'idle', message: '' });
-            }, 2000);
+            }, 600);
           } else {
             setImportStatus({ type: 'error', message: "No valid trades found in CSV." });
           }
@@ -82,9 +455,9 @@ export default function DashboardPage() {
         >
           <div className="flex justify-between items-start mb-6 relative z-10">
             <div className="space-y-1">
-              <span className="text-sm font-bold text-gray-400 uppercase tracking-wide">{t("total_net_worth")}</span>
+              <span className="text-sm font-bold text-gray-400 uppercase tracking-wide">{t("totalNetWorth")}</span>
               <h1 className="text-4xl lg:text-5xl font-black tracking-tighter text-white leading-none">
-                {formatMoney(netWorthHistory[netWorthHistory.length - 1].value / exchangeRates[currency])}
+                {formatMoney(netWorthHistory[netWorthHistory.length - 1].value)}
               </h1>
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1 text-[#4EDEA3]">
@@ -99,49 +472,38 @@ export default function DashboardPage() {
             
             <div className="flex gap-3">
               <button 
+                onClick={() => setIsAddAssetOpen(true)}
+                className="px-4 py-3 bg-[#ADC6FF] text-[#00285d] rounded-2xl font-black text-xs tracking-tight flex items-center gap-2 hover:brightness-110 transition-all"
+              >
+                <Plus size={16} />
+                {t("addAsset")}
+              </button>
+              <button 
                 onClick={() => setIsCSVModalOpen(true)}
                 className="p-3 bg-white/5 border border-white/10 rounded-2xl text-gray-400 hover:text-white transition-all"
-                title={t("import_csv")}
+                title={t("importCsv")}
               >
                 <Download size={20} />
               </button>
             </div>
           </div>
 
-          {/* Recharts Area Chart */}
+          {/* Dashboard Chart */}
           <div className="h-48 mt-4 min-w-0" style={{ minHeight: 192 }}>
-            <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={192}>
-              <AreaChart data={netWorthHistory}>
-                <defs>
-                  <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ADC6FF" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#ADC6FF" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <Area 
-                  type="monotone" 
-                  dataKey="value" 
-                  stroke="#ADC6FF" 
-                  strokeWidth={4}
-                  fillOpacity={1} 
-                  fill="url(#colorValue)" 
-                  animationDuration={2000}
-                />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#1C1B1B', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px' }}
-                  itemStyle={{ color: '#ADC6FF', fontWeight: 'bold' }}
-                  labelStyle={{ color: '#6B7280', fontSize: '10px', textTransform: 'uppercase', fontWeight: 'black' }}
-                  formatter={(value: number) => [formatMoney(value / exchangeRates[currency]), 'Net Worth']}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            <DashboardChart
+              data={netWorthHistory}
+              currency={currency}
+              exchangeRates={exchangeRates}
+              formatMoney={formatMoney}
+              t={t}
+            />
           </div>
         </motion.div>
 
         {/* Top Movers / Quick Actions */}
         <div className="lg:col-span-4 flex flex-col justify-between gap-4">
           <div className="flex justify-between items-center px-2">
-            <h2 className="text-base font-bold tracking-tight text-white">{t("quick_actions")}</h2>
+            <h2 className="text-base font-bold tracking-tight text-white">{t("quickActions")}</h2>
             <span className="text-xs font-black text-[#4EDEA3] uppercase tracking-wide">FinTrack OS</span>
           </div>
           
@@ -156,8 +518,8 @@ export default function DashboardPage() {
                   <Plus size={20} />
                 </div>
                 <div className="text-left">
-                  <h4 className="font-black text-sm text-white leading-tight">{t("add_trade")}</h4>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">{t("manual_entry")}</p>
+                  <h4 className="font-black text-sm text-white leading-tight">{t("addTrade")}</h4>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide">{t("manualEntry")}</p>
                 </div>
               </div>
               <ArrowRight size={16} className="text-gray-600 group-hover:text-[#ADC6FF] transition-colors" />
@@ -173,8 +535,8 @@ export default function DashboardPage() {
                   <Download size={20} />
                 </div>
                 <div className="text-left">
-                  <h4 className="font-black text-sm text-white leading-tight">{t("import_csv")}</h4>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">{t("bulk_import")}</p>
+                  <h4 className="font-black text-sm text-white leading-tight">{t("importCsv")}</h4>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide">{t("bulkImport")}</p>
                 </div>
               </div>
               <ArrowRight size={16} className="text-gray-600 group-hover:text-[#ADC6FF] transition-colors" />
@@ -188,44 +550,29 @@ export default function DashboardPage() {
       </section>
 
       {/* Draggable Widgets Section */}
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Performance Chart Widget */}
         <div className="lg:col-span-2 bg-[#1C1B1B] rounded-3xl p-6 relative group shadow-lg border border-white/5">
           <div className="flex justify-between items-start mb-6">
             <div>
-              <span className="text-xs text-[#E9C349] uppercase tracking-wide font-black">{t("global_performance")}</span>
-              <h3 className="text-lg font-bold text-white">{t("growth_velocity")}</h3>
+              <span className="text-xs text-[#E9C349] uppercase tracking-wide font-black">{t("globalPerformance")}</span>
+              <h3 className="text-lg font-bold text-white">{t("growthVelocity")}</h3>
             </div>
             <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity">
               <Edit3 size={14} className="text-gray-400" />
             </div>
           </div>
           <div className="w-full h-48 relative mt-4 min-w-0" style={{ minHeight: 192 }}>
-            <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={192}>
-              <AreaChart data={netWorthHistory}>
-                <defs>
-                  <linearGradient id="velocityGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#4EDEA3" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#4EDEA3" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <Area 
-                  type="monotone" 
-                  dataKey="value" 
-                  stroke="#4EDEA3" 
-                  strokeWidth={3}
-                  fillOpacity={1} 
-                  fill="url(#velocityGradient)" 
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-            <div className="absolute top-10 left-[80%] bg-white/5 backdrop-blur-md px-3 py-1.5 rounded-lg text-xs border border-white/10">
-              <p className="font-bold text-white">$2.84M Peak</p>
-              <p className="text-gray-500 uppercase tracking-wide">Mar 24, 2024</p>
-            </div>
+            <DashboardChart
+              data={netWorthHistory}
+              currency={currency}
+              exchangeRates={exchangeRates}
+              formatMoney={formatMoney}
+              t={t}
+            />
           </div>
           <div className="flex justify-between mt-6 text-gray-500 text-xs font-black uppercase tracking-wide">
-            <span>JAN</span><span>FEB</span><span>MAR</span><span>APR</span><span>MAY</span><span>JUN</span>
+            <span>{t("chartMonthJan")}</span><span>{t("chartMonthFeb")}</span><span>{t("chartMonthMar")}</span><span>{t("chartMonthApr")}</span><span>{t("chartMonthMay")}</span><span>{t("chartMonthJun")}</span>
           </div>
         </div>
 
@@ -233,8 +580,8 @@ export default function DashboardPage() {
         <div className="bg-[#1C1B1B] rounded-3xl p-6 group relative overflow-hidden border border-white/5 shadow-lg">
           <div className="flex justify-between items-start mb-6">
             <div>
-              <span className="text-xs text-[#E9C349] uppercase tracking-wide font-black">{t("security_logs")}</span>
-              <h3 className="text-lg font-bold text-white">{t("vault_activity")}</h3>
+              <span className="text-xs text-[#E9C349] uppercase tracking-wide font-black">{t("securityLogs")}</span>
+              <h3 className="text-lg font-bold text-white">{t("vaultActivity")}</h3>
             </div>
             <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity">
               <Edit3 size={14} className="text-gray-400" />
@@ -244,31 +591,82 @@ export default function DashboardPage() {
             <div className="flex gap-4">
               <div className="w-1 bg-[#4EDEA3] rounded-full"></div>
               <div>
-                <p className="text-xs font-bold text-white leading-tight">Stake Reward Claimed</p>
-                <p className="text-xs text-gray-500 mt-1 uppercase tracking-wide">2m ago • ETH Vault 01</p>
+                <p className="text-xs font-bold text-white leading-tight">{t("stakeRewardClaimed")}</p>
+                <p className="text-xs text-gray-500 mt-1 uppercase tracking-wide">{t("stakeRewardTime")}</p>
                 <p className="text-xs text-[#4EDEA3] font-black mt-1">+0.42 ETH</p>
               </div>
             </div>
             <div className="flex gap-4">
               <div className="w-1 bg-[#ADC6FF] rounded-full"></div>
               <div>
-                <p className="text-xs font-bold text-white leading-tight">BTC Limit Order Fill</p>
-                <p className="text-xs text-gray-500 mt-1 uppercase tracking-wide">4h ago • Trade Desk</p>
-                <p className="text-xs text-[#ADC6FF] font-black mt-1">Executed $63,400</p>
+                <p className="text-xs font-bold text-white leading-tight">{t("btcLimitOrderFill")}</p>
+                <p className="text-xs text-gray-500 mt-1 uppercase tracking-wide">{t("btcLimitOrderTime")}</p>
+                <p className="text-xs text-[#ADC6FF] font-black mt-1">{t("executed")} $63,400</p>
               </div>
             </div>
             <div className="flex gap-4">
               <div className="w-1 bg-[#E9C349] rounded-full"></div>
               <div>
-                <p className="text-xs font-bold text-white leading-tight">Tier Bonus</p>
-                <p className="text-xs text-gray-500 mt-1 uppercase tracking-wide">Yesterday • Rewards</p>
+                <p className="text-xs font-bold text-white leading-tight">{t("tierBonus")}</p>
+                <p className="text-xs text-gray-500 mt-1 uppercase tracking-wide">{t("tierBonusTime")}</p>
                 <p className="text-xs text-[#E9C349] font-black mt-1">2,500 SVN Points</p>
               </div>
             </div>
           </div>
           <button className="w-full mt-8 py-2.5 rounded-xl border border-white/10 text-xs font-black uppercase tracking-wide text-gray-400 hover:bg-white/5 transition-all">
-            {t("view_full_audit")}
+            {t("viewFullAudit")}
           </button>
+        </div>
+
+        {/* Cashflow Widget */}
+        <div className="bg-[#1C1B1B] rounded-3xl p-6 relative overflow-hidden border border-white/5 shadow-lg group flex flex-col justify-between">
+          <div>
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <span className="text-xs text-[#ADC6FF] uppercase tracking-wide font-black">{t("cashflowOverview")}</span>
+                <h3 className="text-lg font-bold text-white">{t("netCashflow")}</h3>
+              </div>
+              <button onClick={() => setIsAddCashflowOpen(true)} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors">
+                <PlusCircle size={14} className="text-[#ADC6FF]" />
+              </button>
+            </div>
+            
+            {(() => {
+              const currentMonth = new Date().getMonth();
+              const currentYear = new Date().getFullYear();
+              const thisMonthActivities = cashActivities.filter(a => {
+                const date = new Date(a.date);
+                return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+              });
+              const totalIncome = thisMonthActivities.filter(a => a.type === "INCOME").reduce((sum, a) => sum + a.amountUSD, 0);
+              const totalExpenses = thisMonthActivities.filter(a => a.type === "EXPENSE").reduce((sum, a) => sum + a.amountUSD, 0);
+              const net = totalIncome - totalExpenses;
+
+              return (
+                <div className="space-y-4">
+                  <h2 className={cn("text-3xl font-black tracking-tighter mb-4", net >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
+                    {net >= 0 ? "+" : "-"}{formatMoney(Math.abs(net))}
+                  </h2>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center bg-white/5 p-3 rounded-2xl">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-[#4EDEA3]" />
+                        <span className="text-xs text-gray-400 font-bold">{t("income")}</span>
+                      </div>
+                      <span className="text-sm text-white font-black">{formatMoney(totalIncome)}</span>
+                    </div>
+                    <div className="flex justify-between items-center bg-white/5 p-3 rounded-2xl">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-[#FFB4AB]" />
+                        <span className="text-xs text-gray-400 font-bold">{t("expense")}</span>
+                      </div>
+                      <span className="text-sm text-white font-black">{formatMoney(totalExpenses)}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
         </div>
       </section>
 
@@ -278,19 +676,24 @@ export default function DashboardPage() {
         <section className="md:col-span-4 space-y-6">
           <div className="bg-[#1C1B1B] p-6 rounded-3xl border border-white/5 shadow-xl">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-base font-bold text-white">{t("target_allocation")}</h3>
-              <Edit3 size={16} className="text-gray-500 cursor-pointer hover:text-white transition-colors" />
+              <h3 className="text-base font-bold text-white">{t("targetAllocation")}</h3>
+              <Edit3 size={16} className="text-gray-500 cursor-pointer hover:text-white transition-colors" onClick={() => {
+                const vals: Record<string, number> = {};
+                allocations.forEach(a => { vals[a.label] = a.value; });
+                setEditAllocValues(vals);
+                setIsAllocEditOpen(true);
+              }} />
             </div>
             
             <div className="space-y-4">
               {allocations.map(item => (
-                <AllocationItem key={item.label} label={item.label} value={item.value} color={item.color} />
+                <AllocationItem key={item.label} label={translateLabel(item.label)} value={item.value} color={item.color} />
               ))}
             </div>
 
             <div className="mt-8 p-4 bg-white/5 rounded-2xl border border-white/5">
               <p className="text-sm text-gray-400 leading-relaxed font-medium">
-                {t("optimal_rebalancing_msg")}
+                {t("optimalRebalancingMsg")}
               </p>
             </div>
           </div>
@@ -307,7 +710,7 @@ export default function DashboardPage() {
                 <span className="text-xs font-black uppercase text-[#E9C349] tracking-wide">{t("insights")}</span>
               </div>
               <h4 className="text-white font-bold leading-tight">
-                {t("market_volatility_msg")}
+                {t("marketVolatilityMsg")}
               </h4>
             </div>
           </div>
@@ -317,24 +720,31 @@ export default function DashboardPage() {
         <section className="md:col-span-8 space-y-6">
           <div className="bg-[#1C1B1B] rounded-3xl border border-white/5 overflow-hidden shadow-xl">
             <div className="p-6 pb-2">
-              <h3 className="text-base font-bold text-white">{t("current_vs_target")}</h3>
+              <h3 className="text-base font-bold text-white">{t("currentVsTarget")}</h3>
             </div>
             
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
                   <tr className="text-xs font-black uppercase tracking-wide text-gray-500 border-b border-white/5">
-                    <th className="px-6 py-3">{t("asset_class")}</th>
+                    <th className="px-6 py-3">{t("assetClass")}</th>
                     <th className="px-6 py-3">{t("current")}</th>
                     <th className="px-6 py-3">{t("target")}</th>
                     <th className="px-6 py-3 text-right">{t("delta")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  <DriftRow label="US Large Cap" current="64.2%" target="60.0%" delta="+4.2%" type="negative" color="#ADC6FF" />
-                  <DriftRow label="Global Bonds" current="22.1%" target="25.0%" delta="-2.9%" type="positive" color="#E9C349" />
-                  <DriftRow label="Crypto / Alts" current="11.5%" target="10.0%" delta="+1.5%" type="negative" color="#4EDEA3" />
-                  <DriftRow label="Liquid Cash" current="2.2%" target="5.0%" delta="-2.8%" type="positive" color="#6B7280" />
+                  {driftData.map(item => (
+                      <DriftRow 
+                        key={item.label}
+                        label={translateLabel(item.label)} 
+                        current={`${item.currentPct.toFixed(1)}%`} 
+                        target={`${Number(item.targetPct).toFixed(1)}%`} 
+                        delta={`${item.delta >= 0 ? '+' : ''}${item.delta.toFixed(1)}%`} 
+                        type={Math.abs(item.delta) > 2 ? "negative" : "positive"} 
+                        color={item.color} 
+                      />
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -342,46 +752,75 @@ export default function DashboardPage() {
 
           {/* Suggested Trades */}
           <div>
-            <h3 className="text-xs font-black uppercase tracking-wide text-gray-500 mb-6">{t("suggested_trades")}</h3>
+            <h3 className="text-xs font-black uppercase tracking-wide text-gray-500 mb-6">{t("suggestedTrades")}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <TradeCard 
-                type={t("sell")} 
-                asset="VTI (US Total Market)" 
-                desc={`${t("reduce_over_exposure")} ${formatMoney(14200)}`} 
-                icon={TrendingDown} 
-                color="#FFB4AB" 
-              />
-              <TradeCard 
-                type={t("buy")} 
-                asset="BND (Total Bond ETF)" 
-                desc={`${t("increase_allocation")} ${formatMoney(9400)}`} 
-                icon={TrendingUp} 
-                color="#4EDEA3" 
-              />
-              <TradeCard 
-                type={t("sell")} 
-                asset="BTC (Bitcoin)" 
-                desc={`${t("harvesting_gains")} ${formatMoney(4800)}`} 
-                icon={TrendingDown} 
-                color="#FFB4AB" 
-              />
-              
-              <div className="bg-[#ADC6FF]/5 p-6 rounded-3xl border border-[#ADC6FF]/20 flex flex-col justify-center">
-                <div className="flex justify-between items-center mb-4">
-                  <span className="text-xs font-black text-[#ADC6FF] uppercase tracking-wide">{t("total_impact")}</span>
-                  <span className="text-xl font-black text-white">{formatMoney(28400)}</span>
+              {suggestedTrades.length > 0 ? (
+                <>
+                  {suggestedTrades.map(trade => (
+                    <TradeCard 
+                      key={trade.id}
+                      type={trade.type} 
+                      asset={trade.asset} 
+                      desc={`${trade.desc} ${formatMoney(trade.diffUSD)}`} 
+                      icon={trade.icon} 
+                      color={trade.color} 
+                    />
+                  ))}
+                  
+                  <div className="bg-[#ADC6FF]/5 p-6 rounded-3xl border border-[#ADC6FF]/20 flex flex-col justify-center">
+                    <div className="flex justify-between items-center mb-4">
+                      <span className="text-xs font-black text-[#ADC6FF] uppercase tracking-wide">{t("totalImpact")}</span>
+                      <span className="text-xl font-black text-white">{formatMoney(totalImpact)}</span>
+                    </div>
+                    <button 
+                      onClick={executeAllSuggestedTrades}
+                      className="w-full py-3 bg-[#ADC6FF] text-[#00285d] rounded-full font-black text-xs uppercase tracking-wide hover:brightness-110 transition-all active:scale-95"
+                    >
+                      {t("executeAll")}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="col-span-1 sm:col-span-2 py-10 bg-[#1C1B1B] rounded-3xl border border-white/5 flex flex-col items-center justify-center text-center">
+                  <CheckCircle2 size={32} className="text-[#4EDEA3] mb-3 opacity-60" />
+                  <span className="text-sm font-bold text-gray-400">
+                    {t("portfolioBalanced")}
+                  </span>
                 </div>
-                <button 
-                  onClick={() => console.log("Executing all suggested trades...")}
-                  className="w-full py-3 bg-[#ADC6FF] text-[#00285d] rounded-full font-black text-xs uppercase tracking-wide hover:brightness-110 transition-all active:scale-95"
-                >
-                  {t("execute_all")}
-                </button>
-              </div>
+              )}
             </div>
           </div>
         </section>
       </div>
+
+      {/* Money Buckets Quick Link */}
+      <section>
+        <a href="/budget" className="block">
+          <motion.div 
+            whileHover={{ x: 5 }}
+            className="bg-[#1C1B1B] rounded-3xl border border-white/5 p-6 flex items-center justify-between group hover:bg-white/[0.03] transition-all cursor-pointer"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-[#E9C349]/10 flex items-center justify-center text-[#E9C349]">
+                <PiggyBank size={24} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">{t("budgetPage")}</h3>
+                <p className="text-xs text-gray-500 font-medium mt-0.5">{t("moneyBucketsDesc")}</p>
+                <div className="flex items-center gap-3 mt-2">
+                  {moneyBuckets.slice(0, 4).map(b => (
+                    <div key={b.id} className="flex items-center gap-1">
+                      <span className="text-sm">{b.icon}</span>
+                      <span className="text-[10px] font-bold text-gray-400">{formatMoney(b.currentAmount)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <ArrowRight size={18} className="text-gray-600 group-hover:text-[#E9C349] transition-colors" />
+          </motion.div>
+        </a>
+      </section>
 
       {/* Transaction History Section */}
       <section className="space-y-4">
@@ -392,11 +831,20 @@ export default function DashboardPage() {
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {trades.map((trade) => {
-            const currentRate = exchangeRates[currency];
-            const historicalValue = trade.amountUSD * trade.rateAtTime;
-            const currentValue = trade.amountUSD * currentRate;
-            const profitLoss = currentValue - historicalValue;
-            const isProfit = profitLoss >= 0;
+            // Find matching asset for live price data
+            const matchedAsset = assets.find(a => a.symbol.toUpperCase() === trade.asset.toUpperCase());
+            const totalShares = matchedAsset?.shares || 0;
+            const totalAvgCost = matchedAsset?.avgCost || 0;
+            const livePrice = (matchedAsset && totalShares > 0) ? matchedAsset.valueUSD / totalShares : 0;
+            
+            // Calculate per-trade performance
+            const tradePrice = trade.pricePerUnit || (totalAvgCost > 0 ? totalAvgCost : 0);
+            const tradeShares = trade.shares || (tradePrice > 0 ? trade.amountUSD / tradePrice : 0);
+            const holdingValueUSD = tradeShares * livePrice;
+            const profitUSD = holdingValueUSD - trade.amountUSD;
+            const profitPercent = trade.amountUSD > 0 && holdingValueUSD > 0 ? (profitUSD / trade.amountUSD) * 100 : 0;
+            const isProfit = profitUSD >= 0;
+            const hasData = livePrice > 0 && (tradePrice > 0 || totalAvgCost > 0);
 
             return (
               <motion.div 
@@ -404,38 +852,120 @@ export default function DashboardPage() {
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 key={trade.id} 
-                className="bg-[#1C1B1B] p-6 rounded-3xl border border-white/5 shadow-lg"
+                className="bg-[#1C1B1B] p-6 rounded-3xl border border-white/5 shadow-lg flex flex-col justify-between"
               >
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <span className="text-xs font-black text-gray-500 uppercase tracking-wide">{trade.date}</span>
-                    <h4 className="text-lg font-black text-white mt-1">{trade.asset} {trade.type === "BUY" ? t("buy") : t("sell")}</h4>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs font-black text-gray-500 uppercase tracking-wide">{t("initial_investment")}</span>
-                    <div className="text-xs font-bold text-white">{formatMoney(trade.amountUSD, trade.currency as any, trade.rateAtTime)}</div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/5">
-                  <div>
-                    <span className="text-xs font-black text-gray-500 uppercase tracking-wide">{t("current_value")}</span>
-                    <div className="text-base font-black text-white">{formatMoney(trade.amountUSD)}</div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs font-black text-gray-500 uppercase tracking-wide">{t("profit_loss")}</span>
+                <div>
+                  {/* Header */}
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <span className="text-xs font-black text-gray-500 uppercase tracking-wide">{trade.date}</span>
+                      <h4 className="text-lg font-black text-white mt-1">{trade.asset}</h4>
+                    </div>
                     <div className={cn(
-                      "text-base font-black",
-                      isProfit ? "text-[#4EDEA3]" : "text-[#FFB4AB]"
+                      "px-3 py-1 rounded-full text-xs font-black uppercase tracking-wide",
+                      trade.type === "BUY" ? "bg-[#4EDEA3]/10 text-[#4EDEA3]" : "bg-[#FFB4AB]/10 text-[#FFB4AB]"
                     )}>
-                      {isProfit ? "+" : ""}{formatMoney(profitLoss / currentRate)}
+                      {trade.type === "BUY" ? t("buy") : t("sell")}
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-white/5 space-y-2.5">
+                    {/* เงินลงทุน */}
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-bold text-gray-500">{t("investedAmount")}</span>
+                      <span className="text-sm font-black text-white">{formatMoney(trade.amountUSD)}</span>
+                    </div>
+                    
+                    {/* ราคาเทรด */}
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-bold text-gray-500">
+                        {t("tradePrice")}
+                      </span>
+                      <span className="text-sm font-bold text-gray-300">
+                        {hasData ? `${formatMoney(tradePrice, "USD", 1)}/${trade.asset}` : "—"}
+                      </span>
+                    </div>
+                    
+                    {/* จำนวนที่ได้จากเทรดนี้ */}
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-bold text-gray-500">
+                        {t("sharesFromTrade")}
+                      </span>
+                      <span className="text-sm font-bold text-gray-300">
+                        {hasData ? `${tradeShares.toFixed(6)} ${trade.asset}` : "—"}
+                      </span>
+                    </div>
+
+                    {/* จำนวนทั้งหมดและต้นทุนเฉลี่ยในพอร์ต */}
+                    {(totalShares > 0 || totalAvgCost > 0) && (
+                      <div className="mt-2 p-3 bg-white/5 rounded-xl border border-white/10 space-y-1">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase">
+                            {t("currentPortfolioShares")}
+                          </span>
+                          <span className="text-[10px] font-black text-[#ADC6FF]">{totalShares.toFixed(6)}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase">
+                            {t("overallAvgCost")}
+                          </span>
+                          <span className="text-[10px] font-black text-[#ADC6FF]">{formatMoney(totalAvgCost, "USD", 1)} /{trade.asset}</span>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* เส้นแบ่ง */}
+                    <div className="border-t border-white/5 pt-2.5 space-y-2.5 mt-2">
+                      {/* ราคาตอนนี้ */}
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-bold text-gray-500">{t("currentPrice")}</span>
+                        <span className="text-sm font-bold text-gray-300">
+                          {livePrice > 0 ? `${formatMoney(livePrice, "USD", 1)}/${trade.asset}` : "—"}
+                        </span>
+                      </div>
+                    
+                      {/* มูลค่าของเทรดนี้ */}
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-bold text-gray-500">
+                          {t("currentValueThisTrade")}
+                        </span>
+                        <span className="text-sm font-black text-white">
+                          {hasData ? formatMoney(holdingValueUSD) : "—"}
+                        </span>
+                      </div>
+                      
+                      {/* กำไร/ขาดทุน ของเทรดนี้ */}
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-bold text-gray-500">{t("profitLoss")}</span>
+                        {hasData ? (
+                          <div className="text-right">
+                            <span className={cn(
+                              "text-sm font-black",
+                              isProfit ? "text-[#4EDEA3]" : "text-[#FFB4AB]"
+                            )}>
+                              {isProfit ? "+" : ""}{formatMoney(profitUSD)}
+                            </span>
+                            <span className={cn(
+                              "text-[10px] font-bold ml-1.5",
+                              isProfit ? "text-[#4EDEA3]/60" : "text-[#FFB4AB]/60"
+                            )}>
+                              ({isProfit ? "+" : ""}{profitPercent.toFixed(1)}%)
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-500">—</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
                 
-                <div className="mt-3 text-xs text-gray-500 font-medium">
-                  {t("rate_at_trade")}: 1 USD = {trade.rateAtTime} {trade.currency} | {t("current_rate")}: 1 USD = {currentRate} {currency}
-                </div>
+                {/* ข้อความเตือนถ้ายังไม่มีข้อมูล live */}
+                {!hasData && (
+                  <div className="text-[10px] text-[#ADC6FF]/60 font-medium pt-3 text-center mt-auto">
+                    {t("noLiveData")}
+                  </div>
+                )}
               </motion.div>
             );
           })}
@@ -443,10 +973,10 @@ export default function DashboardPage() {
       </section>
 
       {/* Add Trade Modal */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={t("add_trade")}>
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={t("addTrade")}>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
-            <label className="text-xs font-black text-gray-500 uppercase tracking-wide">{t("asset_name")}</label>
+            <label className="text-xs font-black text-gray-500 uppercase tracking-wide">{t("assetName")}</label>
             <input 
               autoFocus
               type="text" 
@@ -457,7 +987,7 @@ export default function DashboardPage() {
             />
           </div>
           <div className="space-y-2">
-            <label className="text-xs font-black text-gray-500 uppercase tracking-wide">{t("amount_usd")}</label>
+            <label className="text-xs font-black text-gray-500 uppercase tracking-wide">{t("amountUsd")}</label>
             <input 
               type="number" 
               placeholder="0.00"
@@ -507,16 +1037,16 @@ export default function DashboardPage() {
       </Modal>
 
       {/* CSV Import Modal */}
-      <Modal isOpen={isCSVModalOpen} onClose={() => setIsCSVModalOpen(false)} title={t("import_csv")}>
+      <Modal isOpen={isCSVModalOpen} onClose={() => setIsCSVModalOpen(false)} title={t("importCsv")}>
         <div className="space-y-8 py-4">
           <div className="text-center space-y-4">
             <div className="w-20 h-20 bg-[#ADC6FF]/10 rounded-3xl flex items-center justify-center mx-auto text-[#ADC6FF]">
               <FileText size={40} />
             </div>
             <div className="space-y-2">
-              <h3 className="text-xl font-black text-white">{t("import_csv")}</h3>
+              <h3 className="text-xl font-black text-white">{t("importCsv")}</h3>
               <p className="text-sm text-gray-500 max-w-xs mx-auto">
-                {t("upload_csv_desc")}
+                {t("uploadCsvDesc")}
               </p>
             </div>
           </div>
@@ -533,13 +1063,13 @@ export default function DashboardPage() {
                 <Download size={24} />
               </div>
               <p className="text-xs font-black uppercase tracking-wide text-gray-500 group-hover:text-white transition-colors">
-                {t("select_file")}
+                {t("selectFile")}
               </p>
             </div>
           </div>
 
           <div className="bg-[#1C1B1B] p-6 rounded-2xl border border-white/5">
-            <h4 className="text-xs font-black text-gray-500 uppercase tracking-wide mb-4">{t("csv_format_example")}</h4>
+            <h4 className="text-xs font-black text-gray-500 uppercase tracking-wide mb-4">{t("csvFormatExample")}</h4>
             <code className="text-xs text-[#ADC6FF] block font-mono bg-black/30 p-4 rounded-xl">
               asset,type,amountUSD,date,rateAtTime,currency<br/>
               BTC,BUY,5000,2024-01-15,34.5,THB<br/>
@@ -570,6 +1100,115 @@ export default function DashboardPage() {
           >
             {t("cancel")}
           </button>
+        </div>
+      </Modal>
+
+      {/* Add Asset Modal (shared component) */}
+      <AddAssetModal isOpen={isAddAssetOpen} onClose={() => setIsAddAssetOpen(false)} />
+
+      {/* Add Cashflow Modal */}
+      <AddCashflowModal isOpen={isAddCashflowOpen} onClose={() => setIsAddCashflowOpen(false)} />
+
+
+
+      {/* Allocation Editor Modal */}
+      <Modal isOpen={isAllocEditOpen} onClose={() => setIsAllocEditOpen(false)} title={t("editAllocation")}>
+        <div className="space-y-5">
+          <p className="text-xs text-gray-400 font-medium">{t("editAllocationDesc")}</p>
+          
+          {allocations.map(item => {
+            const val = editAllocValues[item.label] ?? item.value;
+            return (
+              <div key={item.label} className="space-y-2">
+                <div className="flex justify-between items-center text-xs font-black uppercase tracking-wide text-gray-400">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                    <span>{translateLabel(item.label)}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={val}
+                      onChange={(e) => {
+                        const v = Math.max(0, Math.min(100, Number(e.target.value) || 0));
+                        setEditAllocValues(prev => ({ ...prev, [item.label]: v }));
+                      }}
+                      className="w-14 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-right text-white text-sm font-black outline-none focus:border-[#ADC6FF]/50 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                    <span className="text-white text-sm font-black">%</span>
+                  </div>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={val}
+                  onChange={(e) => setEditAllocValues(prev => ({ ...prev, [item.label]: Number(e.target.value) }))}
+                  className="w-full h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer"
+                  style={{
+                    accentColor: item.color,
+                    background: `linear-gradient(to right, ${item.color} 0%, ${item.color} ${val}%, rgba(255,255,255,0.1) ${val}%, rgba(255,255,255,0.1) 100%)`
+                  }}
+                />
+              </div>
+            );
+          })}
+
+          {(() => {
+            const total = Object.values(editAllocValues).reduce((s, v) => s + v, 0);
+            const isValid = total === 100;
+            return (
+              <>
+                <div className={cn(
+                  "flex justify-between items-center p-4 rounded-2xl border",
+                  isValid ? "bg-[#4EDEA3]/5 border-[#4EDEA3]/20" : "bg-[#FFB4AB]/5 border-[#FFB4AB]/20"
+                )}>
+                  <span className="text-xs font-black uppercase tracking-wide text-gray-400">{t("total")}</span>
+                  <span className={cn("text-lg font-black", isValid ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
+                    {total}%
+                  </span>
+                </div>
+                {!isValid && (
+                  <p className="text-xs text-[#FFB4AB] font-bold text-center">
+                    {t("totalMustBe100")} ({t("remaining")}: {100 - total > 0 ? "+" : ""}{100 - total}%)
+                  </p>
+                )}
+                <div className="flex gap-4 pt-2">
+                  <button
+                    onClick={() => setIsAllocEditOpen(false)}
+                    className="flex-1 py-4 text-gray-500 font-bold text-sm hover:text-white transition-colors"
+                  >
+                    {t("cancel")}
+                  </button>
+                  <button
+                    disabled={!isValid}
+                    onClick={() => {
+                      Object.entries(editAllocValues).forEach(([label, value]) => {
+                        updateAllocation(label, value);
+                      });
+                      setIsAllocEditOpen(false);
+                      addToast(t("allocationSaved"), 'success');
+                      addNotification(
+                        t("targetAllocation"),
+                        allocations.map(a => `${translateLabel(a.label)}: ${editAllocValues[a.label]}%`).join(', '),
+                        'rebalance'
+                      );
+                    }}
+                    className={cn(
+                      "flex-1 py-4 rounded-full font-black text-sm uppercase tracking-tight transition-all",
+                      isValid
+                        ? "bg-[#ADC6FF] text-[#00285d] hover:brightness-110 active:scale-95"
+                        : "bg-white/5 text-gray-600 cursor-not-allowed"
+                    )}
+                  >
+                    {t("confirm")}
+                  </button>
+                </div>
+              </>
+            );
+          })()}
         </div>
       </Modal>
     </div>

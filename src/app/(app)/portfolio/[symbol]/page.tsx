@@ -43,6 +43,8 @@ interface PeriodMeta {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
+const VALID_PERIODS: TimePeriod[] = ["1d", "5d", "1m", "6m", "ytd", "1y", "5y"];
+
 const PERIOD_CONFIG: Record<TimePeriod, PeriodMeta> = {
   "1d":  {
     label: "1D",
@@ -182,9 +184,10 @@ interface ChartProps {
   onHover: (index: number | null) => void;
   language: "en" | "th";
   symbol: string;
+  t: (key: string) => string;
 }
 
-function SVGChart({ data, isPositive, period, hoveredIndex, onHover, language, symbol }: ChartProps) {
+function SVGChart({ data, isPositive, period, hoveredIndex, onHover, language, symbol, t }: ChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 400 });
@@ -222,11 +225,9 @@ function SVGChart({ data, isPositive, period, hoveredIndex, onHover, language, s
     const maxT = Math.max(...times);
     const rangeT = maxT - minT || 1;
 
-    // Use index-based positioning for continuous line (no time gaps)
     const dataCount = data.length;
     const cx = (index: number) => PAD.left + (index / (dataCount - 1)) * (W - PAD.left - PAD.right);
     const cxTime = (time: number) => {
-      // Find closest index for this time
       let closestIdx = 0;
       let minDiff = Infinity;
       data.forEach((d, idx) => {
@@ -240,11 +241,9 @@ function SVGChart({ data, isPositive, period, hoveredIndex, onHover, language, s
     };
     const cy = (p: number) => PAD.top + (1 - (p - adjustedMinP) / rangeP) * (H - PAD.top - PAD.bottom);
 
-    // Y-axis ticks
     const yTickCount = 5;
     const yTicks = Array.from({ length: yTickCount }, (_, i) => adjustedMinP + (i / (yTickCount - 1)) * rangeP);
 
-    // X-axis ticks - evenly spaced based on data index, show labels for actual times
     const getTickCount = () => {
       switch (period) {
         case "1d": return 6;
@@ -265,7 +264,6 @@ function SVGChart({ data, isPositive, period, hoveredIndex, onHover, language, s
       return { ...data[index], index };
     });
 
-    // Smooth line path using cubic bezier - continuous (no gaps)
     const points = data.map((d, i) => ({ x: cx(i), y: cy(d.price), i }));
     let pathD = `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
 
@@ -296,7 +294,6 @@ function SVGChart({ data, isPositive, period, hoveredIndex, onHover, language, s
       pathD += ` C ${cp1x.toFixed(2)} ${cp1y.toFixed(2)}, ${cp2x.toFixed(2)} ${cp2y.toFixed(2)}, ${curr.x.toFixed(2)} ${curr.y.toFixed(2)}`;
     }
 
-    // Area path - continuous
     const areaD = `${pathD} L ${points[points.length - 1].x.toFixed(2)} ${(H - PAD.bottom).toFixed(2)} L ${points[0].x.toFixed(2)} ${(H - PAD.bottom).toFixed(2)} Z`;
 
     return { prices, times, minP, maxP, rangeP, minT, maxT, rangeT, yTicks, xTicks, pathD, areaD, cx, cy };
@@ -308,7 +305,6 @@ function SVGChart({ data, isPositive, period, hoveredIndex, onHover, language, s
     const scaleX = W / rect.width;
     const mouseX = (e.clientX - rect.left) * scaleX;
 
-    // Convert mouseX to index (0 to data.length-1)
     const chartWidth = W - PAD.left - PAD.right;
     const relativeX = Math.max(0, Math.min(mouseX - PAD.left, chartWidth));
     const indexFloat = (relativeX / chartWidth) * (data.length - 1);
@@ -323,7 +319,7 @@ function SVGChart({ data, isPositive, period, hoveredIndex, onHover, language, s
   if (data.length < 2) {
     return (
       <div ref={containerRef} className="w-full h-full flex items-center justify-center">
-        <span className="text-gray-500 text-sm">{language === "th" ? "ไม่มีข้อมูล" : "No data"}</span>
+        <span className="text-gray-500 text-sm">{t("noChartData")}</span>
       </div>
     );
   }
@@ -341,21 +337,18 @@ function SVGChart({ data, isPositive, period, hoveredIndex, onHover, language, s
         style={{ overflow: 'visible' }}
       >
         <defs>
-          {/* Gradient for positive trend */}
           <linearGradient id={`gradient-${symbol}-pos`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#4EDEA3" stopOpacity={0.4} />
             <stop offset="50%" stopColor="#4EDEA3" stopOpacity={0.1} />
             <stop offset="100%" stopColor="#4EDEA3" stopOpacity={0} />
           </linearGradient>
 
-          {/* Gradient for negative trend */}
           <linearGradient id={`gradient-${symbol}-neg`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#FFB4AB" stopOpacity={0.4} />
             <stop offset="50%" stopColor="#FFB4AB" stopOpacity={0.1} />
             <stop offset="100%" stopColor="#FFB4AB" stopOpacity={0} />
           </linearGradient>
 
-          {/* Glow filter */}
           <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
             <feMerge>
@@ -365,7 +358,6 @@ function SVGChart({ data, isPositive, period, hoveredIndex, onHover, language, s
           </filter>
         </defs>
 
-        {/* Grid lines */}
         {yTicks.map((v, i) => (
           <line
             key={`grid-${i}`}
@@ -379,7 +371,6 @@ function SVGChart({ data, isPositive, period, hoveredIndex, onHover, language, s
           />
         ))}
 
-        {/* Y-axis labels */}
         {yTicks.map((v, i) => (
           <text
             key={`y-${i}`}
@@ -394,7 +385,6 @@ function SVGChart({ data, isPositive, period, hoveredIndex, onHover, language, s
           </text>
         ))}
 
-        {/* X-axis labels */}
         {xTicks.map((d, i) => (
           <text
             key={`x-${i}`}
@@ -405,14 +395,14 @@ function SVGChart({ data, isPositive, period, hoveredIndex, onHover, language, s
             fontSize={11}
             fontWeight={500}
           >
-            {language === "th" ? formatThaiDate(d.time, period) : formatEnglishDate(d.time, period)}
+            {period === "1d" || period === "5d"
+              ? (language === "th" ? formatThaiDate(d.time, period) : formatEnglishDate(d.time, period))
+              : new Date(d.time).toLocaleDateString(language === "th" ? "th-TH" : "en-US", { month: 'short' })}
           </text>
         ))}
 
-        {/* Area fill */}
         <path d={areaD} fill={`url(${fillGradientId})`} />
 
-        {/* Line */}
         <path
           d={pathD}
           fill="none"
@@ -423,7 +413,6 @@ function SVGChart({ data, isPositive, period, hoveredIndex, onHover, language, s
           filter="url(#glow)"
         />
 
-        {/* Hover crosshair and tooltip */}
         <AnimatePresence>
           {hov && hoveredIndex !== null && (
             <motion.g
@@ -432,7 +421,6 @@ function SVGChart({ data, isPositive, period, hoveredIndex, onHover, language, s
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
             >
-              {/* Vertical crosshair - use index-based positioning for continuous line */}
               <line
                 x1={cx(hoveredIndex)}
                 y1={PAD.top}
@@ -443,7 +431,6 @@ function SVGChart({ data, isPositive, period, hoveredIndex, onHover, language, s
                 strokeDasharray="4,4"
               />
 
-              {/* Horizontal crosshair */}
               <line
                 x1={PAD.left}
                 y1={cy(hov.price)}
@@ -454,7 +441,6 @@ function SVGChart({ data, isPositive, period, hoveredIndex, onHover, language, s
                 strokeDasharray="4,4"
               />
 
-              {/* Glow point */}
               <circle
                 cx={cx(hoveredIndex)}
                 cy={cy(hov.price)}
@@ -463,7 +449,6 @@ function SVGChart({ data, isPositive, period, hoveredIndex, onHover, language, s
                 opacity={0.3}
               />
 
-              {/* Center point */}
               <circle
                 cx={cx(hoveredIndex)}
                 cy={cy(hov.price)}
@@ -473,7 +458,6 @@ function SVGChart({ data, isPositive, period, hoveredIndex, onHover, language, s
                 strokeWidth={2}
               />
 
-              {/* Price label on the right */}
               <g>
                 <rect
                   x={W - PAD.right + 5}
@@ -500,7 +484,6 @@ function SVGChart({ data, isPositive, period, hoveredIndex, onHover, language, s
         </AnimatePresence>
       </svg>
 
-      {/* Floating tooltip */}
       <AnimatePresence>
         {hov && (
           <motion.div
@@ -531,7 +514,7 @@ function SVGChart({ data, isPositive, period, hoveredIndex, onHover, language, s
                 {hov.price >= data[0].price ? "+" : ""}
                 {((hov.price - data[0].price) / data[0].price * 100).toFixed(2)}%
                 <span className="text-gray-500 ml-1">
-                  {language === "th" ? "จากจุดเริ่มต้น" : "from start"}
+                  {t("fromStart")}
                 </span>
               </div>
             )}
@@ -557,7 +540,6 @@ async function fetchChartData(symbol: string, period: TimePeriod): Promise<Price
     return json.chartData.filter((dp: PricePoint) => dp.price > 0);
   }
 
-  // Fallback to direct Yahoo Finance if API returns different format
   const result = json?.chart?.result?.[0];
   if (!result) throw new Error("No data");
 
@@ -574,15 +556,15 @@ async function fetchChartData(symbol: string, period: TimePeriod): Promise<Price
 
 // ─── Timeline Generator ────────────────────────────────────────────────────────
 
-function generateTimelineItems(asset: any, t: (key: string) => string, formatMoney: (amount: number, currency?: string) => string): TimelineItem[] {
+function generateTimelineItems(asset: any, t: (key: string) => string, formatMoney: (amount: number, currency?: any) => string): TimelineItem[] {
   const items: TimelineItem[] = [];
 
   if (asset.avgCost) {
     items.push({
       id: 'initial',
       date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-      label: t("initial_purchase"),
-      description: t("bought_shares").replace("{shares}", (asset.shares || 0).toFixed(4)).replace("{price}", formatMoney(asset.avgCost)),
+      label: t("initialPurchase"),
+      description: t("boughtShares").replace("{shares}", (asset.shares || 0).toFixed(4)).replace("{price}", formatMoney(asset.avgCost)),
       value: asset.valueUSD,
       change: 0,
       status: 'completed',
@@ -597,8 +579,8 @@ function generateTimelineItems(asset: any, t: (key: string) => string, formatMon
     items.push({
       id: 'milestone1',
       date: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
-      label: t("milestone_10"),
-      description: t("first_milestone"),
+      label: t("milestone10"),
+      description: t("firstMilestone"),
       value: asset.valueUSD * 0.9,
       change: 10,
       status: 'completed',
@@ -610,8 +592,8 @@ function generateTimelineItems(asset: any, t: (key: string) => string, formatMon
     items.push({
       id: 'milestone2',
       date: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-      label: t("milestone_25"),
-      description: t("strong_performance"),
+      label: t("milestone25"),
+      description: t("strongPerformance"),
       value: asset.valueUSD * 0.8,
       change: 25,
       status: 'completed',
@@ -622,8 +604,8 @@ function generateTimelineItems(asset: any, t: (key: string) => string, formatMon
   items.push({
     id: 'current',
     date: new Date().toISOString(),
-    label: t("current_position"),
-    description: t("holding_shares").replace("{shares}", (asset.shares || 0).toFixed(4)).replace("{value}", formatMoney(asset.valueUSD)),
+    label: t("currentPosition"),
+    description: t("holdingShares").replace("{shares}", (asset.shares || 0).toFixed(4)).replace("{value}", formatMoney(asset.valueUSD)),
     value: asset.valueUSD,
     change: profitPercent,
     status: 'current',
@@ -634,8 +616,8 @@ function generateTimelineItems(asset: any, t: (key: string) => string, formatMon
   items.push({
     id: 'target',
     date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
-    label: t("target_50"),
-    description: t("target_price").replace("{price}", formatMoney(targetPrice)),
+    label: t("target50"),
+    description: t("targetPrice").replace("{price}", formatMoney(targetPrice)),
     value: asset.shares ? asset.shares * targetPrice : asset.valueUSD * 1.5,
     change: 50,
     status: 'target',
@@ -651,13 +633,15 @@ export default function AssetDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { assets, t, formatMoney, language } = useApp();
+  const { assets, t, formatMoney, language, currency } = useApp();
 
   const symbol = params.symbol as string;
   const assetIndex = assets.findIndex(a => a.symbol.toUpperCase() === symbol.toUpperCase());
   const asset = assets[assetIndex];
 
-  const initialPeriod = (searchParams.get("period") as TimePeriod) || "1m";
+  // ── Guard against invalid period in URL ──
+  const rawPeriod = searchParams.get("period") as TimePeriod;
+  const initialPeriod: TimePeriod = VALID_PERIODS.includes(rawPeriod) ? rawPeriod : "1m";
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>(initialPeriod);
 
   // Chart data state
@@ -716,14 +700,15 @@ export default function AssetDetailPage() {
     }
   };
 
+  // ── No "1w" — only valid periods ──
   const periods: { key: TimePeriod; label: string; labelTh: string }[] = [
-    { key: "1d", label: "1D", labelTh: "1วัน" },
-    { key: "5d", label: "5D", labelTh: "5วัน" },
-    { key: "1m", label: "1M", labelTh: "1ด." },
-    { key: "6m", label: "6M", labelTh: "6ด." },
-    { key: "ytd", label: "YTD", labelTh: "YTD" },
-    { key: "1y", label: "1Y", labelTh: "1ปี" },
-    { key: "5y", label: "5Y", labelTh: "5ปี" },
+    { key: "1d",  label: "1D",  labelTh: "1วัน" },
+    { key: "5d",  label: "5D",  labelTh: "5วัน" },
+    { key: "1m",  label: "1M",  labelTh: "1ด."  },
+    { key: "6m",  label: "6M",  labelTh: "6ด."  },
+    { key: "ytd", label: "YTD", labelTh: "YTD"  },
+    { key: "1y",  label: "1Y",  labelTh: "1ปี"  },
+    { key: "5y",  label: "5Y",  labelTh: "5ปี"  },
   ];
 
   // Derived values
@@ -747,6 +732,8 @@ export default function AssetDetailPage() {
   const profit = asset ? asset.valueUSD - totalCost : 0;
   const profitPercent = totalCost > 0 ? (profit / totalCost) * 100 : 0;
   const isProfit = profit >= 0;
+
+  const isThaiAsset = asset?.symbol.toUpperCase().endsWith('.BK') || asset?.symbol.toUpperCase().endsWith('.TH');
 
   // Period stats (based on selected chart period)
   const periodStats = useMemo(() => {
@@ -772,22 +759,20 @@ export default function AssetDetailPage() {
   }, [asset, t, formatMoney]);
 
   const dateLabel = displayPoint
-    ? language === "th"
-      ? `ราคา ณ: ${formatFullThaiDate(displayPoint.time, selectedPeriod)}`
-      : `Price as of: ${formatFullEnglishDate(displayPoint.time, selectedPeriod)}`
+    ? `${t("priceAsOf")}: ${language === "th" ? formatFullThaiDate(displayPoint.time, selectedPeriod) : formatFullEnglishDate(displayPoint.time, selectedPeriod)}`
     : "";
 
   if (!asset) {
     return (
       <div className="p-6 lg:p-8 max-w-7xl mx-auto">
         <div className="text-center py-20">
-          <h1 className="text-2xl font-bold text-white mb-4">Asset not found</h1>
+          <h1 className="text-2xl font-bold text-white mb-4">{t("assetNotFound")}</h1>
           <Link
             href="/portfolio"
             className="inline-flex items-center gap-2 px-6 py-3 bg-[#ADC6FF] text-[#00285d] rounded-full font-black text-sm hover:brightness-110 transition-all"
           >
             <ArrowLeft size={16} />
-            Back to Portfolio
+            {t("backToPortfolio")}
           </Link>
         </div>
       </div>
@@ -857,7 +842,10 @@ export default function AssetDetailPage() {
               className="flex items-center gap-3"
             >
               <span className="text-4xl font-black text-white">
-                {formatMoney(currentPrice)}
+                {isThaiAsset 
+                  ? formatMoney(currentPrice, "THB", THB_RATE) 
+                  : formatMoney(currentPrice, "USD", 1)
+                }
               </span>
               <span className={cn(
                 "flex items-center gap-1 text-sm font-black px-3 py-1.5 rounded-full",
@@ -868,9 +856,16 @@ export default function AssetDetailPage() {
               </span>
             </motion.div>
           </AnimatePresence>
-          <span className="text-xs text-gray-500 mt-1">
-            {language === "th" ? `≈ ${thbPrice.toLocaleString("th-TH", { maximumFractionDigits: 2 })} บาท` : "USD"}
-          </span>
+          {!isThaiAsset && currency === "THB" && (
+            <span className="text-sm text-gray-500 mt-1 font-medium">
+              {t("approx")} {formatMoney(currentPrice, "THB", THB_RATE)}
+            </span>
+          )}
+          {isThaiAsset && currency === "USD" && (
+            <span className="text-sm text-gray-500 mt-1 font-medium">
+              {t("approx")} {formatMoney(currentPrice, "USD", 1 / THB_RATE)}
+            </span>
+          )}
           {dateLabel && (
             <span className="text-xs text-gray-500 mt-0.5">{dateLabel}</span>
           )}
@@ -884,28 +879,47 @@ export default function AssetDetailPage() {
           {/* Stats Grid - Overall */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <StatCard
-              label={t("live_price")}
-              value={formatMoney(livePrice)}
+              label={t("livePrice")}
+              value={isThaiAsset ? formatMoney(livePrice, "THB", THB_RATE) : formatMoney(livePrice, "USD", 1)}
+              subValue={(!isThaiAsset && currency === "THB") ? `${t("approx")} ${formatMoney(livePrice, "THB", THB_RATE)}` : (isThaiAsset && currency === "USD") ? `${t("approx")} ${formatMoney(livePrice, "USD", 1 / THB_RATE)}` : undefined}
               change={asset.change}
               icon={TrendingUp}
               isActive={hoveredIndex === null}
             />
             <StatCard
-              label={t("avg_cost")}
-              value={formatMoney(avgCost)}
+              label={t("avgCost")}
+              value={isThaiAsset ? formatMoney(avgCost, "THB", THB_RATE) : formatMoney(avgCost, "USD", 1)}
               icon={DollarSign}
-              subValue={`${shares.toLocaleString('en-US', { maximumFractionDigits: 4 })} units`}
+              subValue={
+                <div className="flex items-center gap-1">
+                  {(!isThaiAsset && currency === "THB") && <span>≈ {formatMoney(avgCost, "THB", THB_RATE)} &bull;</span>}
+                  {(isThaiAsset && currency === "USD") && <span>≈ {formatMoney(avgCost, "USD", 1 / THB_RATE)} &bull;</span>}
+                  <span>{shares.toLocaleString('en-US', { maximumFractionDigits: 4 })} units</span>
+                </div>
+              }
             />
             <StatCard
               label={t("holdings")}
-              value={formatMoney(asset.valueUSD)}
+              value={isThaiAsset ? formatMoney(asset.valueUSD, "THB", THB_RATE) : formatMoney(asset.valueUSD, "USD", 1)}
               icon={BarChart3}
-              subValue={language === "th" ? `สัดส่วน ${asset.allocation}` : `${asset.allocation} allocation`}
+              subValue={
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-gray-500">{t("allocation")} {asset.allocation}</span>
+                  {(!isThaiAsset && currency === "THB") && <span className="opacity-70">≈ {formatMoney(asset.valueUSD, "THB", THB_RATE)}</span>}
+                  {(isThaiAsset && currency === "USD") && <span className="opacity-70">≈ {formatMoney(asset.valueUSD, "USD", 1 / THB_RATE)}</span>}
+                </div>
+              }
             />
             <StatCard
-              label={t("total_return")}
-              value={`${isProfit ? "+" : ""}${formatMoney(profit)}`}
-              subValue={`${isProfit ? "+" : ""}${profitPercent.toFixed(2)}%`}
+              label={t("totalReturn")}
+              value={<>{isProfit ? "+" : ""}{isThaiAsset ? formatMoney(profit, "THB", THB_RATE) : formatMoney(profit, "USD", 1)}</>}
+              subValue={
+                <div className="flex flex-col gap-0.5">
+                  <span className={cn("font-bold", isProfit ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>{isProfit ? "+" : ""}{profitPercent.toFixed(2)}%</span>
+                  {(!isThaiAsset && currency === "THB") && <span className="opacity-70 font-medium">≈ {isProfit ? "+" : ""}{formatMoney(profit, "THB", THB_RATE)}</span>}
+                  {(isThaiAsset && currency === "USD") && <span className="opacity-70 font-medium">≈ {isProfit ? "+" : ""}{formatMoney(profit, "USD", 1 / THB_RATE)}</span>}
+                </div>
+              }
               isPositive={isProfit}
               icon={isProfit ? ArrowUpRight : ArrowDownRight}
             />
@@ -922,25 +936,33 @@ export default function AssetDetailPage() {
                 <div className="flex items-center gap-2 mb-1">
                   <ArrowUpRight size={14} className="text-[#4EDEA3]" />
                   <span className="text-xs text-gray-500">
-                    {language === "th" ? "สูงสุดในงวด" : "Period High"}
+                    {t("periodHigh")}
                   </span>
                 </div>
-                <div className="text-lg font-bold text-white">{formatMoney(periodStats.high)}</div>
+                <div className="text-lg font-bold text-white">
+                  {isThaiAsset ? formatMoney(periodStats.high, "THB", THB_RATE) : formatMoney(periodStats.high, "USD", 1)}
+                </div>
+                {(!isThaiAsset && currency === "THB") && <div className="text-[10px] text-gray-500 mt-1 font-medium">≈ {formatMoney(periodStats.high, "THB", THB_RATE)}</div>}
+                {(isThaiAsset && currency === "USD") && <div className="text-[10px] text-gray-500 mt-1 font-medium">≈ {formatMoney(periodStats.high, "USD", 1 / THB_RATE)}</div>}
               </div>
               <div className="bg-[#1C1B1B]/50 border border-white/5 rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-1">
                   <ArrowDownRight size={14} className="text-[#FFB4AB]" />
                   <span className="text-xs text-gray-500">
-                    {language === "th" ? "ต่ำสุดในงวด" : "Period Low"}
+                    {t("periodLow")}
                   </span>
                 </div>
-                <div className="text-lg font-bold text-white">{formatMoney(periodStats.low)}</div>
+                <div className="text-lg font-bold text-white">
+                  {isThaiAsset ? formatMoney(periodStats.low, "THB", THB_RATE) : formatMoney(periodStats.low, "USD", 1)}
+                </div>
+                {(!isThaiAsset && currency === "THB") && <div className="text-[10px] text-gray-500 mt-1 font-medium">≈ {formatMoney(periodStats.low, "THB", THB_RATE)}</div>}
+                {(isThaiAsset && currency === "USD") && <div className="text-[10px] text-gray-500 mt-1 font-medium">≈ {formatMoney(periodStats.low, "USD", 1 / THB_RATE)}</div>}
               </div>
               <div className="bg-[#1C1B1B]/50 border border-white/5 rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-1">
                   <Activity size={14} className="text-[#ADC6FF]" />
                   <span className="text-xs text-gray-500">
-                    {language === "th" ? "ผลตอบแทนงวด" : "Period Return"}
+                    {t("periodReturn")}
                   </span>
                 </div>
                 <div className={cn(
@@ -959,25 +981,27 @@ export default function AssetDetailPage() {
             animate={{ opacity: 1, y: 0 }}
             className="bg-[#1C1B1B] rounded-[1.5rem] border border-white/5 p-6"
           >
-            <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
+            {/* Performance Header */}
+            <div className="flex flex-wrap justify-between items-start gap-4 mb-6">
               <div className="flex items-center gap-3">
-                <Activity className="text-[#ADC6FF]" size={20} />
-                <h2 className="text-lg font-bold text-white">{t("performance_title")}</h2>
+                <p className="text-sm font-bold text-white">{t("performanceTitle")}</p>
               </div>
-              <div className="flex gap-1 bg-white/5 rounded-xl p-1">
+
+              {/* Period Buttons */}
+              <div className="flex gap-1 bg-white/5 rounded-lg p-1">
                 {periods.map((period) => (
                   <Link
                     key={period.key}
                     href={`/portfolio/${asset.symbol}?period=${period.key}`}
                     onClick={() => setSelectedPeriod(period.key)}
                     className={cn(
-                      "px-3 py-1.5 text-xs font-black uppercase tracking-wide rounded-lg transition-all",
+                      "px-2 py-1 text-[10px] font-black uppercase tracking-wide rounded-md transition-all",
                       selectedPeriod === period.key
-                        ? "bg-[#ADC6FF] text-[#00285d] shadow-lg shadow-[#ADC6FF]/20"
-                        : "text-gray-400 hover:text-white hover:bg-white/5"
+                        ? "bg-[#ADC6FF] text-[#00285d]"
+                        : "text-gray-400 hover:text-white"
                     )}
                   >
-                    {language === "th" ? period.labelTh : period.label}
+                    {t(`period${period.key.toLowerCase()}`)}
                   </Link>
                 ))}
               </div>
@@ -994,7 +1018,7 @@ export default function AssetDetailPage() {
               </span>
               {dataToShow.length > 0 && (
                 <span className="text-gray-600">
-                  • {dataToShow.length} {language === "th" ? "จุดข้อมูล" : "data points"}
+                  • {dataToShow.length} {t("dataPoints")}
                 </span>
               )}
             </div>
@@ -1011,7 +1035,7 @@ export default function AssetDetailPage() {
                   >
                     <Loader2 className="w-8 h-8 text-[#ADC6FF] animate-spin" />
                     <span className="text-gray-500 text-sm">
-                      {language === "th" ? "กำลังโหลดข้อมูล..." : "Loading chart data..."}
+                      {t("loadingChartData")}
                     </span>
                   </motion.div>
                 ) : error ? (
@@ -1026,7 +1050,7 @@ export default function AssetDetailPage() {
                       <Activity size={32} />
                     </div>
                     <p className="text-gray-400 text-sm mb-1">
-                      {language === "th" ? "โหลดข้อมูลไม่สำเร็จ" : "Failed to load data"}
+                      {t("failedToLoadData")}
                     </p>
                     <p className="text-gray-600 text-xs">{error}</p>
                   </motion.div>
@@ -1046,6 +1070,7 @@ export default function AssetDetailPage() {
                       onHover={setHoveredIndex}
                       language={language}
                       symbol={asset.symbol}
+                      t={t}
                     />
                   </motion.div>
                 ) : (
@@ -1057,7 +1082,7 @@ export default function AssetDetailPage() {
                     className="w-full h-full flex flex-col items-center justify-center text-gray-500"
                   >
                     <BarChart3 size={40} className="mb-2 opacity-30" />
-                    <p className="text-lg font-medium">{t("no_historical_data")}</p>
+                    <p className="text-lg font-medium">{t("noHistoricalData")}</p>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -1068,15 +1093,15 @@ export default function AssetDetailPage() {
               <div className="flex items-center gap-4 text-xs text-gray-500">
                 <div className="flex items-center gap-1.5">
                   <div className="w-2 h-2 rounded-full bg-[#4EDEA3]" />
-                  <span>{language === "th" ? "แนวโน้มขึ้น" : "Uptrend"}</span>
+                  <span>{t("uptrend")}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <div className="w-2 h-2 rounded-full bg-[#FFB4AB]" />
-                  <span>{language === "th" ? "แนวโน้มลง" : "Downtrend"}</span>
+                  <span>{t("downtrend")}</span>
                 </div>
               </div>
               <div className="text-xs text-gray-600">
-                {language === "th" ? "เลื่อนเมาส์เพื่อดูราคา" : "Hover to see price"}
+                {t("hoverToSeePrice")}
               </div>
             </div>
           </motion.div>
@@ -1091,17 +1116,16 @@ export default function AssetDetailPage() {
           <div className="p-6 border-b border-white/5">
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
               <Target className="text-[#ADC6FF]" size={20} />
-              {t("investment_journey")}
+              {t("investmentJourney")}
             </h2>
             <p className="text-xs text-gray-500 mt-1">
-              {assets.length} {language === "th" ? "สินทรัพย์ในพอร์ต" : "assets in portfolio"}
+              {assets.length} {t("assetsInPortfolio")}
             </p>
           </div>
           <div className="flex-1 overflow-y-auto p-6">
             <VerticalTimeline
               items={timelineItems}
-              currency={asset.currency || "USD"}
-              formatMoney={formatMoney}
+              formatMoney={(amount, currency) => formatMoney(amount, currency as any)}
             />
           </div>
         </motion.div>
@@ -1140,8 +1164,8 @@ const AssetLogo = ({ symbol, name, className }: { symbol: string; name: string; 
 
 interface StatCardProps {
   label: string;
-  value: string;
-  subValue?: string;
+  value: React.ReactNode;
+  subValue?: React.ReactNode;
   change?: number;
   isPositive?: boolean;
   isActive?: boolean;

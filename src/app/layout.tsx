@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Playfair_Display, Prompt } from "next/font/google";
 import "../index.css";
 import { AppProvider } from "@/src/context/AppContext";
+import { ErrorBoundary } from "@/src/components/ErrorBoundary";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-serif" });

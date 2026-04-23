@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Bell, Globe, ChevronDown, Search, Menu, X, LayoutDashboard } from "lucide-react";
-import { useApp, Language, Currency } from "@/src/context/AppContext";
+import { useApp, Language, Currency, AppNotification } from "@/src/context/AppContext";
 import { cn } from "@/src/lib/utils";
 import { Sidebar } from "./Sidebar";
 import { AnimatePresence, motion } from "motion/react";
@@ -11,14 +11,49 @@ import Link from "next/link";
 import { logoutAction } from "@/src/app/actions";
 import { LogOut, Settings, User } from "lucide-react";
 
+function formatTimeAgo(time: Date, t: (key: string) => string): string {
+  const now = new Date();
+  const diffMs = now.getTime() - time.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHr = Math.floor(diffMs / 3600000);
+  if (diffMin < 1) return t("justNow");
+  if (diffMin < 60) return t("minutesAgo").replace("{n}", String(diffMin));
+  return t("hoursAgo").replace("{n}", String(diffHr));
+}
+
 export function TopBar() {
-  const { language, setLanguage, currency, setCurrency, formatMoney, t, exchangeRates, userProfile } = useApp();
+  const { language, setLanguage, currency, setCurrency, t, userProfile, notifications, markNotificationRead, clearNotifications } = useApp();
   const pathname = usePathname();
   const [showLangMenu, setShowLangMenu] = React.useState(false);
   const [showMobileMenu, setShowMobileMenu] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [showProfileMenu, setShowProfileMenu] = React.useState(false);
   const [showNotifMenu, setShowNotifMenu] = React.useState(false);
+
+  const langMenuRef = React.useRef<HTMLDivElement>(null);
+  const notifMenuRef = React.useRef<HTMLDivElement>(null);
+  const profileMenuRef = React.useRef<HTMLDivElement>(null);
+
+  // Close all popups when clicking outside
+  React.useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as Node;
+      if (showLangMenu && langMenuRef.current && !langMenuRef.current.contains(target)) {
+        setShowLangMenu(false);
+      }
+      if (showNotifMenu && notifMenuRef.current && !notifMenuRef.current.contains(target)) {
+        setShowNotifMenu(false);
+      }
+      if (showProfileMenu && profileMenuRef.current && !profileMenuRef.current.contains(target)) {
+        setShowProfileMenu(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showLangMenu, showNotifMenu, showProfileMenu]);
+
+  const isDashboard = pathname === "/dashboard" || pathname === "/";
 
   const pageTitle = React.useMemo(() => {
     const path = pathname.split("/").pop() || "dashboard";
@@ -59,7 +94,7 @@ export function TopBar() {
             <Search size={14} className="text-gray-500" />
             <input 
               type="text" 
-              placeholder={t("search_placeholder")}
+              placeholder={t("searchPlaceholder")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="bg-transparent border-none outline-none text-sm text-white placeholder:text-gray-600 w-32 lg:w-48"
@@ -68,8 +103,8 @@ export function TopBar() {
 
           {/* Language Selector */}
           <div className="flex items-center gap-2">
-            <div className="relative">
-              <button 
+            <div className="relative" ref={langMenuRef}>
+              <button
                 onClick={() => setShowLangMenu(!showLangMenu)}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-all"
               >
@@ -82,7 +117,7 @@ export function TopBar() {
 
               <AnimatePresence>
                 {showLangMenu && (
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
@@ -117,8 +152,8 @@ export function TopBar() {
                   onClick={() => setCurrency(curr)}
                   className={cn(
                     "px-3 py-1 rounded-full text-xs font-black uppercase tracking-wide transition-all",
-                    currency === curr 
-                      ? "bg-[#ADC6FF] text-[#00285d]" 
+                    currency === curr
+                      ? "bg-[#ADC6FF] text-[#00285d]"
                       : "text-gray-500 hover:text-white"
                   )}
                 >
@@ -126,88 +161,152 @@ export function TopBar() {
                 </button>
               ))}
             </div>
+
+            {/* Go to Dashboard Button */}
+            {!isDashboard && (
+              <Link
+                href="/dashboard"
+                className="flex items-center gap-2 px-4 py-2 bg-[#4EDEA3] text-[#0E0E0E] rounded-full text-xs font-bold uppercase tracking-wide hover:brightness-110 transition-all"
+              >
+                <LayoutDashboard size={14} />
+                {t("goToDashboard") || "Dashboard"}
+              </Link>
+            )}
           </div>
 
           <div className="flex items-center gap-4 relative">
-            <button 
-              onClick={() => { setShowNotifMenu(!showNotifMenu); setShowProfileMenu(false); setShowLangMenu(false); }}
-              className="text-gray-400 hover:text-white transition-colors relative"
-            >
-              <Bell size={20} />
-              <span className="absolute top-0 right-0 w-2 h-2 bg-[#FFB4AB] rounded-full border-2 border-[#1C1B1B]"></span>
-            </button>
-            
-            <AnimatePresence>
-              {showNotifMenu && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  className="absolute top-full right-12 mt-4 w-72 bg-[#1C1B1B] border border-white/10 rounded-2xl shadow-2xl overflow-hidden py-2 z-[60]"
-                >
-                  <div className="px-4 py-2 border-b border-white/5 text-sm font-bold text-white uppercase tracking-wide">
-                    {t("notifications")}
-                  </div>
-                  <div className="p-4 text-center text-xs text-gray-500 font-medium">
-                    You have no new notifications.
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <div 
-              onClick={() => { setShowProfileMenu(!showProfileMenu); setShowNotifMenu(false); setShowLangMenu(false); }}
-              className="w-8 h-8 rounded-full border border-[#ADC6FF]/20 overflow-hidden bg-white/5 flex items-center justify-center relative group cursor-pointer"
-            >
-              {userProfile ? (
-                 <img 
-                 src={userProfile.avatarUrl} 
-                 alt={userProfile.email} 
-                 className="w-full h-full object-cover"
-                 referrerPolicy="no-referrer"
-                 onError={(e) => {
-                   e.currentTarget.style.display = 'none';
-                   if (e.currentTarget.nextElementSibling) {
-                     (e.currentTarget.nextElementSibling as HTMLElement).style.display = 'flex';
-                   }
-                 }}
-               />
-              ) : null}
-              <div className="absolute inset-0 items-center justify-center text-xs font-black text-[#ADC6FF] hidden">
-                 {userProfile?.initials || "US"}
-              </div>
+            <div ref={notifMenuRef} className="flex items-center">
+              <button
+                onClick={() => { setShowNotifMenu(!showNotifMenu); setShowProfileMenu(false); setShowLangMenu(false); }}
+                className="text-gray-400 hover:text-white transition-colors relative flex items-center h-full"
+              >
+                <Bell size={20} />
+                {notifications.filter(n => !n.read).length > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-[#FFB4AB] rounded-full border-2 border-[#1C1B1B] flex items-center justify-center">
+                    <span className="text-[8px] font-black text-[#1C1B1B]">{notifications.filter(n => !n.read).length}</span>
+                  </span>
+                )}
+              </button>
+              
+              <AnimatePresence>
+                {showNotifMenu && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className="absolute top-full right-12 mt-4 w-80 bg-[#1C1B1B] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-[60]"
+                  >
+                    <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
+                      <span className="text-sm font-bold text-white uppercase tracking-wide">{t("notifications")}</span>
+                      {notifications.length > 0 && (
+                        <div className="flex gap-2">
+                          <button onClick={() => { notifications.forEach(n => markNotificationRead(n.id)); }} className="text-[10px] font-bold text-[#ADC6FF] hover:text-white transition-colors">
+                            {t("markAllRead")}
+                          </button>
+                          <span className="text-gray-600">·</span>
+                          <button onClick={clearNotifications} className="text-[10px] font-bold text-[#FFB4AB] hover:text-white transition-colors">
+                            {t("clearAll")}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    {notifications.length === 0 ? (
+                      <div className="p-6 text-center text-xs text-gray-500 font-medium">
+                        {t("noNewNotifications")}
+                      </div>
+                    ) : (
+                      <div className="max-h-72 overflow-y-auto">
+                        {notifications.map((notif) => {
+                          const typeColors: Record<string, string> = {
+                            rebalance: "#ADC6FF",
+                            price: "#E9C349",
+                            trade: "#4EDEA3",
+                            system: "#FFB4AB"
+                          };
+                          const color = typeColors[notif.type] || "#ADC6FF";
+                          return (
+                            <div
+                              key={notif.id}
+                              onClick={() => markNotificationRead(notif.id)}
+                              className={cn(
+                                "px-4 py-3 border-b border-white/5 cursor-pointer transition-all hover:bg-white/5",
+                                !notif.read && "bg-white/[0.02]"
+                              )}
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ backgroundColor: color }} />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-bold text-white truncate">{notif.title}</p>
+                                  <p className="text-[10px] text-gray-400 mt-0.5 line-clamp-2">{notif.message}</p>
+                                  <p className="text-[9px] text-gray-600 mt-1 font-medium">{formatTimeAgo(notif.time, t)}</p>
+                                </div>
+                                {!notif.read && <div className="w-1.5 h-1.5 rounded-full bg-[#ADC6FF] mt-2 flex-shrink-0" />}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
-            <AnimatePresence>
-              {showProfileMenu && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  className="absolute top-full right-0 mt-4 w-56 bg-[#1C1B1B] border border-white/10 rounded-2xl shadow-2xl overflow-hidden py-1 z-[60]"
-                >
-                  <div className="px-4 py-3 border-b border-white/5 mb-1">
-                    <p className="text-sm font-bold text-white truncate">{userProfile?.email || "User"}</p>
-                    <p className="text-xs text-[#4EDEA3] mt-0.5 font-medium">{t("premium_tier") || "Premium Plan"}</p>
-                  </div>
-                  
-                  <button className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
-                    <User size={14} /> My Profile
-                  </button>
-                  <button className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
-                    <Settings size={14} /> {t("settings")}
-                  </button>
-                  
-                  <div className="border-t border-white/5 mt-1 pt-1">
-                    <form action={logoutAction}>
-                      <button type="submit" className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-[#FFB4AB] hover:bg-white/5 transition-colors">
-                        <LogOut size={14} /> {t("logout")}
-                      </button>
-                    </form>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <div ref={profileMenuRef}>
+              <div
+                onClick={() => { setShowProfileMenu(!showProfileMenu); setShowNotifMenu(false); setShowLangMenu(false); }}
+                className="w-8 h-8 rounded-full border border-[#ADC6FF]/20 overflow-hidden bg-white/5 flex items-center justify-center relative group cursor-pointer"
+              >
+                {userProfile ? (
+                   <img 
+                   src={userProfile.avatarUrl} 
+                   alt={userProfile.email} 
+                   className="w-full h-full object-cover"
+                   referrerPolicy="no-referrer"
+                   onError={(e) => {
+                     e.currentTarget.style.display = 'none';
+                     if (e.currentTarget.nextElementSibling) {
+                       (e.currentTarget.nextElementSibling as HTMLElement).style.display = 'flex';
+                     }
+                   }}
+                 />
+                ) : null}
+                <div className="absolute inset-0 items-center justify-center text-xs font-black text-[#ADC6FF] hidden">
+                   {userProfile?.initials || "US"}
+                </div>
+              </div>
+
+              <AnimatePresence>
+                {showProfileMenu && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className="absolute top-full right-0 mt-4 w-56 bg-[#1C1B1B] border border-white/10 rounded-2xl shadow-2xl overflow-hidden py-1 z-[60]"
+                  >
+                    <div className="px-4 py-3 border-b border-white/5 mb-1">
+                      <p className="text-sm font-bold text-white truncate">{userProfile?.email || "User"}</p>
+                      <p className="text-xs text-[#4EDEA3] mt-0.5 font-medium">{t("premiumTier") || "Premium Plan"}</p>
+                    </div>
+                    
+                    <button className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
+                      <User size={14} /> {t("myProfile")}
+                    </button>
+                    <button className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
+                      <Settings size={14} /> {t("settings")}
+                    </button>
+                    
+                    <div className="border-t border-white/5 mt-1 pt-1">
+                      <form action={logoutAction}>
+                        <button type="submit" className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-[#FFB4AB] hover:bg-white/5 transition-colors">
+                          <LogOut size={14} /> {t("logout")}
+                        </button>
+                      </form>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </div>
       </header>

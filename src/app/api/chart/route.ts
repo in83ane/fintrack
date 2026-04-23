@@ -34,10 +34,6 @@ export async function GET(request: Request) {
           finalRange = '5d';
           finalInterval = '15m';
           break;
-        case '1w':
-          finalRange = '7d';
-          finalInterval = '1h';
-          break;
         case '1m':
           finalRange = '1mo';
           finalInterval = '1d';
