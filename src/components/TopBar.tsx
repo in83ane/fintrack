@@ -284,11 +284,23 @@ export function TopBar() {
                     </button>
                     
                     <div className="border-t border-white/5 mt-1 pt-1">
-                      <form action={logoutAction}>
-                        <button type="submit" className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-[#FFB4AB] hover:bg-white/5 transition-colors">
-                          <LogOut size={14} /> {t("logout")}
-                        </button>
-                      </form>
+                      <button 
+                        onClick={async () => {
+                          const keysToRemove = [
+                            "fintrack-assets", "fintrack-trades", "fintrack-allocations",
+                            "fintrack-buckets", "fintrack-bucket-activities", "fintrack-cash-activities"
+                          ];
+                          keysToRemove.forEach(key => localStorage.removeItem(key));
+                          
+                          const { supabase } = await import('@/src/lib/supabase');
+                          await supabase.auth.signOut();
+                          await logoutAction();
+                          window.location.href = "/login";
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-[#FFB4AB] hover:bg-white/5 transition-colors"
+                      >
+                        <LogOut size={14} /> {t("logout")}
+                      </button>
                     </div>
                   </motion.div>
                 )}
