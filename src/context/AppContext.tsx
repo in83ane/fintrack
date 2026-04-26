@@ -1498,6 +1498,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             id: b.id,
             name: b.name,
             targetPercent: b.target_percent,
+            targetAmount: b.target_amount,
             currentAmount: b.current_amount,
             color: b.color,
             icon: b.icon,
@@ -2121,6 +2122,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         user_id: user.id,
         name: bucket.name,
         target_percent: bucket.targetPercent,
+        target_amount: bucket.targetAmount || 0,
         current_amount: bucket.currentAmount,
         color: bucket.color,
         icon: bucket.icon,
@@ -2148,6 +2150,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (updates.name !== undefined) supabaseUpdates.name = updates.name;
       if (updates.currentAmount !== undefined) supabaseUpdates.current_amount = updates.currentAmount;
       if (updates.targetPercent !== undefined) supabaseUpdates.target_percent = updates.targetPercent;
+      if (updates.targetAmount !== undefined) supabaseUpdates.target_amount = updates.targetAmount;
       if (updates.color !== undefined) supabaseUpdates.color = updates.color;
       if (updates.icon !== undefined) supabaseUpdates.icon = updates.icon;
       if (updates.linkedToExpenses !== undefined) supabaseUpdates.linked_to_expenses = updates.linkedToExpenses;

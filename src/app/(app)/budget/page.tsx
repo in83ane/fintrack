@@ -271,6 +271,7 @@ export default function BudgetPage() {
       updateMoneyBucket(editingBucket, {
         name: bucketForm.name,
         targetPercent: safePercent,
+        targetAmount: toUSD(Number(bucketForm.targetAmount) || 0),
         color: bucketForm.color,
         icon: bucketForm.icon,
         linkedToExpenses: bucketForm.linkedToExpenses,
@@ -279,6 +280,7 @@ export default function BudgetPage() {
       addMoneyBucket({
         name: bucketForm.name,
         targetPercent: safePercent,
+        targetAmount: toUSD(Number(bucketForm.targetAmount) || 0),
         currentAmount: toUSD(Number(bucketForm.currentAmount) || 0),
         color: bucketForm.color,
         icon: bucketForm.icon,
@@ -433,13 +435,9 @@ export default function BudgetPage() {
           className="flex gap-4 sm:gap-6 overflow-x-auto py-3 px-1 pb-5 scrollbar-none snap-x snap-mandatory"
         >
           {moneyBuckets.map((bucket) => {
-            // Target amount = what this bucket SHOULD have based on its % of total deposited
-            const targetAmount = totalAllocated > 0 
-              ? (bucket.targetPercent / 100) * totalAllocated
-              : 0;
-            const actualPct = targetAmount > 0 
-              ? Math.min((bucket.currentAmount / targetAmount) * 100, 999)
-              : 0;
+            const actualPct = (bucket.targetAmount && bucket.targetAmount > 0) 
+              ? (bucket.currentAmount / bucket.targetAmount) * 100 
+              : (totalAllocated > 0 ? (bucket.currentAmount / totalAllocated) * 100 : 0);
             return (
               <motion.div
                 key={bucket.id}
@@ -465,7 +463,7 @@ export default function BudgetPage() {
                     </div>
                     <div>
                       <h3 className="font-bold text-white tracking-tight text-sm sm:text-base">{t(bucket.name) || bucket.name}</h3>
-                      <p className="text-[0.55rem] sm:text-[0.6rem] text-[#8c909f] uppercase tracking-widest">{bucket.targetPercent}% {t("target")}</p>
+                      <p className="text-[0.55rem] sm:text-[0.6rem] text-[#8c909f] uppercase tracking-widest">{bucket.targetPercent}% {t("incomeSplit") || "Income Split"}</p>
                     </div>
                   </div>
                   <div className="flex gap-0.5 sm:gap-1 opacity-0 group-hover:opacity-100 transition-opacity relative z-10">
@@ -497,13 +495,13 @@ export default function BudgetPage() {
                     <span className="text-3xl sm:text-4xl font-black tracking-[-0.04em] text-white">
                       {formatMoney(bucket.currentAmount).replace(/[^0-9,.]/g, "")}
                     </span>
-                    {targetAmount > 0 ? (
+                    {bucket.targetAmount && bucket.targetAmount > 0 ? (
                       <span className="text-sm sm:text-base font-bold text-[#8c909f]/60 ml-1 tracking-tight">
-                        / {formatMoney(targetAmount).replace(/[^0-9,.]/g, "")}
+                        / {formatMoney(bucket.targetAmount).replace(/[^0-9,.]/g, "")}
                       </span>
                     ) : null}
                   </div>
-                  {(targetAmount > 0 && bucket.currentAmount > targetAmount) ? (
+                  {(bucket.targetAmount && bucket.targetAmount > 0 && bucket.currentAmount > bucket.targetAmount) ? (
                     <div 
                       className="mt-3 text-[10px] sm:text-xs text-[#E9C349] font-bold bg-[#E9C349]/10 border border-[#E9C349]/20 px-2.5 py-1.5 rounded-lg inline-flex items-center gap-1 cursor-pointer hover:bg-[#E9C349]/20 transition-colors max-w-fit"
                       onClick={(e) => {
@@ -518,22 +516,10 @@ export default function BudgetPage() {
                 <div className="space-y-1.5 sm:space-y-2 relative z-10">
                   <div className="flex justify-between items-end text-[0.6rem] sm:text-[0.6875rem] uppercase tracking-widest font-bold">
                     <span className="text-[#8c909f]">{t("progress")}</span>
-                    <span className="font-mono text-[10px] text-[#8c909f]/70">
-                      {formatMoney(bucket.currentAmount)}
-                      {targetAmount > 0 ? ` / ${formatMoney(targetAmount)}` : ""}
-                    </span>
-                    <span style={{ color: actualPct >= 100 ? '#E9C349' : '#4EDEA3' }}>{actualPct.toFixed(1)}%</span>
+                    <span className="text-[#4EDEA3]">{actualPct.toFixed(1)}%</span>
                   </div>
                   <div className="h-1.5 sm:h-2 w-full bg-[#0e0e0e] rounded-full overflow-hidden">
-                    <div 
-                      className="h-full rounded-full transition-all duration-500" 
-                      style={{ 
-                        width: `${Math.min(actualPct, 100)}%`,
-                        background: actualPct >= 100 
-                          ? 'linear-gradient(to right, #E9C349, #FFB4AB)'
-                          : 'linear-gradient(to right, #4EDEA3, #ADC6FF)'
-                      }} 
-                    />
+                    <div className="h-full bg-gradient-to-r from-[#4EDEA3] to-[#ADC6FF] rounded-full transition-all duration-500" style={{ width: `${Math.min(actualPct, 100)}%` }} />
                   </div>
                 </div>
                 </div>{/* end card surface */}
@@ -884,7 +870,7 @@ export default function BudgetPage() {
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">{t("targetPercent")}</label>
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">{t("incomeSplitPercent") || "Income Split %"}</label>
               <span className="text-[10px] font-bold text-gray-500">
                 {t("currentTotal")}: {totalTargetPercent}%
                 {editingBucket && (
