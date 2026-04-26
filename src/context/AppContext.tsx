@@ -2229,8 +2229,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         type: activity.type,
         amount: activity.amount,
         note: activity.note || null,
-        date: activity.date
-      });
+        date: typeof activity.date === 'string' && activity.date.length === 10
+          ? activity.date
+          : new Date(activity.date).toISOString().split('T')[0]
+      } as any);
       if (data) {
         setBucketActivities(prev => [{ ...activity, id: data.id }, ...prev]);
       }
