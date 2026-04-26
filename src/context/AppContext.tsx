@@ -1351,8 +1351,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
 
     // 2. Initial session check
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session) {
+        setUser(session.user);
+      } else {
+        // Fallback: Check server cookies if client storage is empty
+        try {
+          const { getSessionTokensAction } = await import('@/src/app/actions');
+          const tokens = await getSessionTokensAction();
+          if (tokens?.access_token) {
+            const { data } = await supabase.auth.setSession({
+              access_token: tokens.access_token,
+              refresh_token: tokens.refresh_token
+            });
+            if (data.session) {
+              setUser(data.session.user);
+              return;
+            }
+          }
+        } catch (e) {
+          console.error("Failed to sync session from server", e);
+        }
+        setUser(null);
+      }
     });
 
     return () => subscription.unsubscribe();
