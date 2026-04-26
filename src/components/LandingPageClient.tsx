@@ -390,8 +390,8 @@ export default function LandingPageClient({ initialIsLogged }: { initialIsLogged
           <div className="flex flex-col md:flex-row justify-between items-center gap-6 pt-8 border-t border-white/5">
             <p className="text-sm font-bold uppercase tracking-wide text-gray-600">© 2024 FinTrack OS. {t("allRightsReserved") || "All rights reserved."}</p>
             <div className="flex gap-8">
-              <a href="/privacy-policy" className="text-sm font-bold uppercase tracking-wide text-gray-600 hover:text-white transition-colors">{t("privacyPolicyDoc") || "Privacy Policy"}</a>
-              <a href="/terms-of-service" className="text-sm font-bold uppercase tracking-wide text-gray-600 hover:text-white transition-colors">{t("termsOfServiceDoc") || "Terms of Service"}</a>
+              <Link href="/privacy-policy" className="text-sm font-bold uppercase tracking-wide text-gray-600 hover:text-white transition-colors">{t("privacyPolicyDoc") || "Privacy Policy"}</Link>
+              <Link href="/terms-of-service" className="text-sm font-bold uppercase tracking-wide text-gray-600 hover:text-white transition-colors">{t("termsOfServiceDoc") || "Terms of Service"}</Link>
             </div>
           </div>
         </div>

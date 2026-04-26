@@ -8,10 +8,12 @@ interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
+  assetName?: string;
+  assetSymbol?: string;
   children: React.ReactNode;
 }
 
-export function Modal({ isOpen, onClose, title, children }: ModalProps) {
+export function Modal({ isOpen, onClose, title, assetName, assetSymbol, children }: ModalProps) {
   React.useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
@@ -45,7 +47,15 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
             </div>
             
             <div className="flex justify-between items-center px-8 py-4 sm:py-6 border-b border-white/5 flex-shrink-0">
-              <h3 className="text-xl font-black text-white tracking-tight">{title}</h3>
+              <div className="flex items-center gap-3">
+                {assetName && (
+                  <>
+                    <h3 className="text-lg font-black text-white tracking-tight">{assetName}</h3>
+                    {assetSymbol && <span className="text-sm font-medium text-gray-500">{assetSymbol}</span>}
+                  </>
+                )}
+                {!assetName && <h3 className="text-xl font-black text-white tracking-tight">{title}</h3>}
+              </div>
               <button
                 onClick={onClose}
                 className="p-2 hover:bg-white/5 rounded-full text-gray-400 hover:text-white transition-colors"
@@ -53,7 +63,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
                 <X size={20} />
               </button>
             </div>
-            
+
             <div className="p-8 overflow-y-auto custom-scrollbar">
               {children}
             </div>

@@ -14,32 +14,48 @@ export interface Profile {
 }
 
 export interface Asset {
-  id: number;
+  id: string; // uuid
   user_id: string;
-  symbol: string;
   name: string;
-  shares: number;
-  avg_cost: number;
+  symbol: string;
+  asset_type: string | null;
+  value_usd: number;
+  quantity: number;
+  avg_purchase_price: number | null;
+  current_price: number | null;
+  change_24h: number | null;
+  change_percentage: number | null;
+  allocation_target: number | null;
+  allocation_current: number | null;
+  sector: string | null;
+  country: string | null;
+  notes: string | null;
+  is_active: boolean;
+  is_favorite: boolean;
+  sort_order: number;
   created_at: string;
   updated_at: string;
 }
 
 export interface Trade {
-  id: number;
+  id: string; // uuid
   user_id: string;
-  asset_symbol: string;
-  type: 'BUY' | 'SELL';
+  asset_id: string | null;
+  symbol: string;
+  type: 'BUY' | 'SELL' | 'DIVIDEND' | 'IMPORT';
   amount_usd: number;
-  shares: number | null;
+  quantity: number | null;
   price_per_unit: number | null;
   date: string;
   rate_at_time: number | null;
   currency: string | null;
+  source_bucket_id: string | null;
+  tag: string | null;
   created_at: string;
 }
 
 export interface Allocation {
-  id: number;
+  id: string; // uuid
   user_id: string;
   label: string;
   value: number;
@@ -47,34 +63,38 @@ export interface Allocation {
 }
 
 export interface MoneyBucket {
-  id: number;
+  id: string; // uuid
   user_id: string;
   name: string;
   target_percent: number;
+  target_amount?: number;
   current_amount: number;
   color: string;
   icon: string;
   linked_to_expenses: boolean;
+  created_at: string;
 }
 
 export interface BucketActivity {
-  id: number;
+  id: string; // uuid
   user_id: string;
-  bucket_id: number;
+  bucket_id: string;
   type: 'deposit' | 'withdraw' | 'income_split' | 'invest' | 'profit_split';
   amount: number;
   note: string | null;
+  date: string;
   created_at: string;
 }
 
 export interface CashActivity {
-  id: number;
+  id: string; // uuid
   user_id: string;
   type: 'INCOME' | 'EXPENSE';
   amount: number;
   category: string;
   note: string | null;
   date: string;
+  bucket_id?: string;
   created_at: string;
 }
 
@@ -107,6 +127,7 @@ export const db = {
         .from('assets')
         .select('*')
         .eq('user_id', userId)
+        .order('sort_order', { ascending: true })
         .order('created_at', { ascending: false });
     },
     insert: async (asset: Omit<Asset, 'id' | 'created_at' | 'updated_at'>) => {
@@ -116,7 +137,7 @@ export const db = {
         .select()
         .single();
     },
-    update: async (id: number, updates: Partial<Asset>) => {
+    update: async (id: string, updates: Partial<Asset>) => {
       return await supabase
         .from('assets')
         .update({ ...updates, updated_at: new Date().toISOString() })
@@ -124,15 +145,46 @@ export const db = {
         .select()
         .single();
     },
-    delete: async (id: number) => {
+    delete: async (id: string) => {
       return await supabase.from('assets').delete().eq('id', id);
     },
-    upsert: async (asset: Omit<Asset, 'id' | 'created_at' | 'updated_at'>) => {
+    softDeleteBySymbol: async (userId: string, symbol: string) => {
       return await supabase
         .from('assets')
-        .upsert(asset, { onConflict: 'user_id,symbol' })
-        .select()
+        .update({ is_active: false })
+        .eq('user_id', userId)
+        .ilike('symbol', symbol);
+    },
+    upsert: async (asset: Omit<Asset, 'id' | 'created_at' | 'updated_at'>) => {
+      // Manual upsert since there is no unique constraint on user_id,symbol
+      const existing = await supabase
+        .from('assets')
+        .select('id')
+        .eq('user_id', asset.user_id)
+        .ilike('symbol', asset.symbol)
+        .limit(1)
         .single();
+        
+      if (existing.data?.id) {
+        return await supabase
+          .from('assets')
+          .update({ ...asset, updated_at: new Date().toISOString() })
+          .eq('id', existing.data.id)
+          .select()
+          .single();
+      } else {
+        return await supabase
+          .from('assets')
+          .insert(asset)
+          .select()
+          .single();
+      }
+    },
+    bulkUpdate: async (assets: Partial<Asset> & { id: string }[]) => {
+      const promises = assets.map(a =>
+        supabase.from('assets').update({ ...a, updated_at: new Date().toISOString() }).eq('id', a.id)
+      );
+      return await Promise.all(promises);
     },
   },
 
@@ -148,8 +200,15 @@ export const db = {
     insert: async (trade: Omit<Trade, 'id' | 'created_at'>) => {
       return await supabase.from('trades').insert(trade).select().single();
     },
-    delete: async (id: number) => {
+    delete: async (id: string) => {
       return await supabase.from('trades').delete().eq('id', id);
+    },
+    deleteBySymbol: async (userId: string, symbol: string) => {
+      return await supabase
+        .from('trades')
+        .delete()
+        .eq('user_id', userId)
+        .ilike('symbol', symbol);
     },
     bulkInsert: async (trades: Omit<Trade, 'id' | 'created_at'>[]) => {
       return await supabase.from('trades').insert(trades).select();
@@ -189,13 +248,13 @@ export const db = {
         .eq('user_id', userId)
         .order('created_at');
     },
-    insert: async (bucket: Omit<MoneyBucket, 'id'>) => {
+    insert: async (bucket: Omit<MoneyBucket, 'id' | 'created_at'>) => {
       return await supabase.from('money_buckets').insert(bucket).select().single();
     },
-    update: async (id: number, updates: Partial<MoneyBucket>) => {
+    update: async (id: string, updates: Partial<MoneyBucket>) => {
       return await supabase.from('money_buckets').update(updates).eq('id', id).select().single();
     },
-    delete: async (id: number) => {
+    delete: async (id: string) => {
       return await supabase.from('money_buckets').delete().eq('id', id);
     },
   },
@@ -209,7 +268,7 @@ export const db = {
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
     },
-    insert: async (activity: Omit<BucketActivity, 'id'>) => {
+    insert: async (activity: Omit<BucketActivity, 'id' | 'created_at'>) => {
       return await supabase.from('bucket_activities').insert(activity).select().single();
     },
   },
@@ -226,7 +285,7 @@ export const db = {
     insert: async (activity: Omit<CashActivity, 'id' | 'created_at'>) => {
       return await supabase.from('cash_activities').insert(activity).select().single();
     },
-    delete: async (id: number) => {
+    delete: async (id: string) => {
       return await supabase.from('cash_activities').delete().eq('id', id);
     },
   },
@@ -246,3 +305,4 @@ export const db = {
 export function isSupabaseConfigured(): boolean {
   return !!supabaseUrl && !!supabaseAnonKey;
 }
+ 

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { Plus, Loader2, Wallet } from "lucide-react";
+import { X, Wallet, ChevronDown, Loader2 } from "lucide-react";
 import { Modal } from "@/src/components/Modal";
 import { useApp } from "@/src/context/AppContext";
 import { cn } from "@/src/lib/utils";
@@ -12,7 +12,7 @@ interface AddCashflowModalProps {
 }
 
 export function AddCashflowModal({ isOpen, onClose }: AddCashflowModalProps) {
-  const { t, addCashActivity, moneyBuckets, updateMoneyBucket, addBucketActivity, formatMoney, language, addToast } = useApp();
+  const { t, addCashActivity, moneyBuckets, updateMoneyBucket, addBucketActivity, formatMoney, language, addToast, currency } = useApp();
 
   const [type, setType] = useState<"INCOME" | "EXPENSE">("INCOME");
   const [amount, setAmount] = useState("");
@@ -20,9 +20,7 @@ export function AddCashflowModal({ isOpen, onClose }: AddCashflowModalProps) {
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [note, setNote] = useState("");
   const [isAdding, setIsAdding] = useState(false);
-  const [selectedBucketId, setSelectedBucketId] = useState("<no-bucket>");
-  const [deductFromBucket, setDeductFromBucket] = useState(false);
-
+  const [selectedBucketId, setSelectedBucketId] = useState("<auto-distribute>");
   // Get buckets that are linked to expenses
   const linkedBuckets = useMemo(() => {
     return moneyBuckets.filter(b => b.linkedToExpenses);
@@ -38,8 +36,7 @@ export function AddCashflowModal({ isOpen, onClose }: AddCashflowModalProps) {
   const handleTypeChange = (newType: "INCOME" | "EXPENSE") => {
     setType(newType);
     setCategory(newType === "INCOME" ? "salary" : "food");
-    setDeductFromBucket(false);
-    setSelectedBucketId("<no-bucket>");
+    setSelectedBucketId(newType === "INCOME" ? "<auto-distribute>" : "<no-bucket>");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -48,8 +45,8 @@ export function AddCashflowModal({ isOpen, onClose }: AddCashflowModalProps) {
 
     const amountNum = Number(amount);
 
-    // Validate bucket deduction if enabled
-    if (type === "EXPENSE" && deductFromBucket && selectedBucketId !== "<no-bucket>") {
+    // Validate bucket deduction
+    if (type === "EXPENSE" && selectedBucketId !== "<no-bucket>") {
       const bucket = moneyBuckets.find(b => b.id === selectedBucketId);
       if (bucket && bucket.currentAmount < amountNum) {
         addToast(
@@ -62,17 +59,35 @@ export function AddCashflowModal({ isOpen, onClose }: AddCashflowModalProps) {
 
     setIsAdding(true);
 
+    let detailedNote = note;
+    if (type === "EXPENSE" && selectedBucketId !== "<no-bucket>") {
+      const bucket = moneyBuckets.find(b => b.id === selectedBucketId);
+      if (bucket) {
+        detailedNote = `${note ? note + " | " : ""}Paid from: ${t(bucket.name) || bucket.name}`;
+      }
+    } else if (type === "INCOME") {
+      if (selectedBucketId === "<auto-distribute>") {
+        detailedNote = `${note ? note + " | " : ""}Auto-distributed to buckets`;
+      } else if (selectedBucketId !== "<no-bucket>") {
+        const bucket = moneyBuckets.find(b => b.id === selectedBucketId);
+        if (bucket) {
+          detailedNote = `${note ? note + " | " : ""}Deposited to: ${t(bucket.name) || bucket.name}`;
+        }
+      }
+    }
+
     try {
       addCashActivity({
         type,
         amountUSD: amountNum,
         category: category,
-        date,
-        note
+        date: date === new Date().toISOString().split("T")[0] ? new Date().toISOString() : new Date(date).toISOString(),
+        note: detailedNote,
+        bucketId: selectedBucketId !== "<no-bucket>" && selectedBucketId !== "<auto-distribute>" ? selectedBucketId : undefined
       });
 
-      // Deduct from bucket if enabled
-      if (type === "EXPENSE" && deductFromBucket && selectedBucketId !== "<no-bucket>") {
+      // Deduct from bucket if EXPENSE
+      if (type === "EXPENSE" && selectedBucketId !== "<no-bucket>") {
         const bucket = moneyBuckets.find(b => b.id === selectedBucketId);
         if (bucket) {
           const newAmount = Math.max(0, bucket.currentAmount - amountNum);
@@ -85,6 +100,44 @@ export function AddCashflowModal({ isOpen, onClose }: AddCashflowModalProps) {
             date: new Date().toISOString(),
             note: `${t("deductFromBucket")}: ${t(category) || category}${note ? ` - ${note}` : ""}`,
           });
+        }
+      }
+
+      // Handle INCOME Bucket logic
+      if (type === "INCOME" && moneyBuckets.length > 0) {
+        if (selectedBucketId === "<auto-distribute>") {
+          const totalAllocated = moneyBuckets.reduce((acc, b) => acc + (b.targetPercent || 0), 0);
+          if (totalAllocated > 0) {
+            for (const bucket of moneyBuckets) {
+              const pct = bucket.targetPercent || 0;
+              const share = (pct / totalAllocated) * amountNum;
+              if (share > 0) {
+                updateMoneyBucket(bucket.id, { currentAmount: bucket.currentAmount + share });
+                addBucketActivity({
+                  bucketId: bucket.id,
+                  bucketName: bucket.name,
+                  type: "deposit",
+                  amount: share,
+                  date: new Date().toISOString(),
+                  note: `${t("income")}: ${t(category) || category}${note ? ` - ${note}` : ""}`,
+                });
+              }
+            }
+          }
+        } else if (selectedBucketId !== "<no-bucket>") {
+          // Deposit entirely into one specific bucket
+          const bucket = moneyBuckets.find(b => b.id === selectedBucketId);
+          if (bucket) {
+            updateMoneyBucket(bucket.id, { currentAmount: bucket.currentAmount + amountNum });
+            addBucketActivity({
+              bucketId: bucket.id,
+              bucketName: bucket.name,
+              type: "deposit",
+              amount: amountNum,
+              date: new Date().toISOString(),
+              note: `${t("income")}: ${t(category) || category}${note ? ` - ${note}` : ""}`,
+            });
+          }
         }
       }
 
@@ -106,8 +159,7 @@ export function AddCashflowModal({ isOpen, onClose }: AddCashflowModalProps) {
     setCategory("salary");
     setDate(new Date().toISOString().split("T")[0]);
     setNote("");
-    setDeductFromBucket(false);
-    setSelectedBucketId("<no-bucket>");
+    setSelectedBucketId("<auto-distribute>");
   };
 
   const handleClose = () => {
@@ -150,17 +202,20 @@ export function AddCashflowModal({ isOpen, onClose }: AddCashflowModalProps) {
         {/* Amount */}
         <div className="space-y-2">
           <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">
-            {t("amountUsd")}
+            {t("amount")}
           </label>
-          <input
-            type="number"
-            step="any"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="0.00"
-            className="w-full px-4 py-4 bg-white/5 border border-white/10 rounded-2xl text-white text-sm font-medium placeholder-gray-600 focus:outline-none focus:border-[#ADC6FF]/50 transition-colors"
-            required
-          />
+          <div className="relative">
+            <input
+              type="number"
+              step="any"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0.00"
+              className="w-full px-4 py-4 bg-white/5 border border-white/10 rounded-2xl text-white text-sm font-medium placeholder-gray-600 focus:outline-none focus:border-[#ADC6FF]/50 transition-colors pr-12"
+              required
+            />
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-xs uppercase">{currency}</span>
+          </div>
         </div>
 
         {/* Category */}
@@ -187,71 +242,37 @@ export function AddCashflowModal({ isOpen, onClose }: AddCashflowModalProps) {
           </div>
         </div>
 
-        {/* Bucket Deduction - Only for EXPENSE */}
-        {type === "EXPENSE" && linkedBuckets.length > 0 && (
-          <div className="space-y-3 p-4 bg-white/5 rounded-2xl border border-white/5">
-            <button
-              type="button"
-              onClick={() => setDeductFromBucket(!deductFromBucket)}
-              className="w-full flex items-center gap-3"
-            >
-              <div
-                className={cn(
-                  "w-5 h-5 rounded border flex items-center justify-center transition-all",
-                  deductFromBucket
-                    ? "bg-[#FFB4AB] border-[#FFB4AB]"
-                    : "bg-transparent border-white/30"
-                )}
+        {/* Bucket Selection - Always visible if buckets exist */}
+        {moneyBuckets.length > 0 && (
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide flex items-center gap-1.5">
+              <Wallet size={12} className={type === "INCOME" ? "text-[#4EDEA3]" : "text-[#FFB4AB]"} />
+              {type === "INCOME" ? t("selectBucket") || "Deposit to Bucket" : t("deductFromBucket")}
+            </label>
+            <div className="relative">
+              <select
+                value={selectedBucketId}
+                onChange={(e) => setSelectedBucketId(e.target.value)}
+                className="w-full px-4 py-4 bg-white/5 border border-white/10 rounded-2xl text-white text-sm font-medium appearance-none focus:outline-none focus:border-[#ADC6FF]/50 transition-colors"
               >
-                {deductFromBucket && (
-                  <svg className="w-3 h-3 text-[#0E0E0E]" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
+                {type === "INCOME" && (
+                  <option value="<auto-distribute>" className="bg-[#1C1B1B]">
+                    ⚡ Auto-distribute (Target Plan)
+                  </option>
                 )}
+                <option value="<no-bucket>" className="bg-[#1C1B1B]">
+                  {t("none") || "None (General Cashflow)"}
+                </option>
+                {moneyBuckets.map(bucket => (
+                  <option key={bucket.id} value={bucket.id} className="bg-[#1C1B1B]">
+                    {bucket.icon} {t(bucket.name) || bucket.name} ({formatMoney(bucket.currentAmount)})
+                  </option>
+                ))}
+              </select>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
+                <ChevronDown size={16} />
               </div>
-              <div className="flex items-center gap-2">
-                <Wallet size={14} className="text-[#FFB4AB]" />
-                <span className="text-sm font-bold text-white">{t("deductFromBucket")}</span>
-              </div>
-            </button>
-
-            {deductFromBucket && (
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">
-                  {t("selectBucket")}
-                </label>
-                <div className="space-y-2">
-                  {linkedBuckets.map((bucket) => (
-                    <button
-                      key={bucket.id}
-                      type="button"
-                      onClick={() => setSelectedBucketId(bucket.id)}
-                      className={cn(
-                        "w-full flex items-center gap-3 p-3 rounded-xl border transition-all",
-                        selectedBucketId === bucket.id
-                          ? "bg-white/10 border-white/20"
-                          : "bg-white/[0.02] border-transparent hover:bg-white/5"
-                      )}
-                    >
-                      <span className="text-lg">{bucket.icon}</span>
-                      <div className="flex-1 text-left">
-                        <p className="text-xs font-bold text-white">{t(bucket.name) || bucket.name}</p>
-                        <p className="text-[10px] text-gray-500">
-                          {formatMoney(bucket.currentAmount)}
-                        </p>
-                      </div>
-                      {selectedBucketId === bucket.id && (
-                        <div className="w-4 h-4 rounded-full bg-[#FFB4AB] flex items-center justify-center">
-                          <svg className="w-2.5 h-2.5 text-[#0E0E0E]" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                          </svg>
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+            </div>
           </div>
         )}
 

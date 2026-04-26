@@ -1270,7 +1270,7 @@ function LoginContent() {
                       {/* Password Strength Indicator */}
                       {isRegister && showPasswordStrength && password.length > 0 && (
                         <div
-                          className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 p-3 bg-[#141414] rounded-xl border border-white/10 shadow-xl shadow-black/60"
+                          className="mt-2 p-3 bg-[#141414] rounded-xl border border-white/10 shadow-xl shadow-black/60"
                         >
                           <div className="flex items-center justify-between mb-2.5">
                             <span className="text-xs text-gray-500">{t.passwordRequirements}</span>

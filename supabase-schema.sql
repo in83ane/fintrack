@@ -73,6 +73,8 @@ CREATE TABLE IF NOT EXISTS public.assets (
     country TEXT,
     notes TEXT,
     is_active BOOLEAN DEFAULT TRUE,
+    is_favorite BOOLEAN DEFAULT FALSE,
+    sort_order INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -104,7 +106,7 @@ CREATE TABLE IF NOT EXISTS public.trades (
     asset_id UUID REFERENCES public.assets(id) ON DELETE SET NULL,
     asset_name TEXT NOT NULL,
     symbol TEXT NOT NULL,
-    type TEXT NOT NULL CHECK (type IN ('BUY', 'SELL')),
+    type TEXT NOT NULL CHECK (type IN ('BUY', 'SELL', 'DIVIDEND')),
     amount_usd DECIMAL(15, 2) NOT NULL,
     quantity DECIMAL(15, 6) NOT NULL,
     price_at_execution DECIMAL(15, 6) NOT NULL,

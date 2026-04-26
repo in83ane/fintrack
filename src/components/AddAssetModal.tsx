@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Search, Plus, Loader2 } from "lucide-react";
+import { Search, Plus, Loader2, Wallet, ChevronDown, ArrowDownToLine, ShoppingCart } from "lucide-react";
 import { Modal } from "@/src/components/Modal";
 import { useApp, Asset } from "@/src/context/AppContext";
 import { cn } from "@/src/lib/utils";
@@ -12,7 +12,7 @@ interface AddAssetModalProps {
 }
 
 export function AddAssetModal({ isOpen, onClose }: AddAssetModalProps) {
-  const { t, addAsset, addTrade, fetchAssetMarketData, exchangeRates, currency, language } = useApp();
+  const { t, addAsset, addTrade, addTradeFromBucket, fetchAssetMarketData, exchangeRates, currency, language, moneyBuckets, formatMoney, addToast } = useApp();
 
   const [step, setStep] = useState<"search" | "details">("search");
   const [query, setQuery] = useState("");
@@ -22,6 +22,9 @@ export function AddAssetModal({ isOpen, onClose }: AddAssetModalProps) {
   const [shares, setShares] = useState("");
   const [avgCost, setAvgCost] = useState("");
   const [isAdding, setIsAdding] = useState(false);
+  const [selectedBucketId, setSelectedBucketId] = useState<string>("");
+  const [showBucketDropdown, setShowBucketDropdown] = useState(false);
+  const [isImport, setIsImport] = useState(false);
 
   const handleSearch = async (val: string) => {
     setQuery(val);
@@ -51,35 +54,59 @@ export function AddAssetModal({ isOpen, onClose }: AddAssetModalProps) {
     e.preventDefault();
     if (!selectedResult || !shares || !avgCost) return;
 
+    const totalCost = Number(avgCost) * Number(shares);
+
+    // Validate bucket balance (only for new purchases with bucket)
+    if (!isImport && selectedBucketId) {
+      const bucket = moneyBuckets.find(b => b.id === selectedBucketId);
+      if (bucket && bucket.currentAmount < totalCost) {
+        addToast(t("amountExceedsBalance"), "error");
+        return;
+      }
+    }
+
     setIsAdding(true);
     try {
       const liveData = await fetchAssetMarketData(selectedResult.symbol.toUpperCase());
       const livePrice = liveData?.price || Number(avgCost) || 0;
       const totalValue = livePrice * Number(shares);
 
-      // 1. Add to assets
+      // 1. Add to assets — auto-detect allocation category
+      const sym = selectedResult.symbol.toUpperCase();
+      const CRYPTO = ['BTC', 'ETH', 'SOL', 'USDT', 'DOGE', 'XRP'];
+      const autoAllocation = CRYPTO.includes(sym) ? "Alternatives"
+        : (sym.endsWith('.BK') || sym.endsWith('.TH')) ? "Equities"
+        : "Equities";
+
       addAsset({
         name: liveData?.name || selectedResult.name || selectedResult.symbol,
-        symbol: selectedResult.symbol.toUpperCase(),
+        symbol: sym,
         valueUSD: totalValue,
         change: liveData?.changePercent || 0,
-        allocation: "0%",
+        allocation: autoAllocation,
         shares: Number(shares),
         avgCost: Number(avgCost),
         chartData: liveData?.chartData,
       });
 
-      // 2. Auto-create a trade entry (links to Transactions & Dashboard history)
-      addTrade({
+      // 2. Auto-create a trade entry
+      const tradeData = {
         asset: selectedResult.symbol.toUpperCase(),
-        type: "BUY",
-        amountUSD: Number(avgCost) * Number(shares),
-        date: new Date().toISOString().split("T")[0],
+        type: isImport ? "IMPORT" as const : "BUY" as const,
+        amountUSD: totalCost,
+        date: new Date().toISOString(),
         rateAtTime: exchangeRates[currency],
         currency: currency,
         shares: Number(shares),
-        pricePerUnit: Number(avgCost)
-      });
+        pricePerUnit: Number(avgCost),
+        sourceBucketId: selectedBucketId || undefined,
+      };
+
+      if (!isImport && selectedBucketId) {
+        addTradeFromBucket(tradeData, selectedBucketId);
+      } else {
+        addTrade(tradeData);
+      }
 
       // Reset & close
       resetState();
@@ -98,6 +125,9 @@ export function AddAssetModal({ isOpen, onClose }: AddAssetModalProps) {
     setSelectedResult(null);
     setShares("");
     setAvgCost("");
+    setSelectedBucketId("");
+    setShowBucketDropdown(false);
+    setIsImport(false);
   };
 
   const handleClose = () => {
@@ -187,6 +217,44 @@ export function AddAssetModal({ isOpen, onClose }: AddAssetModalProps) {
             </button>
           </div>
 
+          {/* Import / New Purchase Toggle */}
+          <div className="flex gap-2 p-1 bg-white/5 rounded-2xl border border-white/10">
+            <button
+              type="button"
+              onClick={() => { setIsImport(false); }}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-wide transition-all",
+                !isImport
+                  ? "bg-[#ADC6FF]/20 text-[#ADC6FF] border border-[#ADC6FF]/30"
+                  : "text-gray-500 hover:text-gray-300"
+              )}
+            >
+              <ShoppingCart size={14} />
+              {t("newPurchase")}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setIsImport(true); setSelectedBucketId(""); }}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-wide transition-all",
+                isImport
+                  ? "bg-[#E9C349]/20 text-[#E9C349] border border-[#E9C349]/30"
+                  : "text-gray-500 hover:text-gray-300"
+              )}
+            >
+              <ArrowDownToLine size={14} />
+              {t("importExisting")}
+            </button>
+          </div>
+
+          {/* Info badge for import mode */}
+          {isImport && (
+            <div className="flex items-center gap-2 px-4 py-2.5 bg-[#E9C349]/10 border border-[#E9C349]/20 rounded-xl">
+              <ArrowDownToLine size={12} className="text-[#E9C349] flex-shrink-0" />
+              <span className="text-[11px] text-[#E9C349] font-medium">{t("importExistingDesc")}</span>
+            </div>
+          )}
+
           {/* Shares */}
           <div className="space-y-2">
             <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">
@@ -208,24 +276,111 @@ export function AddAssetModal({ isOpen, onClose }: AddAssetModalProps) {
             <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">
               {t("avgCostPerUnit")}
             </label>
-            <input
-              type="number"
-              step="any"
-              value={avgCost}
-              onChange={(e) => setAvgCost(e.target.value)}
-              placeholder="0.00"
-              className="w-full px-4 py-4 bg-white/5 border border-white/10 rounded-2xl text-white text-sm font-medium placeholder-gray-600 focus:outline-none focus:border-[#ADC6FF]/50 transition-colors"
-              required
-            />
+            <div className="relative">
+              <input
+                type="number"
+                step="any"
+                value={avgCost}
+                onChange={(e) => setAvgCost(e.target.value)}
+                placeholder="0.00"
+                className="w-full px-4 py-4 bg-white/5 border border-white/10 rounded-2xl text-white text-sm font-medium placeholder-gray-600 focus:outline-none focus:border-[#ADC6FF]/50 transition-colors pr-12"
+                required
+              />
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[#ADC6FF] font-bold text-xs uppercase opacity-80">USD</span>
+            </div>
           </div>
+
+          {/* Source Bucket Selector — only for new purchases */}
+          {!isImport && moneyBuckets.length > 0 && (
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-wide flex items-center gap-1.5">
+                <Wallet size={12} className="text-[#ADC6FF]" />
+                {t("sourceBucket")}
+              </label>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowBucketDropdown(!showBucketDropdown)}
+                  className={cn(
+                    "w-full px-4 py-3 bg-white/5 border rounded-2xl text-sm font-medium flex items-center justify-between transition-colors",
+                    selectedBucketId ? "border-[#ADC6FF]/30 text-white" : "border-white/10 text-gray-500"
+                  )}
+                >
+                  <span>
+                    {selectedBucketId
+                      ? (() => {
+                          const b = moneyBuckets.find(b => b.id === selectedBucketId);
+                          return b ? `${b.icon} ${t(b.name) || b.name}` : t("selectSourceBucket");
+                        })()
+                      : t("noBucketSelected")
+                    }
+                  </span>
+                  <ChevronDown size={14} className={cn("transition-transform", showBucketDropdown && "rotate-180")} />
+                </button>
+                {showBucketDropdown && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-[#1C1B1B] border border-white/10 rounded-2xl overflow-hidden z-20 shadow-2xl">
+                    <button
+                      type="button"
+                      onClick={() => { setSelectedBucketId(""); setShowBucketDropdown(false); }}
+                      className={cn("w-full px-4 py-3 text-left text-sm hover:bg-white/5 transition-colors flex items-center justify-between",
+                        !selectedBucketId ? "text-[#ADC6FF] font-bold" : "text-gray-400"
+                      )}
+                    >
+                      <span>{t("noBucketSelected")}</span>
+                    </button>
+                    {moneyBuckets.map(b => {
+                      const totalCost = Number(shares || 0) * Number(avgCost || 0);
+                      const hasEnough = b.currentAmount >= totalCost;
+                      return (
+                        <button
+                          key={b.id}
+                          type="button"
+                          onClick={() => { if (hasEnough || totalCost === 0) { setSelectedBucketId(b.id); setShowBucketDropdown(false); } }}
+                          className={cn(
+                            "w-full px-4 py-3 text-left text-sm hover:bg-white/5 transition-colors flex items-center justify-between",
+                            selectedBucketId === b.id ? "text-[#ADC6FF] font-bold" : "text-gray-300",
+                            !hasEnough && totalCost > 0 && "opacity-40 cursor-not-allowed"
+                          )}
+                        >
+                          <span className="flex items-center gap-2">
+                            <span>{b.icon}</span>
+                            <span>{t(b.name) || b.name}</span>
+                          </span>
+                          <span className={cn("text-xs font-bold", hasEnough || totalCost === 0 ? "text-gray-500" : "text-[#FFB4AB]")}>
+                            {formatMoney(b.currentAmount)}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Total preview */}
           {shares && avgCost && (
-            <div className="p-4 bg-[#ADC6FF]/5 border border-[#ADC6FF]/20 rounded-2xl">
+            <div className="p-4 bg-[#ADC6FF]/5 border border-[#ADC6FF]/20 rounded-2xl space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-400">{t("totalInvestment")}</span>
                 <span className="font-black text-white">${(Number(shares) * Number(avgCost)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
+              {selectedBucketId && (() => {
+                const b = moneyBuckets.find(b => b.id === selectedBucketId);
+                if (!b) return null;
+                const totalCost = Number(shares) * Number(avgCost);
+                const remaining = b.currentAmount - totalCost;
+                return (
+                  <div className="flex justify-between text-xs pt-1 border-t border-white/5">
+                    <span className="text-gray-500 flex items-center gap-1">
+                      <Wallet size={10} /> {t("bucketBalance")}: {b.icon} {t(b.name) || b.name}
+                    </span>
+                    <span className={cn("font-bold", remaining >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
+                      {formatMoney(remaining)}
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
           )}
 

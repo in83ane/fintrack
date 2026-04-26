@@ -1,9 +1,23 @@
 import { NextResponse } from 'next/server';
 
+// In-memory cache
+const chartCache = new Map<string, { data: ChartCacheData; timestamp: number }>();
+const CACHE_TTL = 60000; // 1 minute for chart data
+
+interface ChartCacheData {
+  symbol: string;
+  price: number;
+  changePercent: number;
+  name: string;
+  chartData: any[];
+  period: string;
+  interval: string;
+  range: string;
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const symbol = searchParams.get('symbol');
-  const period = searchParams.get('period');
   const interval = searchParams.get('interval');
   const range = searchParams.get('range');
 
@@ -11,67 +25,27 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Missing symbol parameter' }, { status: 400 });
   }
 
+  const cacheKey = `${symbol}-${interval}-${range}`;
+
+  // Check cache first
+  const cached = chartCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return NextResponse.json(cached.data);
+  }
+
   try {
     const timestamp = new Date().getTime();
-
-    // Determine range and interval based on parameters
-    let finalRange: string;
-    let finalInterval: string;
-
-    // If interval and range are provided directly, use them (new approach)
-    if (interval && range) {
-      finalInterval = interval;
-      finalRange = range;
-    }
-    // Otherwise fall back to period mapping (old approach)
-    else if (period) {
-      switch (period) {
-        case '1d':
-          finalRange = '1d';
-          finalInterval = '1m';
-          break;
-        case '5d':
-          finalRange = '5d';
-          finalInterval = '15m';
-          break;
-        case '1m':
-          finalRange = '1mo';
-          finalInterval = '1d';
-          break;
-        case '6m':
-          finalRange = '6mo';
-          finalInterval = '1d';
-          break;
-        case 'ytd':
-          finalRange = 'ytd';
-          finalInterval = '1d';
-          break;
-        case '1y':
-          finalRange = '1y';
-          finalInterval = '1d';
-          break;
-        case '5y':
-          finalRange = '5y';
-          finalInterval = '1d';
-          break;
-        default:
-          finalRange = '1d';
-          finalInterval = '1m';
-      }
-    } else {
-      // Default fallback
-      finalRange = '1d';
-      finalInterval = '1m';
-    }
+    const finalRange = range || '1d';
+    const finalInterval = interval || '1m';
 
     const response = await fetch(
       `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=${finalRange}&interval=${finalInterval}&_=${timestamp}`,
       {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Accept': 'application/json'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'application/json, text/plain',
         },
-        cache: 'no-store'
+        signal: AbortSignal.timeout(10000) // 10 second timeout
       }
     );
 
@@ -86,32 +60,32 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'No chart data available' }, { status: 404 });
     }
 
-    // Parse chart data
     const timestamps = result?.timestamp || [];
     const closes = result?.indicators?.quote?.[0]?.close || [];
 
-    const chartData = timestamps.map((t: number, i: number) => ({
-      time: t * 1000, // Convert to JS timestamp
-      price: Number(closes[i]) || 0
-    })).filter((dp: any) => dp.price > 0);
+    const chartData = timestamps
+      .map((t: number, i: number) => ({ time: t * 1000, price: Number(closes[i]) || 0 }))
+      .filter((dp: any) => dp.price > 0);
 
-    // Also fetch meta data
     const meta = result?.meta || {};
     const price = meta.regularMarketPrice || 0;
-    const prevClose = meta.chartPreviousClose || price;
+    const prevClose = meta.chartPreviousClose || meta.previousClose || price;
     const changePercent = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
 
-    return NextResponse.json({
+    const responseData = {
       symbol: meta.symbol || symbol,
-      price: price,
-      changePercent: changePercent,
+      price,
+      changePercent: Number(changePercent.toFixed(2)),
       name: meta.shortName || meta.longName || symbol,
-      chartData: chartData,
-      period: period || finalRange,
+      chartData,
+      period: range || finalRange,
       interval: finalInterval,
       range: finalRange
-    });
+    };
 
+    chartCache.set(cacheKey, { data: responseData, timestamp: Date.now() });
+
+    return NextResponse.json(responseData);
   } catch (error) {
     console.error('Chart API Error:', error);
     return NextResponse.json(

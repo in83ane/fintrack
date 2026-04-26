@@ -1,13 +1,15 @@
 "use client";
 
 import React, { useState, useMemo, useRef, useCallback } from "react";
-import { TrendingUp, PlusCircle, MinusCircle, ArrowRight, Edit3, Info, History, Plus, Download, FileText, CheckCircle2, Trash2, Pencil, ArrowDownToLine, ArrowUpFromLine, PiggyBank } from "lucide-react";
+import { TrendingUp, TrendingDown, PlusCircle, MinusCircle, ArrowRight, Edit3, Info, History, Plus, Download, FileText, CheckCircle2, Trash2, Pencil, ArrowDownToLine, ArrowUpFromLine, PiggyBank } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/src/lib/utils";
 import { useApp } from "@/src/context/AppContext";
 import { Modal } from "@/src/components/Modal";
 import { AddAssetModal } from "@/src/components/AddAssetModal";
 import { AddCashflowModal } from "@/src/components/AddCashflowModal";
+import DashboardGrid from "@/src/components/widgets/DashboardGrid";
+import Link from "next/link";
 import Papa from "papaparse";
 
 interface NetWorthPoint {
@@ -298,7 +300,7 @@ const assetClassKeyMap: Record<string, string> = {
 };
 
 export default function DashboardPage() {
-  const { t, formatMoney, currency, exchangeRates, trades, addTrade, bulkAddTrades, allocations, updateAllocation, netWorthHistory, assets, addToast, addNotification, language, cashActivities, moneyBuckets } = useApp();
+  const { t, formatMoney, currency, exchangeRates, trades, addTrade, bulkAddTrades, allocations, updateAllocation, netWorthHistory, assets, addToast, addNotification, language, cashActivities, moneyBuckets, totalInvested, totalUnrealizedPL, totalRealizedPL, totalDividends } = useApp();
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [isCSVModalOpen, setIsCSVModalOpen] = React.useState(false);
   const [isAddAssetOpen, setIsAddAssetOpen] = React.useState(false);
@@ -313,6 +315,11 @@ export default function DashboardPage() {
   const [newTrade, setNewTrade] = React.useState<{ asset: string; amountUSD: string; type: "BUY" | "SELL" }>({ asset: "", amountUSD: "", type: "BUY" });
   const [importStatus, setImportStatus] = React.useState<{ type: 'idle' | 'success' | 'error', message: string }>({ type: 'idle', message: '' });
 
+  const currentNetWorth = netWorthHistory[netWorthHistory.length - 1]?.value || 0;
+  const totalProfit = totalUnrealizedPL + totalRealizedPL + totalDividends;
+  const initialCapital = currentNetWorth - totalProfit;
+  const netWorthReturnPct = initialCapital > 0 ? (totalProfit / initialCapital) * 100 : 0;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTrade.asset || !newTrade.amountUSD) return;
@@ -321,7 +328,7 @@ export default function DashboardPage() {
       asset: newTrade.asset.toUpperCase(),
       type: newTrade.type,
       amountUSD: parseFloat(newTrade.amountUSD),
-      date: new Date().toISOString().split("T")[0],
+      date: new Date().toISOString(),
       rateAtTime: exchangeRates[currency],
       currency: currency,
     });
@@ -392,7 +399,7 @@ export default function DashboardPage() {
       asset: trade.asset.toUpperCase(),
       type: trade.rawType as "BUY" | "SELL",
       amountUSD: trade.diffUSD,
-      date: new Date().toISOString().split("T")[0],
+      date: new Date().toISOString(),
       rateAtTime: exchangeRates[currency],
       currency: currency,
     }));
@@ -419,7 +426,7 @@ export default function DashboardPage() {
             asset: (row.asset || row.Asset || "").toUpperCase(),
             type: (row.type || row.Type || "BUY").toUpperCase() as "BUY" | "SELL",
             amountUSD: parseFloat(row.amountUSD || row.AmountUSD || row.amount || "0"),
-            date: row.date || row.Date || new Date().toISOString().split("T")[0],
+            date: row.date || row.Date || new Date().toISOString(),
             rateAtTime: parseFloat(row.rateAtTime || row.RateAtTime || exchangeRates[currency].toString()),
             currency: row.currency || row.Currency || currency,
           })).filter(t => t.asset && t.amountUSD > 0);
@@ -445,45 +452,48 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-8">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-4 sm:space-y-6">
       {/* Hero Section: Net Worth & Chart */}
-      <section className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <motion.div 
+      <section className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="lg:col-span-8 bg-[#1C1B1B] rounded-3xl p-8 relative overflow-hidden group shadow-xl border border-white/5"
+          className="lg:col-span-8 bg-[#1C1B1B] rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 relative overflow-hidden group shadow-xl border border-white/5"
         >
-          <div className="flex justify-between items-start mb-6 relative z-10">
-            <div className="space-y-1">
-              <span className="text-sm font-bold text-gray-400 uppercase tracking-wide">{t("totalNetWorth")}</span>
-              <h1 className="text-4xl lg:text-5xl font-black tracking-tighter text-white leading-none">
+          <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-4 sm:mb-6 relative z-10">
+            <div className="space-y-1 w-full sm:w-auto">
+              <span className="text-xs sm:text-sm font-bold text-gray-400 uppercase tracking-wide">{t("totalNetWorth")}</span>
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tighter text-white leading-none">
                 {formatMoney(netWorthHistory[netWorthHistory.length - 1].value)}
               </h1>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1 text-[#4EDEA3]">
-                  <TrendingUp size={14} />
-                  <span className="text-sm font-bold">+14.2%</span>
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                <div className={cn("flex items-center gap-1", netWorthReturnPct >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
+                  {netWorthReturnPct >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                  <span className="text-xs sm:text-sm font-bold">
+                    {netWorthReturnPct > 0 ? "+" : ""}{netWorthReturnPct.toFixed(1)}%
+                  </span>
                 </div>
-                <span className="text-gray-500 text-xs font-medium uppercase tracking-wide">
+                <span className="text-gray-500 text-[10px] sm:text-xs font-medium uppercase tracking-wide">
                   Rate: 1 USD = {exchangeRates[currency]} {currency}
                 </span>
               </div>
             </div>
-            
-            <div className="flex gap-3">
-              <button 
+
+            <div className="flex gap-2 w-full sm:w-auto">
+              <button
                 onClick={() => setIsAddAssetOpen(true)}
-                className="px-4 py-3 bg-[#ADC6FF] text-[#00285d] rounded-2xl font-black text-xs tracking-tight flex items-center gap-2 hover:brightness-110 transition-all"
+                className="flex-1 sm:flex-none px-3 sm:px-4 py-2.5 sm:py-3 bg-[#ADC6FF] text-[#00285d] rounded-xl sm:rounded-2xl font-black text-xs tracking-tight flex items-center justify-center gap-2 hover:brightness-110 transition-all"
               >
-                <Plus size={16} />
-                {t("addAsset")}
+                <Plus size={14} />
+                <span className="hidden sm:inline">{t("addAsset")}</span>
+                <span className="sm:hidden">Add</span>
               </button>
-              <button 
+              <button
                 onClick={() => setIsCSVModalOpen(true)}
-                className="p-3 bg-white/5 border border-white/10 rounded-2xl text-gray-400 hover:text-white transition-all"
+                className="p-2.5 sm:p-3 bg-white/5 border border-white/10 rounded-xl sm:rounded-2xl text-gray-400 hover:text-white transition-all flex-shrink-0"
                 title={t("importCsv")}
               >
-                <Download size={20} />
+                <Download size={18} />
               </button>
             </div>
           </div>
@@ -502,67 +512,67 @@ export default function DashboardPage() {
 
         {/* Top Movers / Quick Actions */}
         <div className="lg:col-span-4 flex flex-col justify-between gap-4">
-          <div className="flex justify-between items-center px-2">
-            <h2 className="text-base font-bold tracking-tight text-white">{t("quickActions")}</h2>
-            <span className="text-xs font-black text-[#4EDEA3] uppercase tracking-wide">FinTrack OS</span>
+          <div className="flex justify-between items-center px-1">
+            <h2 className="text-sm sm:text-base font-bold tracking-tight text-white">{t("quickActions")}</h2>
+            <span className="text-[10px] sm:text-xs font-black text-[#4EDEA3] uppercase tracking-wide">FinTrack OS</span>
           </div>
-          
-          <div className="space-y-3 flex-1">
-            <motion.button 
+
+          <div className="space-y-2 sm:space-y-3 flex-1">
+            <motion.button
               whileHover={{ x: 5 }}
               onClick={() => setIsModalOpen(true)}
-              className="w-full p-5 bg-[#1C1B1B] border border-white/5 rounded-2xl flex items-center justify-between group hover:bg-white/5 transition-all"
+              className="w-full p-3 sm:p-4 bg-[#1C1B1B] border border-white/5 rounded-xl sm:rounded-2xl flex items-center justify-between group hover:bg-white/5 transition-all"
             >
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-[#ADC6FF]/10 flex items-center justify-center text-[#ADC6FF]">
-                  <Plus size={20} />
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-[#ADC6FF]/10 flex items-center justify-center text-[#ADC6FF] flex-shrink-0">
+                  <Plus size={16} />
                 </div>
-                <div className="text-left">
-                  <h4 className="font-black text-sm text-white leading-tight">{t("addTrade")}</h4>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">{t("manualEntry")}</p>
+                <div className="text-left min-w-0">
+                  <h4 className="font-black text-xs sm:text-sm text-white leading-tight truncate">{t("addTrade")}</h4>
+                  <p className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wide hidden sm:block">{t("manualEntry")}</p>
                 </div>
               </div>
-              <ArrowRight size={16} className="text-gray-600 group-hover:text-[#ADC6FF] transition-colors" />
+              <ArrowRight size={14} className="text-gray-600 group-hover:text-[#ADC6FF] transition-colors flex-shrink-0" />
             </motion.button>
 
-            <motion.button 
+            <motion.button
               whileHover={{ x: 5 }}
               onClick={() => setIsCSVModalOpen(true)}
-              className="w-full p-5 bg-[#1C1B1B] border border-white/5 rounded-2xl flex items-center justify-between group hover:bg-white/5 transition-all"
+              className="w-full p-3 sm:p-4 bg-[#1C1B1B] border border-white/5 rounded-xl sm:rounded-2xl flex items-center justify-between group hover:bg-white/5 transition-all"
             >
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-[#E9C349]/10 flex items-center justify-center text-[#E9C349]">
-                  <Download size={20} />
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-[#E9C349]/10 flex items-center justify-center text-[#E9C349] flex-shrink-0">
+                  <Download size={16} />
                 </div>
-                <div className="text-left">
-                  <h4 className="font-black text-sm text-white leading-tight">{t("importCsv")}</h4>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">{t("bulkImport")}</p>
+                <div className="text-left min-w-0">
+                  <h4 className="font-black text-xs sm:text-sm text-white leading-tight truncate">{t("importCsv")}</h4>
+                  <p className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wide hidden sm:block">{t("bulkImport")}</p>
                 </div>
               </div>
-              <ArrowRight size={16} className="text-gray-600 group-hover:text-[#ADC6FF] transition-colors" />
+              <ArrowRight size={14} className="text-gray-600 group-hover:text-[#ADC6FF] transition-colors flex-shrink-0" />
             </motion.button>
           </div>
 
-          <button className="w-full py-3.5 bg-gradient-to-r from-[#ADC6FF] to-[#4D8EFF] text-[#00285d] rounded-full font-black text-xs tracking-tight shadow-[0_10px_30px_rgba(173,198,255,0.2)]">
+          <button className="w-full py-3 sm:py-3.5 bg-gradient-to-r from-[#ADC6FF] to-[#4D8EFF] text-[#00285d] rounded-full font-black text-xs tracking-tight shadow-[0_10px_30px_rgba(173,198,255,0.2)]">
             {t("calculate")}
           </button>
         </div>
       </section>
 
       {/* Draggable Widgets Section */}
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         {/* Performance Chart Widget */}
-        <div className="lg:col-span-2 bg-[#1C1B1B] rounded-3xl p-6 relative group shadow-lg border border-white/5">
-          <div className="flex justify-between items-start mb-6">
+        <div className="lg:col-span-2 bg-[#1C1B1B] rounded-2xl sm:rounded-3xl p-4 sm:p-6 relative group shadow-lg border border-white/5">
+          <div className="flex justify-between items-start mb-4 sm:mb-6">
             <div>
-              <span className="text-xs text-[#E9C349] uppercase tracking-wide font-black">{t("globalPerformance")}</span>
-              <h3 className="text-lg font-bold text-white">{t("growthVelocity")}</h3>
+              <span className="text-[10px] sm:text-xs text-[#E9C349] uppercase tracking-wide font-black">{t("globalPerformance")}</span>
+              <h3 className="text-sm sm:text-lg font-bold text-white">{t("growthVelocity")}</h3>
             </div>
-            <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity">
-              <Edit3 size={14} className="text-gray-400" />
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/5 flex items-center justify-center cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity">
+              <Edit3 size={12} className="text-gray-400" />
             </div>
           </div>
-          <div className="w-full h-48 relative mt-4 min-w-0" style={{ minHeight: 192 }}>
+          <div className="w-full h-40 sm:h-48 relative mt-2 sm:mt-4 min-w-0" style={{ minHeight: 160 }}>
             <DashboardChart
               data={netWorthHistory}
               currency={currency}
@@ -571,63 +581,63 @@ export default function DashboardPage() {
               t={t}
             />
           </div>
-          <div className="flex justify-between mt-6 text-gray-500 text-xs font-black uppercase tracking-wide">
-            <span>{t("chartMonthJan")}</span><span>{t("chartMonthFeb")}</span><span>{t("chartMonthMar")}</span><span>{t("chartMonthApr")}</span><span>{t("chartMonthMay")}</span><span>{t("chartMonthJun")}</span>
+          <div className="flex justify-between mt-4 sm:mt-6 text-gray-500 text-[10px] sm:text-xs font-black uppercase tracking-wide overflow-x-auto scrollbar-none">
+            <span className="flex-shrink-0">{t("chartMonthJan")}</span><span className="flex-shrink-0">{t("chartMonthFeb")}</span><span className="flex-shrink-0">{t("chartMonthMar")}</span><span className="flex-shrink-0">{t("chartMonthApr")}</span><span className="flex-shrink-0">{t("chartMonthMay")}</span><span className="flex-shrink-0">{t("chartMonthJun")}</span>
           </div>
         </div>
 
         {/* Vault Activity Widget */}
-        <div className="bg-[#1C1B1B] rounded-3xl p-6 group relative overflow-hidden border border-white/5 shadow-lg">
-          <div className="flex justify-between items-start mb-6">
+        <div className="bg-[#1C1B1B] rounded-2xl sm:rounded-3xl p-4 sm:p-6 group relative overflow-hidden border border-white/5 shadow-lg">
+          <div className="flex justify-between items-start mb-4 sm:mb-6">
             <div>
-              <span className="text-xs text-[#E9C349] uppercase tracking-wide font-black">{t("securityLogs")}</span>
-              <h3 className="text-lg font-bold text-white">{t("vaultActivity")}</h3>
+              <span className="text-[10px] sm:text-xs text-[#E9C349] uppercase tracking-wide font-black">{t("securityLogs")}</span>
+              <h3 className="text-sm sm:text-lg font-bold text-white">{t("vaultActivity")}</h3>
             </div>
-            <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity">
-              <Edit3 size={14} className="text-gray-400" />
-            </div>
-          </div>
-          <div className="space-y-4">
-            <div className="flex gap-4">
-              <div className="w-1 bg-[#4EDEA3] rounded-full"></div>
-              <div>
-                <p className="text-xs font-bold text-white leading-tight">{t("stakeRewardClaimed")}</p>
-                <p className="text-xs text-gray-500 mt-1 uppercase tracking-wide">{t("stakeRewardTime")}</p>
-                <p className="text-xs text-[#4EDEA3] font-black mt-1">+0.42 ETH</p>
-              </div>
-            </div>
-            <div className="flex gap-4">
-              <div className="w-1 bg-[#ADC6FF] rounded-full"></div>
-              <div>
-                <p className="text-xs font-bold text-white leading-tight">{t("btcLimitOrderFill")}</p>
-                <p className="text-xs text-gray-500 mt-1 uppercase tracking-wide">{t("btcLimitOrderTime")}</p>
-                <p className="text-xs text-[#ADC6FF] font-black mt-1">{t("executed")} $63,400</p>
-              </div>
-            </div>
-            <div className="flex gap-4">
-              <div className="w-1 bg-[#E9C349] rounded-full"></div>
-              <div>
-                <p className="text-xs font-bold text-white leading-tight">{t("tierBonus")}</p>
-                <p className="text-xs text-gray-500 mt-1 uppercase tracking-wide">{t("tierBonusTime")}</p>
-                <p className="text-xs text-[#E9C349] font-black mt-1">2,500 SVN Points</p>
-              </div>
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/5 flex items-center justify-center cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity">
+              <Edit3 size={12} className="text-gray-400" />
             </div>
           </div>
-          <button className="w-full mt-8 py-2.5 rounded-xl border border-white/10 text-xs font-black uppercase tracking-wide text-gray-400 hover:bg-white/5 transition-all">
+          <div className="space-y-3 sm:space-y-4">
+            <div className="flex gap-3 sm:gap-4">
+              <div className="w-1 bg-[#4EDEA3] rounded-full flex-shrink-0 mt-1"></div>
+              <div className="min-w-0">
+                <p className="text-[10px] sm:text-xs font-bold text-white leading-tight truncate">{t("stakeRewardClaimed")}</p>
+                <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5 sm:mt-1 uppercase tracking-wide">{t("stakeRewardTime")}</p>
+                <p className="text-xs text-[#4EDEA3] font-black mt-0.5 sm:mt-1">+0.42 ETH</p>
+              </div>
+            </div>
+            <div className="flex gap-3 sm:gap-4">
+              <div className="w-1 bg-[#ADC6FF] rounded-full flex-shrink-0 mt-1"></div>
+              <div className="min-w-0">
+                <p className="text-[10px] sm:text-xs font-bold text-white leading-tight truncate">{t("btcLimitOrderFill")}</p>
+                <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5 sm:mt-1 uppercase tracking-wide">{t("btcLimitOrderTime")}</p>
+                <p className="text-xs text-[#ADC6FF] font-black mt-0.5 sm:mt-1">{t("executed")} $63,400</p>
+              </div>
+            </div>
+            <div className="flex gap-3 sm:gap-4">
+              <div className="w-1 bg-[#E9C349] rounded-full flex-shrink-0 mt-1"></div>
+              <div className="min-w-0">
+                <p className="text-[10px] sm:text-xs font-bold text-white leading-tight truncate">{t("tierBonus")}</p>
+                <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5 sm:mt-1 uppercase tracking-wide">{t("tierBonusTime")}</p>
+                <p className="text-xs text-[#E9C349] font-black mt-0.5 sm:mt-1">2,500 SVN</p>
+              </div>
+            </div>
+          </div>
+          <button className="w-full mt-4 sm:mt-6 py-2 sm:py-2.5 rounded-xl border border-white/10 text-[10px] sm:text-xs font-black uppercase tracking-wide text-gray-400 hover:bg-white/5 transition-all">
             {t("viewFullAudit")}
           </button>
         </div>
 
         {/* Cashflow Widget */}
-        <div className="bg-[#1C1B1B] rounded-3xl p-6 relative overflow-hidden border border-white/5 shadow-lg group flex flex-col justify-between">
+        <div className="bg-[#1C1B1B] rounded-2xl sm:rounded-3xl p-4 sm:p-6 relative overflow-hidden border border-white/5 shadow-lg group flex flex-col justify-between">
           <div>
-            <div className="flex justify-between items-start mb-4">
+            <div className="flex justify-between items-start mb-3 sm:mb-4">
               <div>
-                <span className="text-xs text-[#ADC6FF] uppercase tracking-wide font-black">{t("cashflowOverview")}</span>
-                <h3 className="text-lg font-bold text-white">{t("netCashflow")}</h3>
+                <span className="text-[10px] sm:text-xs text-[#ADC6FF] uppercase tracking-wide font-black">{t("cashflowOverview")}</span>
+                <h3 className="text-sm sm:text-lg font-bold text-white">{t("netCashflow")}</h3>
               </div>
-              <button onClick={() => setIsAddCashflowOpen(true)} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors">
-                <PlusCircle size={14} className="text-[#ADC6FF]" />
+              <button onClick={() => setIsAddCashflowOpen(true)} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors flex-shrink-0">
+                <PlusCircle size={12} className="text-[#ADC6FF]" />
               </button>
             </div>
             
@@ -670,36 +680,64 @@ export default function DashboardPage() {
         </div>
       </section>
 
+      {/* P/L Summary Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-gradient-to-br from-[#1C1B1B] to-[#151515] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5 relative overflow-hidden">
+          <div className="absolute -right-6 -top-6 w-20 h-20 bg-[#ADC6FF]/10 blur-3xl rounded-full" />
+          <p className="text-[10px] sm:text-xs font-black text-[#ADC6FF] uppercase tracking-wide mb-1">{t("totalInvested")}</p>
+          <h3 className="text-lg sm:text-2xl font-black text-white tracking-tighter">{formatMoney(totalInvested)}</h3>
+        </motion.div>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
+          <p className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide mb-1">{t("unrealizedPL")}</p>
+          <h3 className={cn("text-lg sm:text-2xl font-black tracking-tighter", totalUnrealizedPL >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
+            {totalUnrealizedPL >= 0 ? "+" : ""}{formatMoney(totalUnrealizedPL)}
+          </h3>
+        </motion.div>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
+          <p className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide mb-1">{t("realizedPL")}</p>
+          <h3 className={cn("text-lg sm:text-2xl font-black tracking-tighter", totalRealizedPL >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
+            {totalRealizedPL >= 0 ? "+" : ""}{formatMoney(totalRealizedPL)}
+          </h3>
+        </motion.div>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
+          <p className="text-[10px] sm:text-xs font-black text-[#E9C349] uppercase tracking-wide mb-1">{t("dividends")}</p>
+          <h3 className="text-lg sm:text-2xl font-black text-white tracking-tighter">{formatMoney(totalDividends)}</h3>
+        </motion.div>
+      </div>
+
+      {/* Customizable Widget Grid */}
+      <DashboardGrid />
+
       {/* Bento Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6">
         {/* Left Column: Target Allocation */}
-        <section className="md:col-span-4 space-y-6">
-          <div className="bg-[#1C1B1B] p-6 rounded-3xl border border-white/5 shadow-xl">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-base font-bold text-white">{t("targetAllocation")}</h3>
-              <Edit3 size={16} className="text-gray-500 cursor-pointer hover:text-white transition-colors" onClick={() => {
+        <section className="md:col-span-4 space-y-4 sm:space-y-6">
+          <div className="bg-[#1C1B1B] p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-white/5 shadow-xl">
+            <div className="flex justify-between items-center mb-4 sm:mb-6">
+              <h3 className="text-sm sm:text-base font-bold text-white">{t("targetAllocation")}</h3>
+              <Edit3 size={14} className="text-gray-500 cursor-pointer hover:text-white transition-colors" onClick={() => {
                 const vals: Record<string, number> = {};
                 allocations.forEach(a => { vals[a.label] = a.value; });
                 setEditAllocValues(vals);
                 setIsAllocEditOpen(true);
               }} />
             </div>
-            
-            <div className="space-y-4">
+
+            <div className="space-y-2 sm:space-y-4">
               {allocations.map(item => (
                 <AllocationItem key={item.label} label={translateLabel(item.label)} value={item.value} color={item.color} />
               ))}
             </div>
 
-            <div className="mt-8 p-4 bg-white/5 rounded-2xl border border-white/5">
-              <p className="text-sm text-gray-400 leading-relaxed font-medium">
+            <div className="mt-4 sm:mt-8 p-3 sm:p-4 bg-white/5 rounded-xl sm:rounded-2xl border border-white/5">
+              <p className="text-xs sm:text-sm text-gray-400 leading-relaxed font-medium">
                 {t("optimalRebalancingMsg")}
               </p>
             </div>
           </div>
 
           {/* Insight Card */}
-          <div className="relative overflow-hidden rounded-3xl h-48 bg-[#1C1B1B] p-8 flex flex-col justify-end group border border-white/5">
+          <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl h-40 sm:h-48 bg-[#1C1B1B] p-4 sm:p-8 flex flex-col justify-end group border border-white/5">
             <div 
               className="absolute inset-0 opacity-20 group-hover:opacity-30 transition-opacity duration-500 bg-cover bg-center" 
               style={{ backgroundImage: "url('https://picsum.photos/seed/market/600/400')" }}
@@ -717,20 +755,20 @@ export default function DashboardPage() {
         </section>
 
         {/* Right Column: Drift Table & Suggested Trades */}
-        <section className="md:col-span-8 space-y-6">
-          <div className="bg-[#1C1B1B] rounded-3xl border border-white/5 overflow-hidden shadow-xl">
-            <div className="p-6 pb-2">
-              <h3 className="text-base font-bold text-white">{t("currentVsTarget")}</h3>
+        <section className="md:col-span-8 space-y-4 sm:space-y-6">
+          <div className="bg-[#1C1B1B] rounded-2xl sm:rounded-3xl border border-white/5 overflow-hidden shadow-xl">
+            <div className="p-4 sm:p-6 pb-2">
+              <h3 className="text-sm sm:text-base font-bold text-white">{t("currentVsTarget")}</h3>
             </div>
-            
+
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
-                  <tr className="text-xs font-black uppercase tracking-wide text-gray-500 border-b border-white/5">
-                    <th className="px-6 py-3">{t("assetClass")}</th>
-                    <th className="px-6 py-3">{t("current")}</th>
-                    <th className="px-6 py-3">{t("target")}</th>
-                    <th className="px-6 py-3 text-right">{t("delta")}</th>
+                  <tr className="text-[10px] sm:text-xs font-black uppercase tracking-wide text-gray-500 border-b border-white/5">
+                    <th className="px-3 sm:px-6 py-2 sm:py-3">{t("assetClass")}</th>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3">{t("current")}</th>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3">{t("target")}</th>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-right">{t("delta")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -752,38 +790,38 @@ export default function DashboardPage() {
 
           {/* Suggested Trades */}
           <div>
-            <h3 className="text-xs font-black uppercase tracking-wide text-gray-500 mb-6">{t("suggestedTrades")}</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <h3 className="text-[10px] sm:text-xs font-black uppercase tracking-wide text-gray-500 mb-4 sm:mb-6">{t("suggestedTrades")}</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
               {suggestedTrades.length > 0 ? (
                 <>
                   {suggestedTrades.map(trade => (
-                    <TradeCard 
+                    <TradeCard
                       key={trade.id}
-                      type={trade.type} 
-                      asset={trade.asset} 
-                      desc={`${trade.desc} ${formatMoney(trade.diffUSD)}`} 
-                      icon={trade.icon} 
-                      color={trade.color} 
+                      type={trade.type}
+                      asset={trade.asset}
+                      desc={`${trade.desc} ${formatMoney(trade.diffUSD)}`}
+                      icon={trade.icon}
+                      color={trade.color}
                     />
                   ))}
-                  
-                  <div className="bg-[#ADC6FF]/5 p-6 rounded-3xl border border-[#ADC6FF]/20 flex flex-col justify-center">
-                    <div className="flex justify-between items-center mb-4">
-                      <span className="text-xs font-black text-[#ADC6FF] uppercase tracking-wide">{t("totalImpact")}</span>
-                      <span className="text-xl font-black text-white">{formatMoney(totalImpact)}</span>
+
+                  <div className="bg-[#ADC6FF]/5 p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-[#ADC6FF]/20 flex flex-col justify-center">
+                    <div className="flex justify-between items-center mb-3 sm:mb-4">
+                      <span className="text-[10px] sm:text-xs font-black text-[#ADC6FF] uppercase tracking-wide">{t("totalImpact")}</span>
+                      <span className="text-lg sm:text-xl font-black text-white">{formatMoney(totalImpact)}</span>
                     </div>
-                    <button 
+                    <button
                       onClick={executeAllSuggestedTrades}
-                      className="w-full py-3 bg-[#ADC6FF] text-[#00285d] rounded-full font-black text-xs uppercase tracking-wide hover:brightness-110 transition-all active:scale-95"
+                      className="w-full py-2.5 sm:py-3 bg-[#ADC6FF] text-[#00285d] rounded-full font-black text-xs uppercase tracking-wide hover:brightness-110 transition-all active:scale-95"
                     >
                       {t("executeAll")}
                     </button>
                   </div>
                 </>
               ) : (
-                <div className="col-span-1 sm:col-span-2 py-10 bg-[#1C1B1B] rounded-3xl border border-white/5 flex flex-col items-center justify-center text-center">
-                  <CheckCircle2 size={32} className="text-[#4EDEA3] mb-3 opacity-60" />
-                  <span className="text-sm font-bold text-gray-400">
+                <div className="col-span-1 sm:col-span-2 py-8 sm:py-10 bg-[#1C1B1B] rounded-2xl sm:rounded-3xl border border-white/5 flex flex-col items-center justify-center text-center">
+                  <CheckCircle2 size={24} className="text-[#4EDEA3] mb-2 sm:mb-3 opacity-60" />
+                  <span className="text-xs sm:text-sm font-bold text-gray-400">
                     {t("portfolioBalanced")}
                   </span>
                 </div>
@@ -795,31 +833,31 @@ export default function DashboardPage() {
 
       {/* Money Buckets Quick Link */}
       <section>
-        <a href="/budget" className="block">
-          <motion.div 
+        <Link href="/budget" className="block">
+          <motion.div
             whileHover={{ x: 5 }}
-            className="bg-[#1C1B1B] rounded-3xl border border-white/5 p-6 flex items-center justify-between group hover:bg-white/[0.03] transition-all cursor-pointer"
+            className="bg-[#1C1B1B] rounded-2xl sm:rounded-3xl border border-white/5 p-4 sm:p-6 flex items-center justify-between group hover:bg-white/[0.03] transition-all cursor-pointer"
           >
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-[#E9C349]/10 flex items-center justify-center text-[#E9C349]">
-                <PiggyBank size={24} />
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-[#E9C349]/10 flex items-center justify-center text-[#E9C349] flex-shrink-0">
+                <PiggyBank size={20} className="sm:size-24" />
               </div>
-              <div>
-                <h3 className="text-base font-bold text-white">{t("budgetPage")}</h3>
-                <p className="text-xs text-gray-500 font-medium mt-0.5">{t("moneyBucketsDesc")}</p>
-                <div className="flex items-center gap-3 mt-2">
+              <div className="min-w-0">
+                <h3 className="text-sm sm:text-base font-bold text-white">{t("budgetPage")}</h3>
+                <p className="text-[10px] sm:text-xs text-gray-500 font-medium mt-0.5 hidden sm:block">{t("moneyBucketsDesc")}</p>
+                <div className="flex items-center gap-2 sm:gap-3 mt-2 overflow-x-auto scrollbar-none">
                   {moneyBuckets.slice(0, 4).map(b => (
-                    <div key={b.id} className="flex items-center gap-1">
-                      <span className="text-sm">{b.icon}</span>
+                    <div key={b.id} className="flex items-center gap-1 flex-shrink-0">
+                      <span className="text-xs sm:text-sm">{b.icon}</span>
                       <span className="text-[10px] font-bold text-gray-400">{formatMoney(b.currentAmount)}</span>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
-            <ArrowRight size={18} className="text-gray-600 group-hover:text-[#E9C349] transition-colors" />
+            <ArrowRight size={14} className="text-gray-600 group-hover:text-[#E9C349] transition-colors flex-shrink-0" />
           </motion.div>
-        </a>
+        </Link>
       </section>
 
       {/* Transaction History Section */}
@@ -988,13 +1026,16 @@ export default function DashboardPage() {
           </div>
           <div className="space-y-2">
             <label className="text-xs font-black text-gray-500 uppercase tracking-wide">{t("amountUsd")}</label>
-            <input 
-              type="number" 
-              placeholder="0.00"
-              value={newTrade.amountUSD}
-              onChange={(e) => setNewTrade({ ...newTrade, amountUSD: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white outline-none focus:border-[#ADC6FF]/50 transition-all"
-            />
+            <div className="relative">
+              <input 
+                type="number" 
+                placeholder="0.00"
+                value={newTrade.amountUSD}
+                onChange={(e) => setNewTrade({ ...newTrade, amountUSD: e.target.value })}
+                className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 pr-12 text-white outline-none focus:border-[#ADC6FF]/50 transition-all"
+              />
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[#ADC6FF] font-bold text-xs uppercase opacity-80">USD</span>
+            </div>
           </div>
           <div className="flex gap-4">
             <button 

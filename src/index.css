@@ -75,3 +75,14 @@ html[lang="en"] body {
 @keyframes status-glow-orange { 0%, 100% { background-color: #ffffff; } 50% { background-color: #fffbeb; } }
 .glow-overdue { animation: status-glow-red 2s infinite ease-in-out; }
 .glow-inprogress { animation: status-glow-orange 2.5s infinite ease-in-out; }
+
+/* Light Mode Implementation using Semantic Inversion */
+html.light-mode {
+  filter: invert(1) hue-rotate(180deg);
+  background-color: white;
+}
+
+html.light-mode img,
+html.light-mode video {
+  filter: invert(1) hue-rotate(180deg);
+}

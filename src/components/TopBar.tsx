@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Bell, Globe, ChevronDown, Search, Menu, X, LayoutDashboard } from "lucide-react";
+import { Bell, Globe, ChevronDown, Search, Menu, X } from "lucide-react";
 import { useApp, Language, Currency, AppNotification } from "@/src/context/AppContext";
 import { cn } from "@/src/lib/utils";
 import { Sidebar } from "./Sidebar";
@@ -88,102 +88,89 @@ export function TopBar() {
           </h2>
         </div>
 
-        <div className="flex items-center gap-3 lg:gap-6">
-          {/* Search Bar */}
-          <form onSubmit={handleSearch} className="hidden sm:flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 focus-within:border-[#ADC6FF]/50 transition-all">
-            <Search size={14} className="text-gray-500" />
-            <input 
-              type="text" 
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Search Bar - Mobile hidden */}
+          <form onSubmit={handleSearch} className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 focus-within:border-[#ADC6FF]/50 transition-all">
+            <Search size={12} className="text-gray-500 flex-shrink-0" />
+            <input
+              type="text"
               placeholder={t("searchPlaceholder")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent border-none outline-none text-sm text-white placeholder:text-gray-600 w-32 lg:w-48"
+              className="bg-transparent border-none outline-none text-xs text-white placeholder:text-gray-600 w-28 lg:w-40"
             />
           </form>
 
-          {/* Language Selector */}
-          <div className="flex items-center gap-2">
-            <div className="relative" ref={langMenuRef}>
-              <button
-                onClick={() => setShowLangMenu(!showLangMenu)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-all"
-              >
-                <Globe size={14} className="text-gray-400" />
-                <span className="text-xs font-black uppercase tracking-wide text-white">
-                  {languages.find(l => l.code === language)?.label}
-                </span>
-                <ChevronDown size={12} className={cn("text-gray-500 transition-transform", showLangMenu && "rotate-180")} />
-              </button>
+          {/* Language Selector - Compact */}
+          <div className="relative" ref={langMenuRef}>
+            <button
+              onClick={() => setShowLangMenu(!showLangMenu)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-all"
+            >
+              <Globe size={12} className="text-gray-400" />
+              <span className="text-[10px] font-black uppercase tracking-wide text-white hidden sm:inline">
+                {languages.find(l => l.code === language)?.label}
+              </span>
+              <ChevronDown size={10} className={cn("text-gray-500 transition-transform", showLangMenu && "rotate-180")} />
+            </button>
 
-              <AnimatePresence>
-                {showLangMenu && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 10 }}
-                    className="absolute top-full right-0 mt-2 w-32 bg-[#1C1B1B] border border-white/10 rounded-xl shadow-2xl overflow-hidden py-1 z-[60]"
-                  >
-                    {languages.map((lang) => (
-                      <button
-                        key={lang.code}
-                        onClick={() => {
-                          setLanguage(lang.code);
-                          setShowLangMenu(false);
-                        }}
-                        className={cn(
-                          "w-full flex items-center gap-3 px-4 py-2 text-xs font-black uppercase tracking-wide transition-colors hover:bg-white/5",
-                          language === lang.code ? "text-[#4EDEA3]" : "text-gray-400"
-                        )}
-                      >
-                        <span>{lang.flag}</span>
-                        <span>{lang.label}</span>
-                      </button>
-                    ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            {/* Currency Selector */}
-            <div className="flex bg-white/5 rounded-full p-1 border border-white/10">
-              {currencies.map((curr) => (
-                <button
-                  key={curr}
-                  onClick={() => setCurrency(curr)}
-                  className={cn(
-                    "px-3 py-1 rounded-full text-xs font-black uppercase tracking-wide transition-all",
-                    currency === curr
-                      ? "bg-[#ADC6FF] text-[#00285d]"
-                      : "text-gray-500 hover:text-white"
-                  )}
+            <AnimatePresence>
+              {showLangMenu && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  className="absolute top-full right-0 mt-2 w-28 bg-[#1C1B1B] border border-white/10 rounded-xl shadow-2xl overflow-hidden py-1 z-[60]"
                 >
-                  {curr}
-                </button>
-              ))}
-            </div>
-
-            {/* Go to Dashboard Button */}
-            {!isDashboard && (
-              <Link
-                href="/dashboard"
-                className="flex items-center gap-2 px-4 py-2 bg-[#4EDEA3] text-[#0E0E0E] rounded-full text-xs font-bold uppercase tracking-wide hover:brightness-110 transition-all"
-              >
-                <LayoutDashboard size={14} />
-                {t("goToDashboard") || "Dashboard"}
-              </Link>
-            )}
+                  {languages.map((lang) => (
+                    <button
+                      key={lang.code}
+                      onClick={() => {
+                        setLanguage(lang.code);
+                        setShowLangMenu(false);
+                      }}
+                      className={cn(
+                        "w-full flex items-center gap-2.5 px-3 py-2 text-xs font-black uppercase tracking-wide transition-colors hover:bg-white/5",
+                        language === lang.code ? "text-[#4EDEA3]" : "text-gray-400"
+                      )}
+                    >
+                      <span>{lang.flag}</span>
+                      <span>{lang.label}</span>
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
-          <div className="flex items-center gap-4 relative">
+          {/* Currency Selector - Compact */}
+          <div className="flex bg-white/5 rounded-full p-0.5 border border-white/10">
+            {currencies.map((curr) => (
+              <button
+                key={curr}
+                onClick={() => setCurrency(curr)}
+                className={cn(
+                  "px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide transition-all",
+                  currency === curr
+                    ? "bg-[#ADC6FF] text-[#00285d]"
+                    : "text-gray-500 hover:text-white"
+                )}
+              >
+                {curr}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2 sm:gap-3 relative">
             <div ref={notifMenuRef} className="flex items-center">
               <button
                 onClick={() => { setShowNotifMenu(!showNotifMenu); setShowProfileMenu(false); setShowLangMenu(false); }}
-                className="text-gray-400 hover:text-white transition-colors relative flex items-center h-full"
+                className="text-gray-400 hover:text-white transition-colors relative flex items-center h-full p-1"
               >
-                <Bell size={20} />
+                <Bell size={18} />
                 {notifications.filter(n => !n.read).length > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-[#FFB4AB] rounded-full border-2 border-[#1C1B1B] flex items-center justify-center">
-                    <span className="text-[8px] font-black text-[#1C1B1B]">{notifications.filter(n => !n.read).length}</span>
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-3.5 bg-[#FFB4AB] rounded-full border-2 border-[#1C1B1B] flex items-center justify-center">
+                    <span className="text-[7px] font-black text-[#1C1B1B]">{notifications.filter(n => !n.read).length}</span>
                   </span>
                 )}
               </button>

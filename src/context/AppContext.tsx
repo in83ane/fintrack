@@ -1,6 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { db, supabase } from "@/src/lib/supabase";
+import { User } from "@supabase/supabase-js";
 
 export type Language = "en" | "th";
 export type Currency = "USD" | "THB" | "JPY" | "EUR";
@@ -8,13 +10,16 @@ export type Currency = "USD" | "THB" | "JPY" | "EUR";
 export interface Trade {
   id: number;
   asset: string;
-  type: "BUY" | "SELL";
+  type: "BUY" | "SELL" | "DIVIDEND" | "IMPORT";
   amountUSD: number;
   date: string;
   rateAtTime: number;
   currency: string;
   shares?: number;
   pricePerUnit?: number;
+  sourceBucketId?: string;
+  tag?: string;
+  dbId?: string;
 }
 
 export interface CashActivity {
@@ -24,6 +29,7 @@ export interface CashActivity {
   category: string;
   date: string;
   note?: string;
+  bucketId?: string;
 }
 
 export interface Allocation {
@@ -58,6 +64,7 @@ export interface MoneyBucket {
   id: string;
   name: string;
   targetPercent: number;
+  targetAmount?: number;
   currentAmount: number;
   color: string;
   icon: string;
@@ -75,15 +82,35 @@ export interface BucketActivity {
 }
 
 export interface Asset {
+  id?: string; // Optional for new assets, mandatory for existing
   name: string;
   symbol: string;
   valueUSD: number;
   change: number;
   allocation: string;
-  shares?: number; // Added to enable accurate real-time portfolio tracking
-  avgCost?: number; // Added to track cost basis for PnL
-  chartData?: {time: number, price: number}[]; // Stores intraday or historical chart
-  intradayData?: {time: number, price: number}[]; // Intraday data for 1d sparkline
+  shares?: number;
+  avgCost?: number;
+  chartData?: {time: number, price: number}[];
+  intradayData?: {time: number, price: number}[];
+  dividendTotal?: number;
+  realizedPL?: number;
+  isFavorite?: boolean;
+  sortOrder?: number;
+  is_active?: boolean;
+  currentPrice?: number;
+}
+
+export type WidgetType = 'watchlist' | 'monthly_summary' | 'allocation_pie' | 'daily_journal' | 'equity_curve' | 'bucket_overview' | 'pl_calendar_mini' | 'top_movers';
+
+export interface DashboardWidget {
+  i: string;
+  type: WidgetType;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  minW?: number;
+  minH?: number;
 }
 
 interface AppState {
@@ -109,10 +136,14 @@ interface AppState {
   setUserProfile: (profile: { email: string; avatarUrl: string; initials: string } | undefined) => void;
   fetchAssetMarketData: (symbol: string) => Promise<any>;
   removeAsset: (symbol: string) => void;
+  updateAsset: (symbol: string, updates: Partial<Asset>) => void;
+  reorderAssets: (reordered: Asset[]) => void;
   removeTrade: (id: number) => void;
   toasts: AppToast[];
   addToast: (message: string, type?: 'success' | 'info' | 'warning' | 'error') => void;
   removeToast: (id: string) => void;
+  darkMode: boolean;
+  setDarkMode: (val: boolean) => void;
   notifications: AppNotification[];
   addNotification: (title: string, message: string, type: AppNotification['type']) => void;
   markNotificationRead: (id: string) => void;
@@ -125,6 +156,13 @@ interface AppState {
   removeMoneyBucket: (id: string) => void;
   bucketActivities: BucketActivity[];
   addBucketActivity: (activity: Omit<BucketActivity, 'id'>) => void;
+  addTradeFromBucket: (trade: Omit<Trade, 'id'>, bucketId: string) => void;
+  dashboardWidgets: DashboardWidget[];
+  setDashboardWidgets: (widgets: DashboardWidget[]) => void;
+  totalInvested: number;
+  totalUnrealizedPL: number;
+  totalRealizedPL: number;
+  totalDividends: number;
 }
 
 const translations: Record<Language, Record<string, string>> = {
@@ -154,7 +192,7 @@ const translations: Record<Language, Record<string, string>> = {
     sell: "SELL",
     addTrade: "Add Trade",
     assetName: "Asset Name",
-    amountUsd: "Amount (USD)",
+    amountUsd: "Amount",
     confirm: "Confirm",
     cancel: "Cancel",
     searchPlaceholder: "Search assets, trades...",
@@ -407,7 +445,9 @@ const translations: Record<Language, Record<string, string>> = {
     exportCsv: "Export CSV",
     searchTransactions: "Search Ledger...",
     all: "All",
+    pricePerUnit: "Price per unit",
     date: "Date",
+    shares: "Shares",
     flow: "Flow",
     actions: "Actions",
     noTransactionsFound: "No Ledger Entries Found",
@@ -426,8 +466,10 @@ const translations: Record<Language, Record<string, string>> = {
     addBucket: "Add Bucket",
     editBucket: "Edit Bucket",
     bucketName: "Bucket Name",
-    targetPercent: "Target %",
+    targetPercent: "Income Split %",
+    targetAmount: "Target Goal ($)",
     currentAmount: "Current Amount",
+    suggestionInvest: "Excess amount! Consider investing:",
     savings: "Savings",
     emergency: "Emergency Fund",
     lowRiskInvest: "Low-risk Investment",
@@ -436,6 +478,9 @@ const translations: Record<Language, Record<string, string>> = {
     bucketSaved: "Bucket saved!",
     bucketDeleted: "Bucket deleted.",
     depositToBucket: "Deposit",
+    deposit: "Deposit",
+    withdraw: "Withdraw",
+    invalidAmount: "Invalid Amount",
     withdrawFromBucket: "Withdraw",
     bucketTotal: "Total Allocated",
     bucketRemaining: "Remaining",
@@ -521,6 +566,15 @@ const translations: Record<Language, Record<string, string>> = {
     customColor: "Custom Color",
     noRecordsFound: "No records found",
 
+    // Transaction Details
+    transactionDetails: "Transaction Details",
+    atTimeOfTrade: "At time of trade",
+    totalValue: "Total Value",
+    tag: "Tag",
+    exchangeRate: "Exchange Rate",
+    timestamp: "Timestamp",
+    adjustAmount: "Adjust Amount",
+
     // Chart months
     chartMonthJan: "JAN",
     chartMonthFeb: "FEB",
@@ -538,6 +592,10 @@ const translations: Record<Language, Record<string, string>> = {
     // Additional missing
     noChartData: "No data",
     deleteAsset: "Delete Asset",
+    edit: "Edit",
+    editAssets: "Edit Assets",
+    delete: "Delete",
+    confirmDeleteAsset: "Confirm Delete",
     amountExceedsBalance: "Amount exceeds bucket balance",
     insufficientBucketBalance: "Insufficient balance in {bucket}",
     noValidTradesFound: "No valid trades found",
@@ -556,7 +614,7 @@ const translations: Record<Language, Record<string, string>> = {
     typeToSearch: "Type an asset name or symbol to search",
     change: "Change",
     quantitySharesCoins: "Quantity (Shares/Coins)",
-    avgCostPerUnit: "Avg Cost per Unit (USD)",
+    avgCostPerUnit: "Avg Cost per Unit",
     totalInvestment: "Total Investment",
     // StockChart
     period1d: "1D",
@@ -581,6 +639,75 @@ const translations: Record<Language, Record<string, string>> = {
     approx: "≈",
     allocation: "allocation",
     executed: "Executed",
+
+    // Widget Dashboard
+    editDashboard: "Edit Dashboard",
+    doneDashboard: "Done",
+    addWidget: "Add Widget",
+    removeWidget: "Remove",
+    widgetWatchlist: "Watchlist",
+    widgetMonthlySummary: "Monthly Summary",
+    widgetAllocationPie: "Asset Allocation",
+    widgetDailyJournal: "Trade Journal",
+    widgetEquityCurve: "Equity Curve",
+    widgetBucketOverview: "Money Buckets",
+    widgetPLCalendar: "P/L Calendar",
+    widgetTopMovers: "Top Movers",
+    widgetLibrary: "Widget Library",
+    dragToReorder: "Drag to reorder",
+    resetLayout: "Reset Layout",
+
+    // Enhanced P/L
+    totalInvested: "Total Invested",
+    unrealizedPL: "Unrealized P/L",
+    realizedPL: "Realized P/L",
+    realized: "Realized",
+    dividends: "Dividends",
+    sourceBucket: "Source Bucket",
+    selectSourceBucket: "Select source bucket",
+    noBucketSelected: "No bucket (manual)",
+    bucketBalance: "Balance",
+    deductedFromBucket: "Deducted from bucket",
+    portfolioValue: "Portfolio Value",
+    costBasis: "Cost Basis",
+
+    // Import & Filter
+    importExisting: "Import from external",
+    importExistingDesc: "Won't deduct from budget",
+    newPurchase: "New Purchase",
+    newPurchaseDesc: "Deduct from selected bucket",
+    filterAll: "All",
+    filterByCategory: "By Category",
+    filterByType: "By Type",
+    stockType: "Stock",
+    cryptoType: "Crypto",
+    thaiStockType: "Thai Stock",
+    favorites: "Favorites",
+    importCsvPortfolio: "Import CSV",
+    exportCsvPortfolio: "Export CSV",
+    csvImportedAssets: "Imported assets from CSV!",
+    csvExportSuccess: "Portfolio exported!",
+    csvImportInstructions: "CSV format: symbol, shares, avgCost (one asset per row)",
+
+    // Calendar Tags
+    dayTrade: "Day Trade",
+    swingTrade: "Swing Trade",
+    longTerm: "Long Term",
+    dividendIncome: "Dividend",
+    cryptoTrade: "Crypto",
+    forexTrade: "Forex",
+    allTags: "All Tags",
+    equityCurve: "Equity Curve",
+    cumulativePL: "Cumulative P/L",
+    noDataYet: "No data yet",
+    portfolioGrowth: "Portfolio Growth",
+    progress: "Progress",
+    performance: "Performance",
+    winRate: "Win Rate",
+    wins: "Wins",
+    losses: "Losses",
+    avgWin: "Avg Win",
+    avgLoss: "Avg Loss",
   },
   th: {
     dashboard: "แผงควบคุม",
@@ -688,7 +815,9 @@ const translations: Record<Language, Record<string, string>> = {
     exportCsv: "ส่งออก CSV",
     searchTransactions: "ค้นหาบันทึก...",
     all: "ทั้งหมด",
+    pricePerUnit: "ราคาต่อหน่วย",
     date: "วันที่",
+    shares: "จำนวน",
     flow: "ประเภท",
     actions: "ดำเนินการ",
     noTransactionsFound: "ไม่พบรายการ",
@@ -707,8 +836,10 @@ const translations: Record<Language, Record<string, string>> = {
     addBucket: "เพิ่มกระเป๋า",
     editBucket: "แก้ไขกระเป๋า",
     bucketName: "ชื่อกระเป๋า",
-    targetPercent: "เป้าหมาย %",
+    targetPercent: "เปอร์เซ็นต์แบ่งเงิน",
+    targetAmount: "เป้าหมายเงินเก็บ",
     currentAmount: "ยอดปัจจุบัน",
+    suggestionInvest: "ยอดเงินเกินเป้าหมาย! นำส่วนเกินไปลงทุน:",
     savings: "เงินเก็บ",
     emergency: "เงินฉุกเฉิน",
     lowRiskInvest: "ลงทุนเสี่ยงต่ำ",
@@ -717,6 +848,9 @@ const translations: Record<Language, Record<string, string>> = {
     bucketSaved: "บันทึกกระเป๋าเรียบร้อย!",
     bucketDeleted: "ลบกระเป๋าแล้ว",
     depositToBucket: "ฝากเงิน",
+    deposit: "ฝากเพิ่ม",
+    withdraw: "ถอนออก",
+    invalidAmount: "จำนวนเงินไม่ถูกต้อง",
     withdrawFromBucket: "ถอนเงิน",
     bucketTotal: "จัดสรรรวม",
     bucketRemaining: "เหลือ",
@@ -925,7 +1059,7 @@ const translations: Record<Language, Record<string, string>> = {
     sell: "ขาย",
     addTrade: "เพิ่มรายการ",
     assetName: "ชื่อสินทรัพย์",
-    amountUsd: "จำนวน (USD)",
+    amountUsd: "จำนวนเงิน",
     confirm: "ยืนยัน",
     cancel: "ยกเลิก",
     searchPlaceholder: "ค้นหาสินทรัพย์, รายการ...",
@@ -936,10 +1070,10 @@ const translations: Record<Language, Record<string, string>> = {
     transactions: "ธุรกรรมเงิน",
     pricing: "ราคาแพ็กเกจ",
     premiumTier: "สมาชิกพรีเมียม",
-    marketPriceAndCost: "ราคาปัจจุบัน / ต้นทุน",
+    marketPriceAndCost: "ราคา / ต้นทุน",
     intradayTrend: "แนวโน้มรายวัน",
-    holdings: "จำนวนถือครอง",
-    totalReturn: "ผลตอบแทนรวม",
+    holdings: "ถือครอง",
+    totalReturn: "ผลตอบแทน",
     eliteAccess: "สิทธิพิเศษขั้นสูงสุด",
     upgradeDesc: "อัปเกรดเป็น Gold เพื่อรับบทวิเคราะห์จาก AI",
     upgradeNow: "อัปเกรดเลย",
@@ -975,6 +1109,15 @@ const translations: Record<Language, Record<string, string>> = {
     noRemainingPercent: "ไม่มี%ที่เหลือ",
     noRecordsFound: "ไม่พบรายการ",
 
+    // Transaction Details
+    transactionDetails: "รายละเอียดธุรกรรม",
+    atTimeOfTrade: "ณ เวลาทำรายการ",
+    totalValue: "มูลค่ารวม",
+    tag: "แท็ก",
+    exchangeRate: "อัตราแลกเปลี่ยน",
+    timestamp: "วันที่เวลา",
+    adjustAmount: "ปรับจำนวนเงิน",
+
     // Chart months
     chartMonthJan: "ม.ค.",
     chartMonthFeb: "ก.พ.",
@@ -992,6 +1135,10 @@ const translations: Record<Language, Record<string, string>> = {
     // Additional missing
     noChartData: "ไม่มีข้อมูล",
     deleteAsset: "ลบสินทรัพย์",
+    edit: "แก้ไข",
+    editAssets: "แก้ไขสินทรัพย์",
+    delete: "ลบ",
+    confirmDeleteAsset: "ยืนยันการลบ",
     amountExceedsBalance: "จำนวนเงินเกินยอดคงเหลือ",
     insufficientBucketBalance: "ยอดเงินใน{bucket}ไม่พอ",
     noValidTradesFound: "ไม่พบรายการที่ถูกต้อง",
@@ -1010,7 +1157,7 @@ const translations: Record<Language, Record<string, string>> = {
     typeToSearch: "พิมพ์ชื่อหรือสัญลักษณ์สินทรัพย์เพื่อค้นหา",
     change: "เปลี่ยน",
     quantitySharesCoins: "จำนวน (หุ้น/เหรียญ)",
-    avgCostPerUnit: "ต้นทุนเฉลี่ยต่อหน่วย (USD)",
+    avgCostPerUnit: "ต้นทุนเฉลี่ยต่อหน่วย",
     totalInvestment: "ยอดลงทุนรวม",
     // StockChart
     period1d: "1วัน",
@@ -1035,6 +1182,75 @@ const translations: Record<Language, Record<string, string>> = {
     approx: "≈",
     allocation: "สัดส่วน",
     executed: "ดำเนินการแล้ว",
+
+    // Widget Dashboard
+    editDashboard: "แก้ไขแดชบอร์ด",
+    doneDashboard: "เสร็จสิ้น",
+    addWidget: "เพิ่ม Widget",
+    removeWidget: "ลบ",
+    widgetWatchlist: "รายการจับตา",
+    widgetMonthlySummary: "สรุปรายเดือน",
+    widgetAllocationPie: "สัดส่วนสินทรัพย์",
+    widgetDailyJournal: "บันทึกการเทรด",
+    widgetEquityCurve: "กราฟมูลค่าพอร์ต",
+    widgetBucketOverview: "กระเป๋าเงิน",
+    widgetPLCalendar: "ปฏิทินกำไร/ขาดทุน",
+    widgetTopMovers: "สินทรัพย์เคลื่อนไหวมาก",
+    widgetLibrary: "คลัง Widget",
+    dragToReorder: "ลากเพื่อจัดเรียง",
+    resetLayout: "รีเซ็ตเลย์เอาต์",
+
+    // Enhanced P/L
+    totalInvested: "ลงทุนรวม",
+    unrealizedPL: "กำไรยังไม่ขาย",
+    realizedPL: "กำไรขายแล้ว",
+    realized: "ขายแล้ว",
+    dividends: "เงินปันผล",
+    sourceBucket: "กระเป๋าต้นทาง",
+    selectSourceBucket: "เลือกกระเป๋าต้นทาง",
+    noBucketSelected: "ไม่เลือก (บันทึกเอง)",
+    bucketBalance: "คงเหลือ",
+    deductedFromBucket: "หักจากกระเป๋าแล้ว",
+    portfolioValue: "มูลค่าพอร์ต",
+    costBasis: "ต้นทุนรวม",
+
+    // Import & Filter
+    importExisting: "นำเข้าจากที่อื่น",
+    importExistingDesc: "ไม่หักจากกระเป๋าเงิน",
+    newPurchase: "ซื้อใหม่",
+    newPurchaseDesc: "หักจากกระเป๋าที่เลือก",
+    filterAll: "ทั้งหมด",
+    filterByCategory: "ตามประเภท",
+    filterByType: "ตามชนิด",
+    stockType: "หุ้น",
+    cryptoType: "คริปโต",
+    thaiStockType: "หุ้นไทย",
+    favorites: "รายการโปรด",
+    importCsvPortfolio: "นำเข้า CSV",
+    exportCsvPortfolio: "ส่งออก CSV",
+    csvImportedAssets: "นำเข้าสินทรัพย์จาก CSV แล้ว!",
+    csvExportSuccess: "ส่งออกพอร์ตแล้ว!",
+    csvImportInstructions: "รูปแบบ CSV: symbol, shares, avgCost (1 สินทรัพย์ต่อบรรทัด)",
+
+    // Calendar Tags
+    dayTrade: "เทรดรายวัน",
+    swingTrade: "สวิงเทรด",
+    longTerm: "ลงทุนระยะยาว",
+    dividendIncome: "เงินปันผล",
+    cryptoTrade: "คริปโต",
+    forexTrade: "ฟอเร็กซ์",
+    allTags: "ทุกประเภท",
+    equityCurve: "กราฟมูลค่าพอร์ต",
+    cumulativePL: "กำไร/ขาดทุนสะสม",
+    noDataYet: "ยังไม่มีข้อมูล",
+    portfolioGrowth: "การเติบโตของพอร์ต",
+    progress: "ความคืบหน้า",
+    performance: "ผลงาน",
+    winRate: "อัตราชนะ",
+    wins: "ชนะ",
+    losses: "แพ้",
+    avgWin: "ชนะเฉลี่ย",
+    avgLoss: "แพ้เฉลี่ย",
   },
 };
 
@@ -1051,15 +1267,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguage] = useState<Language>("en");
   const [currency, setCurrency] = useState<Currency>("USD");
 
-  // Initialize lang from localStorage safely on client side
+  const [darkMode, setDarkModeState] = useState(true);
+
+  // Initialize lang and theme from localStorage safely on client side
   useEffect(() => {
     try {
-      const stored = localStorage.getItem("preferred-lang") as Language;
-      if (stored === "en" || stored === "th") {
-        setLanguage(stored);
+      const storedLang = localStorage.getItem("preferred-lang") as Language;
+      if (storedLang === "en" || storedLang === "th") {
+        setLanguage(storedLang);
+      }
+      const storedTheme = localStorage.getItem("theme");
+      if (storedTheme === "light") {
+        setDarkModeState(false);
       }
     } catch {}
   }, []);
+
+  const setDarkMode = (isDark: boolean) => {
+    setDarkModeState(isDark);
+    try {
+      localStorage.setItem("theme", isDark ? "dark" : "light");
+    } catch {}
+  };
+
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.remove('light-mode');
+    } else {
+      document.documentElement.classList.add('light-mode');
+    }
+  }, [darkMode]);
 
   // Sync HTML lang attribute and save to localStorage
   useEffect(() => {
@@ -1091,9 +1328,199 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [moneyBuckets, setMoneyBuckets] = useState<MoneyBucket[]>(defaultMoneyBuckets);
   const [bucketActivities, setBucketActivities] = useState<BucketActivity[]>([]);
   const [userProfile, setUserProfile] = useState<{ email: string; avatarUrl: string; initials: string } | undefined>();
+  const [user, setUser] = useState<User | null>(null);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const deletedAssetSymbols = React.useRef<Set<string>>(new Set());
   const [toasts, setToasts] = useState<AppToast[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+
+  // Auth & Data Loading
+  useEffect(() => {
+    // 1. Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        setUserProfile({
+          email: session.user.email ?? "",
+          initials: session.user.email?.substring(0, 2).toUpperCase() ?? "US",
+          avatarUrl: `https://api.dicebear.com/7.x/identicon/svg?seed=${session.user.email}&backgroundColor=1C1B1B`,
+        });
+      } else {
+        setUserProfile(undefined);
+      }
+    });
+
+    // 2. Initial session check
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Fetch data when user changes
+  useEffect(() => {
+    if (!user) {
+      // Load from localStorage for offline mode
+      try {
+        const storedAssets = localStorage.getItem("fintrack-assets");
+        const storedTrades = localStorage.getItem("fintrack-trades");
+        const storedAllocations = localStorage.getItem("fintrack-allocations");
+        const storedBuckets = localStorage.getItem("fintrack-buckets");
+        const storedBucketActivities = localStorage.getItem("fintrack-bucket-activities");
+        const storedCashActivities = localStorage.getItem("fintrack-cash-activities");
+
+        if (storedAssets) {
+          const parsedAssets = JSON.parse(storedAssets);
+          if (Array.isArray(parsedAssets)) {
+            const uniqueAssets = Array.from(new Map(parsedAssets.map(item => [item.symbol.toUpperCase(), item])).values());
+            setAssets(uniqueAssets as Asset[]);
+          }
+        }
+        if (storedTrades) setTrades(JSON.parse(storedTrades));
+        if (storedAllocations) setAllocations(JSON.parse(storedAllocations));
+        if (storedBuckets) setMoneyBuckets(JSON.parse(storedBuckets));
+        if (storedBucketActivities) setBucketActivities(JSON.parse(storedBucketActivities));
+        if (storedCashActivities) setCashActivities(JSON.parse(storedCashActivities));
+      } catch (err) {
+        console.error("Failed to load from localStorage", err);
+      }
+      setIsDataLoaded(true);
+      return;
+    }
+
+    const loadData = async () => {
+      try {
+        const [
+          { data: assetsData },
+          { data: tradesData },
+          { data: allocationsData },
+          { data: bucketsData },
+          { data: bucketActivitiesData },
+          { data: cashActivitiesData }
+        ] = await Promise.all([
+          db.assets.getAll(user.id),
+          db.trades.getAll(user.id),
+          db.allocations.getAll(user.id),
+          db.buckets.getAll(user.id),
+          db.bucketActivities.getAll(user.id),
+          db.cashActivities.getAll(user.id)
+        ]);
+
+        if (assetsData) {
+          // Populate deleted symbols so trades don't recreate them
+          assetsData.filter(a => a.is_active === false).forEach(a => {
+            deletedAssetSymbols.current.add(a.symbol.toUpperCase());
+          });
+
+          // Filter out soft-deleted assets (is_active: false)
+          const activeAssets = assetsData.filter(a => a.is_active !== false);
+          const uniqueAssetsMap = new Map();
+          activeAssets.forEach(a => {
+            if (!uniqueAssetsMap.has(a.symbol.toUpperCase())) {
+              uniqueAssetsMap.set(a.symbol.toUpperCase(), {
+                id: a.id,
+                name: a.name,
+                symbol: a.symbol,
+                valueUSD: a.value_usd,
+                change: a.change_percentage || 0,
+                allocation: a.asset_type || 'Equities',
+                shares: a.quantity,
+                avgCost: a.avg_purchase_price || 0,
+                currentPrice: a.current_price || (a.quantity && a.quantity > 0 ? a.value_usd / a.quantity : 0),
+                isFavorite: a.is_favorite,
+                sortOrder: a.sort_order,
+                is_active: a.is_active
+              });
+            }
+          });
+          setAssets(Array.from(uniqueAssetsMap.values()));
+        }
+
+        if (tradesData) {
+          setTrades(tradesData.map(t => ({
+            id: parseInt(t.id.split('-')[0], 16) || Date.now(), // Fallback for old trade ID system if needed
+            asset: t.symbol,
+            type: t.type,
+            amountUSD: t.amount_usd,
+            date: t.date,
+            rateAtTime: t.rate_at_time || 1,
+            currency: t.currency || 'USD',
+            shares: t.quantity || 0,
+            pricePerUnit: t.price_per_unit || 0,
+            sourceBucketId: t.source_bucket_id || undefined,
+            tag: t.tag || undefined,
+            dbId: t.id
+          })));
+        }
+
+        if (allocationsData && allocationsData.length > 0) {
+          setAllocations(allocationsData.map(a => ({
+            label: a.label,
+            value: a.value,
+            color: a.color
+          })));
+        }
+
+        if (bucketsData) {
+          setMoneyBuckets(bucketsData.map(b => ({
+            id: b.id,
+            name: b.name,
+            targetPercent: b.target_percent,
+            targetAmount: b.target_amount,
+            currentAmount: b.current_amount,
+            color: b.color,
+            icon: b.icon,
+            linkedToExpenses: b.linked_to_expenses
+          })));
+        }
+
+        if (bucketActivitiesData) {
+          setBucketActivities(bucketActivitiesData.map(ba => ({
+            id: ba.id,
+            bucketId: ba.bucket_id,
+            bucketName: "", // We can look this up
+            type: ba.type,
+            amount: ba.amount,
+            date: ba.date,
+            note: ba.note || undefined
+          })));
+        }
+
+        if (cashActivitiesData) {
+          setCashActivities(cashActivitiesData.map(ca => ({
+            id: ca.id,
+            type: ca.type,
+            amountUSD: ca.amount,
+            category: ca.category,
+            date: ca.date,
+            note: ca.note || undefined
+          })));
+        }
+
+      } catch (err) {
+        console.error("Failed to load data from Supabase", err);
+      } finally {
+        setIsDataLoaded(true);
+      }
+    };
+
+    loadData();
+  }, [user]);
+
+  // Sync state to local storage is no longer needed as primary source, 
+  // but we can keep it as a backup for transient state if we want.
+  // For now, let's focus on Supabase persistence in the action functions.
+
+
+  const [dashboardWidgets, setDashboardWidgets] = useState<DashboardWidget[]>([
+    { i: 'w1', type: 'equity_curve', x: 0, y: 0, w: 2, h: 2, minW: 1, minH: 2 },
+    { i: 'w2', type: 'allocation_pie', x: 2, y: 0, w: 1, h: 2, minW: 1, minH: 2 },
+    { i: 'w3', type: 'monthly_summary', x: 3, y: 0, w: 1, h: 2, minW: 1, minH: 2 },
+    { i: 'w4', type: 'watchlist', x: 0, y: 2, w: 2, h: 2, minW: 1, minH: 2 },
+    { i: 'w5', type: 'bucket_overview', x: 2, y: 2, w: 1, h: 2, minW: 1, minH: 2 },
+    { i: 'w6', type: 'top_movers', x: 3, y: 2, w: 1, h: 2, minW: 1, minH: 2 },
+  ]);
   const [notifPreferences, setNotifPreferences] = useState<NotifPreferences>({
     priceAlerts: true,
     rebalanceAlerts: true,
@@ -1126,61 +1553,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setNotifications([]);
   };
 
-  // Load data from localStorage on mount (per user)
-  useEffect(() => {
-    if (!userProfile?.email) return;
-    try {
-      const email = userProfile.email;
-      const storedTrades = localStorage.getItem(`fintrack_trades_${email}`);
-      const storedAllocations = localStorage.getItem(`fintrack_allocations_${email}`);
-      const storedAssets = localStorage.getItem(`fintrack_assets_${email}`);
-      const storedBuckets = localStorage.getItem(`fintrack_buckets_${email}`);
-      const storedBucketActivities = localStorage.getItem(`fintrack_bucket_activities_${email}`);
-
-      if (storedTrades) {
-        const parsedTrades = JSON.parse(storedTrades);
-        // Wipe old mock data (BTC $5000, ID 1) if it still exists
-        if (parsedTrades.length > 0 && parsedTrades[0].id === 1 && parsedTrades[0].amountUSD === 5000 && parsedTrades[0].asset === "BTC") {
-           setTrades([]);
-           setAssets([]);
-           localStorage.removeItem(`fintrack_trades_${email}`);
-           localStorage.removeItem(`fintrack_assets_${email}`);
-        } else {
-           setTrades(parsedTrades);
-        }
-      }
-      if (storedAllocations) setAllocations(JSON.parse(storedAllocations));
-      if (storedAssets && localStorage.getItem(`fintrack_trades_${email}`)) {
-         setAssets(JSON.parse(storedAssets));
-      }
-      if (storedBuckets) setMoneyBuckets(JSON.parse(storedBuckets));
-      if (storedBucketActivities) setBucketActivities(JSON.parse(storedBucketActivities));
-    } catch (e) {
-      console.error("Failed to parse local storage", e);
-    } finally {
-      setIsDataLoaded(true);
-    }
-  }, [userProfile?.email]);
-
-  // Sync data to localStorage dynamically (only if we've already loaded it to prevent overwriting with defaults)
-  useEffect(() => {
-    if (!isDataLoaded || !userProfile?.email) return;
-    try {
-      const email = userProfile.email;
-      localStorage.setItem(`fintrack_trades_${email}`, JSON.stringify(trades));
-      localStorage.setItem(`fintrack_allocations_${email}`, JSON.stringify(allocations));
-      localStorage.setItem(`fintrack_assets_${email}`, JSON.stringify(assets));
-      localStorage.setItem(`fintrack_buckets_${email}`, JSON.stringify(moneyBuckets));
-      localStorage.setItem(`fintrack_bucket_activities_${email}`, JSON.stringify(bucketActivities));
-    } catch {}
-  }, [trades, allocations, assets, moneyBuckets, bucketActivities, userProfile?.email, isDataLoaded]);
-
   // Compute net worth history from actual trade data + current portfolio value
   const netWorthHistory = React.useMemo(() => {
-    const currentTotalUSD = assets.reduce((acc, curr) => acc + curr.valueUSD, 0);
+    const currentCashUSD = moneyBuckets.reduce((acc, curr) => acc + curr.currentAmount, 0) / (exchangeRates[currency] || 1);
+    const currentTotalUSD = assets.reduce((acc, curr) => acc + curr.valueUSD, 0) + currentCashUSD;
     const now = new Date();
     const currentDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    
+
     // Group trades by month to build historical net worth timeline
     const monthlyInvested: Record<string, number> = {};
     trades.forEach(trade => {
@@ -1188,29 +1567,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (!monthlyInvested[month]) monthlyInvested[month] = 0;
       monthlyInvested[month] += trade.type === "BUY" ? trade.amountUSD : -trade.amountUSD;
     });
-    
+
     // Build cumulative timeline
     const months = Object.keys(monthlyInvested).sort();
     let cumulative = 0;
     const history = months.map(m => {
       cumulative += monthlyInvested[m];
-      return { date: m, value: cumulative };
+      return { date: m, value: cumulative + currentCashUSD };
     });
-    
+
     // Always add current real portfolio value as the latest point
     if (history.length === 0 || history[history.length - 1].date !== currentDateStr) {
-      history.push({ date: currentDateStr, value: currentTotalUSD });
+      history.push({ date: currentDateStr, value: currentTotalUSD > 0 ? currentTotalUSD : cumulative });
     } else {
-      history[history.length - 1].value = currentTotalUSD;
+      history[history.length - 1].value = currentTotalUSD > 0 ? currentTotalUSD : history[history.length - 1].value;
     }
-    
+
     // Need at least 2 points for the chart
     if (history.length < 2) {
       history.unshift({ date: "Start", value: 0 });
     }
-    
+
     return history;
-  }, [assets, trades]);
+  }, [assets, trades, moneyBuckets, currency, exchangeRates]);
 
 
   // Helper to read cookie by name
@@ -1259,61 +1638,202 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Fetch Live Market Data
+  // Sync asset holdings from trades (Moving Average method)
   useEffect(() => {
-    let mounted = true;
-    const fetchMarketData = async () => {
-      try {
-        const mapToMarketSymbol = (sym: string) => {
-          if (['BTC', 'ETH', 'SOL', 'USDT', 'DOGE', 'XRP'].includes(sym.toUpperCase())) return `${sym.toUpperCase()}-USD`;
-          return sym.toUpperCase();
-        };
+    if (!isDataLoaded) return;
 
-        // We fetch for whatever is currently in the assets array initially
-        setAssets(currentAssets => {
-          if (currentAssets.length === 0) return currentAssets;
-          
-          const symbolsQuery = currentAssets.map(a => mapToMarketSymbol(a.symbol)).join(',');
-          
-          fetch(`/api/market?symbols=${symbolsQuery}`)
-            .then(res => res.ok ? res.json() : null)
-            .then(data => {
-              if (mounted && data?.results && Array.isArray(data.results)) {
-                setAssets(prev => prev.map(asset => {
-                  const marketSym = mapToMarketSymbol(asset.symbol);
-                  const liveData = data.results.find((r: any) => r.symbol === marketSym);
-                  if (liveData) {
-                    // Adjust valueUSD if shares exist to be accurate, else just update change percentage
-                    const calculatedValue = asset.shares ? (asset.shares * liveData.price) : asset.valueUSD;
-                    return {
-                      ...asset,
-                      change: Number(liveData.changePercent.toFixed(2)),
-                      valueUSD: calculatedValue,
-                      name: liveData.name || asset.name,
-                      chartData: liveData.chartData || asset.chartData,
-                      intradayData: liveData.intradayData || asset.intradayData,
-                    };
-                  }
-                  return asset;
-                }));
-              }
-            }).catch(e => console.error("Market APi Error", e));
-            
-          return currentAssets;
-        });
-      } catch (err) {
-        // Silently fail UI demo if external API breaks
+    const stats: Record<string, { shares: number; totalCost: number; realizedPL: number; dividendTotal: number }> = {};
+    const sortedTrades = [...trades].sort((a, b) => a.date.localeCompare(b.date));
+
+    sortedTrades.forEach(trade => {
+      const sym = trade.asset.toUpperCase();
+      // Skip trades for assets that were manually deleted
+      if (deletedAssetSymbols.current.has(sym)) return;
+      if (!stats[sym]) stats[sym] = { shares: 0, totalCost: 0, realizedPL: 0, dividendTotal: 0 };
+      
+      const s = stats[sym];
+      const tradeShares = trade.shares || (trade.pricePerUnit && trade.pricePerUnit > 0 ? trade.amountUSD / trade.pricePerUnit : 0);
+
+      if (trade.type === "BUY" || trade.type === "IMPORT") {
+        s.shares += tradeShares;
+        s.totalCost += trade.amountUSD;
+      } else if (trade.type === "SELL") {
+        if (s.shares > 0) {
+          const costOfSharesSold = (tradeShares / s.shares) * s.totalCost;
+          s.realizedPL += (trade.amountUSD - costOfSharesSold);
+          s.shares -= tradeShares;
+          s.totalCost -= costOfSharesSold;
+        } else {
+          // Short selling or selling without buy record
+          s.realizedPL += trade.amountUSD;
+        }
+      } else if (trade.type === "DIVIDEND") {
+        s.dividendTotal += trade.amountUSD;
       }
+    });
+
+    setAssets(prev => {
+      // Build a set of symbols that exist in Supabase with is_active: false
+      const softDeletedSymbols = new Set(
+        prev.filter(a => a.is_active === false).map(a => a.symbol.toUpperCase())
+      );
+
+      // Filter out deleted symbols (both soft-deleted and manually removed)
+      const filtered = prev.filter(a => {
+        const sym = a.symbol.toUpperCase();
+        return !deletedAssetSymbols.current.has(sym) && !softDeletedSymbols.has(sym);
+      });
+      const newAssets = [...filtered];
+      // Update existing
+      newAssets.forEach((asset, idx) => {
+        const s = stats[asset.symbol.toUpperCase()];
+        if (s) {
+          newAssets[idx] = {
+            ...asset,
+            shares: s.shares,
+            avgCost: s.shares > 0 ? s.totalCost / s.shares : 0,
+            realizedPL: s.realizedPL,
+            dividendTotal: s.dividendTotal
+          };
+          delete stats[asset.symbol.toUpperCase()];
+        }
+      });
+      // Add new ones that aren't in the deleted set and have positive shares
+      Object.entries(stats).forEach(([symbol, s]) => {
+        if (deletedAssetSymbols.current.has(symbol)) return;
+        // Don't recreate assets with 0 shares (fully sold)
+        if (s.shares <= 0) return;
+        // Don't recreate soft-deleted assets
+        if (softDeletedSymbols.has(symbol)) return;
+        const CRYPTO_SYM = ['BTC', 'ETH', 'SOL', 'USDT', 'DOGE', 'XRP'];
+        const autoAlloc = CRYPTO_SYM.includes(symbol) ? 'Alternatives'
+          : (symbol.endsWith('.BK') || symbol.endsWith('.TH')) ? 'Equities'
+          : 'Equities';
+        newAssets.push({
+          name: symbol,
+          symbol: symbol,
+          valueUSD: s.totalCost,
+          currentPrice: s.shares > 0 ? s.totalCost / s.shares : 0,
+          change: 0,
+          allocation: autoAlloc,
+          shares: s.shares,
+          avgCost: s.shares > 0 ? s.totalCost / s.shares : 0,
+          realizedPL: s.realizedPL,
+          dividendTotal: s.dividendTotal
+        });
+      });
+      // Deduplicate to avoid React key collisions
+      const deduplicatedAssets = Array.from(new Map(newAssets.map(item => [item.symbol.toUpperCase(), item])).values());
+      return deduplicatedAssets;
+    });
+  }, [trades, isDataLoaded]);
+
+  // Fetch Live Market Data with caching and optimistic updates
+  useEffect(() => {
+    if (!isDataLoaded) return;
+
+    let mounted = true;
+    const CACHE_KEY = 'fintrack-market-cache';
+    const CACHE_DURATION = 30000; // 30 seconds cache
+
+    const getCachedData = () => {
+      try {
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const { data, timestamp } = JSON.parse(cached);
+          if (Date.now() - timestamp < CACHE_DURATION) {
+            return data;
+          }
+        }
+      } catch {}
+      return null;
+    };
+
+    const setCacheData = (data: any) => {
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify({ data, timestamp: Date.now() }));
+      } catch {}
+    };
+
+    const fetchMarketData = async () => {
+      setAssets(currentAssets => {
+        if (currentAssets.length === 0) return currentAssets;
+
+        // First: Try cache immediately for fast UI
+        const cachedData = getCachedData();
+        let updated = currentAssets;
+
+        if (cachedData?.results && Array.isArray(cachedData.results)) {
+          updated = currentAssets.map(asset => {
+            const marketSym = mapToMarketSymbol(asset.symbol);
+            const liveData = cachedData.results.find((r: any) => r.symbol === marketSym);
+            if (liveData) {
+              const calculatedValue = asset.shares ? (asset.shares * liveData.price) : asset.valueUSD;
+              return {
+                ...asset,
+                change: Number(liveData.changePercent.toFixed(2)),
+                valueUSD: calculatedValue,
+                currentPrice: liveData.price,
+                name: liveData.name || asset.name,
+                chartData: liveData.chartData || asset.chartData,
+                intradayData: liveData.intradayData || asset.intradayData,
+              };
+            }
+            return asset;
+          });
+        }
+
+        // Background: Fetch fresh data
+        const symbolsQuery = currentAssets.map(a => mapToMarketSymbol(a.symbol)).join(',');
+
+        fetch(`/api/market?symbols=${symbolsQuery}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' }
+        })
+          .then(res => res.ok ? res.json() : null)
+          .then(data => {
+            if (mounted && data?.results && Array.isArray(data.results)) {
+              setCacheData(data);
+              setAssets(prev => prev.map(asset => {
+                const marketSym = mapToMarketSymbol(asset.symbol);
+                const liveData = data.results.find((r: any) => r.symbol === marketSym);
+                if (liveData) {
+                  const calculatedValue = asset.shares ? (asset.shares * liveData.price) : asset.valueUSD;
+                  return {
+                    ...asset,
+                    change: Number(liveData.changePercent.toFixed(2)),
+                    valueUSD: calculatedValue,
+                    currentPrice: liveData.price,
+                    name: liveData.name || asset.name,
+                    chartData: liveData.chartData || asset.chartData,
+                    intradayData: liveData.intradayData || asset.intradayData,
+                  };
+                }
+                return asset;
+              }));
+            }
+          })
+          .catch(e => {
+            console.debug("Market fetch failed, using cached data");
+          });
+
+        return updated;
+      });
+    };
+
+    const mapToMarketSymbol = (sym: string) => {
+      if (['BTC', 'ETH', 'SOL', 'USDT', 'DOGE', 'XRP'].includes(sym.toUpperCase())) return `${sym.toUpperCase()}-USD`;
+      return sym.toUpperCase();
     };
 
     fetchMarketData();
-    const interval = setInterval(fetchMarketData, 60000); // 1 minute auto-refresh
+    const interval = setInterval(fetchMarketData, 30000); // 30 seconds refresh
 
     return () => {
       mounted = false;
       clearInterval(interval);
     };
-  }, []);
+  }, [isDataLoaded]);
 
   const fetchAssetMarketData = async (symbol: string) => {
     try {
@@ -1355,57 +1875,459 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return formatted;
   };
 
-  const addAsset = (asset: Asset) => {
-    setAssets(prev => [asset, ...prev]);
+  const addAsset = async (assetData: Asset) => {
+    const existingIdx = assets.findIndex(a => a.symbol.toUpperCase() === assetData.symbol.toUpperCase());
+    if (!user) {
+      if (existingIdx === -1) {
+        setAssets(prev => [assetData, ...prev]);
+      }
+      return;
+    }
+    try {
+      const { data, error } = await db.assets.upsert({
+        user_id: user.id,
+        name: assetData.name,
+        symbol: assetData.symbol,
+        asset_type: assetData.allocation,
+        value_usd: assetData.valueUSD,
+        quantity: assetData.shares || 0,
+        avg_purchase_price: assetData.avgCost || 0,
+        current_price: assetData.valueUSD / (assetData.shares || 1),
+        is_active: true,
+        is_favorite: assetData.isFavorite || false,
+        sort_order: assetData.sortOrder || assets.length,
+        notes: null,
+        sector: null,
+        country: null,
+        allocation_target: 0,
+        allocation_current: 0,
+        change_24h: 0,
+        change_percentage: assetData.change
+      });
+      if (data) {
+        const newAsset = {
+          ...assetData,
+          id: data.id,
+          is_active: data.is_active,
+          isFavorite: data.is_favorite,
+          sortOrder: data.sort_order
+        };
+        setAssets(prev => {
+          const idx = prev.findIndex(a => a.symbol.toUpperCase() === newAsset.symbol.toUpperCase());
+          if (idx >= 0) {
+            const next = [...prev];
+            next[idx] = { ...next[idx], ...newAsset };
+            return next;
+          }
+          return [newAsset, ...prev];
+        });
+      }
+    } catch (err) {
+      console.error("Failed to add asset to Supabase", err);
+    }
   };
 
-  const addTrade = (tradeData: Omit<Trade, "id">) => {
-    const nextId = trades.length > 0 ? Math.max(...trades.map(t => t.id)) + 1 : 1;
-    setTrades([...trades, { ...tradeData, id: nextId }]);
+  const addTrade = async (tradeData: Omit<Trade, "id">) => {
+    if (!user) {
+      const nextId = trades.length > 0 ? Math.max(...trades.map(t => t.id)) + 1 : 1;
+      const newTrades = [...trades, { ...tradeData, id: nextId }];
+      setTrades(newTrades);
+      localStorage.setItem("fintrack-trades", JSON.stringify(newTrades));
+      return;
+    }
+    try {
+      const { data, error } = await db.trades.insert({
+        user_id: user.id,
+        asset_id: null, // We could link this if we had the asset ID
+        symbol: tradeData.asset,
+        type: tradeData.type,
+        amount_usd: tradeData.amountUSD,
+        quantity: tradeData.shares || 0,
+        price_per_unit: tradeData.pricePerUnit || 0,
+        date: tradeData.date,
+        rate_at_time: tradeData.rateAtTime,
+        currency: tradeData.currency,
+        source_bucket_id: tradeData.sourceBucketId || null,
+        tag: tradeData.tag || null
+      });
+      if (data) {
+        setTrades(prev => [...prev, {
+          ...tradeData,
+          id: parseInt(data.id.split('-')[0], 16) || Date.now(),
+          dbId: data.id
+        }]);
+      }
+    } catch (err) {
+      console.error("Failed to add trade to Supabase", err);
+    }
+
+    // Also log as cash activity for Cashflow tracking
+    await addCashActivity({
+      type: tradeData.type === "BUY" ? "EXPENSE" : "INCOME",
+      amountUSD: tradeData.amountUSD,
+      category: "investment",
+      date: tradeData.date,
+      note: `${tradeData.type} ${tradeData.asset} | ${tradeData.shares ? `${tradeData.shares} shares @ ${tradeData.pricePerUnit?.toFixed(2)}` : ""} | Total: ${tradeData.amountUSD.toFixed(2)} ${tradeData.sourceBucketId ? `| Wallet: ${moneyBuckets.find(b => b.id === tradeData.sourceBucketId)?.name || "Unknown"}` : ""}`
+    });
+
+    // If SELL, distribute the income to buckets automatically
+    if (tradeData.type === "SELL" && moneyBuckets.length > 0) {
+      const totalAllocated = moneyBuckets.reduce((acc, b) => acc + (b.targetPercent || 0), 0);
+      if (totalAllocated > 0) {
+        for (const bucket of moneyBuckets) {
+          const pct = bucket.targetPercent || 0;
+          const share = (pct / totalAllocated) * tradeData.amountUSD;
+          if (share > 0) {
+            updateMoneyBucket(bucket.id, { currentAmount: bucket.currentAmount + share });
+            addBucketActivity({
+              bucketId: bucket.id,
+              bucketName: bucket.name,
+              type: "deposit",
+              amount: share,
+              date: new Date().toISOString(),
+              note: `SELL ${tradeData.asset} — ${t("income")}`,
+            });
+          }
+        }
+      }
+    }
   };
 
-  const addCashActivity = (activityData: Omit<CashActivity, "id">) => {
-    const id = Math.random().toString(36).substr(2, 9);
-    setCashActivities([...cashActivities, { ...activityData, id }]);
+  const removeAsset = async (symbol: string) => {
+    const sym = symbol.toUpperCase();
+    if (!user) {
+      deletedAssetSymbols.current.add(sym);
+      setAssets(prev => {
+        const newAssets = prev.filter(a => a.symbol.toUpperCase() !== sym);
+        localStorage.setItem("fintrack-assets", JSON.stringify(newAssets));
+        return newAssets;
+      });
+      setTrades(prev => {
+        const newTrades = prev.filter(t => t.asset.toUpperCase() !== sym);
+        localStorage.setItem("fintrack-trades", JSON.stringify(newTrades));
+        return newTrades;
+      });
+      return;
+    }
+    try {
+      // Option B: Soft delete all rows matching symbol
+      await db.assets.softDeleteBySymbol(user.id, sym);
+      
+      // Delete all trades for this asset
+      await db.trades.deleteBySymbol(user.id, sym);
+      
+      deletedAssetSymbols.current.add(sym);
+      setAssets(prev => prev.filter(a => a.symbol.toUpperCase() !== sym));
+      setTrades(prev => prev.filter(t => t.asset.toUpperCase() !== sym));
+    } catch (err) {
+      console.error("Failed to remove asset from Supabase", err);
+    }
   };
 
-  const removeCashActivity = (id: string) => {
-    setCashActivities(cashActivities.filter(a => a.id !== id));
+  const updateAsset = async (symbol: string, updates: Partial<Asset>) => {
+    const sym = symbol.toUpperCase();
+    if (!user) {
+      setAssets(prev => {
+        const newAssets = prev.map(a => a.symbol.toUpperCase() === sym ? { ...a, ...updates } : a);
+        localStorage.setItem("fintrack-assets", JSON.stringify(newAssets));
+        return newAssets;
+      });
+      return;
+    }
+    try {
+      const asset = assets.find(a => a.symbol.toUpperCase() === sym);
+      if (asset?.id) {
+        const supabaseUpdates: any = {};
+        if (updates.name !== undefined) supabaseUpdates.name = updates.name;
+        if (updates.isFavorite !== undefined) supabaseUpdates.is_favorite = updates.isFavorite;
+        if (updates.sortOrder !== undefined) supabaseUpdates.sort_order = updates.sortOrder;
+        if (updates.allocation !== undefined) supabaseUpdates.asset_type = updates.allocation;
+        if (updates.is_active !== undefined) supabaseUpdates.is_active = updates.is_active;
+        
+        await db.assets.update(asset.id, supabaseUpdates);
+      }
+      setAssets(prev => prev.map(a => a.symbol.toUpperCase() === sym ? { ...a, ...updates } : a));
+    } catch (err) {
+      console.error("Failed to update asset in Supabase", err);
+    }
   };
 
-  const updateAllocation = (label: string, value: number) => {
+  const reorderAssets = async (reordered: Asset[]) => {
+    setAssets(reordered);
+    if (!user) {
+      localStorage.setItem("fintrack-assets", JSON.stringify(reordered));
+      return;
+    }
+    try {
+      // Batch update sort order
+      const updates = reordered
+        .filter(a => a.id)
+        .map((a, idx) => ({ id: a.id!, sort_order: idx }));
+
+      if (updates.length > 0) {
+        await db.assets.bulkUpdate(updates);
+      }
+    } catch (err) {
+      console.error("Failed to reorder assets in Supabase", err);
+    }
+  };
+
+  const removeTrade = async (id: number) => {
+    const tradeToRemove = trades.find(t => t.id === id);
+    if (!user || !tradeToRemove?.dbId) {
+      setTrades(prev => {
+        const newTrades = prev.filter(t => t.id !== id);
+        localStorage.setItem("fintrack-trades", JSON.stringify(newTrades));
+        return newTrades;
+      });
+      return;
+    }
+    try {
+      await db.trades.delete(tradeToRemove.dbId);
+      setTrades(prev => prev.filter(t => t.id !== id));
+    } catch (err) {
+      console.error("Failed to remove trade from Supabase", err);
+    }
+  };
+
+  const addMoneyBucket = async (bucket: Omit<MoneyBucket, 'id'>) => {
+    if (!user) {
+      const id = Date.now().toString();
+      setMoneyBuckets(prev => {
+        const newBuckets = [...prev, { ...bucket, id }];
+        localStorage.setItem("fintrack-buckets", JSON.stringify(newBuckets));
+        return newBuckets;
+      });
+      return;
+    }
+    try {
+      const { data } = await db.buckets.insert({
+        user_id: user.id,
+        name: bucket.name,
+        target_percent: bucket.targetPercent,
+        target_amount: bucket.targetAmount || 0,
+        current_amount: bucket.currentAmount,
+        color: bucket.color,
+        icon: bucket.icon,
+        linked_to_expenses: bucket.linkedToExpenses || false
+      });
+      if (data) {
+        setMoneyBuckets(prev => [...prev, { ...bucket, id: data.id }]);
+      }
+    } catch (err) {
+      console.error("Failed to add bucket to Supabase", err);
+    }
+  };
+
+  const updateMoneyBucket = async (id: string, updates: Partial<MoneyBucket>) => {
+    if (!user) {
+      setMoneyBuckets(prev => {
+        const newBuckets = prev.map(b => b.id === id ? { ...b, ...updates } : b);
+        localStorage.setItem("fintrack-buckets", JSON.stringify(newBuckets));
+        return newBuckets;
+      });
+      return;
+    }
+    try {
+      const supabaseUpdates: any = {};
+      if (updates.name !== undefined) supabaseUpdates.name = updates.name;
+      if (updates.currentAmount !== undefined) supabaseUpdates.current_amount = updates.currentAmount;
+      if (updates.targetPercent !== undefined) supabaseUpdates.target_percent = updates.targetPercent;
+      if (updates.targetAmount !== undefined) supabaseUpdates.target_amount = updates.targetAmount;
+      if (updates.color !== undefined) supabaseUpdates.color = updates.color;
+      if (updates.icon !== undefined) supabaseUpdates.icon = updates.icon;
+      if (updates.linkedToExpenses !== undefined) supabaseUpdates.linked_to_expenses = updates.linkedToExpenses;
+      
+      const { error } = await db.buckets.update(id, supabaseUpdates);
+      if (error) throw error;
+      setMoneyBuckets(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
+    } catch (err) {
+      console.error("Failed to update bucket in Supabase", err);
+    }
+  };
+
+  const removeMoneyBucket = async (id: string) => {
+    if (!user) {
+      setMoneyBuckets(prev => {
+        const newBuckets = prev.filter(b => b.id !== id);
+        localStorage.setItem("fintrack-buckets", JSON.stringify(newBuckets));
+        return newBuckets;
+      });
+      return;
+    }
+    try {
+      await db.buckets.delete(id);
+      setMoneyBuckets(prev => prev.filter(b => b.id !== id));
+    } catch (err) {
+      console.error("Failed to remove bucket from Supabase", err);
+    }
+  };
+
+  const addBucketActivity = async (activity: Omit<BucketActivity, 'id'>) => {
+    if (!user) {
+      const id = Date.now().toString() + "-" + Math.random().toString(36).substr(2, 9);
+      setBucketActivities(prev => {
+        const newActivities = [{ ...activity, id }, ...prev];
+        localStorage.setItem("fintrack-bucket-activities", JSON.stringify(newActivities));
+        return newActivities;
+      });
+      return;
+    }
+    try {
+      const { data } = await db.bucketActivities.insert({
+        user_id: user.id,
+        bucket_id: activity.bucketId,
+        type: activity.type,
+        amount: activity.amount,
+        note: activity.note || null,
+        date: activity.date
+      });
+      if (data) {
+        setBucketActivities(prev => [{ ...activity, id: data.id }, ...prev]);
+      }
+    } catch (err) {
+      console.error("Failed to add bucket activity to Supabase", err);
+    }
+  };
+
+  const addCashActivity = async (activityData: Omit<CashActivity, "id">) => {
+    if (!user) {
+      const id = Math.random().toString(36).substr(2, 9);
+      setCashActivities(prev => {
+        const newActivities = [...prev, { ...activityData, id }];
+        localStorage.setItem("fintrack-cash-activities", JSON.stringify(newActivities));
+        return newActivities;
+      });
+      return;
+    }
+    try {
+      const { data } = await db.cashActivities.insert({
+        user_id: user.id,
+        type: activityData.type,
+        amount: activityData.amountUSD,
+        category: activityData.category,
+        note: activityData.note || null,
+        date: activityData.date
+      });
+      if (data) {
+        setCashActivities(prev => [...prev, { ...activityData, id: data.id }]);
+      }
+    } catch (err) {
+      console.error("Failed to add cash activity to Supabase", err);
+    }
+  };
+
+  const removeCashActivity = async (id: string) => {
+    if (!user) {
+      setCashActivities(prev => {
+        const newActivities = prev.filter(a => a.id !== id);
+        localStorage.setItem("fintrack-cash-activities", JSON.stringify(newActivities));
+        return newActivities;
+      });
+      return;
+    }
+    try {
+      await db.cashActivities.delete(id);
+      setCashActivities(prev => prev.filter(a => a.id !== id));
+    } catch (err) {
+      console.error("Failed to remove cash activity from Supabase", err);
+    }
+  };
+
+  const updateAllocation = async (label: string, value: number) => {
     setAllocations(prev => prev.map(a => a.label === label ? { ...a, value } : a));
-  };
-  const bulkAddTrades = (newTrades: Omit<Trade, "id">[]) => {
-    const tradesWithIds = newTrades.map((t, i) => ({ ...t, id: Date.now() + i }));
-    setTrades(prev => [...tradesWithIds, ...prev]);
-  };
-
-  const removeAsset = (symbol: string) => {
-    setAssets(prev => prev.filter(a => a.symbol !== symbol));
-  };
-
-  const removeTrade = (id: number) => {
-    setTrades(prev => prev.filter(t => t.id !== id));
-  };
-
-  const addMoneyBucket = (bucket: Omit<MoneyBucket, 'id'>) => {
-    const id = Date.now().toString();
-    setMoneyBuckets(prev => [...prev, { ...bucket, id }]);
+    if (!user) return;
+    try {
+      const allocation = allocations.find(a => a.label === label);
+      await db.allocations.upsert({
+        user_id: user.id,
+        label,
+        value,
+        color: allocation?.color || "#6B7280"
+      });
+    } catch (err) {
+      console.error("Failed to update allocation in Supabase", err);
+    }
   };
 
-  const updateMoneyBucket = (id: string, updates: Partial<MoneyBucket>) => {
-    setMoneyBuckets(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
+  const bulkAddTrades = async (newTrades: Omit<Trade, "id">[]) => {
+    if (!user) {
+      const tradesWithIds = newTrades.map((t, i) => ({ ...t, id: Date.now() + i }));
+      setTrades(prev => [...tradesWithIds, ...prev]);
+      return;
+    }
+    try {
+      const supabaseTrades = newTrades.map(t => ({
+        user_id: user.id,
+        asset_id: null,
+        symbol: t.asset,
+        type: t.type,
+        amount_usd: t.amountUSD,
+        quantity: t.shares || 0,
+        price_per_unit: t.pricePerUnit || 0,
+        date: t.date,
+        rate_at_time: t.rateAtTime,
+        currency: t.currency,
+        source_bucket_id: t.sourceBucketId || null,
+        tag: t.tag || null
+      }));
+      const { data } = await db.trades.bulkInsert(supabaseTrades);
+      if (data) {
+        const tradesWithIds = newTrades.map((t, i) => ({ 
+          ...t, 
+          id: parseInt(data[i].id.split('-')[0], 16) || Date.now() + i 
+        }));
+        setTrades(prev => [...tradesWithIds, ...prev]);
+      }
+    } catch (err) {
+      console.error("Failed to bulk add trades to Supabase", err);
+    }
   };
 
-  const removeMoneyBucket = (id: string) => {
-    setMoneyBuckets(prev => prev.filter(b => b.id !== id));
+  const addTradeFromBucket = async (tradeData: Omit<Trade, 'id'>, bucketId: string) => {
+    const bucket = moneyBuckets.find(b => b.id === bucketId);
+    if (!bucket) return;
+    if (tradeData.amountUSD > bucket.currentAmount) {
+      addToast(t("amountExceedsBalance"), 'error');
+      return;
+    }
+
+    // Add the trade
+    await addTrade({ ...tradeData, sourceBucketId: bucketId });
+
+    // Deduct from bucket
+    await updateMoneyBucket(bucketId, { currentAmount: bucket.currentAmount - tradeData.amountUSD });
+
+    // Log activity
+    await addBucketActivity({
+      bucketId: bucket.id,
+      bucketName: bucket.name,
+      type: 'invest',
+      amount: tradeData.amountUSD,
+      date: new Date().toISOString(),
+      note: `Trade ${tradeData.asset} — ${t('deductedFromBucket')}`,
+    });
   };
 
-  const addBucketActivity = (activity: Omit<BucketActivity, 'id'>) => {
-    const id = Date.now().toString();
-    setBucketActivities(prev => [{ ...activity, id }, ...prev]);
-  };
+
+  // Computed P/L metrics
+  const totalInvested = React.useMemo(() => {
+    return assets.reduce((acc, a) => acc + (a.avgCost || 0) * (a.shares || 0), 0);
+  }, [assets]);
+
+  const totalUnrealizedPL = React.useMemo(() => {
+    const portfolioValue = assets.reduce((acc, a) => acc + a.valueUSD, 0);
+    const costBasis = assets.reduce((acc, a) => acc + (a.avgCost || 0) * (a.shares || 0), 0);
+    return portfolioValue - costBasis;
+  }, [assets]);
+
+  const totalRealizedPL = React.useMemo(() => {
+    return assets.reduce((acc, a) => acc + (a.realizedPL || 0), 0);
+  }, [assets]);
+
+  const totalDividends = React.useMemo(() => {
+    return assets.reduce((acc, a) => acc + (a.dividendTotal || 0), 0);
+  }, [assets]);
 
   return (
     <AppContext.Provider value={{ 
@@ -1431,10 +2353,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setUserProfile,
       fetchAssetMarketData,
       removeAsset,
+      updateAsset,
+      reorderAssets,
       removeTrade,
       toasts,
       addToast,
       removeToast,
+      darkMode,
+      setDarkMode,
       notifications,
       addNotification,
       markNotificationRead,
@@ -1446,7 +2372,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updateMoneyBucket,
       removeMoneyBucket,
       bucketActivities,
-      addBucketActivity
+      addBucketActivity,
+      addTradeFromBucket,
+      dashboardWidgets,
+      setDashboardWidgets,
+      totalInvested,
+      totalUnrealizedPL,
+      totalRealizedPL,
+      totalDividends
     }}>
       {children}
       

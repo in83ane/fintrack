@@ -7,9 +7,8 @@ import { useApp, Language } from "@/src/context/AppContext";
 import { cn } from "@/src/lib/utils";
 
 export default function SettingsPage() {
-  const { t, language, setLanguage, currency, setCurrency, addToast, notifPreferences, setNotifPreferences } = useApp();
+  const { t, language, setLanguage, currency, setCurrency, addToast, notifPreferences, setNotifPreferences, darkMode, setDarkMode } = useApp();
   const [activeSection, setActiveSection] = useState<string | null>(null);
-  const [darkMode, setDarkMode] = useState(true);
 
   const languages: { code: Language; label: string; flag: string }[] = [
     { code: "en", label: "English", flag: "🇺🇸" },
