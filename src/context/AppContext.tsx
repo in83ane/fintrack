@@ -1315,12 +1315,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     { label: "Cash", value: 5, color: "#6B7280" },
   ];
   const defaultAssets: Asset[] = [];
-  const defaultMoneyBuckets: MoneyBucket[] = [
-    { id: 'fixed-expenses', name: 'Fixed Expenses & Debt', targetPercent: 40, currentAmount: 0, color: '#ADC6FF', icon: '🏠', linkedToExpenses: true },
-    { id: 'personal', name: 'Personal Spending', targetPercent: 30, currentAmount: 0, color: '#E9C349', icon: '🛒', linkedToExpenses: true },
-    { id: 'emergency', name: 'Emergency Fund (Low Risk)', targetPercent: 20, currentAmount: 0, color: '#4EDEA3', icon: '🛡️', linkedToExpenses: false },
-    { id: 'investment', name: 'Investment (High Risk)', targetPercent: 10, currentAmount: 0, color: '#FF8B9A', icon: '🚀', linkedToExpenses: false },
-  ];
+  const defaultMoneyBuckets: MoneyBucket[] = [];
 
   const [trades, setTrades] = useState<Trade[]>(defaultTrades);
   const [allocations, setAllocations] = useState<Allocation[]>(defaultAllocations);
@@ -1509,37 +1504,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             linkedToExpenses: b.linked_to_expenses
           })));
         } else {
-          if (user) {
-            // Auto-create default buckets in DB for new users
-            Promise.all(defaultMoneyBuckets.map(b => 
-              db.buckets.insert({
-                user_id: user.id,
-                name: b.name,
-                target_percent: b.targetPercent,
-                current_amount: b.currentAmount,
-                color: b.color,
-                icon: b.icon,
-                linked_to_expenses: b.linkedToExpenses || false
-              } as any)
-            )).then(results => {
-               const createdBuckets = results.map(r => r.data).filter(Boolean);
-               if (createdBuckets.length > 0) {
-                 setMoneyBuckets(createdBuckets.map(b => ({
-                    id: b.id,
-                    name: b.name,
-                    targetPercent: b.target_percent,
-                    currentAmount: b.current_amount,
-                    color: b.color,
-                    icon: b.icon,
-                    linkedToExpenses: b.linked_to_expenses
-                 })));
-               } else {
-                 setMoneyBuckets(defaultMoneyBuckets);
-               }
-            });
-          } else {
-            setMoneyBuckets(defaultMoneyBuckets);
-          }
+          setMoneyBuckets([]);
         }
 
         if (bucketActivitiesData) {
