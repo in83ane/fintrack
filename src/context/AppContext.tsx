@@ -1461,20 +1461,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (tradesData) {
-          setTrades(tradesData.map(t => ({
-            id: parseInt(t.id.split('-')[0], 16) || Date.now(), // Fallback for old trade ID system if needed
-            asset: t.symbol,
-            type: t.type,
-            amountUSD: t.amount_usd,
-            date: t.date,
-            rateAtTime: t.rate_at_time || 1,
-            currency: t.currency || 'USD',
-            shares: t.quantity || 0,
-            pricePerUnit: t.price_per_unit || 0,
-            sourceBucketId: t.source_bucket_id || undefined,
-            tag: t.tag || undefined,
-            dbId: t.id
-          })));
+          setTrades(tradesData.map(t => {
+            // Extract source bucket ID from notes if present
+            let sourceBucketId: string | undefined = undefined;
+            if (t.notes && t.notes.startsWith("Source Wallet ID: ")) {
+              sourceBucketId = t.notes.replace("Source Wallet ID: ", "").trim();
+            }
+
+            return {
+              id: parseInt(t.id.split('-')[0], 16) || Date.now(), // Fallback for old trade ID system if needed
+              asset: t.symbol,
+              type: t.type,
+              amountUSD: t.amount_usd,
+              date: t.execution_date,
+              rateAtTime: t.exchange_rate_at_time || 1,
+              currency: t.currency || 'USD',
+              shares: t.quantity || 0,
+              pricePerUnit: t.price_at_execution || 0,
+              sourceBucketId: sourceBucketId,
+              tag: (t.tags && t.tags.length > 0) ? t.tags[0] : undefined,
+              dbId: t.id
+            };
+          }));
         } else {
           setTrades([]);
         }
@@ -1948,18 +1956,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data, error } = await db.trades.insert({
         user_id: user.id,
-        asset_id: null, // We could link this if we had the asset ID
+        asset_id: null,
+        asset_name: tradeData.asset,
         symbol: tradeData.asset,
-        type: tradeData.type,
+        type: tradeData.type === "IMPORT" ? "BUY" : tradeData.type,
         amount_usd: tradeData.amountUSD,
         quantity: tradeData.shares || 0,
-        price_per_unit: tradeData.pricePerUnit || 0,
-        date: tradeData.date,
-        rate_at_time: tradeData.rateAtTime,
-        currency: tradeData.currency,
-        source_bucket_id: tradeData.sourceBucketId || null,
-        tag: tradeData.tag || null
-      });
+        price_at_execution: tradeData.pricePerUnit || 0,
+        execution_date: new Date(tradeData.date).toISOString(),
+        exchange_rate_at_time: tradeData.rateAtTime || 1,
+        currency: tradeData.currency || "USD",
+        total_cost: tradeData.amountUSD,
+        status: "completed",
+        notes: tradeData.sourceBucketId ? `Source Wallet ID: ${tradeData.sourceBucketId}` : null,
+        tags: tradeData.tag ? [tradeData.tag] : []
+      } as any);
       if (data) {
         setTrades(prev => [...prev, {
           ...tradeData,
@@ -2115,12 +2126,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         user_id: user.id,
         name: bucket.name,
         target_percent: bucket.targetPercent,
-        target_amount: bucket.targetAmount || 0,
         current_amount: bucket.currentAmount,
         color: bucket.color,
         icon: bucket.icon,
         linked_to_expenses: bucket.linkedToExpenses || false
-      });
+      } as any);
       if (data) {
         setMoneyBuckets(prev => [...prev, { ...bucket, id: data.id }]);
       }
@@ -2143,7 +2153,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (updates.name !== undefined) supabaseUpdates.name = updates.name;
       if (updates.currentAmount !== undefined) supabaseUpdates.current_amount = updates.currentAmount;
       if (updates.targetPercent !== undefined) supabaseUpdates.target_percent = updates.targetPercent;
-      if (updates.targetAmount !== undefined) supabaseUpdates.target_amount = updates.targetAmount;
       if (updates.color !== undefined) supabaseUpdates.color = updates.color;
       if (updates.icon !== undefined) supabaseUpdates.icon = updates.icon;
       if (updates.linkedToExpenses !== undefined) supabaseUpdates.linked_to_expenses = updates.linkedToExpenses;
@@ -2270,17 +2279,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const supabaseTrades = newTrades.map(t => ({
         user_id: user.id,
         asset_id: null,
+        asset_name: t.asset,
         symbol: t.asset,
-        type: t.type,
+        type: t.type === "IMPORT" ? "BUY" : t.type,
         amount_usd: t.amountUSD,
         quantity: t.shares || 0,
-        price_per_unit: t.pricePerUnit || 0,
-        date: t.date,
-        rate_at_time: t.rateAtTime,
-        currency: t.currency,
-        source_bucket_id: t.sourceBucketId || null,
-        tag: t.tag || null
-      }));
+        price_at_execution: t.pricePerUnit || 0,
+        execution_date: new Date(t.date).toISOString(),
+        exchange_rate_at_time: t.rateAtTime || 1,
+        currency: t.currency || "USD",
+        total_cost: t.amountUSD,
+        status: "completed",
+        notes: t.sourceBucketId ? `Source Wallet ID: ${t.sourceBucketId}` : null,
+        tags: t.tag ? [t.tag] : []
+      } as any));
       const { data } = await db.trades.bulkInsert(supabaseTrades);
       if (data) {
         const tradesWithIds = newTrades.map((t, i) => ({ 
