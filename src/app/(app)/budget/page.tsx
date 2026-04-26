@@ -197,8 +197,8 @@ export default function BudgetPage() {
   };
 
   const profitNum = parseFloat(profitAmount) || 0;
-  const emergencyBucket = moneyBuckets.find((b) => b.name === "emergencyFund" || b.name === "emergency");
-  const investBucket = moneyBuckets.find((b) => b.name === "investmentGrowth" || b.name === "highRiskInvest");
+  const emergencyBucket = moneyBuckets.find((b) => b.name === 'Emergency Fund (Low Risk)' || b.name.toLowerCase().includes('emergency'));
+  const investBucket = moneyBuckets.find((b) => b.name === 'Investment (High Risk)' || b.name.toLowerCase().includes('invest'));
 
   const handleApplyProfitSuggestion = () => {
     if (profitNum <= 0) return;
@@ -271,7 +271,6 @@ export default function BudgetPage() {
       updateMoneyBucket(editingBucket, {
         name: bucketForm.name,
         targetPercent: safePercent,
-        targetAmount: toUSD(Number(bucketForm.targetAmount) || 0),
         color: bucketForm.color,
         icon: bucketForm.icon,
         linkedToExpenses: bucketForm.linkedToExpenses,
@@ -280,7 +279,6 @@ export default function BudgetPage() {
       addMoneyBucket({
         name: bucketForm.name,
         targetPercent: safePercent,
-        targetAmount: toUSD(Number(bucketForm.targetAmount) || 0),
         currentAmount: toUSD(Number(bucketForm.currentAmount) || 0),
         color: bucketForm.color,
         icon: bucketForm.icon,

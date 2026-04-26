@@ -1316,10 +1316,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   ];
   const defaultAssets: Asset[] = [];
   const defaultMoneyBuckets: MoneyBucket[] = [
-    { id: 'fixed-expenses', name: 'fixedExpenses', targetPercent: 40, currentAmount: 0, color: '#ADC6FF', icon: '🏠', linkedToExpenses: true },
-    { id: 'personal', name: 'personalExpenses', targetPercent: 30, currentAmount: 0, color: '#E9C349', icon: '🛒', linkedToExpenses: true },
-    { id: 'emergency', name: 'emergencyFund', targetPercent: 20, currentAmount: 0, color: '#4EDEA3', icon: '🛡️', linkedToExpenses: false },
-    { id: 'investment', name: 'investmentGrowth', targetPercent: 10, currentAmount: 0, color: '#FF8B9A', icon: '🚀', linkedToExpenses: false },
+    { id: 'fixed-expenses', name: 'Fixed Expenses & Debt', targetPercent: 40, currentAmount: 0, color: '#ADC6FF', icon: '🏠', linkedToExpenses: true },
+    { id: 'personal', name: 'Personal Spending', targetPercent: 30, currentAmount: 0, color: '#E9C349', icon: '🛒', linkedToExpenses: true },
+    { id: 'emergency', name: 'Emergency Fund (Low Risk)', targetPercent: 20, currentAmount: 0, color: '#4EDEA3', icon: '🛡️', linkedToExpenses: false },
+    { id: 'investment', name: 'Investment (High Risk)', targetPercent: 10, currentAmount: 0, color: '#FF8B9A', icon: '🚀', linkedToExpenses: false },
   ];
 
   const [trades, setTrades] = useState<Trade[]>(defaultTrades);
@@ -2256,8 +2256,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         amount: activityData.amountUSD,
         category: activityData.category,
         note: activityData.note || null,
-        date: activityData.date
-      });
+        date: typeof activityData.date === 'string' && activityData.date.length === 10
+          ? activityData.date
+          : new Date(activityData.date).toISOString().split('T')[0]
+      } as any);
       if (data) {
         setCashActivities(prev => [...prev, { ...activityData, id: data.id }]);
       }
