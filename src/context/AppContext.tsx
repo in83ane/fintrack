@@ -2117,8 +2117,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
       return;
     }
+    // Optimistically add to state right away so UI is always responsive
+    const tempId = Date.now().toString();
+    setMoneyBuckets(prev => [...prev, { ...bucket, id: tempId }]);
     try {
-      const { data } = await db.buckets.insert({
+      const { data, error } = await db.buckets.insert({
         user_id: user.id,
         name: bucket.name,
         target_percent: bucket.targetPercent,
@@ -2128,11 +2131,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         icon: bucket.icon,
         linked_to_expenses: bucket.linkedToExpenses || false
       } as any);
+      if (error) {
+        console.error("Supabase bucket insert error:", error);
+        // Replace tempId with itself — state stays, DB failed silently
+        return;
+      }
       if (data) {
-        setMoneyBuckets(prev => [...prev, { ...bucket, id: data.id }]);
+        // Replace temp entry with DB-confirmed entry (real UUID)
+        setMoneyBuckets(prev => prev.map(b => b.id === tempId ? { ...bucket, id: data.id } : b));
       }
     } catch (err) {
-      console.error("Failed to add bucket to Supabase", err);
+      console.error("Failed to add bucket to Supabase:", err);
     }
   };
 
