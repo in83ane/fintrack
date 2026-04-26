@@ -132,9 +132,9 @@ function detectSuspiciousPatterns(input: string): boolean {
 
 export interface ActionResult {
   success: boolean;
+  message?: string;
   error?: string;
   errorCode?: string;
-  message?: string;
   requiresEmailConfirmation?: boolean;
   email?: string;
   redirectUrl?: string;
@@ -143,6 +143,7 @@ export interface ActionResult {
     resetTime: number;
     blocked: boolean;
   };
+  session?: { access_token: string; refresh_token: string };
 }
 
 // ─── Generic Error Messages ──────────────────────────────────────────────────
@@ -386,7 +387,14 @@ export async function signInAction(credentials: SignInCredentials): Promise<Acti
       });
     }
 
-    return { success: true, email: sanitizedEmail };
+    return { 
+      success: true, 
+      email: sanitizedEmail,
+      session: {
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token
+      }
+    };
   } catch (err) {
     console.error("Sign in error:", err);
     // Log more details for debugging

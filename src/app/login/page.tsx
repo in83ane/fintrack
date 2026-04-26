@@ -731,6 +731,12 @@ function LoginContent() {
             avatarUrl: `https://api.dicebear.com/7.x/identicon/svg?seed=${userEmail}&backgroundColor=1C1B1B`,
           });
 
+          // Sync session to client-side Supabase
+          if (result.session) {
+            const { supabase } = await import('@/src/lib/supabase');
+            await supabase.auth.setSession(result.session);
+          }
+
           // Login success - redirect
           const returnUrl = searchParams.get("returnUrl") || "/dashboard";
           // Validate returnUrl to prevent open redirect

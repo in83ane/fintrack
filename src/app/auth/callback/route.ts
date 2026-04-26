@@ -133,7 +133,11 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    return NextResponse.redirect(new URL(redirectPath, request.url));
+    const redirectUrl = new URL(redirectPath, request.url);
+    // Append session to hash so client-side Supabase can pick it up
+    redirectUrl.hash = `access_token=${data.session.access_token}&refresh_token=${data.session.refresh_token}&expires_in=${data.session.expires_in}&token_type=bearer&type=recovery`;
+
+    return NextResponse.redirect(redirectUrl);
   } catch (err) {
     console.error("OAuth callback error:", err);
 

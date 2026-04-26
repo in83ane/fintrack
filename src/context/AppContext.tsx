@@ -1866,7 +1866,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const existingIdx = assets.findIndex(a => a.symbol.toUpperCase() === assetData.symbol.toUpperCase());
     if (!user) {
       if (existingIdx === -1) {
-        setAssets(prev => [assetData, ...prev]);
+        const newAssets = [assetData, ...assets];
+        setAssets(newAssets);
+        localStorage.setItem("fintrack-assets", JSON.stringify(newAssets));
       }
       return;
     }
