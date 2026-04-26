@@ -195,7 +195,7 @@ export const db = {
         .from('trades')
         .select('*')
         .eq('user_id', userId)
-        .order('date', { ascending: false });
+        .order('execution_date', { ascending: false });
     },
     insert: async (trade: Omit<Trade, 'id' | 'created_at'>) => {
       return await supabase.from('trades').insert(trade).select().single();

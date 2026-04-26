@@ -2199,8 +2199,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
       return;
     }
+    
+    // Optimistic update
+    const tempId = Date.now().toString() + "-" + Math.random().toString(36).substr(2, 9);
+    setBucketActivities(prev => [{ ...activity, id: tempId }, ...prev]);
+
     try {
-      const { data } = await db.bucketActivities.insert({
+      const { data, error } = await db.bucketActivities.insert({
         user_id: user.id,
         bucket_id: activity.bucketId,
         type: activity.type,
@@ -2210,8 +2215,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           ? activity.date
           : new Date(activity.date).toISOString().split('T')[0]
       } as any);
+      
+      if (error) {
+        console.error("Supabase bucket_activities insert error:", error);
+        return;
+      }
+      
       if (data) {
-        setBucketActivities(prev => [{ ...activity, id: data.id }, ...prev]);
+        setBucketActivities(prev => prev.map(a => a.id === tempId ? { ...activity, id: data.id } : a));
       }
     } catch (err) {
       console.error("Failed to add bucket activity to Supabase", err);
@@ -2228,8 +2239,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
       return;
     }
+    
+    const tempId = Math.random().toString(36).substr(2, 9);
+    setCashActivities(prev => [...prev, { ...activityData, id: tempId }]);
+
     try {
-      const { data } = await db.cashActivities.insert({
+      const { data, error } = await db.cashActivities.insert({
         user_id: user.id,
         type: activityData.type,
         amount: activityData.amountUSD,
@@ -2239,8 +2254,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           ? activityData.date
           : new Date(activityData.date).toISOString().split('T')[0]
       } as any);
+      
+      if (error) {
+        console.error("Supabase cash_activities insert error:", error);
+        return;
+      }
+      
       if (data) {
-        setCashActivities(prev => [...prev, { ...activityData, id: data.id }]);
+        setCashActivities(prev => prev.map(a => a.id === tempId ? { ...activityData, id: data.id } : a));
       }
     } catch (err) {
       console.error("Failed to add cash activity to Supabase", err);
