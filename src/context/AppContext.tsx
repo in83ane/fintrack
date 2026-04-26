@@ -1512,7 +1512,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setBucketActivities(bucketActivitiesData.map(ba => ({
             id: ba.id,
             bucketId: ba.bucket_id,
-            bucketName: "", // We can look this up
+            bucketName: bucketsData?.find(b => b.id === ba.bucket_id)?.name || "",
             type: ba.type,
             amount: ba.amount,
             date: ba.date,
