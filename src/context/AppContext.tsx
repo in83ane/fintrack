@@ -1435,6 +1435,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             }
           });
           setAssets(Array.from(uniqueAssetsMap.values()));
+        } else {
+          setAssets([]);
         }
 
         if (tradesData) {
@@ -1452,6 +1454,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             tag: t.tag || undefined,
             dbId: t.id
           })));
+        } else {
+          setTrades([]);
         }
 
         if (allocationsData && allocationsData.length > 0) {
@@ -1460,6 +1464,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             value: a.value,
             color: a.color
           })));
+        } else {
+          setAllocations([]);
         }
 
         if (bucketsData) {
@@ -1473,6 +1479,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             icon: b.icon,
             linkedToExpenses: b.linked_to_expenses
           })));
+        } else {
+          setMoneyBuckets([]);
         }
 
         if (bucketActivitiesData) {
@@ -1485,6 +1493,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             date: ba.date,
             note: ba.note || undefined
           })));
+        } else {
+          setBucketActivities([]);
         }
 
         if (cashActivitiesData) {
@@ -1496,6 +1506,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             date: ca.date,
             note: ca.note || undefined
           })));
+        } else {
+          setCashActivities([]);
         }
 
       } catch (err) {

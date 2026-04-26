@@ -35,6 +35,17 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
   );
 
   const handleLogout = async () => {
+    // Clear all local storage data related to user session to prevent data bleeding
+    const keysToRemove = [
+      "fintrack-assets",
+      "fintrack-trades",
+      "fintrack-allocations",
+      "fintrack-buckets",
+      "fintrack-bucket-activities",
+      "fintrack-cash-activities"
+    ];
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+
     await supabase.auth.signOut();
     await logoutAction();
     window.location.href = "/login";
