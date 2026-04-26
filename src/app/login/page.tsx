@@ -815,19 +815,35 @@ function LoginContent() {
         return;
       }
 
-      // Handle successful OAuth URL return
-      if (result.success && result.redirectUrl) {
-        // Redirect to Google OAuth
-        window.location.href = result.redirectUrl;
-        return; // Don't set loading to false, we're redirecting
-      }
-
-      // Handle error response
+      // Handle error response from server checks
       if (result.success === false) {
         recordFailedAttempt();
         setError(result.error || t.errorGoogle);
         if (result.errorCode) setErrorCode(result.errorCode);
+        setLoading(false);
+        return;
       }
+
+      // If server checks pass, trigger OAuth on the client
+      const { supabase } = await import('@/src/lib/supabase');
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+
+      if (error) {
+        recordFailedAttempt();
+        setError(t.errorGoogle);
+        setErrorCode(`OAUTH_ERROR: ${error.message}`);
+        setLoading(false);
+      }
+      // Note: If successful, the page will redirect, so no need to set loading to false
     } catch (err: unknown) {
       // Check if this is a redirect error (which means success for OAuth)
       // Next.js redirect() throws an error with specific properties

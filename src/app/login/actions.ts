@@ -795,75 +795,9 @@ export async function initiateGoogleAuth(data: GoogleAuthData): Promise<ActionRe
     };
   }
 
-  let redirectUrl: string | null = null;
-
-  try {
-    // Get Supabase credentials with better error handling
-    let url: string;
-    let anonKey: string;
-    try {
-      url = getSupabaseUrl();
-      anonKey = getSupabaseAnonKey();
-    } catch (envErr) {
-      console.error("Environment variable error:", envErr);
-      return {
-        success: false,
-        error: lang === "th" ? "การตั้งค่า Supabase ไม่สมบูรณ์" : "Supabase configuration incomplete",
-        errorCode: "ENV_CONFIG_ERROR"
-      };
-    }
-
-    const supabase = createClient(url, anonKey);
-
-    // Get app URL with fallback
-    let appUrl: string;
-    try {
-      appUrl = getAppUrl();
-    } catch (appUrlErr) {
-      console.warn("App URL error, using fallback:", appUrlErr);
-      appUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000";
-    }
-
-    const { data: authData, error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${appUrl}/auth/callback`,
-        queryParams: {
-          access_type: "offline",
-          prompt: "consent",
-          // Note: Don't include state here - Supabase manages it automatically
-          // and validates it during exchangeCodeForSession
-        },
-      },
-    });
-
-    if (error) {
-      console.error("Supabase OAuth error:", error);
-      throw error;
-    }
-
-    if (authData.url) {
-      redirectUrl = authData.url;
-    } else {
-      return { success: false, error: getMessage("SERVER_ERROR", lang) };
-    }
-  } catch (err) {
-    console.error("Google auth error:", err);
-    const errorMessage = err instanceof Error ? err.message : "Unknown error";
-    return {
-      success: false,
-      error: getMessage("SERVER_ERROR", lang),
-      errorCode: `OAUTH_ERROR: ${errorMessage.slice(0, 100)}`
-    };
-  }
-
-  if (redirectUrl) {
-    // Return URL instead of calling redirect() to avoid NEXT_REDIRECT error
-    // Client will handle the redirect
-    return { success: true, redirectUrl };
-  }
-
-  return { success: false, error: getMessage("SERVER_ERROR", lang) };
+  // We return success here and let the client handle the actual Supabase OAuth call.
+  // Doing it on the client ensures PKCE code verifier is correctly stored in localStorage.
+  return { success: true };
 }
 
 // ─── Get CSRF Token ────────────────────────────────────────────────────────
