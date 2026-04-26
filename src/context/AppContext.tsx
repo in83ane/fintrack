@@ -148,6 +148,7 @@ interface AppState {
   addNotification: (title: string, message: string, type: AppNotification['type']) => void;
   markNotificationRead: (id: string) => void;
   clearNotifications: () => void;
+  isDataLoaded: boolean;
   notifPreferences: NotifPreferences;
   setNotifPreferences: (prefs: NotifPreferences) => void;
   moneyBuckets: MoneyBucket[];
@@ -1497,19 +1498,48 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setAllocations([]);
         }
 
-        if (bucketsData) {
+        if (bucketsData && bucketsData.length > 0) {
           setMoneyBuckets(bucketsData.map(b => ({
             id: b.id,
             name: b.name,
             targetPercent: b.target_percent,
-            targetAmount: b.target_amount,
             currentAmount: b.current_amount,
             color: b.color,
             icon: b.icon,
             linkedToExpenses: b.linked_to_expenses
           })));
         } else {
-          setMoneyBuckets([]);
+          if (user) {
+            // Auto-create default buckets in DB for new users
+            Promise.all(defaultMoneyBuckets.map(b => 
+              db.buckets.insert({
+                user_id: user.id,
+                name: b.name,
+                target_percent: b.targetPercent,
+                current_amount: b.currentAmount,
+                color: b.color,
+                icon: b.icon,
+                linked_to_expenses: b.linkedToExpenses || false
+              } as any)
+            )).then(results => {
+               const createdBuckets = results.map(r => r.data).filter(Boolean);
+               if (createdBuckets.length > 0) {
+                 setMoneyBuckets(createdBuckets.map(b => ({
+                    id: b.id,
+                    name: b.name,
+                    targetPercent: b.target_percent,
+                    currentAmount: b.current_amount,
+                    color: b.color,
+                    icon: b.icon,
+                    linkedToExpenses: b.linked_to_expenses
+                 })));
+               } else {
+                 setMoneyBuckets(defaultMoneyBuckets);
+               }
+            });
+          } else {
+            setMoneyBuckets(defaultMoneyBuckets);
+          }
         }
 
         if (bucketActivitiesData) {
