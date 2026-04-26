@@ -2389,6 +2389,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addNotification,
       markNotificationRead,
       clearNotifications,
+      isDataLoaded,
       notifPreferences,
       setNotifPreferences,
       moneyBuckets,
