@@ -30,11 +30,11 @@
 #### 3.1 Email Provider Settings
 ไปที่: **Authentication → Providers → Email**
 
-- ✅ Enable Email provider
-- ✅ Confirm email (recommended for production)
-- ✅ Secure email change
-- ✅ Prevent signup if email exists
-- ❌ Enable email confirmations (ถ้าต้องการ auto-confirm ให้ปิด)
+- Enable Email provider
+- Confirm email (recommended for production)
+- Secure email change
+- Prevent signup if email exists
+- Enable email confirmations (ถ้าต้องการ auto-confirm ให้ปิด)
 
 #### 3.2 URL Configuration
 ไปที่: **Authentication → URL Configuration**
