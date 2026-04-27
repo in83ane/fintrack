@@ -167,6 +167,11 @@ function validateCSRFToken(request: NextRequest): boolean {
   const pathname = request.nextUrl.pathname;
   if (!pathname.startsWith("/api/auth") && pathname !== "/") return true;
 
+  // Skip Next.js internal requests (preflight, HMR, etc.)
+  const purpose = request.headers.get("purpose");
+  const secFetchDest = request.headers.get("sec-fetch-dest");
+  if (purpose === "preflight" || secFetchDest === "empty") return true;
+
   const csrfHeader = request.headers.get("x-csrf-token");
   const csrfCookie = request.cookies.get("csrf-token")?.value;
 
@@ -411,12 +416,14 @@ export const config = {
     /*
      * Match all request paths except:
      * - _next/static (static files)
-     * - _next/image  (image optimisation)
+     * - _next/image (image optimisation)
+     * - _next/data (client-side navigation data)
+     * - api routes
      * - favicon.ico
      * - public assets (images, fonts, etc.)
      * - manifest.json, robots.txt, sitemap.xml
      */
-    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|manifest.json|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff|woff2|ttf|eot|ico)$).*)",
+    "/((?!api|_next/static|_next/image|_next/data|favicon.ico|robots.txt|sitemap.xml|manifest.json|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff|woff2|ttf|eot|ico)$).*)",
   ],
 };
 

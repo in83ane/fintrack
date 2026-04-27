@@ -29,6 +29,17 @@ import { ConfirmModal } from "@/src/components/ConfirmModal";
 import { TransactionDetailModal } from "@/src/components/TransactionDetailModal";
 
 export default function BudgetPage() {
+  // Hide number input spinners (arrows) via inline style injection
+  const hideSpinnerStyle = `
+    input[type=number]::-webkit-outer-spin-button,
+    input[type=number]::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    input[type=number] {
+      -moz-appearance: textfield;
+    }
+  `;
   const {
     t,
     formatMoney,
@@ -88,9 +99,9 @@ export default function BudgetPage() {
 
   const [bucketForm, setBucketForm] = useState({
     name: "",
-    targetPercent: "25",
-    targetAmount: "0",
-    currentAmount: "0",
+    targetPercent: "",
+    targetAmount: "",
+    currentAmount: "",
     color: "#4EDEA3",
     icon: "💰",
     linkedToExpenses: false,
@@ -346,6 +357,7 @@ export default function BudgetPage() {
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-4 sm:space-y-6">
       {/* Header */}
+      <style>{hideSpinnerStyle}</style>
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
           <span className="text-[#E9C349] uppercase tracking-wide text-xs font-black mb-1 block">
@@ -361,7 +373,7 @@ export default function BudgetPage() {
               const presetColors = ["#4EDEA3", "#ADC6FF", "#E9C349", "#FF8B9A", "#FFB4AB", "#A78BFA", "#60A5FA", "#F97316"];
               const usedColorsList = moneyBuckets.map(b => b.color);
               const unusedColor = presetColors.find(c => !usedColorsList.includes(c)) || "#4EDEA3";
-              setBucketForm({ name: "", targetPercent: "25", targetAmount: "0", currentAmount: "0", color: unusedColor, icon: "💰", linkedToExpenses: false });
+              setBucketForm({ name: "", targetPercent: "", targetAmount: "", currentAmount: "", color: unusedColor, icon: "💰", linkedToExpenses: false });
               setIsBucketModalOpen(true);
             }}
             disabled={!canAddMoreBuckets}
@@ -534,7 +546,7 @@ export default function BudgetPage() {
               const presetColors = ["#4EDEA3", "#ADC6FF", "#E9C349", "#FF8B9A", "#FFB4AB", "#A78BFA", "#60A5FA", "#F97316"];
               const usedColorsList = moneyBuckets.map(b => b.color);
               const unusedColor = presetColors.find(c => !usedColorsList.includes(c)) || "#4EDEA3";
-              setBucketForm({ name: "", targetPercent: "25", targetAmount: "0", currentAmount: "0", color: unusedColor, icon: "💰", linkedToExpenses: false });
+              setBucketForm({ name: "", targetPercent: "", targetAmount: "", currentAmount: "", color: unusedColor, icon: "💰", linkedToExpenses: false });
               setIsBucketModalOpen(true);
             }}
             className={cn(
@@ -870,7 +882,7 @@ export default function BudgetPage() {
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">{t("incomeSplitPercent") || "Income Split %"}</label>
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">Income Split %</label>
               <span className="text-[10px] font-bold text-gray-500">
                 {t("currentTotal")}: {totalTargetPercent}%
                 {editingBucket && (
@@ -901,16 +913,17 @@ export default function BudgetPage() {
                       type="number"
                       min={1}
                       max={maxAllowed}
-                      value={clampedValue}
+                      value={clampedValue > 0 ? clampedValue : ""}
                       onChange={(e) => {
                         const val = Math.max(1, Math.min(maxAllowed, Number(e.target.value) || 0));
                         setBucketForm((prev) => ({ ...prev, targetPercent: val.toString() }));
                       }}
                       onBlur={(e) => {
-                        const val = Math.max(1, Math.min(maxAllowed, Number(e.target.value) || 0));
+                        const val = Math.max(1, Math.min(maxAllowed, Number(e.target.value) || 1));
                         setBucketForm((prev) => ({ ...prev, targetPercent: val.toString() }));
                       }}
-                      className="w-20 px-2 py-1.5 bg-white/5 border border-white/10 rounded-lg text-white text-sm font-bold text-center focus:outline-none focus:border-[#ADC6FF]/50"
+                      placeholder="25"
+                      className="w-20 px-2 py-1.5 bg-white/5 border border-white/10 rounded-lg text-white text-sm font-bold text-center focus:outline-none focus:border-[#ADC6FF]/50 placeholder:text-gray-600"
                     />
                     <span className="text-sm font-bold text-gray-500">%</span>
                   </div>

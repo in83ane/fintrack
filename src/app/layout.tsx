@@ -11,6 +11,7 @@ const prompt = Prompt({ subsets: ["latin", "thai"], weight: ["300", "400", "500"
 export const metadata: Metadata = {
   title: "FinTrack | Portfolio Management",
   description: "Unified Investment Dashboard with real-time tracking and insights.",
+  icons: "/fintrack-icon.svg",
 };
 
 export default function RootLayout({
@@ -20,6 +21,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`dark ${inter.variable} ${playfair.variable} ${prompt.variable}`}>
+      <head>
+        <link rel="icon" href="/fintrack-icon.svg" type="image/svg+xml" />
+      </head>
       <body className={`${prompt.className} bg-[#131313] text-[#e5e2e1] min-h-screen antialiased`}>
         <AppProvider>
           {children}
