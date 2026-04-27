@@ -24,10 +24,11 @@ export interface Trade {
 
 export interface CashActivity {
   id: string;
-  type: "INCOME" | "EXPENSE";
+  type: "INCOME" | "EXPENSE" | "DEPOSIT" | "WITHDRAW";
   amountUSD: number;
   category: string;
   date: string;
+  time?: string;
   note?: string;
   bucketId?: string;
 }
@@ -432,6 +433,8 @@ const translations: Record<Language, Record<string, string>> = {
     justNow: "Just now",
     minutesAgo: "{n} minutes ago",
     hoursAgo: "{n} hours ago",
+    daysAgo: "{n} days ago",
+    minsAgo: "{n}m ago",
 
     // Allocation Editor
     editAllocation: "Edit Allocation",
@@ -481,6 +484,7 @@ const translations: Record<Language, Record<string, string>> = {
     depositToBucket: "Deposit",
     deposit: "Deposit",
     withdraw: "Withdraw",
+    bucketTransactions: "Bucket Transactions",
     invalidAmount: "Invalid Amount",
     withdrawFromBucket: "Withdraw",
     bucketTotal: "Total Allocated",
@@ -851,6 +855,7 @@ const translations: Record<Language, Record<string, string>> = {
     depositToBucket: "ฝากเงิน",
     deposit: "ฝากเพิ่ม",
     withdraw: "ถอนออก",
+    bucketTransactions: "ธุรกรรมกระเป๋า",
     invalidAmount: "จำนวนเงินไม่ถูกต้อง",
     withdrawFromBucket: "ถอนเงิน",
     bucketTotal: "จัดสรรรวม",
@@ -2211,9 +2216,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         type: activity.type,
         amount: activity.amount,
         note: activity.note || null,
-        date: typeof activity.date === 'string' && activity.date.length === 10
-          ? activity.date
-          : new Date(activity.date).toISOString().split('T')[0]
+        date: activity.date
       } as any);
       
       if (error) {
@@ -2230,7 +2233,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addCashActivity = async (activityData: Omit<CashActivity, "id">) => {
+    console.log("addCashActivity called:", activityData);
+    console.log("User:", user);
+
     if (!user) {
+      console.log("No user, saving to localStorage");
       const id = Math.random().toString(36).substr(2, 9);
       setCashActivities(prev => {
         const newActivities = [...prev, { ...activityData, id }];
@@ -2239,24 +2246,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
       return;
     }
-    
+
     const tempId = Math.random().toString(36).substr(2, 9);
     setCashActivities(prev => [...prev, { ...activityData, id: tempId }]);
 
     try {
+      console.log("Inserting to Supabase:", {
+        user_id: user.id,
+        type: activityData.type,
+        amount: activityData.amountUSD,
+        category: activityData.category,
+        date: activityData.date,
+        time: activityData.time || null
+      });
+
       const { data, error } = await db.cashActivities.insert({
         user_id: user.id,
         type: activityData.type,
         amount: activityData.amountUSD,
         category: activityData.category,
         note: activityData.note || null,
-        date: typeof activityData.date === 'string' && activityData.date.length === 10
-          ? activityData.date
-          : new Date(activityData.date).toISOString().split('T')[0]
+        date: activityData.date,
+        time: activityData.time || null
       } as any);
-      
+
+      console.log("Supabase insert result:", { data, error });
+
       if (error) {
         console.error("Supabase cash_activities insert error:", error);
+        console.error("Failed to insert cash activity:", activityData);
         return;
       }
       

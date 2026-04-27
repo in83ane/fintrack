@@ -89,12 +89,12 @@ export interface BucketActivity {
 export interface CashActivity {
   id: string; // uuid
   user_id: string;
-  type: 'INCOME' | 'EXPENSE';
+  type: 'INCOME' | 'EXPENSE' | 'DEPOSIT' | 'WITHDRAW';
   amount: number;
   category: string;
   note: string | null;
   date: string;
-  bucket_id?: string;
+  time: string | null;
   created_at: string;
 }
 

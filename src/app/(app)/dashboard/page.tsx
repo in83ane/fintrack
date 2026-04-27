@@ -300,7 +300,7 @@ const assetClassKeyMap: Record<string, string> = {
 };
 
 export default function DashboardPage() {
-  const { t, formatMoney, currency, exchangeRates, trades, addTrade, bulkAddTrades, allocations, updateAllocation, netWorthHistory, assets, addToast, addNotification, language, cashActivities, moneyBuckets, totalInvested, totalUnrealizedPL, totalRealizedPL, totalDividends } = useApp();
+  const { t, formatMoney, currency, exchangeRates, trades, addTrade, bulkAddTrades, allocations, updateAllocation, netWorthHistory, assets, addToast, addNotification, language, cashActivities, moneyBuckets, bucketActivities, totalInvested, totalUnrealizedPL, totalRealizedPL, totalDividends } = useApp();
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [isCSVModalOpen, setIsCSVModalOpen] = React.useState(false);
   const [isAddAssetOpen, setIsAddAssetOpen] = React.useState(false);
@@ -586,7 +586,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Vault Activity Widget */}
+        {/* Vault Activity Widget - Real data from bucketActivities */}
         <div className="bg-[#1C1B1B] rounded-2xl sm:rounded-3xl p-4 sm:p-6 group relative overflow-hidden border border-white/5 shadow-lg">
           <div className="flex justify-between items-start mb-4 sm:mb-6">
             <div>
@@ -597,39 +597,50 @@ export default function DashboardPage() {
               <Edit3 size={12} className="text-gray-400" />
             </div>
           </div>
-          <div className="space-y-3 sm:space-y-4">
-            <div className="flex gap-3 sm:gap-4">
-              <div className="w-1 bg-[#4EDEA3] rounded-full flex-shrink-0 mt-1"></div>
-              <div className="min-w-0">
-                <p className="text-[10px] sm:text-xs font-bold text-white leading-tight truncate">{t("stakeRewardClaimed")}</p>
-                <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5 sm:mt-1 uppercase tracking-wide">{t("stakeRewardTime")}</p>
-                <p className="text-xs text-[#4EDEA3] font-black mt-0.5 sm:mt-1">+0.42 ETH</p>
-              </div>
+          {bucketActivities.length === 0 ? (
+            <div className="py-8 flex flex-col items-center gap-2 opacity-40">
+              <History size={20} className="text-white" />
+              <p className="text-[10px] text-gray-500 font-bold uppercase">{t("noActivityYet")}</p>
             </div>
-            <div className="flex gap-3 sm:gap-4">
-              <div className="w-1 bg-[#ADC6FF] rounded-full flex-shrink-0 mt-1"></div>
-              <div className="min-w-0">
-                <p className="text-[10px] sm:text-xs font-bold text-white leading-tight truncate">{t("btcLimitOrderFill")}</p>
-                <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5 sm:mt-1 uppercase tracking-wide">{t("btcLimitOrderTime")}</p>
-                <p className="text-xs text-[#ADC6FF] font-black mt-0.5 sm:mt-1">{t("executed")} $63,400</p>
-              </div>
+          ) : (
+            <div className="space-y-3 sm:space-y-4">
+              {bucketActivities.slice(0, 5).map((act, idx) => {
+                const isPositive = act.type === "deposit" || act.type === "income_split" || act.type === "profit_split";
+                const barColor = isPositive ? "#4EDEA3" : act.type === "invest" ? "#ADC6FF" : "#FFB4AB";
+                const amountText = `${isPositive ? "+" : "-"}${formatMoney(act.amount)}`;
+                const timeAgo = (() => {
+                  const now = Date.now();
+                  const actDate = new Date(act.date).getTime();
+                  const diffMs = now - actDate;
+                  const diffMins = Math.floor(diffMs / 60000);
+                  const diffHours = Math.floor(diffMins / 60);
+                  const diffDays = Math.floor(diffHours / 24);
+
+                  if (diffMins < 1) return t("justNow");
+                  if (diffMins < 60) return t("minsAgo").replace("{n}", diffMins.toString());
+                  if (diffHours < 24) return t("hoursAgo").replace("{n}", diffHours.toString());
+                  return t("daysAgo").replace("{n}", diffDays.toString());
+                })();
+                return (
+                  <div key={`${act.id}-${idx}`} className="flex gap-3 sm:gap-4">
+                    <div className="w-1 bg-{barColor} rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: barColor }}></div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] sm:text-xs font-bold text-white leading-tight truncate">{act.note || act.type}</p>
+                      <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5 sm:mt-1 uppercase tracking-wide">{timeAgo} • {act.bucketName}</p>
+                      <p className={`text-xs font-black mt-0.5 sm:mt-1 ${isPositive ? "text-[#4EDEA3]" : "text-[#FFB4AB]"}`}>{amountText}</p>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <div className="flex gap-3 sm:gap-4">
-              <div className="w-1 bg-[#E9C349] rounded-full flex-shrink-0 mt-1"></div>
-              <div className="min-w-0">
-                <p className="text-[10px] sm:text-xs font-bold text-white leading-tight truncate">{t("tierBonus")}</p>
-                <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5 sm:mt-1 uppercase tracking-wide">{t("tierBonusTime")}</p>
-                <p className="text-xs text-[#E9C349] font-black mt-0.5 sm:mt-1">2,500 SVN</p>
-              </div>
-            </div>
-          </div>
-          <button className="w-full mt-4 sm:mt-6 py-2 sm:py-2.5 rounded-xl border border-white/10 text-[10px] sm:text-xs font-black uppercase tracking-wide text-gray-400 hover:bg-white/5 transition-all">
+          )}
+          <Link href="/budget" className="w-full mt-4 sm:mt-6 py-2 sm:py-2.5 rounded-xl border border-white/10 text-[10px] sm:text-xs font-black uppercase tracking-wide text-gray-400 hover:bg-white/5 transition-all block text-center">
             {t("viewFullAudit")}
-          </button>
+          </Link>
         </div>
 
         {/* Cashflow Widget */}
-        <div className="bg-[#1C1B1B] rounded-2xl sm:rounded-3xl p-4 sm:p-6 relative overflow-hidden border border-white/5 shadow-lg group flex flex-col justify-between">
+        <div className="bg-[#1C1B1B] rounded-2xl sm:rounded-3xl p-4 sm:p-6 relative overflow-hidden border border-white/5 shadow-lg group flex flex-col">
           <div>
             <div className="flex justify-between items-start mb-3 sm:mb-4">
               <div>
@@ -640,16 +651,41 @@ export default function DashboardPage() {
                 <PlusCircle size={12} className="text-[#ADC6FF]" />
               </button>
             </div>
-            
+
             {(() => {
               const currentMonth = new Date().getMonth();
               const currentYear = new Date().getFullYear();
-              const thisMonthActivities = cashActivities.filter(a => {
+
+              // Get cash activities
+              const thisMonthCashActivities = cashActivities.filter(a => {
                 const date = new Date(a.date);
                 return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
               });
-              const totalIncome = thisMonthActivities.filter(a => a.type === "INCOME").reduce((sum, a) => sum + a.amountUSD, 0);
-              const totalExpenses = thisMonthActivities.filter(a => a.type === "EXPENSE").reduce((sum, a) => sum + a.amountUSD, 0);
+
+              // Get bucket activities (deposit = income, withdraw/invest = expense)
+              const thisMonthBucketActivities = bucketActivities.filter(a => {
+                const date = new Date(a.date);
+                return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+              });
+
+              const bucketIncome = thisMonthBucketActivities
+                .filter(a => a.type === "deposit" || a.type === "income_split" || a.type === "profit_split")
+                .reduce((sum, a) => sum + a.amount, 0);
+
+              const bucketExpenses = thisMonthBucketActivities
+                .filter(a => a.type === "withdraw" || a.type === "invest")
+                .reduce((sum, a) => sum + a.amount, 0);
+
+              const cashIncome = thisMonthCashActivities
+                .filter(a => a.type === "INCOME")
+                .reduce((sum, a) => sum + a.amountUSD, 0);
+
+              const cashExpenses = thisMonthCashActivities
+                .filter(a => a.type === "EXPENSE")
+                .reduce((sum, a) => sum + a.amountUSD, 0);
+
+              const totalIncome = bucketIncome + cashIncome;
+              const totalExpenses = bucketExpenses + cashExpenses;
               const net = totalIncome - totalExpenses;
 
               return (
@@ -677,6 +713,43 @@ export default function DashboardPage() {
               );
             })()}
           </div>
+
+          {/* Recent Activities */}
+          {(cashActivities.length > 0 || bucketActivities.length > 0) && (
+            <div className="mt-4 pt-4 border-t border-white/5">
+              <h4 className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide mb-3">Recent</h4>
+              <div className="space-y-2 max-h-40 overflow-y-auto scrollbar-thin">
+                {[...cashActivities, ...bucketActivities.map(ba => ({
+                  id: ba.id,
+                  type: ba.type === "deposit" || ba.type === "income_split" || ba.type === "profit_split" ? "INCOME" : "EXPENSE",
+                  amountUSD: ba.amount,
+                  category: ba.bucketName || ba.type,
+                  date: ba.date,
+                  note: ba.note
+                }))].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5).map((act, idx) => {
+                  const isIncome = act.type === "INCOME";
+                  return (
+                    <div key={`${act.id}-${idx}`} className="flex items-center justify-between text-xs">
+                      <div className="min-w-0">
+                        <p className="text-white font-bold truncate">{act.category}</p>
+                        <p className="text-[10px] text-gray-500">
+                          {new Date(act.date).toLocaleDateString(language === "th" ? "th-TH" : "en-US", {
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit"
+                          })}
+                        </p>
+                      </div>
+                      <span className={cn("text-xs font-black flex-shrink-0", isIncome ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
+                        {isIncome ? "+" : "-"}{formatMoney(act.amountUSD)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
@@ -1008,6 +1081,59 @@ export default function DashboardPage() {
             );
           })}
         </div>
+
+        {/* Bucket Activities */}
+        {bucketActivities.length > 0 && (
+          <div className="mt-6">
+            <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+              <PiggyBank size={18} className="text-[#E9C349]" />
+              {t("bucketTransactions")}
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {bucketActivities.slice(0, 20).map((act) => {
+                const isPositive = act.type === "deposit" || act.type === "income_split" || act.type === "profit_split";
+                return (
+                  <motion.div
+                    key={act.id}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="bg-[#1C1B1B] p-6 rounded-3xl border border-white/5 shadow-lg"
+                  >
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <span className="text-xs font-black text-gray-500 uppercase tracking-wide">
+                          {new Date(act.date).toLocaleDateString(language === "th" ? "th-TH" : "en-US", {
+                            day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
+                          })}
+                        </span>
+                        <h4 className="text-lg font-black text-white mt-1">{act.bucketName}</h4>
+                      </div>
+                      <div className={cn(
+                        "px-3 py-1 rounded-full text-xs font-black uppercase tracking-wide",
+                        isPositive ? "bg-[#4EDEA3]/10 text-[#4EDEA3]" : "bg-[#FFB4AB]/10 text-[#FFB4AB]"
+                      )}>
+                        {t(act.type)}
+                      </div>
+                    </div>
+                    <div className="pt-4 border-t border-white/5 space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-bold text-gray-500">{t("amount")}</span>
+                        <span className={cn("text-lg font-black", isPositive ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
+                          {isPositive ? "+" : "-"}{formatMoney(act.amount)}
+                        </span>
+                      </div>
+                      {act.note && (
+                        <div className="text-xs text-gray-400 bg-white/5 p-3 rounded-xl">
+                          {act.note}
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Add Trade Modal */}

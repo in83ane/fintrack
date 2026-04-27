@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { X, Wallet, ChevronDown, Loader2 } from "lucide-react";
 import { Modal } from "@/src/components/Modal";
 import { useApp } from "@/src/context/AppContext";
@@ -9,18 +9,38 @@ import { cn } from "@/src/lib/utils";
 interface AddCashflowModalProps {
   isOpen: boolean;
   onClose: () => void;
+  presetType?: "INCOME" | "EXPENSE" | "DEPOSIT" | "WITHDRAW";
+  presetBucketId?: string;
 }
 
-export function AddCashflowModal({ isOpen, onClose }: AddCashflowModalProps) {
+export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }: AddCashflowModalProps) {
   const { t, addCashActivity, moneyBuckets, updateMoneyBucket, addBucketActivity, formatMoney, language, addToast, currency } = useApp();
 
-  const [type, setType] = useState<"INCOME" | "EXPENSE">("INCOME");
+  const [type, setType] = useState<"INCOME" | "EXPENSE" | "DEPOSIT" | "WITHDRAW">("INCOME");
+  const [selectedBucketId, setSelectedBucketId] = useState<string>("<auto-distribute>");
+  const prevOpenRef = useRef(false);
+
+  // Sync with preset values when modal opens (only when presetType is provided)
+  useEffect(() => {
+    if (isOpen && presetType && !prevOpenRef.current) {
+      setType(presetType);
+      // For EXPENSE/WITHDRAW, select first bucket by default; for INCOME/DEPOSIT, use auto-distribute
+      const defaultBucket = presetBucketId
+        || (presetType === "DEPOSIT" || presetType === "INCOME" ? "<auto-distribute>" : (moneyBuckets[0]?.id || "<no-bucket>"));
+      setSelectedBucketId(defaultBucket);
+      setCategory(presetType === "DEPOSIT" || presetType === "INCOME" ? "salary" : "food");
+      prevOpenRef.current = true;
+    } else if (!isOpen) {
+      prevOpenRef.current = false;
+    }
+  }, [isOpen, presetType, presetBucketId, moneyBuckets]);
+
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("salary");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [note, setNote] = useState("");
   const [isAdding, setIsAdding] = useState(false);
-  const [selectedBucketId, setSelectedBucketId] = useState("<auto-distribute>");
+
   // Get buckets that are linked to expenses
   const linkedBuckets = useMemo(() => {
     return moneyBuckets.filter(b => b.linkedToExpenses);
@@ -29,14 +49,22 @@ export function AddCashflowModal({ isOpen, onClose }: AddCashflowModalProps) {
   // Available categories based on type
   const incomeCategories = ["salary", "investment", "other"];
   const expenseCategories = ["food", "transport", "utilities", "entertainment", "investment", "other"];
+  const depositCategories = ["salary", "investment", "other"];
+  const withdrawCategories = ["food", "transport", "utilities", "entertainment", "investment", "other"];
 
-  const currentCategories = type === "INCOME" ? incomeCategories : expenseCategories;
+  const currentCategories = type === "INCOME" ? incomeCategories
+    : type === "EXPENSE" ? expenseCategories
+    : type === "DEPOSIT" ? depositCategories
+    : withdrawCategories;
 
   // Handle type change reset
-  const handleTypeChange = (newType: "INCOME" | "EXPENSE") => {
+  const handleTypeChange = (newType: "INCOME" | "EXPENSE" | "DEPOSIT" | "WITHDRAW") => {
     setType(newType);
-    setCategory(newType === "INCOME" ? "salary" : "food");
-    setSelectedBucketId(newType === "INCOME" ? "<auto-distribute>" : "<no-bucket>");
+    setCategory(newType === "INCOME" || newType === "DEPOSIT" ? "salary" : "food");
+    // For EXPENSE/WITHDRAW, select first bucket; for INCOME/DEPOSIT, use auto-distribute
+    setSelectedBucketId(
+      newType === "INCOME" || newType === "DEPOSIT" ? "<auto-distribute>" : (moneyBuckets[0]?.id || "<no-bucket>")
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -46,7 +74,7 @@ export function AddCashflowModal({ isOpen, onClose }: AddCashflowModalProps) {
     const amountNum = Number(amount);
 
     // Validate bucket deduction
-    if (type === "EXPENSE" && selectedBucketId !== "<no-bucket>") {
+    if ((type === "EXPENSE" || type === "WITHDRAW") && selectedBucketId !== "<no-bucket>") {
       const bucket = moneyBuckets.find(b => b.id === selectedBucketId);
       if (bucket && bucket.currentAmount < amountNum) {
         addToast(
@@ -60,12 +88,12 @@ export function AddCashflowModal({ isOpen, onClose }: AddCashflowModalProps) {
     setIsAdding(true);
 
     let detailedNote = note;
-    if (type === "EXPENSE" && selectedBucketId !== "<no-bucket>") {
+    if ((type === "EXPENSE" || type === "WITHDRAW") && selectedBucketId !== "<no-bucket>") {
       const bucket = moneyBuckets.find(b => b.id === selectedBucketId);
       if (bucket) {
         detailedNote = `${note ? note + " | " : ""}Paid from: ${t(bucket.name) || bucket.name}`;
       }
-    } else if (type === "INCOME") {
+    } else if (type === "INCOME" || type === "DEPOSIT") {
       if (selectedBucketId === "<auto-distribute>") {
         detailedNote = `${note ? note + " | " : ""}Auto-distributed to buckets`;
       } else if (selectedBucketId !== "<no-bucket>") {
@@ -77,17 +105,31 @@ export function AddCashflowModal({ isOpen, onClose }: AddCashflowModalProps) {
     }
 
     try {
+      // Get current time for the activity
+      const currentTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+      console.log("Adding CashActivity:", {
+        type,
+        amountUSD: amountNum,
+        category,
+        date: date === new Date().toISOString().split("T")[0] ? new Date().toISOString() : new Date(date).toISOString(),
+        time: type === "DEPOSIT" || type === "WITHDRAW" ? currentTime : undefined,
+        note: detailedNote,
+        bucketId: selectedBucketId !== "<no-bucket>" && selectedBucketId !== "<auto-distribute>" ? selectedBucketId : undefined
+      });
+
       addCashActivity({
         type,
         amountUSD: amountNum,
         category: category,
         date: date === new Date().toISOString().split("T")[0] ? new Date().toISOString() : new Date(date).toISOString(),
+        time: type === "DEPOSIT" || type === "WITHDRAW" ? currentTime : undefined,
         note: detailedNote,
         bucketId: selectedBucketId !== "<no-bucket>" && selectedBucketId !== "<auto-distribute>" ? selectedBucketId : undefined
       });
 
-      // Deduct from bucket if EXPENSE
-      if (type === "EXPENSE" && selectedBucketId !== "<no-bucket>") {
+      // Deduct from bucket if EXPENSE or WITHDRAW
+      if ((type === "EXPENSE" || type === "WITHDRAW") && selectedBucketId !== "<no-bucket>") {
         const bucket = moneyBuckets.find(b => b.id === selectedBucketId);
         if (bucket) {
           const newAmount = Math.max(0, bucket.currentAmount - amountNum);
@@ -103,8 +145,8 @@ export function AddCashflowModal({ isOpen, onClose }: AddCashflowModalProps) {
         }
       }
 
-      // Handle INCOME Bucket logic
-      if (type === "INCOME" && moneyBuckets.length > 0) {
+      // Handle INCOME or DEPOSIT Bucket logic
+      if ((type === "INCOME" || type === "DEPOSIT") && moneyBuckets.length > 0) {
         if (selectedBucketId === "<auto-distribute>") {
           const totalAllocated = moneyBuckets.reduce((acc, b) => acc + (b.targetPercent || 0), 0);
           if (totalAllocated > 0) {
@@ -119,7 +161,7 @@ export function AddCashflowModal({ isOpen, onClose }: AddCashflowModalProps) {
                   type: "deposit",
                   amount: share,
                   date: new Date().toISOString(),
-                  note: `${t("income")}: ${t(category) || category}${note ? ` - ${note}` : ""}`,
+                  note: `${type === "DEPOSIT" ? t("deposit") : t("income")}: ${t(category) || category}${note ? ` - ${note}` : ""}`,
                 });
               }
             }
@@ -135,7 +177,7 @@ export function AddCashflowModal({ isOpen, onClose }: AddCashflowModalProps) {
               type: "deposit",
               amount: amountNum,
               date: new Date().toISOString(),
-              note: `${t("income")}: ${t(category) || category}${note ? ` - ${note}` : ""}`,
+              note: `${type === "DEPOSIT" ? t("deposit") : t("income")}: ${t(category) || category}${note ? ` - ${note}` : ""}`,
             });
           }
         }
@@ -162,6 +204,9 @@ export function AddCashflowModal({ isOpen, onClose }: AddCashflowModalProps) {
     setSelectedBucketId("<auto-distribute>");
   };
 
+  // Get default bucket for EXPENSE/WITHDRAW
+  const defaultBucketId = moneyBuckets[0]?.id || "<no-bucket>";
+
   const handleClose = () => {
     resetState();
     onClose();
@@ -172,14 +217,14 @@ export function AddCashflowModal({ isOpen, onClose }: AddCashflowModalProps) {
       <form onSubmit={handleSubmit} className="space-y-6">
         
         {/* Type Toggle */}
-        <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10">
+        <div className="grid grid-cols-4 gap-1 bg-white/5 p-1 rounded-2xl border border-white/10">
           <button
             type="button"
             onClick={() => handleTypeChange("INCOME")}
             className={cn(
-              "flex-1 py-3 text-sm font-black uppercase tracking-wide rounded-xl transition-all",
-              type === "INCOME" 
-                ? "bg-[#4EDEA3] text-[#00285d] shadow-lg" 
+              "py-3 text-xs font-black uppercase tracking-wide rounded-xl transition-all",
+              type === "INCOME"
+                ? "bg-[#4EDEA3] text-[#00285d] shadow-lg"
                 : "text-gray-400 hover:text-white"
             )}
           >
@@ -189,13 +234,37 @@ export function AddCashflowModal({ isOpen, onClose }: AddCashflowModalProps) {
             type="button"
             onClick={() => handleTypeChange("EXPENSE")}
             className={cn(
-              "flex-1 py-3 text-sm font-black uppercase tracking-wide rounded-xl transition-all",
-              type === "EXPENSE" 
-                ? "bg-[#FFB4AB] text-[#00285d] shadow-lg" 
+              "py-3 text-xs font-black uppercase tracking-wide rounded-xl transition-all",
+              type === "EXPENSE"
+                ? "bg-[#FFB4AB] text-[#00285d] shadow-lg"
                 : "text-gray-400 hover:text-white"
             )}
           >
             {t("expense")}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleTypeChange("DEPOSIT")}
+            className={cn(
+              "py-3 text-xs font-black uppercase tracking-wide rounded-xl transition-all",
+              type === "DEPOSIT"
+                ? "bg-[#4EDEA3] text-[#00285d] shadow-lg"
+                : "text-gray-400 hover:text-white"
+            )}
+          >
+            {t("deposit")}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleTypeChange("WITHDRAW")}
+            className={cn(
+              "py-3 text-xs font-black uppercase tracking-wide rounded-xl transition-all",
+              type === "WITHDRAW"
+                ? "bg-[#FFB4AB] text-[#00285d] shadow-lg"
+                : "text-gray-400 hover:text-white"
+            )}
+          >
+            {t("withdraw")}
           </button>
         </div>
 
@@ -246,8 +315,10 @@ export function AddCashflowModal({ isOpen, onClose }: AddCashflowModalProps) {
         {moneyBuckets.length > 0 && (
           <div className="space-y-2">
             <label className="text-xs font-bold text-gray-400 uppercase tracking-wide flex items-center gap-1.5">
-              <Wallet size={12} className={type === "INCOME" ? "text-[#4EDEA3]" : "text-[#FFB4AB]"} />
-              {type === "INCOME" ? t("selectBucket") || "Deposit to Bucket" : t("deductFromBucket")}
+              <Wallet size={12} className={type === "INCOME" || type === "DEPOSIT" ? "text-[#4EDEA3]" : "text-[#FFB4AB]"} />
+              {type === "INCOME" || type === "DEPOSIT"
+                ? t("selectBucket") || "Deposit to Bucket"
+                : t("deductFromBucket")}
             </label>
             <div className="relative">
               <select
@@ -255,19 +326,29 @@ export function AddCashflowModal({ isOpen, onClose }: AddCashflowModalProps) {
                 onChange={(e) => setSelectedBucketId(e.target.value)}
                 className="w-full px-4 py-4 bg-white/5 border border-white/10 rounded-2xl text-white text-sm font-medium appearance-none focus:outline-none focus:border-[#ADC6FF]/50 transition-colors"
               >
-                {type === "INCOME" && (
-                  <option value="<auto-distribute>" className="bg-[#1C1B1B]">
-                    ⚡ Auto-distribute (Target Plan)
-                  </option>
+                {type === "INCOME" || type === "DEPOSIT" ? (
+                  <>
+                    <option value="<auto-distribute>" className="bg-[#1C1B1B]">
+                      ⚡ Auto-distribute (Target Plan)
+                    </option>
+                    {moneyBuckets.map(bucket => (
+                      <option key={bucket.id} value={bucket.id} className="bg-[#1C1B1B]">
+                        {bucket.icon} {t(bucket.name) || bucket.name} ({formatMoney(bucket.currentAmount)})
+                      </option>
+                    ))}
+                  </>
+                ) : (
+                  <>
+                    {moneyBuckets.map(bucket => (
+                      <option key={bucket.id} value={bucket.id} className="bg-[#1C1B1B]">
+                        {bucket.icon} {t(bucket.name) || bucket.name} ({formatMoney(bucket.currentAmount)})
+                      </option>
+                    ))}
+                    <option value="<no-bucket>" className="bg-[#1C1B1B]">
+                      {t("none") || "None (General Cashflow)"}
+                    </option>
+                  </>
                 )}
-                <option value="<no-bucket>" className="bg-[#1C1B1B]">
-                  {t("none") || "None (General Cashflow)"}
-                </option>
-                {moneyBuckets.map(bucket => (
-                  <option key={bucket.id} value={bucket.id} className="bg-[#1C1B1B]">
-                    {bucket.icon} {t(bucket.name) || bucket.name} ({formatMoney(bucket.currentAmount)})
-                  </option>
-                ))}
               </select>
               <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
                 <ChevronDown size={16} />

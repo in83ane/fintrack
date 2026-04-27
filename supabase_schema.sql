@@ -1,8 +1,25 @@
 -- ==============================================================================
 -- FINTRACK DATABASE SCHEMA (SUPABASE / POSTGRESQL)
+-- Updated: 2026-04-27
 -- ==============================================================================
 
--- 1. Profiles Table (Provided by User)
+-- Enable UUID extension
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- ==============================================================================
+-- HELPER FUNCTION
+-- ==============================================================================
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+   NEW.updated_at = NOW();
+   RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- ==============================================================================
+-- 1. PROFILES TABLE
+-- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.profiles (
   id uuid not null,
   email text not null,
@@ -22,22 +39,12 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   constraint profiles_id_fkey foreign KEY (id) references auth.users (id) on delete CASCADE
 ) TABLESPACE pg_default;
 
--- Profile Trigger
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-   NEW.updated_at = NOW();
-   RETURN NEW;
-END;
-$$ language 'plpgsql';
-
-DROP TRIGGER IF EXISTS update_profiles_updated_at ON profiles;
 CREATE TRIGGER update_profiles_updated_at BEFORE
 update on profiles for EACH row
 execute FUNCTION update_updated_at_column ();
 
--- Trigger to auto-create profile on signup
-CREATE OR REPLACE FUNCTION public.handle_new_user() 
+-- Auto-create profile on user signup
+CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
   INSERT INTO public.profiles (id, email)
@@ -52,99 +59,179 @@ CREATE TRIGGER on_auth_user_created
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- ==============================================================================
--- 2. Assets Table (For Live Portfolio Tracking)
+-- 2. ASSETS TABLE
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.assets (
-  id BIGSERIAL PRIMARY KEY,
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  symbol TEXT NOT NULL,
-  name TEXT NOT NULL,
-  shares DECIMAL(20, 8) NOT NULL DEFAULT 0,
-  avg_cost DECIMAL(20, 4) NOT NULL DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(user_id, symbol) -- One summary row per symbol per user
-);
+  id uuid not null default extensions.uuid_generate_v4 (),
+  user_id uuid not null,
+  name text not null,
+  symbol text not null,
+  asset_type text null default 'stock'::text,
+  value_usd numeric(15, 2) not null default 0,
+  quantity numeric(15, 6) null default 0,
+  avg_purchase_price numeric(15, 2) null,
+  current_price numeric(15, 2) null,
+  change_24h numeric(5, 2) null,
+  change_percentage numeric(5, 2) null,
+  allocation_target numeric(5, 2) null default 0,
+  allocation_current numeric(5, 2) null default 0,
+  sector text null,
+  country text null,
+  notes text null,
+  is_active boolean null default true,
+  created_at timestamp with time zone null default now(),
+  updated_at timestamp with time zone null default now(),
+  is_favorite boolean null default false,
+  sort_order integer null default 0,
+  constraint assets_pkey primary key (id),
+  constraint assets_user_id_fkey foreign KEY (user_id) references auth.users (id) on delete CASCADE
+) TABLESPACE pg_default;
+
+CREATE INDEX IF NOT EXISTS idx_assets_user_id ON public.assets USING btree (user_id) TABLESPACE pg_default;
+CREATE INDEX IF NOT EXISTS idx_assets_sort_order ON public.assets USING btree (sort_order) TABLESPACE pg_default;
+CREATE INDEX IF NOT EXISTS idx_assets_symbol ON public.assets USING btree (symbol) TABLESPACE pg_default;
 
 CREATE TRIGGER update_assets_updated_at BEFORE
-UPDATE ON assets FOR EACH ROW
-EXECUTE FUNCTION update_updated_at_column();
+update on assets for EACH row
+execute FUNCTION update_updated_at_column ();
 
 -- ==============================================================================
--- 3. Trades Table (Transaction Ledger)
+-- 3. TRADES TABLE
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.trades (
-  id BIGSERIAL PRIMARY KEY,
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  asset_symbol TEXT NOT NULL,
-  type TEXT NOT NULL CHECK (type IN ('BUY', 'SELL')),
-  amount_usd DECIMAL(20, 4) NOT NULL,
-  shares DECIMAL(20, 8),           -- Quantity received for this specific trade
-  price_per_unit DECIMAL(20, 4),   -- Execution price for this specific trade
-  date DATE NOT NULL DEFAULT CURRENT_DATE,
-  rate_at_time DECIMAL(10, 4) DEFAULT 1,
-  currency TEXT DEFAULT 'USD',
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+  id uuid not null default extensions.uuid_generate_v4 (),
+  user_id uuid not null,
+  asset_id uuid null,
+  asset_name text not null,
+  symbol text not null,
+  type text not null,
+  amount_usd numeric(15, 2) not null,
+  quantity numeric(15, 6) not null,
+  price_at_execution numeric(15, 6) not null,
+  currency text null default 'USD'::text,
+  exchange_rate_at_time numeric(10, 4) null default 1,
+  fees numeric(10, 2) null default 0,
+  taxes numeric(10, 2) null default 0,
+  total_cost numeric(15, 2) null,
+  profit_loss numeric(15, 2) null,
+  profit_loss_percentage numeric(5, 2) null,
+  execution_date timestamp with time zone null default now(),
+  settlement_date timestamp with time zone null,
+  status text null default 'completed'::text,
+  notes text null,
+  tags text[] null,
+  created_at timestamp with time zone null default now(),
+  updated_at timestamp with time zone null default now(),
+  constraint trades_pkey primary key (id),
+  constraint trades_asset_id_fkey foreign KEY (asset_id) references assets (id) on delete set null,
+  constraint trades_user_id_fkey foreign KEY (user_id) references auth.users (id) on delete CASCADE,
+  constraint trades_type_check check (
+    type = any (array['BUY'::text, 'SELL'::text, 'DIVIDEND'::text])
+  )
+) TABLESPACE pg_default;
+
+CREATE INDEX IF NOT EXISTS idx_trades_user_id ON public.trades USING btree (user_id) TABLESPACE pg_default;
+CREATE INDEX IF NOT EXISTS idx_trades_asset_id ON public.trades USING btree (asset_id) TABLESPACE pg_default;
+CREATE INDEX IF NOT EXISTS idx_trades_execution_date ON public.trades USING btree (execution_date) TABLESPACE pg_default;
+
+CREATE TRIGGER update_trades_updated_at BEFORE
+update on trades for EACH row
+execute FUNCTION update_updated_at_column ();
 
 -- ==============================================================================
--- 4. Allocations Table (User Custom Portfolio Ratios)
+-- 4. ALLOCATIONS TABLE
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.allocations (
-  id BIGSERIAL PRIMARY KEY,
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  label TEXT NOT NULL,
-  value DECIMAL(5, 2) NOT NULL DEFAULT 0,
-  color TEXT NOT NULL DEFAULT '#ADC6FF',
-  UNIQUE(user_id, label)
-);
+  id uuid not null default extensions.uuid_generate_v4 (),
+  user_id uuid not null,
+  label text not null,
+  value numeric(10, 2) null default 0,
+  color text null,
+  created_at timestamp with time zone null default now(),
+  updated_at timestamp with time zone null default now(),
+  constraint allocations_pkey primary key (id),
+  constraint allocations_user_id_label_key unique (user_id, label),
+  constraint allocations_user_id_fkey foreign KEY (user_id) references auth.users (id) on delete CASCADE
+) TABLESPACE pg_default;
+
+CREATE INDEX IF NOT EXISTS idx_allocations_user_id ON public.allocations USING btree (user_id) TABLESPACE pg_default;
 
 -- ==============================================================================
--- 5. Money Buckets Table (Budget Management)
+-- 5. MONEY BUCKETS TABLE
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.money_buckets (
-  id BIGSERIAL PRIMARY KEY,
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  target_percent DECIMAL(5, 2) NOT NULL DEFAULT 0,
-  current_amount DECIMAL(20, 4) NOT NULL DEFAULT 0,
-  color TEXT NOT NULL DEFAULT '#ADC6FF',
-  icon TEXT NOT NULL DEFAULT '📦',
-  linked_to_expenses BOOLEAN DEFAULT false,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+  id uuid not null default extensions.uuid_generate_v4 (),
+  user_id uuid not null,
+  name text not null,
+  target_percent numeric(5, 2) null default 0,
+  current_amount numeric(15, 2) null default 0,
+  color text null,
+  icon text null,
+  linked_to_expenses boolean null default false,
+  created_at timestamp with time zone null default now(),
+  updated_at timestamp with time zone null default now(),
+  target_amount numeric(15, 2) null default 0,
+  constraint money_buckets_pkey primary key (id),
+  constraint money_buckets_user_id_fkey foreign KEY (user_id) references auth.users (id) on delete CASCADE
+) TABLESPACE pg_default;
+
+CREATE INDEX IF NOT EXISTS idx_money_buckets_user_id ON public.money_buckets USING btree (user_id) TABLESPACE pg_default;
 
 CREATE TRIGGER update_money_buckets_updated_at BEFORE
-UPDATE ON money_buckets FOR EACH ROW
-EXECUTE FUNCTION update_updated_at_column();
+update on money_buckets for EACH row
+execute FUNCTION update_updated_at_column ();
 
 -- ==============================================================================
--- 6. Bucket Activities Table (Money Bucket Transaction Log)
+-- 6. BUCKET ACTIVITIES TABLE
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.bucket_activities (
-  id BIGSERIAL PRIMARY KEY,
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  bucket_id BIGINT NOT NULL REFERENCES public.money_buckets(id) ON DELETE CASCADE,
-  type TEXT NOT NULL CHECK (type IN ('deposit', 'withdraw', 'income_split', 'invest', 'profit_split')),
-  amount DECIMAL(20, 4) NOT NULL,
-  note TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+  id uuid not null default extensions.uuid_generate_v4 (),
+  user_id uuid not null,
+  bucket_id uuid null,
+  type text not null,
+  amount numeric(15, 2) not null,
+  note text null,
+  date timestamp with time zone not null default now(),
+  created_at timestamp with time zone null default now(),
+  constraint bucket_activities_pkey primary key (id),
+  constraint bucket_activities_bucket_id_fkey foreign KEY (bucket_id) references money_buckets (id) on delete CASCADE,
+  constraint bucket_activities_user_id_fkey foreign KEY (user_id) references auth.users (id) on delete CASCADE,
+  constraint bucket_activities_type_check check (
+    type = any (
+      array[
+        'deposit'::text,
+        'withdraw'::text,
+        'income_split'::text,
+        'invest'::text,
+        'profit_split'::text
+      ]
+    )
+  )
+) TABLESPACE pg_default;
+
+CREATE INDEX IF NOT EXISTS idx_bucket_activities_user_id ON public.bucket_activities USING btree (user_id) TABLESPACE pg_default;
+CREATE INDEX IF NOT EXISTS idx_bucket_activities_bucket_id ON public.bucket_activities USING btree (bucket_id) TABLESPACE pg_default;
 
 -- ==============================================================================
--- 7. Cash Activities Table (Income/Expense Tracking)
+-- 7. CASH ACTIVITIES TABLE
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.cash_activities (
-  id BIGSERIAL PRIMARY KEY,
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  type TEXT NOT NULL CHECK (type IN ('INCOME', 'EXPENSE')),
-  amount DECIMAL(20, 4) NOT NULL,
-  category TEXT NOT NULL,
-  note TEXT,
-  date DATE NOT NULL DEFAULT CURRENT_DATE,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+  id uuid not null default extensions.uuid_generate_v4 (),
+  user_id uuid not null,
+  type text not null,
+  amount numeric(15, 2) not null,
+  category text not null,
+  note text null,
+  date timestamp with time zone not null default now(),
+  created_at timestamp with time zone null default now(),
+  constraint cash_activities_pkey primary key (id),
+  constraint cash_activities_user_id_fkey foreign KEY (user_id) references auth.users (id) on delete CASCADE,
+  constraint cash_activities_type_check check (
+    type = any (array['INCOME'::text, 'EXPENSE'::text])
+  )
+) TABLESPACE pg_default;
+
+CREATE INDEX IF NOT EXISTS idx_cash_activities_user_id ON public.cash_activities USING btree (user_id) TABLESPACE pg_default;
 
 -- ==============================================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES
@@ -154,8 +241,11 @@ ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE assets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trades ENABLE ROW LEVEL SECURITY;
 ALTER TABLE allocations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE money_buckets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bucket_activities ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cash_activities ENABLE ROW LEVEL SECURITY;
 
--- Profiles: Users can read and update their own profile
+-- Profiles Policies
 CREATE POLICY "Users can read own profile" ON profiles
   FOR SELECT USING (auth.uid() = id);
 

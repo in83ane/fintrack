@@ -10,3 +10,9 @@ coverage/
 .claude
 next
 *.tsbuildinfo
+
+# Supabase temporary migration files
+*_apply.sql
+*_migration.sql
+READY_TO_RUN.sql
+update_*.sql

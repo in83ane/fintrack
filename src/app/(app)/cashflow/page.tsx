@@ -115,15 +115,23 @@ export default function CashflowPage() {
   };
 
   const filteredCashflow = cashActivities.filter(c => {
-    const matchesSearch = t(c.category).toLowerCase().includes(searchTerm.toLowerCase()) || 
+    const matchesSearch = t(c.category).toLowerCase().includes(searchTerm.toLowerCase()) ||
                           (c.note && c.note.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesFilter = filterType === "all" || c.type.toLowerCase() === filterType;
     return matchesSearch && matchesFilter;
   });
 
+  const getFlowLabel = (type: string) => {
+    if (type === "DEPOSIT") return t("deposit");
+    if (type === "WITHDRAW") return t("withdraw");
+    if (type === "INCOME") return t("income");
+    if (type === "EXPENSE") return t("expense");
+    return t(type.toLowerCase());
+  };
+
   // Calculate stats
-  const totalIncome = cashActivities.filter(c => c.type === 'INCOME').reduce((acc, c) => acc + c.amountUSD, 0);
-  const totalExpenses = cashActivities.filter(c => c.type === 'EXPENSE').reduce((acc, c) => acc + c.amountUSD, 0);
+  const totalIncome = cashActivities.filter(c => c.type === 'INCOME' || c.type === 'DEPOSIT').reduce((acc, c) => acc + c.amountUSD, 0);
+  const totalExpenses = cashActivities.filter(c => c.type === 'EXPENSE' || c.type === 'WITHDRAW').reduce((acc, c) => acc + c.amountUSD, 0);
   const netCashflow = totalIncome - totalExpenses;
 
   // Category breakdown for current month
@@ -133,8 +141,8 @@ export default function CashflowPage() {
     const date = new Date(a.date);
     return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
   });
-  const monthIncome = thisMonthActivities.filter(a => a.type === "INCOME").reduce((sum, a) => sum + a.amountUSD, 0);
-  const monthExpense = thisMonthActivities.filter(a => a.type === "EXPENSE").reduce((sum, a) => sum + a.amountUSD, 0);
+  const monthIncome = thisMonthActivities.filter(a => a.type === "INCOME" || a.type === "DEPOSIT").reduce((sum, a) => sum + a.amountUSD, 0);
+  const monthExpense = thisMonthActivities.filter(a => a.type === "EXPENSE" || a.type === "WITHDRAW").reduce((sum, a) => sum + a.amountUSD, 0);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-4 sm:space-y-6">
@@ -265,7 +273,7 @@ export default function CashflowPage() {
             </div>
             <div className="space-y-3">
               {(() => {
-                const expenses = cashActivities.filter(c => c.type === 'EXPENSE');
+                const expenses = cashActivities.filter(c => c.type === 'EXPENSE' || c.type === 'WITHDRAW');
                 const categories = [...new Set(expenses.map(c => c.category))];
                 const colors = ['#FFB4AB', '#E9C349', '#ADC6FF', '#A78BFA', '#4EDEA3'];
                 return categories.map((cat, i) => {
@@ -308,21 +316,21 @@ export default function CashflowPage() {
           />
         </div>
         <div className="flex gap-2 w-full">
-          {(['all', 'income', 'expense'] as const).map((type) => (
+          {(['all', 'income', 'expense', 'deposit', 'withdraw'] as const).map((type) => (
             <button
               key={type}
               onClick={() => setFilterType(type)}
               className={`flex-1 sm:flex-none px-3 sm:px-6 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl text-xs font-bold uppercase tracking-wide transition-all ${
                 filterType === type
-                  ? type === 'income'
+                  ? type === 'income' || type === 'deposit'
                     ? "bg-[#4EDEA3] text-[#0E0E0E]"
-                    : type === 'expense'
+                    : type === 'expense' || type === 'withdraw'
                       ? "bg-[#FFB4AB] text-[#0E0E0E]"
                       : "bg-[#ADC6FF] text-[#0E0E0E]"
                   : "bg-[#0E0E0E] text-gray-500 hover:text-white"
               }`}
             >
-              {type === 'all' ? t('all') : type === 'income' ? t('income') : t('expense')}
+              {type === 'all' ? t('all') : getFlowLabel(type)}
             </button>
           ))}
         </div>
@@ -364,14 +372,21 @@ export default function CashflowPage() {
                     onClick={() => handleViewDetails(txn)}
                   >
                     <td className="px-3 sm:px-6 py-3 sm:py-4">
-                      <span className="text-[10px] sm:text-xs text-gray-400 font-medium">{format(new Date(txn.date), 'MMM dd, yyyy')}</span>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] sm:text-xs text-gray-400 font-medium">
+                          {format(new Date(txn.date), 'MMM dd, yyyy')}
+                        </span>
+                        <span className="text-[9px] text-gray-600">
+                          {txn.time ? txn.time : format(new Date(txn.date), 'HH:mm')}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4">
                       <div className="flex items-center gap-2 sm:gap-3">
                         <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center ${
-                          txn.type === 'EXPENSE' ? 'bg-[#FFB4AB]/10 text-[#FFB4AB]' : 'bg-[#4EDEA3]/10 text-[#4EDEA3]'
+                          txn.type === 'EXPENSE' || txn.type === 'WITHDRAW' ? 'bg-[#FFB4AB]/10 text-[#FFB4AB]' : 'bg-[#4EDEA3]/10 text-[#4EDEA3]'
                         }`}>
-                          {txn.type === 'EXPENSE' ? <ArrowDownLeft size={12} /> : <ArrowUpRight size={12} />}
+                          {txn.type === 'EXPENSE' || txn.type === 'WITHDRAW' ? <ArrowDownLeft size={12} /> : <ArrowUpRight size={12} />}
                         </div>
                         <div>
                           <span className="text-xs font-bold text-white block">{t(txn.category)}</span>
@@ -382,11 +397,11 @@ export default function CashflowPage() {
                     <td className="px-3 sm:px-6 py-3 sm:py-4">
                       <span className={cn(
                         "px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wide",
-                        txn.type === 'INCOME'
+                        txn.type === 'INCOME' || txn.type === 'DEPOSIT'
                           ? "bg-[#4EDEA3]/10 text-[#4EDEA3]"
                           : "bg-[#FFB4AB]/10 text-[#FFB4AB]"
                       )}>
-                        {t(txn.type.toLowerCase())}
+                        {getFlowLabel(txn.type)}
                       </span>
                     </td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4 hidden sm:table-cell">
@@ -401,9 +416,9 @@ export default function CashflowPage() {
                     </td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4">
                       <span className={`text-sm sm:text-base font-black tracking-tighter ${
-                        txn.type === 'INCOME' ? 'text-[#4EDEA3]' : 'text-[#FFB4AB]'
+                        txn.type === 'INCOME' || txn.type === 'DEPOSIT' ? 'text-[#4EDEA3]' : 'text-[#FFB4AB]'
                       }`}>
-                        {txn.type === 'INCOME' ? '+' : '-'}{formatMoney(txn.amountUSD)}
+                        {txn.type === 'INCOME' || txn.type === 'DEPOSIT' ? '+' : '-'}{formatMoney(txn.amountUSD)}
                       </span>
                     </td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4 text-right">

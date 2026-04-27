@@ -27,6 +27,7 @@ import { useApp } from "@/src/context/AppContext";
 import { Modal } from "@/src/components/Modal";
 import { ConfirmModal } from "@/src/components/ConfirmModal";
 import { TransactionDetailModal } from "@/src/components/TransactionDetailModal";
+import { AddCashflowModal } from "@/src/components/AddCashflowModal";
 
 export default function BudgetPage() {
   // Hide number input spinners (arrows) via inline style injection
@@ -52,6 +53,7 @@ export default function BudgetPage() {
     removeMoneyBucket,
     bucketActivities,
     addBucketActivity,
+    addCashActivity,
     addToast,
   } = useApp();
 
@@ -136,6 +138,7 @@ export default function BudgetPage() {
 
   const [bucketAmountModal, setBucketAmountModal] = useState<{ id: string } | null>(null);
   const [bucketAmountValue, setBucketAmountValue] = useState("");
+  const [cashflowModal, setCashflowModal] = useState<{ type: "DEPOSIT" | "WITHDRAW"; id: string } | null>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [isCarouselHovered, setIsCarouselHovered] = useState(false);
@@ -316,13 +319,14 @@ export default function BudgetPage() {
       type === "deposit"
         ? bucket.currentAmount + valUSD
         : Math.max(0, bucket.currentAmount - valUSD);
+    const now = new Date().toISOString();
     updateMoneyBucket(bucketAmountModal.id, { currentAmount: newAmount });
     addBucketActivity({
       bucketId: bucket.id,
       bucketName: bucket.name,
       type: type,
       amount: valUSD,
-      date: new Date().toISOString(),
+      date: now,
       note: `${type === "deposit" ? "+" : "-"}${formatDisplay(displayVal)} → ${t(bucket.name) || bucket.name}`,
     });
     addToast(
@@ -1011,14 +1015,20 @@ export default function BudgetPage() {
           </div>
           <div className="flex gap-4">
             <button
-              onClick={() => handleBucketAmount("deposit")}
+              onClick={() => {
+                setBucketAmountModal(null);
+                setCashflowModal({ type: "DEPOSIT", id: bucketAmountModal!.id });
+              }}
               className="flex-1 py-4 bg-[#4EDEA3] text-[#00285d] rounded-full font-black text-sm uppercase tracking-tight hover:brightness-110 transition-all active:scale-95 flex items-center justify-center gap-2"
             >
               <ArrowDownToLine size={16} />
               {t("deposit")}
             </button>
             <button
-              onClick={() => handleBucketAmount("withdraw")}
+              onClick={() => {
+                setBucketAmountModal(null);
+                setCashflowModal({ type: "WITHDRAW", id: bucketAmountModal!.id });
+              }}
               className="flex-1 py-4 bg-[#FFB4AB] text-[#00285d] rounded-full font-black text-sm uppercase tracking-tight hover:brightness-110 transition-all active:scale-95 flex items-center justify-center gap-2"
             >
               <ArrowUpFromLine size={16} />
@@ -1027,6 +1037,14 @@ export default function BudgetPage() {
           </div>
         </div>
       </Modal>
+
+      {/* Cashflow Modal for Deposit/Withdraw */}
+      <AddCashflowModal
+        isOpen={!!cashflowModal}
+        onClose={() => setCashflowModal(null)}
+        presetType={cashflowModal?.type}
+        presetBucketId={cashflowModal?.id}
+      />
 
       {/* Invest Modal */}
       <Modal isOpen={!!investModal} onClose={() => setInvestModal(null)} title={t("investFromBucket")}>
