@@ -24,6 +24,9 @@ import { ConfirmModal } from "@/src/components/ConfirmModal";
 import { TransactionDetailModal } from "@/src/components/TransactionDetailModal";
 import { cn } from "@/src/lib/utils";
 
+// Extend CashActivity locally to include source
+type CashActivityWithSource = CashActivity & { source: 'cash' | 'bucket' };
+
 export default function CashflowPage() {
   const { t, formatMoney, cashActivities, bucketActivities, removeCashActivity, removeBucketActivity, currency, exchangeRates, moneyBuckets } = useApp();
   const [showAddModal, setShowAddModal] = useState(false);
@@ -36,13 +39,13 @@ export default function CashflowPage() {
   const [showDetailModal, setShowDetailModal] = useState(false);
 
   // Add source property to cash activities
-  const cashActivitiesWithSource: CashActivity[] = cashActivities.map(ca => ({
+  const cashActivitiesWithSource: CashActivityWithSource[] = cashActivities.map(ca => ({
     ...ca,
     source: 'cash' as const
   }));
 
   // Convert bucket activities to cashflow format
-  const bucketActivitiesAsCashflow: CashActivity[] = bucketActivities.map(ba => {
+  const bucketActivitiesAsCashflow: CashActivityWithSource[] = bucketActivities.map(ba => {
     const bucket = moneyBuckets.find(b => b.id === ba.bucketId);
     // Map bucket activity types to cash activity types
     let type: "INCOME" | "EXPENSE" | "DEPOSIT" | "WITHDRAW" = "DEPOSIT";
@@ -63,16 +66,16 @@ export default function CashflowPage() {
       time: undefined,
       note: ba.note || `${ba.type} - ${ba.bucketName}`,
       bucketId: ba.bucketId,
-      isTransfer: ba.type === 'invest' || ba.type === 'withdraw', // Moving money out to invest
+      isTransfer: ba.type === 'invest' || ba.type === 'withdraw',
       source: 'bucket' as const
     };
   });
 
   // Combine cash and bucket activities, sort by date (newest first)
-  const allCashflowActivities = [...cashActivitiesWithSource, ...bucketActivitiesAsCashflow]
+  const allCashflowActivities: CashActivityWithSource[] = [...cashActivitiesWithSource, ...bucketActivitiesAsCashflow]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  const handleViewDetails = (activity: CashActivity) => {
+  const handleViewDetails = (activity: CashActivityWithSource) => {
     const isBucketActivity = activity.source === 'bucket';
     setSelectedTransaction({
       id: activity.id,
@@ -147,7 +150,6 @@ export default function CashflowPage() {
             const type = (row.type || "INCOME").toUpperCase();
             const amount = parseFloat(row.amount || row.amountUSD || "0");
             if (amount > 0 && (type === "INCOME" || type === "EXPENSE")) {
-              // We can't bulk add, so show message
               count++;
             }
           });
