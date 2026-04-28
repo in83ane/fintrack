@@ -271,6 +271,9 @@ export const db = {
     insert: async (activity: Omit<BucketActivity, 'id' | 'created_at'>) => {
       return await supabase.from('bucket_activities').insert(activity).select().single();
     },
+    delete: async (id: string) => {
+      return await supabase.from('bucket_activities').delete().eq('id', id);
+    },
   },
 
   // Cash Activities
