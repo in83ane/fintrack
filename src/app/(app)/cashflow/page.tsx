@@ -18,14 +18,14 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import Papa from "papaparse";
-import { useApp, CashActivity } from "@/src/context/AppContext";
+import { useApp, CashActivity, BucketActivity } from "@/src/context/AppContext";
 import { AddCashflowModal } from "@/src/components/AddCashflowModal";
 import { ConfirmModal } from "@/src/components/ConfirmModal";
 import { TransactionDetailModal } from "@/src/components/TransactionDetailModal";
 import { cn } from "@/src/lib/utils";
 
 export default function CashflowPage() {
-  const { t, formatMoney, cashActivities, removeCashActivity, currency, exchangeRates, moneyBuckets } = useApp();
+  const { t, formatMoney, cashActivities, bucketActivities, removeCashActivity, removeBucketActivity, currency, exchangeRates, moneyBuckets } = useApp();
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
@@ -34,17 +34,58 @@ export default function CashflowPage() {
   
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  
+
+  // Add source property to cash activities
+  const cashActivitiesWithSource: CashActivity[] = cashActivities.map(ca => ({
+    ...ca,
+    source: 'cash' as const
+  }));
+
+  // Convert bucket activities to cashflow format
+  const bucketActivitiesAsCashflow: CashActivity[] = bucketActivities.map(ba => {
+    const bucket = moneyBuckets.find(b => b.id === ba.bucketId);
+    // Map bucket activity types to cash activity types
+    let type: "INCOME" | "EXPENSE" | "DEPOSIT" | "WITHDRAW" = "DEPOSIT";
+    if (ba.type === 'withdraw' || ba.type === 'invest') {
+      type = "WITHDRAW";
+    } else if (ba.type === 'income_split' || ba.type === 'profit_split') {
+      type = "DEPOSIT";
+    } else if (ba.type === 'deposit') {
+      type = "DEPOSIT";
+    }
+
+    return {
+      id: ba.id,
+      type,
+      amountUSD: ba.amount,
+      category: ba.bucketName || ba.type,
+      date: ba.date,
+      time: undefined,
+      note: ba.note || `${ba.type} - ${ba.bucketName}`,
+      bucketId: ba.bucketId,
+      isTransfer: ba.type === 'invest' || ba.type === 'withdraw', // Moving money out to invest
+      source: 'bucket' as const
+    };
+  });
+
+  // Combine cash and bucket activities, sort by date (newest first)
+  const allCashflowActivities = [...cashActivitiesWithSource, ...bucketActivitiesAsCashflow]
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
   const handleViewDetails = (activity: CashActivity) => {
+    const isBucketActivity = activity.source === 'bucket';
     setSelectedTransaction({
       id: activity.id,
       type: activity.type,
       category: activity.category,
       amountUSD: activity.amountUSD,
       date: activity.date,
+      time: activity.time,
       note: activity.note,
       sourceBucketId: activity.bucketId,
       currency: currency,
+      isTransfer: activity.isTransfer,
+      isBucketActivity,
     });
     setShowDetailModal(true);
   };
@@ -62,13 +103,19 @@ export default function CashflowPage() {
 
   const confirmDeleteCashflow = () => {
     if (!cashflowToDelete) return;
-    removeCashActivity(cashflowToDelete);
+    // Check if it's a bucket activity or cash activity
+    const isBucketActivity = bucketActivities.some(ba => ba.id === cashflowToDelete);
+    if (isBucketActivity) {
+      removeBucketActivity(cashflowToDelete);
+    } else {
+      removeCashActivity(cashflowToDelete);
+    }
     showNotification(t("recordSaved"), 'success');
     setCashflowToDelete(null);
   };
 
   const handleExportCSV = () => {
-    const csv = Papa.unparse(cashActivities.map(c => ({
+    const csv = Papa.unparse(allCashflowActivities.map(c => ({
       type: c.type,
       amount: c.amountUSD,
       category: c.category,
@@ -114,7 +161,7 @@ export default function CashflowPage() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const filteredCashflow = cashActivities.filter(c => {
+  const filteredCashflow = allCashflowActivities.filter(c => {
     const matchesSearch = t(c.category).toLowerCase().includes(searchTerm.toLowerCase()) ||
                           (c.note && c.note.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesFilter = filterType === "all" || c.type.toLowerCase() === filterType;
@@ -129,20 +176,20 @@ export default function CashflowPage() {
     return t(type.toLowerCase());
   };
 
-  // Calculate stats
-  const totalIncome = cashActivities.filter(c => c.type === 'INCOME' || c.type === 'DEPOSIT').reduce((acc, c) => acc + c.amountUSD, 0);
-  const totalExpenses = cashActivities.filter(c => c.type === 'EXPENSE' || c.type === 'WITHDRAW').reduce((acc, c) => acc + c.amountUSD, 0);
+  // Calculate stats (exclude transfers - they're just moving money, not income/expense)
+  const totalIncome = allCashflowActivities.filter(c => (c.type === 'INCOME' || c.type === 'DEPOSIT') && !c.isTransfer).reduce((acc, c) => acc + c.amountUSD, 0);
+  const totalExpenses = allCashflowActivities.filter(c => (c.type === 'EXPENSE' || c.type === 'WITHDRAW') && !c.isTransfer).reduce((acc, c) => acc + c.amountUSD, 0);
   const netCashflow = totalIncome - totalExpenses;
 
   // Category breakdown for current month
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
-  const thisMonthActivities = cashActivities.filter(a => {
+  const thisMonthActivities = allCashflowActivities.filter(a => {
     const date = new Date(a.date);
     return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
   });
-  const monthIncome = thisMonthActivities.filter(a => a.type === "INCOME" || a.type === "DEPOSIT").reduce((sum, a) => sum + a.amountUSD, 0);
-  const monthExpense = thisMonthActivities.filter(a => a.type === "EXPENSE" || a.type === "WITHDRAW").reduce((sum, a) => sum + a.amountUSD, 0);
+  const monthIncome = thisMonthActivities.filter(a => (a.type === "INCOME" || a.type === "DEPOSIT") && !a.isTransfer).reduce((sum, a) => sum + a.amountUSD, 0);
+  const monthExpense = thisMonthActivities.filter(a => (a.type === "EXPENSE" || a.type === "WITHDRAW") && !a.isTransfer).reduce((sum, a) => sum + a.amountUSD, 0);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-4 sm:space-y-6">
@@ -227,7 +274,7 @@ export default function CashflowPage() {
       </div>
 
       {/* Monthly Breakdown Chart */}
-      {cashActivities.length > 0 && (
+      {allCashflowActivities.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           {/* Income by Category */}
           <div className="bg-[#1C1B1B] p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-white/5">
@@ -237,7 +284,7 @@ export default function CashflowPage() {
             </div>
             <div className="space-y-3">
               {(() => {
-                const incomes = cashActivities.filter(c => c.type === 'INCOME');
+                const incomes = allCashflowActivities.filter(c => c.type === 'INCOME' || c.type === 'DEPOSIT');
                 const categories = [...new Set(incomes.map(c => c.category))];
                 const colors = ['#4EDEA3', '#ADC6FF', '#E9C349', '#FF8B9A', '#A78BFA'];
                 return categories.map((cat, i) => {
@@ -273,7 +320,7 @@ export default function CashflowPage() {
             </div>
             <div className="space-y-3">
               {(() => {
-                const expenses = cashActivities.filter(c => c.type === 'EXPENSE' || c.type === 'WITHDRAW');
+                const expenses = allCashflowActivities.filter(c => c.type === 'EXPENSE' || c.type === 'WITHDRAW');
                 const categories = [...new Set(expenses.map(c => c.category))];
                 const colors = ['#FFB4AB', '#E9C349', '#ADC6FF', '#A78BFA', '#4EDEA3'];
                 return categories.map((cat, i) => {
@@ -384,9 +431,18 @@ export default function CashflowPage() {
                     <td className="px-3 sm:px-6 py-3 sm:py-4">
                       <div className="flex items-center gap-2 sm:gap-3">
                         <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center ${
-                          txn.type === 'EXPENSE' || txn.type === 'WITHDRAW' ? 'bg-[#FFB4AB]/10 text-[#FFB4AB]' : 'bg-[#4EDEA3]/10 text-[#4EDEA3]'
+                          txn.isTransfer
+                            ? 'bg-[#ADC6FF]/10 text-[#ADC6FF]'
+                            : txn.type === 'EXPENSE' || txn.type === 'WITHDRAW'
+                              ? 'bg-[#FFB4AB]/10 text-[#FFB4AB]'
+                              : 'bg-[#4EDEA3]/10 text-[#4EDEA3]'
                         }`}>
-                          {txn.type === 'EXPENSE' || txn.type === 'WITHDRAW' ? <ArrowDownLeft size={12} /> : <ArrowUpRight size={12} />}
+                          {txn.isTransfer
+                            ? <Wallet size={12} />
+                            : txn.type === 'EXPENSE' || txn.type === 'WITHDRAW'
+                              ? <ArrowDownLeft size={12} />
+                              : <ArrowUpRight size={12} />
+                          }
                         </div>
                         <div>
                           <span className="text-xs font-bold text-white block">{t(txn.category)}</span>
@@ -397,11 +453,13 @@ export default function CashflowPage() {
                     <td className="px-3 sm:px-6 py-3 sm:py-4">
                       <span className={cn(
                         "px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wide",
-                        txn.type === 'INCOME' || txn.type === 'DEPOSIT'
-                          ? "bg-[#4EDEA3]/10 text-[#4EDEA3]"
-                          : "bg-[#FFB4AB]/10 text-[#FFB4AB]"
+                        txn.isTransfer
+                          ? "bg-[#ADC6FF]/10 text-[#ADC6FF]"
+                          : txn.type === 'INCOME' || txn.type === 'DEPOSIT'
+                            ? "bg-[#4EDEA3]/10 text-[#4EDEA3]"
+                            : "bg-[#FFB4AB]/10 text-[#FFB4AB]"
                       )}>
-                        {getFlowLabel(txn.type)}
+                        {txn.isTransfer ? 'Transfer' : getFlowLabel(txn.type)}
                       </span>
                     </td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4 hidden sm:table-cell">
@@ -416,9 +474,16 @@ export default function CashflowPage() {
                     </td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4">
                       <span className={`text-sm sm:text-base font-black tracking-tighter ${
-                        txn.type === 'INCOME' || txn.type === 'DEPOSIT' ? 'text-[#4EDEA3]' : 'text-[#FFB4AB]'
+                        txn.isTransfer
+                          ? 'text-[#ADC6FF]'
+                          : txn.type === 'INCOME' || txn.type === 'DEPOSIT'
+                            ? 'text-[#4EDEA3]'
+                            : 'text-[#FFB4AB]'
                       }`}>
-                        {txn.type === 'INCOME' || txn.type === 'DEPOSIT' ? '+' : '-'}{formatMoney(txn.amountUSD)}
+                        {txn.type === 'INCOME' || txn.type === 'DEPOSIT'
+                          ? `+${formatMoney(txn.amountUSD)}`
+                          : `-${formatMoney(txn.amountUSD)}`
+                        }
                       </span>
                     </td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4 text-right">

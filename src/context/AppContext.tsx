@@ -31,6 +31,7 @@ export interface CashActivity {
   time?: string;
   note?: string;
   bucketId?: string;
+  isTransfer?: boolean; // true = money moving between Cash ↔ Bucket (not income/expense)
 }
 
 export interface Allocation {
@@ -80,6 +81,21 @@ export interface BucketActivity {
   amount: number;
   date: string;
   note?: string;
+}
+
+// Extended CashActivity that includes bucket activities for Cashflow page
+export interface CashflowActivity {
+  id: string;
+  type: "INCOME" | "EXPENSE" | "DEPOSIT" | "WITHDRAW";
+  amountUSD: number;
+  category: string;
+  date: string;
+  time?: string;
+  note?: string;
+  bucketId?: string;
+  bucketName?: string;
+  isTransfer?: boolean;
+  source: 'cash' | 'bucket'; // 'cash' = from cash_activities, 'bucket' = from bucket_activities
 }
 
 export interface Asset {
@@ -158,6 +174,7 @@ interface AppState {
   removeMoneyBucket: (id: string) => void;
   bucketActivities: BucketActivity[];
   addBucketActivity: (activity: Omit<BucketActivity, 'id'>) => void;
+  removeBucketActivity: (id: string) => void;
   addTradeFromBucket: (trade: Omit<Trade, 'id'>, bucketId: string) => void;
   dashboardWidgets: DashboardWidget[];
   setDashboardWidgets: (widgets: DashboardWidget[]) => void;
@@ -484,6 +501,7 @@ const translations: Record<Language, Record<string, string>> = {
     depositToBucket: "Deposit",
     deposit: "Deposit",
     withdraw: "Withdraw",
+    transfer: "Transfer",
     bucketTransactions: "Bucket Transactions",
     invalidAmount: "Invalid Amount",
     withdrawFromBucket: "Withdraw",
@@ -855,6 +873,7 @@ const translations: Record<Language, Record<string, string>> = {
     depositToBucket: "ฝากเงิน",
     deposit: "ฝากเพิ่ม",
     withdraw: "ถอนออก",
+    transfer: "โอนเงิน",
     bucketTransactions: "ธุรกรรมกระเป๋า",
     invalidAmount: "จำนวนเงินไม่ถูกต้อง",
     withdrawFromBucket: "ถอนเงิน",
@@ -2204,7 +2223,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
       return;
     }
-    
+
     // Optimistic update
     const tempId = Date.now().toString() + "-" + Math.random().toString(36).substr(2, 9);
     setBucketActivities(prev => [{ ...activity, id: tempId }, ...prev]);
@@ -2218,17 +2237,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         note: activity.note || null,
         date: activity.date
       } as any);
-      
+
       if (error) {
         console.error("Supabase bucket_activities insert error:", error);
         return;
       }
-      
+
       if (data) {
         setBucketActivities(prev => prev.map(a => a.id === tempId ? { ...activity, id: data.id } : a));
       }
     } catch (err) {
       console.error("Failed to add bucket activity to Supabase", err);
+    }
+  };
+
+  const removeBucketActivity = async (id: string) => {
+    if (!user) {
+      setBucketActivities(prev => {
+        const newActivities = prev.filter(a => a.id !== id);
+        localStorage.setItem("fintrack-bucket-activities", JSON.stringify(newActivities));
+        return newActivities;
+      });
+      return;
+    }
+    try {
+      await db.bucketActivities.delete(id);
+      setBucketActivities(prev => prev.filter(a => a.id !== id));
+    } catch (err) {
+      console.error("Failed to remove bucket activity from Supabase", err);
     }
   };
 
@@ -2446,6 +2482,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       removeMoneyBucket,
       bucketActivities,
       addBucketActivity,
+      removeBucketActivity,
       addTradeFromBucket,
       dashboardWidgets,
       setDashboardWidgets,

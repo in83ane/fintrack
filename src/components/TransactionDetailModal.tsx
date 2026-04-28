@@ -41,6 +41,8 @@ interface TransactionDetailModalProps {
     category?: string;
     note?: string;
     activityType?: string;
+    isTransfer?: boolean;
+    source?: 'cash' | 'bucket';
   } | null;
 }
 
@@ -54,8 +56,8 @@ export function TransactionDetailModal({ isOpen, onClose, transaction }: Transac
     : null;
 
   const isTrade = transaction.asset !== undefined;
-  const isBucketActivity = transaction.activityType !== undefined;
-  const isCashActivity = transaction.category !== undefined && !isTrade;
+  const isBucketActivity = transaction.source === 'bucket' || (transaction.activityType !== undefined && !isTrade);
+  const isCashActivity = transaction.source === 'cash' || (transaction.category !== undefined && !isTrade && !isBucketActivity);
 
   // Icon mapping for activity types
   const getActivityIcon = (type: string) => {
@@ -135,8 +137,8 @@ export function TransactionDetailModal({ isOpen, onClose, transaction }: Transac
               <h3 className="text-lg font-black text-white">
                 {isTrade
                   ? `${transaction.type} ${transaction.asset}`
-                  : transaction.bucketName
-                    ? t(transaction.bucketName) || transaction.bucketName
+                  : isBucketActivity
+                    ? t(transaction.bucketName || transaction.type === 'DEPOSIT' || transaction.type === 'WITHDRAW' ? (transaction.type === 'DEPOSIT' ? 'deposit' : 'withdraw') : (transaction.activityType || '')) || transaction.bucketName || transaction.type || transaction.activityType
                     : t(transaction.category || '') || transaction.category
                 }
               </h3>
@@ -149,14 +151,15 @@ export function TransactionDetailModal({ isOpen, onClose, transaction }: Transac
             <p className={cn(
               "text-xl font-black",
               transaction.type === 'BUY' || transaction.type === 'IMPORT' ||
+              transaction.type === 'INCOME' || transaction.type === 'DEPOSIT' ||
               (transaction.activityType && ['deposit', 'income_split', 'profit_split'].includes(transaction.activityType))
                 ? 'text-[#4EDEA3]'
-                : transaction.type === 'SELL' || transaction.activityType === 'withdraw'
+                : transaction.type === 'SELL' || transaction.type === 'EXPENSE' || transaction.type === 'WITHDRAW' || transaction.activityType === 'withdraw'
                   ? 'text-[#FFB4AB]'
                   : 'text-white'
             )}>
-              {transaction.type === 'BUY' || transaction.type === 'IMPORT' ? '+' : ''}
-              {transaction.type === 'SELL' ? '-' : ''}
+              {(transaction.type === 'BUY' || transaction.type === 'IMPORT' || transaction.type === 'INCOME' || transaction.type === 'DEPOSIT') ? '+' : ''}
+              {(transaction.type === 'SELL' || transaction.type === 'EXPENSE' || transaction.type === 'WITHDRAW') ? '-' : ''}
               {formatMoney(transaction.amountUSD)}
             </p>
           </div>
@@ -275,12 +278,12 @@ export function TransactionDetailModal({ isOpen, onClose, transaction }: Transac
           <>
             <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
               <div className="flex items-center gap-2 mb-3">
-                {React.createElement(getActivityIcon(transaction.activityType || 'deposit'), {
+                {React.createElement(getActivityIcon(transaction.type === 'DEPOSIT' || transaction.type === 'WITHDRAW' ? (transaction.type === 'DEPOSIT' ? 'deposit' : 'withdraw') : (transaction.activityType || 'deposit')), {
                   size: 14,
-                  style: { color: getActivityColor(transaction.activityType || 'deposit') }
+                  style: { color: getActivityColor(transaction.type === 'DEPOSIT' || transaction.type === 'WITHDRAW' ? (transaction.type === 'DEPOSIT' ? 'deposit' : 'withdraw') : (transaction.activityType || 'deposit')) }
                 })}
                 <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">
-                  {t(transaction.activityType || '') || transaction.activityType}
+                  {t(transaction.type === 'DEPOSIT' || transaction.type === 'WITHDRAW' ? (transaction.type === 'DEPOSIT' ? 'deposit' : 'withdraw') : (transaction.activityType || '')) || transaction.type || transaction.activityType}
                 </span>
               </div>
               {transaction.note && (
@@ -320,6 +323,23 @@ export function TransactionDetailModal({ isOpen, onClose, transaction }: Transac
                 {t(transaction.category || '') || transaction.category}
               </p>
             </div>
+
+            {transaction.isTransfer && (
+              <div className="p-4 bg-[#ADC6FF]/5 rounded-2xl border border-[#ADC6FF]/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <Wallet size={14} className="text-[#ADC6FF]" />
+                  <span className="text-xs font-bold text-[#ADC6FF] uppercase tracking-wide">
+                    {t("transfer") || "Money Transfer"}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-300 leading-relaxed">
+                  {transaction.type === 'DEPOSIT'
+                    ? `Money moved from Cash to ${t(transaction.category || '') || transaction.category}`
+                    : `Money moved from ${t(transaction.category || '') || transaction.category} back to Cash`
+                  }
+                </p>
+              </div>
+            )}
 
             {transaction.note && (
               <div className="p-4 bg-white/5 rounded-2xl border border-white/10">

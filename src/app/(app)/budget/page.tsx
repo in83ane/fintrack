@@ -27,7 +27,6 @@ import { useApp } from "@/src/context/AppContext";
 import { Modal } from "@/src/components/Modal";
 import { ConfirmModal } from "@/src/components/ConfirmModal";
 import { TransactionDetailModal } from "@/src/components/TransactionDetailModal";
-import { AddCashflowModal } from "@/src/components/AddCashflowModal";
 
 export default function BudgetPage() {
   // Hide number input spinners (arrows) via inline style injection
@@ -136,9 +135,8 @@ export default function BudgetPage() {
     return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
   };
 
-  const [bucketAmountModal, setBucketAmountModal] = useState<{ id: string } | null>(null);
-  const [bucketAmountValue, setBucketAmountValue] = useState("");
-  const [cashflowModal, setCashflowModal] = useState<{ type: "DEPOSIT" | "WITHDRAW"; id: string } | null>(null);
+  const [inlineAction, setInlineAction] = useState<{ id: string; type: "deposit" | "withdraw" } | null>(null);
+  const [inlineAmount, setInlineAmount] = useState("");
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [isCarouselHovered, setIsCarouselHovered] = useState(false);
@@ -203,6 +201,15 @@ export default function BudgetPage() {
           date: now,
           note: `${t("distributed")} ${b.targetPercent}% → ${t(b.name) || b.name}`,
         });
+        // Add cash activity for Cashflow page
+        addCashActivity({
+          type: "DEPOSIT",
+          amountUSD: splitUSD,
+          category: t(b.name) || b.name,
+          date: now,
+          bucketId: b.id,
+          note: `Income distribution ${b.targetPercent}% - ${t(b.name) || b.name}`,
+        });
       }
     });
     addToast(`${t("distributed")} ${formatDisplay(incomeNum)}`, "success");
@@ -231,6 +238,15 @@ export default function BudgetPage() {
         date: now,
         note: `${t("suggestSafeHaven")} — 50%`,
       });
+      // Add cash activity for Cashflow page
+      addCashActivity({
+        type: "DEPOSIT",
+        amountUSD: halfAUSD,
+        category: t(emergencyBucket.name) || emergencyBucket.name,
+        date: now,
+        bucketId: emergencyBucket.id,
+        note: `Profit split 50% - ${t(emergencyBucket.name) || emergencyBucket.name}`,
+      });
     }
     if (investBucket) {
       updateMoneyBucket(investBucket.id, { currentAmount: investBucket.currentAmount + halfBUSD });
@@ -241,6 +257,15 @@ export default function BudgetPage() {
         amount: halfBUSD,
         date: now,
         note: `${t("suggestReinvest")} — 50%`,
+      });
+      // Add cash activity for Cashflow page
+      addCashActivity({
+        type: "DEPOSIT",
+        amountUSD: halfBUSD,
+        category: t(investBucket.name) || investBucket.name,
+        date: now,
+        bucketId: investBucket.id,
+        note: `Profit split 50% - ${t(investBucket.name) || investBucket.name}`,
       });
     }
     addToast(`${t("profitAdded")} ${formatDisplay(profitNum)}`, "success");
@@ -270,6 +295,15 @@ export default function BudgetPage() {
       amount: amtUSD,
       date: new Date().toISOString(),
       note: `${t("investedFromBucket")} ${t(bucket.name) || bucket.name}`,
+    });
+    // Add cash activity for Cashflow page (Invest = money leaves the system)
+    addCashActivity({
+      type: "WITHDRAW",
+      amountUSD: amtUSD,
+      category: t(bucket.name) || bucket.name,
+      date: new Date().toISOString(),
+      bucketId: bucket.id,
+      note: `Invest from ${t(bucket.name) || bucket.name}`,
     });
     addToast(`${t("investedFromBucket")}: -${formatDisplay(displayAmt)} ← ${t(bucket.name) || bucket.name}`, "success");
     setInvestModal(null);
@@ -305,35 +339,37 @@ export default function BudgetPage() {
     setIsBucketModalOpen(false);
   };
 
-  const handleBucketAmount = (type: "deposit" | "withdraw") => {
-    const displayVal = Number(bucketAmountValue);
-    if (displayVal < 0) {
-      addToast(t("invalidAmount") || "Invalid amount", "error");
-      return;
-    }
-    if (!displayVal || displayVal <= 0 || !bucketAmountModal) return;
-    const bucket = moneyBuckets.find((b) => b.id === bucketAmountModal.id);
+  const handleInlineAction = () => {
+    const displayVal = Number(inlineAmount);
+    if (!displayVal || displayVal <= 0 || !inlineAction) return;
+    const bucket = moneyBuckets.find((b) => b.id === inlineAction.id);
     if (!bucket) return;
     const valUSD = toUSD(displayVal);
+    if (inlineAction.type === "withdraw" && valUSD > bucket.currentAmount) {
+      addToast(t("amountExceedsBalance"), "error");
+      return;
+    }
     const newAmount =
-      type === "deposit"
+      inlineAction.type === "deposit"
         ? bucket.currentAmount + valUSD
         : Math.max(0, bucket.currentAmount - valUSD);
     const now = new Date().toISOString();
-    updateMoneyBucket(bucketAmountModal.id, { currentAmount: newAmount });
+    updateMoneyBucket(bucket.id, { currentAmount: newAmount });
     addBucketActivity({
       bucketId: bucket.id,
       bucketName: bucket.name,
-      type: type,
+      type: inlineAction.type,
       amount: valUSD,
       date: now,
-      note: `${type === "deposit" ? "+" : "-"}${formatDisplay(displayVal)} → ${t(bucket.name) || bucket.name}`,
+      note: `${inlineAction.type === "deposit" ? "+" : "-"}${formatDisplay(displayVal)} → ${t(bucket.name) || bucket.name}`,
     });
+    // No cash activity created - bucket transactions are standalone
     addToast(
-      `${type === "deposit" ? "+" : "-"}${formatDisplay(displayVal)} → ${t(bucket.name) || bucket.name}`,
+      `${inlineAction.type === "deposit" ? "+" : "-"}${formatDisplay(displayVal)} → ${t(bucket.name) || bucket.name}`,
       "success"
     );
-    setBucketAmountModal(null);
+    setInlineAction(null);
+    setInlineAmount("");
   };
 
   const activityIcon = (type: string) => {
@@ -468,9 +504,8 @@ export default function BudgetPage() {
                   <div className="absolute -right-4 -top-4 w-24 h-24 blur-2xl rounded-full opacity-20" style={{ backgroundColor: bucket.color }} />
                 </div>
                 {/* Card surface — scales on hover */}
-                <div 
-                  className="relative h-full bg-[#353534]/40 backdrop-blur-xl p-4 sm:p-6 rounded-xl sm:rounded-2xl border border-[#424754]/5 shadow-xl flex flex-col justify-between group-hover:scale-[1.02] transition-all duration-200 cursor-pointer"
-                  onClick={() => { setBucketAmountModal({ id: bucket.id }); setBucketAmountValue(""); }}
+                <div
+                  className="relative h-full bg-[#353534]/40 backdrop-blur-xl p-4 sm:p-6 rounded-xl sm:rounded-2xl border border-[#424754]/5 shadow-xl flex flex-col justify-between group-hover:scale-[1.02] transition-all duration-200"
                 >
                 <div className="flex justify-between items-start relative z-10">
                   <div className="flex items-center gap-2 sm:gap-3">
@@ -538,6 +573,78 @@ export default function BudgetPage() {
                     <div className="h-full bg-gradient-to-r from-[#4EDEA3] to-[#ADC6FF] rounded-full transition-all duration-500" style={{ width: `${Math.min(actualPct, 100)}%` }} />
                   </div>
                 </div>
+
+                {/* Inline Deposit/Withdraw */}
+                <div className="mt-4 space-y-2">
+                  {inlineAction?.id === bucket.id ? (
+                    <div className="flex gap-2 items-center">
+                      <input
+                        type="number"
+                        step="any"
+                        min="0"
+                        value={inlineAmount}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val.includes('-')) return;
+                          setInlineAmount(val);
+                        }}
+                        placeholder="0.00"
+                        autoFocus
+                        className="flex-1 bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-white text-sm font-bold outline-none focus:border-[#E9C349]/50 transition-all text-center"
+                      />
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleInlineAction();
+                        }}
+                        className={cn(
+                          "px-3 py-2 rounded-xl font-black text-xs uppercase transition-all",
+                          inlineAction.type === "deposit"
+                            ? "bg-[#4EDEA3] text-[#00285d] hover:brightness-110"
+                            : "bg-[#FFB4AB] text-[#00285d] hover:brightness-110"
+                        )}
+                      >
+                        {inlineAction.type === "deposit" ? "+" : "-"}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setInlineAction(null);
+                          setInlineAmount("");
+                        }}
+                        className="px-3 py-2 rounded-xl font-bold text-xs text-gray-400 hover:text-white hover:bg-white/10 transition-all"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setInlineAction({ id: bucket.id, type: "deposit" });
+                          setInlineAmount("");
+                        }}
+                        className="flex-1 py-2.5 rounded-xl font-black text-xs uppercase bg-[#4EDEA3]/10 text-[#4EDEA3] border border-[#4EDEA3]/20 hover:bg-[#4EDEA3]/20 transition-all flex items-center justify-center gap-1.5"
+                      >
+                        <ArrowDownToLine size={14} />
+                        {t("deposit")}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setInlineAction({ id: bucket.id, type: "withdraw" });
+                          setInlineAmount("");
+                        }}
+                        className="flex-1 py-2.5 rounded-xl font-black text-xs uppercase bg-[#FFB4AB]/10 text-[#FFB4AB] border border-[#FFB4AB]/20 hover:bg-[#FFB4AB]/20 transition-all flex items-center justify-center gap-1.5"
+                      >
+                        <ArrowUpFromLine size={14} />
+                        {t("withdraw")}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
                 </div>{/* end card surface */}
               </motion.div>
             );
@@ -986,65 +1093,6 @@ export default function BudgetPage() {
         </div>
       </Modal>
 
-      {/* Deposit/Withdraw Modal */}
-      <Modal
-        isOpen={!!bucketAmountModal}
-        onClose={() => setBucketAmountModal(null)}
-        title={t("adjustAmount") || "Adjust Amount"}
-      >
-        <div className="space-y-5">
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">{t("amount")}</label>
-            <div className="relative">
-              <input
-                type="number"
-                step="any"
-                min="0"
-                value={bucketAmountValue}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val.includes('-')) return;
-                  setBucketAmountValue(val);
-                }}
-                placeholder="0.00"
-                autoFocus
-                className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-4 pr-12 text-white text-lg font-black outline-none focus:border-[#E9C349]/50 transition-all text-center"
-              />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-xs uppercase">{currency}</span>
-            </div>
-          </div>
-          <div className="flex gap-4">
-            <button
-              onClick={() => {
-                setBucketAmountModal(null);
-                setCashflowModal({ type: "DEPOSIT", id: bucketAmountModal!.id });
-              }}
-              className="flex-1 py-4 bg-[#4EDEA3] text-[#00285d] rounded-full font-black text-sm uppercase tracking-tight hover:brightness-110 transition-all active:scale-95 flex items-center justify-center gap-2"
-            >
-              <ArrowDownToLine size={16} />
-              {t("deposit")}
-            </button>
-            <button
-              onClick={() => {
-                setBucketAmountModal(null);
-                setCashflowModal({ type: "WITHDRAW", id: bucketAmountModal!.id });
-              }}
-              className="flex-1 py-4 bg-[#FFB4AB] text-[#00285d] rounded-full font-black text-sm uppercase tracking-tight hover:brightness-110 transition-all active:scale-95 flex items-center justify-center gap-2"
-            >
-              <ArrowUpFromLine size={16} />
-              {t("withdraw")}
-            </button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Cashflow Modal for Deposit/Withdraw */}
-      <AddCashflowModal
-        isOpen={!!cashflowModal}
-        onClose={() => setCashflowModal(null)}
-        presetType={cashflowModal?.type}
-        presetBucketId={cashflowModal?.id}
-      />
 
       {/* Invest Modal */}
       <Modal isOpen={!!investModal} onClose={() => setInvestModal(null)} title={t("investFromBucket")}>
