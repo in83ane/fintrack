@@ -183,15 +183,53 @@ export default function CashflowPage() {
   const totalExpenses = allCashflowActivities.filter(c => (c.type === 'EXPENSE' || c.type === 'WITHDRAW') && !c.isTransfer).reduce((acc, c) => acc + c.amountUSD, 0);
   const netCashflow = totalIncome - totalExpenses;
 
-  // Category breakdown for current month
-  const currentMonth = new Date().getMonth();
-  const currentYear = new Date().getFullYear();
-  const thisMonthActivities = allCashflowActivities.filter(a => {
-    const date = new Date(a.date);
-    return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
-  });
-  const monthIncome = thisMonthActivities.filter(a => (a.type === "INCOME" || a.type === "DEPOSIT") && !a.isTransfer).reduce((sum, a) => sum + a.amountUSD, 0);
-  const monthExpense = thisMonthActivities.filter(a => (a.type === "EXPENSE" || a.type === "WITHDRAW") && !a.isTransfer).reduce((sum, a) => sum + a.amountUSD, 0);
+  // Category icons mapping (#18)
+  const getCategoryIcon = (category: string): string => {
+    const cat = category.toLowerCase();
+    if (cat.includes('food') || cat.includes('อาหาร')) return '🍔';
+    if (cat.includes('transport') || cat.includes('เดินทาง')) return '🚗';
+    if (cat.includes('housing') || cat.includes('บ้าน') || cat.includes('rent')) return '🏠';
+    if (cat.includes('invest') || cat.includes('ลงทุน')) return '📈';
+    if (cat.includes('health') || cat.includes('สุขภาพ')) return '🏥';
+    if (cat.includes('entertainment') || cat.includes('บันเทิง')) return '🎬';
+    if (cat.includes('shopping') || cat.includes('ช้อปปิ้ง')) return '🛍️';
+    if (cat.includes('education') || cat.includes('การศึกษา')) return '📚';
+    if (cat.includes('salary') || cat.includes('เงินเดือน')) return '💰';
+    if (cat.includes('freelance') || cat.includes('ฟรีแลนซ์')) return '💻';
+    if (cat.includes('dividend') || cat.includes('ปันผล')) return '🪙';
+    if (cat.includes('emergency') || cat.includes('ฉุกเฉิน')) return '🛡️';
+    if (cat.includes('saving') || cat.includes('ออม')) return '🏦';
+    if (cat.includes('profit') || cat.includes('กำไร')) return '📊';
+    if (cat.includes('income') || cat.includes('รายได้')) return '💵';
+    if (cat.includes('transfer')) return '🔄';
+    return '💳';
+  };
+
+  // Monthly bar chart data (#19)
+  const monthlyChartData = React.useMemo(() => {
+    const months: Record<string, { income: number; expense: number; label: string }> = {};
+    allCashflowActivities.forEach(a => {
+      const d = new Date(a.date);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (!months[key]) months[key] = { income: 0, expense: 0, label: format(d, 'MMM yy') };
+      if ((a.type === 'INCOME' || a.type === 'DEPOSIT') && !a.isTransfer) months[key].income += a.amountUSD;
+      if ((a.type === 'EXPENSE' || a.type === 'WITHDRAW') && !a.isTransfer) months[key].expense += a.amountUSD;
+    });
+    return Object.values(months).slice(-6); // Last 6 months
+  }, [allCashflowActivities]);
+
+  const chartMax = Math.max(...monthlyChartData.map(m => Math.max(m.income, m.expense)), 1);
+
+  // Group cashflow by date for timeline view (#17)
+  const groupedByDate = React.useMemo(() => {
+    const groups: Record<string, CashActivityWithSource[]> = {};
+    filteredCashflow.forEach(txn => {
+      const dateKey = format(new Date(txn.date), 'yyyy-MM-dd');
+      if (!groups[dateKey]) groups[dateKey] = [];
+      groups[dateKey].push(txn);
+    });
+    return Object.entries(groups).sort(([a], [b]) => b.localeCompare(a));
+  }, [filteredCashflow]);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-4 sm:space-y-6">
@@ -247,42 +285,48 @@ export default function CashflowPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="bg-gradient-to-br from-[#1C1B1B] to-[#0E0E0E] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5 relative overflow-hidden">
           <div className="absolute -right-4 -top-4 w-20 h-20 bg-[#ADC6FF]/10 blur-3xl rounded-full" />
-          <p className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide mb-1">{t("netCashflow")}</p>
-          <h3 className={cn("text-xl sm:text-2xl font-black tracking-tighter", netCashflow >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
+          <p className="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">{t("netCashflow")}</p>
+          <h3 className={cn("text-xl sm:text-2xl font-bold tracking-tighter", netCashflow >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
             {netCashflow >= 0 ? "+" : ""}{formatMoney(netCashflow)}
           </h3>
         </div>
         <div className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
-          <p className="text-[10px] sm:text-xs font-black text-[#4EDEA3] uppercase tracking-wide mb-1">{t("totalIncome")}</p>
-          <h3 className="text-xl sm:text-2xl font-black text-white tracking-tighter">
-            {formatMoney(totalIncome)}
-          </h3>
+          <p className="text-[10px] sm:text-xs font-bold text-[#4EDEA3] uppercase tracking-wide mb-1">{t("totalIncome")}</p>
+          <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tighter">{formatMoney(totalIncome)}</h3>
         </div>
         <div className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
-          <p className="text-[10px] sm:text-xs font-black text-[#FFB4AB] uppercase tracking-wide mb-1">{t("totalExpenses")}</p>
-          <h3 className="text-xl sm:text-2xl font-black text-white tracking-tighter">
-            {formatMoney(totalExpenses)}
-          </h3>
+          <p className="text-[10px] sm:text-xs font-bold text-[#FFB4AB] uppercase tracking-wide mb-1">{t("totalExpenses")}</p>
+          <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tighter">{formatMoney(totalExpenses)}</h3>
         </div>
+        {/* Monthly Bar Chart Mini (#19) */}
         <div className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
-          <p className="text-[10px] sm:text-xs font-black text-[#E9C349] uppercase tracking-wide mb-1">{t("monthlyOverview") || "This Month"}</p>
-          <div className="flex items-baseline gap-2">
-            <h3 className="text-base sm:text-lg font-black text-white tracking-tighter">
-              <span className="text-[#4EDEA3]">+{formatMoney(monthIncome)}</span>
-            </h3>
-          </div>
-          <p className="text-[10px] sm:text-xs text-[#FFB4AB] font-bold mt-0.5">-{formatMoney(monthExpense)}</p>
+          <p className="text-[10px] sm:text-xs font-bold text-[#E9C349] uppercase tracking-wide mb-2">{t("monthlyOverview") || "Monthly"}</p>
+          {monthlyChartData.length > 0 ? (
+            <div className="flex items-end gap-1 h-12">
+              {monthlyChartData.map((m, i) => (
+                <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
+                  <div className="w-full flex gap-px items-end" style={{ height: '32px' }}>
+                    <div className="flex-1 rounded-t bg-[#4EDEA3]/60 transition-all" style={{ height: `${Math.max(2, (m.income / chartMax) * 32)}px` }} />
+                    <div className="flex-1 rounded-t bg-[#FFB4AB]/60 transition-all" style={{ height: `${Math.max(2, (m.expense / chartMax) * 32)}px` }} />
+                  </div>
+                  <span className="text-[7px] text-gray-600">{m.label}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-[10px] text-gray-600 text-center py-3">No data</div>
+          )}
         </div>
       </div>
 
-      {/* Monthly Breakdown Chart */}
+      {/* Category Breakdown Charts */}
       {allCashflowActivities.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           {/* Income by Category */}
           <div className="bg-[#1C1B1B] p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-white/5">
             <div className="flex items-center gap-2 mb-4">
               <PieChart size={14} className="text-[#4EDEA3]" />
-              <h3 className="text-xs font-black text-gray-400 uppercase tracking-wide">{t("incomeByCategory") || "Income by Category"}</h3>
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide">{t("incomeByCategory") || "Income by Category"}</h3>
             </div>
             <div className="space-y-3">
               {(() => {
@@ -295,7 +339,7 @@ export default function CashflowPage() {
                   return (
                     <div key={cat}>
                       <div className="flex justify-between text-xs font-bold mb-1">
-                        <span className="text-gray-400">{t(cat)}</span>
+                        <span className="text-gray-400 flex items-center gap-1.5">{getCategoryIcon(cat)} {t(cat)}</span>
                         <span className="text-white">{formatMoney(total)} <span className="text-gray-500">({pct.toFixed(0)}%)</span></span>
                       </div>
                       <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
@@ -318,7 +362,7 @@ export default function CashflowPage() {
           <div className="bg-[#1C1B1B] p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-white/5">
             <div className="flex items-center gap-2 mb-4">
               <Wallet size={14} className="text-[#FFB4AB]" />
-              <h3 className="text-xs font-black text-gray-400 uppercase tracking-wide">{t("expenseByCategory") || "Expense by Category"}</h3>
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide">{t("expenseByCategory") || "Expense by Category"}</h3>
             </div>
             <div className="space-y-3">
               {(() => {
@@ -331,7 +375,7 @@ export default function CashflowPage() {
                   return (
                     <div key={cat}>
                       <div className="flex justify-between text-xs font-bold mb-1">
-                        <span className="text-gray-400">{t(cat)}</span>
+                        <span className="text-gray-400 flex items-center gap-1.5">{getCategoryIcon(cat)} {t(cat)}</span>
                         <span className="text-white">{formatMoney(total)} <span className="text-gray-500">({pct.toFixed(0)}%)</span></span>
                       </div>
                       <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">

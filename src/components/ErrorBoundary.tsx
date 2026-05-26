@@ -1,57 +1,55 @@
 "use client";
 
-import React, { Component, ErrorInfo, ReactNode } from "react";
+import React from "react";
 
-interface Props {
-  children: ReactNode;
-  fallback?: ReactNode;
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+  fallback?: React.ReactNode;
 }
 
-interface State {
+interface ErrorBoundaryState {
   hasError: boolean;
   error?: Error;
 }
 
-export class ErrorBoundary extends Component<Props, State> {
-  public state: State = {
-    hasError: false,
-    error: undefined,
-  };
+export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false };
+  }
 
-  public static getDerivedStateFromError(error: Error): State {
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };
   }
 
-  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("ErrorBoundary caught an error:", error, errorInfo);
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("ErrorBoundary caught:", error, errorInfo);
   }
 
-  public render() {
+  render() {
     if (this.state.hasError) {
-      if (this.props.fallback) {
-        return this.props.fallback;
-      }
-
+      if (this.props.fallback) return this.props.fallback;
       return (
-        <div className="min-h-screen flex items-center justify-center bg-[#131313] text-white p-6">
-          <div className="max-w-md w-full bg-[#1C1B1B] border border-white/10 rounded-2xl p-8">
-            <h1 className="text-2xl font-bold mb-4 text-[#FFB4AB]">Something went wrong</h1>
-            <p className="text-gray-400 mb-6">
-              An error occurred while rendering this page. Please try refreshing or contact support if the problem persists.
-            </p>
-            {this.state.error && (
-              <details className="text-sm text-gray-500">
-                <summary className="cursor-pointer mb-2">Error details</summary>
-                <pre className="whitespace-pre-wrap text-xs bg-[#131313] p-3 rounded">
-                  {this.state.error.message}
-                </pre>
-              </details>
-            )}
+        <div className="min-h-[200px] flex items-center justify-center">
+          <div className="bg-[#1C1B1B] rounded-3xl p-8 border border-white/5 max-w-md w-full text-center space-y-4">
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-[#FFB4AB]/10 flex items-center justify-center">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#FFB4AB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-white mb-1">Something went wrong</h3>
+              <p className="text-sm text-gray-400">
+                {this.state.error?.message || "An unexpected error occurred"}
+              </p>
+            </div>
             <button
-              onClick={() => window.location.reload()}
-              className="mt-6 w-full bg-[#ADC6FF] text-[#131313] font-semibold py-3 rounded-lg hover:bg-[#ADC6FF]/90 transition-colors"
+              onClick={() => this.setState({ hasError: false, error: undefined })}
+              className="px-6 py-2.5 rounded-xl bg-white/10 text-white text-sm font-bold hover:bg-white/20 transition-colors"
             >
-              Refresh Page
+              Try Again
             </button>
           </div>
         </div>
@@ -61,5 +59,3 @@ export class ErrorBoundary extends Component<Props, State> {
     return this.props.children;
   }
 }
-
-export default ErrorBoundary;

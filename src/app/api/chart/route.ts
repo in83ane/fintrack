@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server';
-
-// In-memory cache
-const chartCache = new Map<string, { data: ChartCacheData; timestamp: number }>();
-const CACHE_TTL = 60000; // 1 minute for chart data
+import { chartCache, generateCacheKey, queryDeduplicator } from '@/src/lib/cache';
 
 interface ChartCacheData {
   symbol: string;
@@ -25,66 +22,69 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Missing symbol parameter' }, { status: 400 });
   }
 
-  const cacheKey = `${symbol}-${interval}-${range}`;
+  const cacheKey = generateCacheKey('chart', { symbol, interval, range });
 
   // Check cache first
   const cached = chartCache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-    return NextResponse.json(cached.data);
+  if (cached) {
+    return NextResponse.json(cached);
   }
 
   try {
-    const timestamp = new Date().getTime();
-    const finalRange = range || '1d';
-    const finalInterval = interval || '1m';
+    // Use deduplicator to prevent duplicate requests
+    const responseData = await queryDeduplicator.dedupe(cacheKey, async () => {
+      const timestamp = new Date().getTime();
+      const finalRange = range || '1d';
+      const finalInterval = interval || '1m';
 
-    const response = await fetch(
-      `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=${finalRange}&interval=${finalInterval}&_=${timestamp}`,
-      {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'application/json, text/plain',
-        },
-        signal: AbortSignal.timeout(10000) // 10 second timeout
+      const response = await fetch(
+        `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=${finalRange}&interval=${finalInterval}&_=${timestamp}`,
+        {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json, text/plain',
+          },
+          signal: AbortSignal.timeout(10000) // 10 second timeout
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Yahoo API returned ${response.status}`);
       }
-    );
 
-    if (!response.ok) {
-      return NextResponse.json({ error: 'Failed to fetch chart data' }, { status: 500 });
-    }
+      const data = await response.json();
+      const result = data?.chart?.result?.[0];
 
-    const data = await response.json();
-    const result = data?.chart?.result?.[0];
+      if (!result) {
+        throw new Error('No chart data available');
+      }
 
-    if (!result) {
-      return NextResponse.json({ error: 'No chart data available' }, { status: 404 });
-    }
+      const timestamps = result?.timestamp || [];
+      const closes = result?.indicators?.quote?.[0]?.close || [];
 
-    const timestamps = result?.timestamp || [];
-    const closes = result?.indicators?.quote?.[0]?.close || [];
+      const chartData = timestamps
+        .map((t: number, i: number) => ({ time: t * 1000, price: Number(closes[i]) || 0 }))
+        .filter((dp: any) => dp.price > 0);
 
-    const chartData = timestamps
-      .map((t: number, i: number) => ({ time: t * 1000, price: Number(closes[i]) || 0 }))
-      .filter((dp: any) => dp.price > 0);
+      const meta = result?.meta || {};
+      const price = meta.regularMarketPrice || 0;
+      const prevClose = meta.chartPreviousClose || meta.previousClose || price;
+      const changePercent = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
 
-    const meta = result?.meta || {};
-    const price = meta.regularMarketPrice || 0;
-    const prevClose = meta.chartPreviousClose || meta.previousClose || price;
-    const changePercent = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
+      return {
+        symbol: meta.symbol || symbol,
+        price,
+        changePercent: Number(changePercent.toFixed(2)),
+        name: meta.shortName || meta.longName || symbol,
+        chartData,
+        period: range || finalRange,
+        interval: finalInterval,
+        range: finalRange
+      } as ChartCacheData;
+    });
 
-    const responseData = {
-      symbol: meta.symbol || symbol,
-      price,
-      changePercent: Number(changePercent.toFixed(2)),
-      name: meta.shortName || meta.longName || symbol,
-      chartData,
-      period: range || finalRange,
-      interval: finalInterval,
-      range: finalRange
-    };
-
-    chartCache.set(cacheKey, { data: responseData, timestamp: Date.now() });
-
+    // Cache the successful response
+    chartCache.set(cacheKey, responseData);
     return NextResponse.json(responseData);
   } catch (error) {
     console.error('Chart API Error:', error);

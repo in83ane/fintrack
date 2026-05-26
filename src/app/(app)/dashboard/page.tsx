@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useRef, useCallback } from "react";
-import { TrendingUp, TrendingDown, PlusCircle, MinusCircle, ArrowRight, Edit3, Info, History, Plus, Download, FileText, CheckCircle2, Trash2, Pencil, ArrowDownToLine, ArrowUpFromLine, PiggyBank } from "lucide-react";
+import { TrendingUp, TrendingDown, PlusCircle, MinusCircle, ArrowRight, Edit3, Info, History, Plus, Download, FileText, CheckCircle2, Trash2, Pencil, ArrowDownToLine, ArrowUpFromLine, PiggyBank, Briefcase, Wallet, BarChart3, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/src/lib/utils";
 import { useApp } from "@/src/context/AppContext";
@@ -9,7 +9,10 @@ import { Modal } from "@/src/components/Modal";
 import { AddAssetModal } from "@/src/components/AddAssetModal";
 import { AddCashflowModal } from "@/src/components/AddCashflowModal";
 import DashboardGrid from "@/src/components/widgets/DashboardGrid";
+import { AnimatedNumber } from "@/src/components/AnimatedNumber";
+import { SkeletonDashboard } from "@/src/components/SkeletonLoader";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Papa from "papaparse";
 
 interface NetWorthPoint {
@@ -301,6 +304,7 @@ const assetClassKeyMap: Record<string, string> = {
 
 export default function DashboardPage() {
   const { t, formatMoney, currency, exchangeRates, trades, addTrade, bulkAddTrades, allocations, updateAllocation, netWorthHistory, assets, addToast, addNotification, language, cashActivities, moneyBuckets, bucketActivities, totalInvested, totalUnrealizedPL, totalRealizedPL, totalDividends } = useApp();
+  const router = useRouter();
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [isCSVModalOpen, setIsCSVModalOpen] = React.useState(false);
   const [isAddAssetOpen, setIsAddAssetOpen] = React.useState(false);
@@ -314,6 +318,7 @@ export default function DashboardPage() {
   };
   const [newTrade, setNewTrade] = React.useState<{ asset: string; amountUSD: string; type: "BUY" | "SELL" }>({ asset: "", amountUSD: "", type: "BUY" });
   const [importStatus, setImportStatus] = React.useState<{ type: 'idle' | 'success' | 'error', message: string }>({ type: 'idle', message: '' });
+  const [historySearchQuery, setHistorySearchQuery] = useState("");
 
   const currentNetWorth = netWorthHistory[netWorthHistory.length - 1]?.value || 0;
   const totalProfit = totalUnrealizedPL + totalRealizedPL + totalDividends;
@@ -451,8 +456,88 @@ export default function DashboardPage() {
     });
   };
 
+  const greetingHour = new Date().getHours();
+  const greeting = greetingHour < 12 ? (language === 'th' ? 'สวัสดีตอนเช้า' : 'Good Morning') : greetingHour < 18 ? (language === 'th' ? 'สวัสดีตอนบ่าย' : 'Good Afternoon') : (language === 'th' ? 'สวัสดีตอนค่ำ' : 'Good Evening');
+  const activePositions = assets.filter(a => a.is_active !== false).length;
+  const todayPL = totalUnrealizedPL;
+  const totalBucketValue = moneyBuckets.reduce((s, b) => s + b.currentAmount, 0);
+
+  // Empty state — no assets, no trades
+  const isEmpty = assets.length === 0 && trades.length === 0;
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-4 sm:space-y-6">
+
+      {/* Welcome Card */}
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+            {greeting} <span className="text-[#ADC6FF]">👋</span>
+          </h1>
+          <p className="text-xs text-gray-500 mt-0.5">{language === 'th' ? 'สรุปภาพรวมการเงินของคุณวันนี้' : 'Your financial overview for today'}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <kbd className="hidden sm:inline-flex px-2 py-1 rounded-lg bg-white/5 text-[10px] font-bold text-gray-500 border border-white/10">⌘K {language === 'th' ? 'ค้นหา' : 'Search'}</kbd>
+        </div>
+      </motion.div>
+
+      {/* Quick Stats Bar */}
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: language === 'th' ? 'สินทรัพย์ทั้งหมด' : 'Total Assets', value: activePositions.toString(), icon: <Briefcase size={16} />, color: '#ADC6FF', onClick: () => router.push('/portfolio') },
+          { label: language === 'th' ? 'กำไร/ขาดทุนวันนี้' : "Today's P/L", value: `${todayPL >= 0 ? '+' : ''}${formatMoney(todayPL)}`, icon: <BarChart3 size={16} />, color: todayPL >= 0 ? '#4EDEA3' : '#FFB4AB', onClick: () => router.push('/portfolio') },
+          { label: language === 'th' ? 'เงินในกระเป๋า' : 'Bucket Balance', value: formatMoney(totalBucketValue), icon: <Wallet size={16} />, color: '#E9C349', onClick: () => router.push('/budget') },
+          { label: language === 'th' ? 'รายการเทรด' : 'Total Trades', value: trades.length.toString(), icon: <TrendingUp size={16} />, color: '#A78BFA', onClick: () => router.push('/transactions') },
+        ].map((stat, i) => (
+          <motion.button key={i} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={stat.onClick}
+            className="bg-[#1C1B1B] rounded-2xl p-4 border border-white/5 text-left hover:border-white/10 transition-all group">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${stat.color}15`, color: stat.color }}>{stat.icon}</div>
+            </div>
+            <div className="text-lg font-bold text-white tracking-tight">{stat.value}</div>
+            <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">{stat.label}</div>
+          </motion.button>
+        ))}
+      </motion.div>
+
+      {/* Quick Actions Row */}
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} className="flex flex-wrap gap-2">
+        <button onClick={() => setIsAddAssetOpen(true)} className="px-4 py-2 rounded-xl bg-[#ADC6FF]/10 text-[#ADC6FF] text-xs font-bold hover:bg-[#ADC6FF]/20 transition-all flex items-center gap-1.5 border border-[#ADC6FF]/10">
+          <Plus size={14} /> {t('addAsset')}
+        </button>
+        <button onClick={() => router.push('/trade')} className="px-4 py-2 rounded-xl bg-[#4EDEA3]/10 text-[#4EDEA3] text-xs font-bold hover:bg-[#4EDEA3]/20 transition-all flex items-center gap-1.5 border border-[#4EDEA3]/10">
+          <TrendingUp size={14} /> {language === 'th' ? 'เข้า Trade' : 'Trade'}
+        </button>
+        <button onClick={() => router.push('/budget')} className="px-4 py-2 rounded-xl bg-[#E9C349]/10 text-[#E9C349] text-xs font-bold hover:bg-[#E9C349]/20 transition-all flex items-center gap-1.5 border border-[#E9C349]/10">
+          <Wallet size={14} /> {language === 'th' ? 'แจกเงิน' : 'Distribute'}
+        </button>
+        <button onClick={() => setIsCSVModalOpen(true)} className="px-4 py-2 rounded-xl bg-white/5 text-gray-400 text-xs font-bold hover:bg-white/10 transition-all flex items-center gap-1.5 border border-white/5">
+          <Download size={14} /> {t('importCsv')}
+        </button>
+      </motion.div>
+
+      {/* Empty State */}
+      {isEmpty && (
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-gradient-to-br from-[#1C1B1B] to-[#141414] rounded-3xl p-8 sm:p-12 border border-white/5 text-center relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-[#ADC6FF]/5 via-transparent to-[#4EDEA3]/5" />
+          <div className="relative z-10">
+            <div className="w-20 h-20 rounded-3xl bg-[#ADC6FF]/10 flex items-center justify-center mx-auto mb-6">
+              <Sparkles size={36} className="text-[#ADC6FF]" />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">{language === 'th' ? 'ยินดีต้อนรับสู่ FinTrack' : 'Welcome to FinTrack'}</h2>
+            <p className="text-sm text-gray-400 max-w-md mx-auto mb-8">{language === 'th' ? 'เริ่มต้นเพิ่มสินทรัพย์แรกของคุณ หรือนำเข้าข้อมูลจาก CSV เพื่อเริ่มติดตามพอร์ต' : 'Add your first asset or import data from CSV to start tracking your portfolio'}</p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button onClick={() => setIsAddAssetOpen(true)} className="px-6 py-3 rounded-2xl bg-[#ADC6FF] text-[#00285d] font-bold text-sm hover:brightness-110 transition-all flex items-center justify-center gap-2">
+                <Plus size={18} /> {language === 'th' ? 'เพิ่มสินทรัพย์แรก' : 'Add First Asset'}
+              </button>
+              <button onClick={() => router.push('/trade')} className="px-6 py-3 rounded-2xl bg-white/5 text-white font-bold text-sm hover:bg-white/10 transition-all flex items-center justify-center gap-2 border border-white/10">
+                <TrendingUp size={18} /> {language === 'th' ? 'วิเคราะห์สัญญาณ' : 'Analyze Signals'}
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* Hero Section: Net Worth & Chart */}
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
         <motion.div
@@ -462,9 +547,9 @@ export default function DashboardPage() {
         >
           <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-4 sm:mb-6 relative z-10">
             <div className="space-y-1 w-full sm:w-auto">
-              <span className="text-xs sm:text-sm font-bold text-gray-400 uppercase tracking-wide">{t("totalNetWorth")}</span>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tighter text-white leading-none">
-                {formatMoney(netWorthHistory[netWorthHistory.length - 1].value)}
+              <span className="text-xs sm:text-sm font-semibold text-gray-400 uppercase tracking-wide">{t("totalNetWorth")}</span>
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tighter text-white leading-none">
+                <AnimatedNumber value={netWorthHistory[netWorthHistory.length - 1]?.value || 0} formatter={(v) => formatMoney(v)} />
               </h1>
               <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                 <div className={cn("flex items-center gap-1", netWorthReturnPct >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
@@ -716,9 +801,23 @@ export default function DashboardPage() {
 
           {/* Recent Activities */}
           {(cashActivities.length > 0 || bucketActivities.length > 0) && (
-            <div className="mt-4 pt-4 border-t border-white/5">
-              <h4 className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide mb-3">Recent</h4>
-              <div className="space-y-2 max-h-40 overflow-y-auto scrollbar-thin">
+            <div className="mt-4 pt-4 border-t border-white/5 flex-1 flex flex-col min-h-0">
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide">Recent History</h4>
+                <div className="relative w-32 sm:w-48">
+                  <input
+                    type="text"
+                    placeholder="Search..."
+                    value={historySearchQuery}
+                    onChange={(e) => setHistorySearchQuery(e.target.value)}
+                    className="w-full bg-black/40 border border-white/10 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white outline-none focus:border-[#ADC6FF] transition-colors"
+                  />
+                  <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2 overflow-y-auto scrollbar-thin flex-1 pr-1">
                 {[...cashActivities, ...bucketActivities.map(ba => ({
                   id: ba.id,
                   type: ba.type === "deposit" || ba.type === "income_split" || ba.type === "profit_split" ? "INCOME" : "EXPENSE",
@@ -726,12 +825,20 @@ export default function DashboardPage() {
                   category: ba.bucketName || ba.type,
                   date: ba.date,
                   note: ba.note
-                }))].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5).map((act, idx) => {
+                }))]
+                .filter(act => {
+                  if (!historySearchQuery) return true;
+                  const q = historySearchQuery.toLowerCase();
+                  return act.category.toLowerCase().includes(q) || (act.note && act.note.toLowerCase().includes(q));
+                })
+                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                .slice(0, historySearchQuery ? 20 : 5)
+                .map((act, idx) => {
                   const isIncome = act.type === "INCOME";
                   return (
-                    <div key={`${act.id}-${idx}`} className="flex items-center justify-between text-xs">
+                    <div key={`${act.id}-${idx}`} className="flex items-center justify-between text-xs p-2 rounded-xl hover:bg-white/5 transition-colors">
                       <div className="min-w-0">
-                        <p className="text-white font-bold truncate">{act.category}</p>
+                        <p className="text-white font-bold truncate">{act.category} {act.note && <span className="text-gray-500 font-normal ml-1">({act.note})</span>}</p>
                         <p className="text-[10px] text-gray-500">
                           {new Date(act.date).toLocaleDateString(language === "th" ? "th-TH" : "en-US", {
                             month: "short",

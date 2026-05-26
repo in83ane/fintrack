@@ -2493,20 +2493,41 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }}>
       {children}
       
-      {/* Global Toast Container */}
-      <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-3 pointer-events-none">
-        {toasts.map(toast => (
-          <div 
-            key={toast.id}
-            className="pointer-events-auto bg-[#1C1B1B] text-white border border-white/10 shadow-2xl rounded-2xl px-6 py-4 flex items-center gap-3 transition-all animate-in slide-in-from-right-8 fade-in"
-          >
-            {toast.type === 'success' && <div className="w-2 h-2 rounded-full bg-[#4EDEA3]" />}
-            {toast.type === 'warning' && <div className="w-2 h-2 rounded-full bg-[#E9C349]" />}
-            {toast.type === 'error' && <div className="w-2 h-2 rounded-full bg-[#FFB4AB]" />}
-            {toast.type === 'info' && <div className="w-2 h-2 rounded-full bg-[#ADC6FF]" />}
-            <p className="text-sm font-bold">{toast.message}</p>
-          </div>
-        ))}
+      {/* Global Toast Container — Rich Upgrade (#30) */}
+      <div className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-[9999] flex flex-col gap-3 pointer-events-none max-w-sm w-full">
+        {toasts.map(toast => {
+          const iconColor = toast.type === 'success' ? '#4EDEA3' : toast.type === 'warning' ? '#E9C349' : toast.type === 'error' ? '#FFB4AB' : '#ADC6FF';
+          const iconBg = toast.type === 'success' ? 'rgba(78,222,163,0.1)' : toast.type === 'warning' ? 'rgba(233,195,73,0.1)' : toast.type === 'error' ? 'rgba(255,180,171,0.1)' : 'rgba(173,198,255,0.1)';
+          return (
+            <div 
+              key={toast.id}
+              className="pointer-events-auto bg-[#1C1B1B] text-white border border-white/10 shadow-2xl rounded-2xl overflow-hidden transition-all animate-in slide-in-from-right-8 fade-in"
+            >
+              <div className="flex items-center gap-3 px-4 py-3">
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: iconBg }}>
+                  {toast.type === 'success' && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2.5" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg>}
+                  {toast.type === 'warning' && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2.5" strokeLinecap="round"><path d="M12 9v4M12 17h.01"/><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>}
+                  {toast.type === 'error' && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>}
+                  {toast.type === 'info' && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>}
+                </div>
+                <p className="text-sm font-bold flex-1 leading-snug">{toast.message}</p>
+                <button 
+                  onClick={() => removeToast(toast.id)}
+                  className="text-gray-600 hover:text-white transition-colors p-1 flex-shrink-0"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+              {/* Progress bar */}
+              <div className="h-0.5 w-full" style={{ backgroundColor: `${iconColor}15` }}>
+                <div 
+                  className="h-full animate-[shrink_4s_linear_forwards]"
+                  style={{ backgroundColor: iconColor, width: '100%' }}
+                />
+              </div>
+            </div>
+          );
+        })}
       </div>
     </AppContext.Provider>
   );

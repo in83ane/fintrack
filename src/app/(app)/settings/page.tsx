@@ -5,10 +5,14 @@ import { Settings, Shield, Bell, User, CreditCard, Globe, Check, ChevronRight, M
 import { motion, AnimatePresence } from "motion/react";
 import { useApp, Language } from "@/src/context/AppContext";
 import { cn } from "@/src/lib/utils";
+import { supabase, db } from "@/src/lib/supabase";
 
 export default function SettingsPage() {
   const { t, language, setLanguage, currency, setCurrency, addToast, notifPreferences, setNotifPreferences, darkMode, setDarkMode } = useApp();
   const [activeSection, setActiveSection] = useState<string | null>(null);
+  
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const languages: { code: Language; label: string; flag: string }[] = [
     { code: "en", label: "English", flag: "🇺🇸" },
@@ -69,6 +73,29 @@ export default function SettingsPage() {
     setNotifPreferences({ ...notifPreferences, [key]: !notifPreferences[key] });
   };
 
+  const handleDeleteData = async () => {
+    if (deleteConfirm !== "DELETE") {
+      addToast(language === "th" ? "กรุณาพิมพ์ DELETE เพื่อยืนยัน" : "Please type DELETE to confirm.", "error");
+      return;
+    }
+    
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const user = sessionData?.session?.user;
+      
+      if (user) {
+        await db.deleteAllUserData(user.id);
+      }
+      
+      localStorage.clear();
+      addToast(language === "th" ? "ข้อมูลทั้งหมดถูกลบแล้ว ยกเว้นชื่อและอีเมล กำลังรีเฟรช..." : "All data deleted except account profile. Refreshing...", "success");
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (e) {
+      console.error("Delete data error:", e);
+      addToast(language === "th" ? "เกิดข้อผิดพลาดในการลบข้อมูล" : "Failed to delete data. Please try again.", "error");
+    }
+  };
+
   return (
     <div className="p-8 lg:p-12 max-w-4xl mx-auto space-y-12">
       <motion.div 
@@ -82,14 +109,35 @@ export default function SettingsPage() {
       </motion.div>
 
       <div className="space-y-8">
+        {/* Profile Card (#23) */}
+        <section>
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-gradient-to-br from-[#1C1B1B] to-[#141414] p-6 rounded-3xl border border-white/5 relative overflow-hidden">
+            <div className="absolute -right-8 -top-8 w-32 h-32 bg-[#ADC6FF]/5 blur-3xl rounded-full" />
+            <div className="flex items-center gap-4 relative z-10">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#ADC6FF] to-[#4D8EFF] flex items-center justify-center text-xl font-bold text-white shadow-lg">
+                <User size={24} />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-white">FinTrack User</h3>
+                <p className="text-xs text-gray-500">{language === 'th' ? 'สมาชิกตั้งแต่' : 'Member since'} 2024</p>
+              </div>
+              <div className="text-right">
+                <div className="text-[10px] font-bold text-[#4EDEA3] uppercase tracking-wide bg-[#4EDEA3]/10 px-3 py-1 rounded-full border border-[#4EDEA3]/20">
+                  {language === 'th' ? 'แอคทีฟ' : 'Active'}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </section>
+
         {/* Regional Settings */}
         <section className="space-y-4">
-          <h2 className="text-sm font-black uppercase tracking-wide text-gray-500 px-2">{t("regionalSettings")}</h2>
+          <h2 className="text-sm font-bold uppercase tracking-wide text-gray-500 px-2">{t("regionalSettings")}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-[#1C1B1B] p-6 rounded-3xl border border-white/5 space-y-4">
               <div className="flex items-center gap-3 text-[#ADC6FF]">
                 <Globe size={18} />
-                <span className="text-xs font-black uppercase tracking-wide">{t("languageLabel")}</span>
+                <span className="text-xs font-bold uppercase tracking-wide">{t("languageLabel")}</span>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 {languages.map((lang) => (
@@ -112,7 +160,7 @@ export default function SettingsPage() {
             <div className="bg-[#1C1B1B] p-6 rounded-3xl border border-white/5 space-y-4">
               <div className="flex items-center gap-3 text-[#E9C349]">
                 <CreditCard size={18} />
-                <span className="text-xs font-black uppercase tracking-wide">{t("baseCurrency")}</span>
+                <span className="text-xs font-bold uppercase tracking-wide">{t("baseCurrency")}</span>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 {currencies.map((curr) => (
@@ -268,6 +316,51 @@ export default function SettingsPage() {
               active={activeSection === "notif"}
               onClick={() => setActiveSection(activeSection === "notif" ? null : "notif")}
             />
+          </div>
+        </section>
+
+        {/* Danger Zone */}
+        <section className="space-y-4">
+          <h2 className="text-sm font-black uppercase tracking-wide text-[#FFB4AB] px-2">Danger Zone</h2>
+          <div className="bg-[#FFB4AB]/5 rounded-3xl border border-[#FFB4AB]/20 p-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-white">{language === "th" ? "ล้างข้อมูลทั้งหมด" : "Delete All Data"}</h3>
+              <p className="text-xs text-gray-500 mt-1">
+                {language === "th" 
+                  ? "ระบบจะลบข้อมูลประวัติการเทรด พอร์ต และการตั้งค่าทั้งหมดอย่างถาวร (ยกเว้น ชื่อ อีเมล และรหัสผ่าน) การกระทำนี้ไม่สามารถย้อนกลับได้" 
+                  : "This will permanently delete all your portfolios, transactions, and settings (except name, email, password). This action cannot be undone."}
+              </p>
+            </div>
+            {showDeleteModal ? (
+              <div className="flex gap-2 items-center w-full sm:w-auto">
+                <input 
+                  type="text" 
+                  placeholder={language === "th" ? "พิมพ์ DELETE" : "Type DELETE"} 
+                  value={deleteConfirm} 
+                  onChange={(e) => setDeleteConfirm(e.target.value)}
+                  className="bg-black/50 border border-[#FFB4AB]/30 rounded-xl px-4 py-2 text-sm text-[#FFB4AB] outline-none focus:border-[#FFB4AB] w-full sm:w-40"
+                />
+                <button 
+                  onClick={handleDeleteData}
+                  className="px-4 py-2 bg-[#FFB4AB] text-black rounded-xl text-xs font-black uppercase whitespace-nowrap hover:bg-[#ff9a8f]"
+                >
+                  {language === "th" ? "ยืนยัน" : "Confirm"}
+                </button>
+                <button 
+                  onClick={() => { setShowDeleteModal(false); setDeleteConfirm(""); }}
+                  className="px-4 py-2 bg-white/10 text-white rounded-xl text-xs font-bold uppercase whitespace-nowrap"
+                >
+                  {language === "th" ? "ยกเลิก" : "Cancel"}
+                </button>
+              </div>
+            ) : (
+              <button 
+                onClick={() => setShowDeleteModal(true)}
+                className="px-6 py-2 bg-[#FFB4AB]/10 text-[#FFB4AB] border border-[#FFB4AB]/30 rounded-xl text-xs font-black uppercase hover:bg-[#FFB4AB]/20 transition-all shrink-0"
+              >
+                {language === "th" ? "ล้างข้อมูล" : "Delete Data"}
+              </button>
+            )}
           </div>
         </section>
       </div>

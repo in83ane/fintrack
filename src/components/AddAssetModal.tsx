@@ -11,6 +11,15 @@ interface AddAssetModalProps {
   onClose: () => void;
 }
 
+const POPULAR_ASSETS = [
+  { symbol: "BTC-USD", name: "Bitcoin", exchange: "CRYPTO" },
+  { symbol: "ETH-USD", name: "Ethereum", exchange: "CRYPTO" },
+  { symbol: "AAPL", name: "Apple Inc.", exchange: "NASDAQ" },
+  { symbol: "TSLA", name: "Tesla, Inc.", exchange: "NASDAQ" },
+  { symbol: "AOT.BK", name: "Airports of Thailand", exchange: "SET" },
+  { symbol: "PTT.BK", name: "PTT Public Company", exchange: "SET" },
+];
+
 export function AddAssetModal({ isOpen, onClose }: AddAssetModalProps) {
   const { t, addAsset, addTrade, addTradeFromBucket, fetchAssetMarketData, exchangeRates, currency, language, moneyBuckets, formatMoney, addToast } = useApp();
 
@@ -190,9 +199,23 @@ export function AddAssetModal({ isOpen, onClose }: AddAssetModalProps) {
           )}
 
           {query.length < 2 && (
-            <div className="text-center py-12 text-gray-600 text-sm">
-              <Search size={32} className="mx-auto mb-3 text-gray-700" />
-              {t("typeToSearch")}
+            <div className="pt-4">
+              <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3">Popular Assets</p>
+              <div className="grid grid-cols-2 gap-2">
+                {POPULAR_ASSETS.map((asset) => (
+                  <button
+                    key={asset.symbol}
+                    onClick={() => handleSelect(asset.symbol, asset.name)}
+                    className="flex flex-col text-left p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-[#ADC6FF]/30 transition-all group"
+                  >
+                    <div className="flex justify-between items-center w-full mb-1">
+                      <span className="text-sm font-black text-white group-hover:text-[#ADC6FF] transition-colors">{asset.symbol}</span>
+                      <span className="text-[9px] font-bold text-gray-500 bg-black/40 px-1.5 py-0.5 rounded uppercase">{asset.exchange}</span>
+                    </div>
+                    <span className="text-xs text-gray-500 line-clamp-1">{asset.name}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>

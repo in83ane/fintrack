@@ -24,7 +24,7 @@ export default function RootLayout({
       <head>
         <link rel="icon" href="/fintrack-icon.svg" type="image/svg+xml" />
       </head>
-      <body className={`${prompt.className} bg-[#131313] text-[#e5e2e1] min-h-screen antialiased`}>
+      <body suppressHydrationWarning className={`${prompt.className} bg-[#131313] text-[#e5e2e1] min-h-screen antialiased`}>
         <AppProvider>
           {children}
         </AppProvider>

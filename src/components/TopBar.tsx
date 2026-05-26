@@ -26,7 +26,6 @@ export function TopBar() {
   const pathname = usePathname();
   const [showLangMenu, setShowLangMenu] = React.useState(false);
   const [showMobileMenu, setShowMobileMenu] = React.useState(false);
-  const [searchQuery, setSearchQuery] = React.useState("");
   const [showProfileMenu, setShowProfileMenu] = React.useState(false);
   const [showNotifMenu, setShowNotifMenu] = React.useState(false);
 
@@ -67,12 +66,6 @@ export function TopBar() {
 
   const currencies: Currency[] = ["USD", "THB"];
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log("Searching for:", searchQuery);
-    // Add search logic here
-  };
-
   return (
     <>
       <header className="w-full top-0 sticky z-50 bg-[#1C1B1B]/80 backdrop-blur-md border-b border-white/5 flex justify-between items-center px-6 lg:px-12 py-4">
@@ -83,23 +76,40 @@ export function TopBar() {
           >
             <Menu size={24} />
           </button>
-          <h2 className="text-sm font-black uppercase tracking-wide text-white hidden md:block">
-            {pageTitle}
-          </h2>
+          {!pathname.startsWith('/trade') && (
+            <h2 className="text-sm font-bold uppercase tracking-wide text-white hidden md:block">
+              {pageTitle}
+            </h2>
+          )}
+          {/* Breadcrumb Navigation */}
+          {pathname !== '/dashboard' && pathname !== '/' && (
+            <div className="hidden md:flex items-center gap-1.5 text-[10px] font-semibold text-gray-500">
+              <Link href="/dashboard" className="hover:text-white transition-colors">Home</Link>
+              {pathname.split('/').filter(Boolean).map((seg, i, arr) => (
+                <React.Fragment key={i}>
+                  <span className="text-gray-700">/</span>
+                  {i === arr.length - 1 ? (
+                    <span className="text-[#ADC6FF]">{decodeURIComponent(seg).replace(/\[|\]/g, '')}</span>
+                  ) : (
+                    <Link href={`/${arr.slice(0, i + 1).join('/')}`} className="hover:text-white transition-colors">{seg}</Link>
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+          )}
+          <div id="topbar-price-portal" className="flex items-center gap-3"></div>
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Search Bar - Mobile hidden */}
-          <form onSubmit={handleSearch} className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 focus-within:border-[#ADC6FF]/50 transition-all">
-            <Search size={12} className="text-gray-500 flex-shrink-0" />
-            <input
-              type="text"
-              placeholder={t("searchPlaceholder")}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent border-none outline-none text-xs text-white placeholder:text-gray-600 w-28 lg:w-40"
-            />
-          </form>
+          {/* ⌘K Search Trigger */}
+          <button
+            onClick={() => { const e = new KeyboardEvent('keydown', { key: 'k', metaKey: true, ctrlKey: true, bubbles: true }); window.dispatchEvent(e); }}
+            className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:border-[#ADC6FF]/30 transition-all cursor-pointer"
+          >
+            <Search size={12} className="text-gray-500" />
+            <span className="text-xs text-gray-500">{t('searchPlaceholder')}</span>
+            <kbd className="text-[9px] font-bold text-gray-600 bg-white/5 px-1.5 py-0.5 rounded border border-white/5">⌘K</kbd>
+          </button>
 
           {/* Language Selector - Compact */}
           <div className="relative" ref={langMenuRef}>
@@ -167,10 +177,10 @@ export function TopBar() {
                 onClick={() => { setShowNotifMenu(!showNotifMenu); setShowProfileMenu(false); setShowLangMenu(false); }}
                 className="text-gray-400 hover:text-white transition-colors relative flex items-center h-full p-1"
               >
-                <Bell size={18} />
+                <Bell size={18} className={notifications.filter(n => !n.read).length > 0 ? 'animate-[wiggle_0.5s_ease-in-out]' : ''} />
                 {notifications.filter(n => !n.read).length > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-3.5 bg-[#FFB4AB] rounded-full border-2 border-[#1C1B1B] flex items-center justify-center">
-                    <span className="text-[7px] font-black text-[#1C1B1B]">{notifications.filter(n => !n.read).length}</span>
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 bg-[#FFB4AB] rounded-full border-2 border-[#1C1B1B] flex items-center justify-center animate-pulse">
+                    <span className="text-[8px] font-bold text-[#1C1B1B]">{notifications.filter(n => !n.read).length}</span>
                   </span>
                 )}
               </button>
@@ -276,12 +286,12 @@ export function TopBar() {
                       <p className="text-xs text-[#4EDEA3] mt-0.5 font-medium">{t("premiumTier") || "Premium Plan"}</p>
                     </div>
                     
-                    <button className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
+                    <Link href="/settings" onClick={() => setShowProfileMenu(false)} className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
                       <User size={14} /> {t("myProfile")}
-                    </button>
-                    <button className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
+                    </Link>
+                    <Link href="/settings" onClick={() => setShowProfileMenu(false)} className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
                       <Settings size={14} /> {t("settings")}
-                    </button>
+                    </Link>
                     
                     <div className="border-t border-white/5 mt-1 pt-1">
                       <button 

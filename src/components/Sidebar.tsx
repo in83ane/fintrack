@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { LayoutDashboard, Wallet, Settings, HelpCircle, Crown, Calendar, User, LineChart, Banknote, PiggyBank } from "lucide-react";
+import { LayoutDashboard, Wallet, Settings, HelpCircle, Crown, Calendar, User, LineChart, Banknote, PiggyBank, CandlestickChart } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 import { useApp } from "@/src/context/AppContext";
 import Link from "next/link";
@@ -24,6 +24,7 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
     { icon: Calendar, label: t("calendar"), href: "/calendar" },
     { icon: LineChart, label: t("transactions") || "Transactions", href: "/transactions" },
     { icon: Banknote, label: t("cashflowOverview"), href: "/cashflow" },
+    { icon: CandlestickChart, label: "Trade Assistant", href: "/trade" },
     { icon: PiggyBank, label: t("budgetPage"), href: "/budget" },
     { icon: Crown, label: t("pricing") || "Pricing", href: "/#pricing" },
     { icon: Settings, label: t("settings"), href: "/settings" },

@@ -431,20 +431,61 @@ export default function BudgetPage() {
         </div>
       </div>
 
-      {/* Total Net Worth Card */}
+      {/* Total Net Worth Card with Ring Chart */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-gradient-to-br from-[#1C1B1B] to-[#141414] rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-white/5 relative overflow-hidden">
         <div className="absolute -right-8 -top-8 w-32 h-32 bg-[#E9C349]/5 blur-3xl rounded-full" />
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between relative z-10 gap-3">
-          <div>
-            <span className="text-xs font-black text-gray-500 uppercase tracking-wide">{t("bucketTotal")}</span>
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white tracking-tighter">{formatMoney(totalAllocated)}</h2>
-          </div>
-          <div className="text-left sm:text-right">
-            <span className="text-xs font-bold text-gray-500">{moneyBuckets.length} {t("buckets")}</span>
-            <div className={cn("text-xs font-black mt-0.5", totalTargetPercent === 100 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
-              {totalTargetPercent}% {t("total")}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between relative z-10 gap-4">
+          <div className="flex-1">
+            <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">{t("bucketTotal")}</span>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white tracking-tighter">{formatMoney(totalAllocated)}</h2>
+            <div className="flex items-center gap-3 mt-1">
+              <span className="text-xs font-bold text-gray-500">{moneyBuckets.length} {t("buckets")}</span>
+              <span className={cn("text-xs font-bold", totalTargetPercent === 100 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
+                {totalTargetPercent}% {t("total")}
+              </span>
             </div>
           </div>
+          {/* Ring Chart (#15) */}
+          {moneyBuckets.length > 0 && (
+            <div className="flex items-center gap-3">
+              <svg viewBox="0 0 100 100" className="w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0">
+                {(() => {
+                  let cumPct = 0;
+                  const R = 38, r = 26, C = 50;
+                  return moneyBuckets.map((b, i) => {
+                    const pct = totalAllocated > 0 ? Math.max((b.currentAmount / totalAllocated) * 100, 0.5) : (100 / moneyBuckets.length);
+                    const startAngle = cumPct * 3.6;
+                    cumPct += pct;
+                    const endAngle = cumPct * 3.6;
+                    const largeArc = pct > 50 ? 1 : 0;
+                    const startRad = ((startAngle - 90) * Math.PI) / 180;
+                    const endRad = ((endAngle - 90) * Math.PI) / 180;
+                    const x1 = C + R * Math.cos(startRad);
+                    const y1 = C + R * Math.sin(startRad);
+                    const x2 = C + R * Math.cos(endRad);
+                    const y2 = C + R * Math.sin(endRad);
+                    return (
+                      <path
+                        key={i}
+                        d={`M ${C} ${C} L ${x1.toFixed(1)} ${y1.toFixed(1)} A ${R} ${R} 0 ${largeArc} 1 ${x2.toFixed(1)} ${y2.toFixed(1)} Z`}
+                        fill={b.color}
+                        stroke="#141414"
+                        strokeWidth={1}
+                        opacity={0.85}
+                      />
+                    );
+                  });
+                })()}
+                <circle cx={50} cy={50} r={22} fill="#141414" />
+                <text x={50} y={48} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize="11" fontWeight="bold">
+                  {moneyBuckets.length}
+                </text>
+                <text x={50} y={60} textAnchor="middle" dominantBaseline="middle" fill="#6B7280" fontSize="6" fontWeight="bold">
+                  {language === 'th' ? 'กระเป๋า' : 'buckets'}
+                </text>
+              </svg>
+            </div>
+          )}
         </div>
         <div className="h-2.5 sm:h-3 bg-white/5 rounded-full overflow-hidden flex mt-4">
           {moneyBuckets.map((b) => (

@@ -5,6 +5,59 @@ import { X, Wallet, ChevronDown, Loader2 } from "lucide-react";
 import { Modal } from "@/src/components/Modal";
 import { useApp } from "@/src/context/AppContext";
 import { cn } from "@/src/lib/utils";
+import { motion } from "motion/react";
+import { createPortal } from "react-dom";
+
+function SuccessConfetti({ active }: { active: boolean }) {
+  const [particles, setParticles] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (active) {
+      setParticles(
+        Array.from({ length: 60 }).map((_, i) => ({
+          id: i,
+          x: Math.random() * window.innerWidth,
+          color: ['#4EDEA3', '#E9C349', '#FFB4AB', '#ADC6FF', '#ffffff'][Math.floor(Math.random() * 5)],
+          size: Math.random() * 8 + 6,
+          delay: Math.random() * 0.2,
+          rotation: Math.random() * 360,
+        }))
+      );
+    } else {
+      setParticles([]);
+    }
+  }, [active]);
+
+  if (!active || typeof window === 'undefined') return null;
+
+  return createPortal(
+    <div className="fixed inset-0 pointer-events-none z-[9999] overflow-hidden">
+      {particles.map((p) => (
+        <motion.div
+          key={p.id}
+          initial={{ y: -50, x: p.x, opacity: 1, scale: 0, rotate: p.rotation }}
+          animate={{ 
+            y: window.innerHeight + 50, 
+            x: p.x + (Math.random() - 0.5) * 200, 
+            opacity: [1, 1, 0],
+            scale: 1,
+            rotate: p.rotation + 360 * (Math.random() > 0.5 ? 1 : -1)
+          }}
+          transition={{ duration: 1.5 + Math.random(), delay: p.delay, ease: "easeOut" }}
+          style={{
+            position: 'absolute',
+            width: p.size,
+            height: p.size,
+            backgroundColor: p.color,
+            borderRadius: Math.random() > 0.5 ? '50%' : '2px',
+            boxShadow: `0 0 10px ${p.color}80`
+          }}
+        />
+      ))}
+    </div>,
+    document.body
+  );
+}
 
 interface AddCashflowModalProps {
   isOpen: boolean;
@@ -40,6 +93,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [note, setNote] = useState("");
   const [isAdding, setIsAdding] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
 
   // Get buckets that are linked to expenses
   const linkedBuckets = useMemo(() => {
@@ -185,9 +239,17 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
 
       addToast(t("recordSaved"), "success");
 
-      // Reset & close
-      resetState();
-      onClose();
+      if (type === "INCOME" || type === "DEPOSIT") {
+        setShowConfetti(true);
+        setTimeout(() => {
+          setShowConfetti(false);
+          resetState();
+          onClose();
+        }, 1800);
+      } else {
+        resetState();
+        onClose();
+      }
     } catch (err) {
       console.error("Failed to add cashflow activity", err);
     } finally {
@@ -213,8 +275,10 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title={t("logIncomeExpense")}>
-      <form onSubmit={handleSubmit} className="space-y-6">
+    <>
+      <SuccessConfetti active={showConfetti} />
+      <Modal isOpen={isOpen} onClose={handleClose} title={t("logIncomeExpense")}>
+        <form onSubmit={handleSubmit} className="space-y-6">
         
         {/* Type Toggle */}
         <div className="grid grid-cols-4 gap-1 bg-white/5 p-1 rounded-2xl border border-white/10">
@@ -411,6 +475,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
           </button>
         </div>
       </form>
-    </Modal>
+      </Modal>
+    </>
   );
 }

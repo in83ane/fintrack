@@ -393,23 +393,23 @@ export default function PortfolioPage() {
     // Filter by active status
     if (!showSoldAssets) {
       result = result.filter(a => a.is_active !== false);
-    } else {
-      // If showing sold, maybe show ONLY sold or both? 
-      // User asked "How to know if it's sold", so maybe they want to see them.
-      // Let's show both but maybe dim the sold ones.
     }
 
-    if (activeFilter === 'all') return result;
-    if (activeFilter === 'favorites') return result.filter(a => a.isFavorite);
-    // Category filters
-    if (['Equities', 'Fixed Income', 'Alternatives', 'Cash'].includes(activeFilter)) {
-      return result.filter(a => (a.allocation || 'Other') === activeFilter);
+    if (activeFilter === 'all') { /* no filter */ }
+    else if (activeFilter === 'favorites') result = result.filter(a => a.isFavorite);
+    else if (['Equities', 'Fixed Income', 'Alternatives', 'Cash'].includes(activeFilter)) {
+      result = result.filter(a => (a.allocation || 'Other') === activeFilter);
     }
-    // Type filters
-    if (activeFilter === 'crypto') return result.filter(a => CRYPTO_SYMBOLS.includes(a.symbol.toUpperCase()));
-    if (activeFilter === 'thai') return result.filter(a => a.symbol.toUpperCase().endsWith('.BK') || a.symbol.toUpperCase().endsWith('.TH'));
-    if (activeFilter === 'stock') return result.filter(a => !CRYPTO_SYMBOLS.includes(a.symbol.toUpperCase()) && !a.symbol.toUpperCase().endsWith('.BK') && !a.symbol.toUpperCase().endsWith('.TH'));
-    return result;
+    else if (activeFilter === 'crypto') result = result.filter(a => CRYPTO_SYMBOLS.includes(a.symbol.toUpperCase()));
+    else if (activeFilter === 'thai') result = result.filter(a => a.symbol.toUpperCase().endsWith('.BK') || a.symbol.toUpperCase().endsWith('.TH'));
+    else if (activeFilter === 'stock') result = result.filter(a => !CRYPTO_SYMBOLS.includes(a.symbol.toUpperCase()) && !a.symbol.toUpperCase().endsWith('.BK') && !a.symbol.toUpperCase().endsWith('.TH'));
+
+    // Sort: favorites first, then by value descending
+    return [...result].sort((a, b) => {
+      if (a.isFavorite && !b.isFavorite) return -1;
+      if (!a.isFavorite && b.isFavorite) return 1;
+      return b.valueUSD - a.valueUSD;
+    });
   }, [assets, activeFilter, showSoldAssets]);
 
   // CSV Export handler
@@ -881,7 +881,8 @@ export default function PortfolioPage() {
                       as="tr"
                       className={cn(
                         "hover:bg-white/5 transition-colors group cursor-pointer",
-                        isReorderMode && "cursor-grab active:cursor-grabbing"
+                        isReorderMode && "cursor-grab active:cursor-grabbing",
+                        asset.isFavorite && "border-l-2 border-l-[#E9C349] bg-[#E9C349]/[0.02]"
                       )}
                     >
                       <td className="pl-4 sm:pl-8 pr-2 sm:pr-3 py-3 sm:py-4 max-w-[100px] sm:max-w-[200px]" onClick={() => { if (!isReorderMode) { setSelectedAsset(asset); setIsDetailModalOpen(true); } }}>

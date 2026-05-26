@@ -293,6 +293,51 @@ export const db = {
     },
   },
 
+  // DCA Drafts (per user per symbol)
+  dcaDrafts: {
+    get: async (userId: string, symbol: string) => {
+      return await supabase
+        .from('dca_drafts')
+        .select('entries')
+        .eq('user_id', userId)
+        .eq('symbol', symbol)
+        .maybeSingle();
+    },
+    upsert: async (userId: string, symbol: string, entries: any[]) => {
+      return await supabase
+        .from('dca_drafts')
+        .upsert(
+          { user_id: userId, symbol, entries, updated_at: new Date().toISOString() },
+          { onConflict: 'user_id,symbol' }
+        );
+    },
+    delete: async (userId: string, symbol: string) => {
+      return await supabase
+        .from('dca_drafts')
+        .delete()
+        .eq('user_id', userId)
+        .eq('symbol', symbol);
+    },
+  },
+
+  // Wipe all user data
+  deleteAllUserData: async (userId: string) => {
+    const tables = [
+      'assets', 
+      'trades', 
+      'allocations', 
+      'money_buckets', 
+      'bucket_activities', 
+      'cash_activities', 
+      'trade_journal',
+      'dca_drafts'
+    ];
+    const promises = tables.map(table => 
+      supabase.from(table).delete().eq('user_id', userId)
+    );
+    return await Promise.all(promises);
+  },
+
   // Profile
   profile: {
     get: async (userId: string) => {

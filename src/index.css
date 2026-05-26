@@ -86,3 +86,49 @@ html.light-mode img,
 html.light-mode video {
   filter: invert(1) hue-rotate(180deg);
 }
+
+/* Wiggle animation for notification bell (#24) */
+@keyframes wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  15% { transform: rotate(14deg); }
+  30% { transform: rotate(-12deg); }
+  45% { transform: rotate(8deg); }
+  60% { transform: rotate(-6deg); }
+  75% { transform: rotate(3deg); }
+}
+
+/* Toast progress bar shrink animation (#30) */
+@keyframes shrink {
+  from { width: 100%; }
+  to { width: 0%; }
+}
+
+/* Touch-friendly targets (#35) */
+@media (pointer: coarse) {
+  button, a, [role="button"], input[type="checkbox"], input[type="radio"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  input[type="text"], input[type="number"], input[type="email"], 
+  input[type="password"], input[type="search"], select, textarea {
+    min-height: 48px;
+    font-size: 16px; /* Prevents iOS zoom on focus */
+  }
+  
+  /* Larger tap targets for table action buttons */
+  table button {
+    min-height: 36px;
+    min-width: 36px;
+  }
+}
+
+/* Smooth number input transitions */
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}

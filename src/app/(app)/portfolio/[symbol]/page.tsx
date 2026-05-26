@@ -952,6 +952,10 @@ export default function AssetDetailPage() {
               >
                 <ChevronRight size={20} />
               </button>
+
+              <Link href={`/trade/${asset.symbol}`} className="ml-2 px-4 py-2 bg-[#ADC6FF] text-[#00285d] font-bold text-xs rounded-xl uppercase tracking-wide flex items-center gap-2 hover:brightness-110 transition-all">
+                <Activity size={16} /> {language === "th" ? "วิเคราะห์เทรด" : "Trade Assistant"}
+              </Link>
             </div>
           </div>
 
