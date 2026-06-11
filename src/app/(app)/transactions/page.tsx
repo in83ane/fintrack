@@ -21,6 +21,7 @@ import { useApp, Trade, BucketActivity, CashActivity } from "@/src/context/AppCo
 import { AddAssetModal } from "@/src/components/AddAssetModal";
 import { ConfirmModal } from "@/src/components/ConfirmModal";
 import { TransactionDetailModal } from "@/src/components/TransactionDetailModal";
+import { calcExpectancy, calcStreak } from "@/src/lib/finance";
 
 interface UnifiedTransaction {
   id: string;
@@ -40,7 +41,7 @@ interface UnifiedTransaction {
 }
 
 export default function TransactionsPage() {
-  const { t, formatMoney, trades, removeTrade, bulkAddTrades, currency, exchangeRates, moneyBuckets, bucketActivities, cashActivities } = useApp();
+  const { t, formatMoney, trades, removeTrade, bulkAddTrades, currency, exchangeRates, moneyBuckets, bucketActivities, cashActivities, assets } = useApp();
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
@@ -48,6 +49,32 @@ export default function TransactionsPage() {
   const [tradeToDelete, setTradeToDelete] = useState<number | null>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+
+  // Calculate trade metrics
+  const tradePnLs = assets.map(a => a.realizedPL || 0).filter(p => p !== 0);
+  const wins = tradePnLs.filter(p => p > 0);
+  const losses = tradePnLs.filter(p => p < 0);
+  const winRate = tradePnLs.length > 0 ? wins.length / tradePnLs.length : 0;
+  const avgWin = wins.length > 0 ? wins.reduce((a, b) => a + b, 0) / wins.length : 0;
+  const avgLoss = losses.length > 0 ? losses.reduce((a, b) => a + b, 0) / losses.length : 0;
+  const expectancy = calcExpectancy(winRate, avgWin, avgLoss);
+  const { maxWinStreak, maxLossStreak } = calcStreak(tradePnLs);
+
+  // Daily P/L for Heatmap
+  const now = new Date();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).getDay();
+
+  const dailyPL: Record<number, number> = {};
+  trades.forEach(trade => {
+    const d = new Date(trade.date);
+    if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
+      const day = d.getDate();
+      if (!dailyPL[day]) dailyPL[day] = 0;
+      const rate = exchangeRates[currency] || 1;
+      dailyPL[day] += trade.amountUSD * (rate - trade.rateAtTime) / rate;
+    }
+  });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -237,7 +264,7 @@ export default function TransactionsPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4">
         <div className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
           <p className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide mb-1">{t("totalBalance")}</p>
           <h3 className="text-xl sm:text-2xl font-black text-white tracking-tighter">
@@ -273,6 +300,69 @@ export default function TransactionsPage() {
               (t.category === 'bucket' && (t.bucketActivityType === 'withdraw' || t.bucketActivityType === 'invest'))
             ).reduce((acc, t) => acc + t.amount, 0))}
           </h3>
+        </div>
+        <div className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
+          <p className="text-[10px] sm:text-xs font-black text-[#ADC6FF] uppercase tracking-wide mb-1">Expectancy</p>
+          <h3 className={`text-xl sm:text-2xl font-black tracking-tighter ${expectancy >= 0 ? 'text-[#4EDEA3]' : 'text-[#FFB4AB]'}`}>
+            {formatMoney(expectancy)}
+          </h3>
+        </div>
+        <div className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5 flex flex-col justify-between">
+          <p className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide mb-1">Max Streaks</p>
+          <div className="flex gap-4">
+            <div>
+              <p className="text-[9px] text-gray-500 font-bold uppercase">WIN</p>
+              <h3 className="text-lg font-black text-[#4EDEA3]">{maxWinStreak}</h3>
+            </div>
+            <div>
+              <p className="text-[9px] text-gray-500 font-bold uppercase">LOSS</p>
+              <h3 className="text-lg font-black text-[#FFB4AB]">{maxLossStreak}</h3>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Heatmap Section */}
+      <div className="bg-[#1C1B1B] p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-white/5">
+        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-4">Monthly P&L Heatmap</h3>
+        <div className="grid grid-cols-7 gap-1 sm:gap-2">
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+            <div key={d} className="text-center text-[9px] sm:text-xs font-bold text-gray-500 uppercase">{d}</div>
+          ))}
+          {Array.from({ length: firstDay }, (_, i) => (
+            <div key={`empty-${i}`} className="aspect-square" />
+          ))}
+          {Array.from({ length: daysInMonth }, (_, i) => {
+            const day = i + 1;
+            const pl = dailyPL[day];
+            const hasData = pl !== undefined;
+            const isProfit = pl > 0;
+            const isLoss = pl < 0;
+            
+            return (
+              <div 
+                key={day} 
+                className={`aspect-square rounded-lg flex flex-col items-center justify-center relative group transition-colors ${
+                  !hasData ? 'bg-white/[0.02]' :
+                  isProfit ? 'bg-[#4EDEA3]/20 text-[#4EDEA3]' :
+                  isLoss ? 'bg-[#FFB4AB]/20 text-[#FFB4AB]' :
+                  'bg-white/10 text-white'
+                }`}
+              >
+                <span className="text-[9px] sm:text-xs font-bold opacity-50">{day}</span>
+                {hasData && (
+                  <span className="text-[8px] sm:text-[10px] font-black hidden sm:block">
+                    {pl > 0 ? '+' : ''}{(pl >= 1000 || pl <= -1000) ? `${(pl/1000).toFixed(1)}k` : pl.toFixed(0)}
+                  </span>
+                )}
+                {hasData && (
+                  <div className="absolute opacity-0 group-hover:opacity-100 bg-black text-white text-[10px] px-2 py-1 rounded-lg -top-8 whitespace-nowrap z-10 transition-opacity pointer-events-none">
+                    {formatMoney(pl)}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 

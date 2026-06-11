@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { Wallet, ArrowUpRight, ArrowDownRight, Filter, Upload, Download, Plus, X, ZoomIn, Trash2, TrendingUp, PieChart, ChevronDown } from "lucide-react";
+import { Wallet, ArrowUpRight, ArrowDownRight, Filter, Upload, Download, Plus, X, ZoomIn, Trash2, TrendingUp, PieChart, ChevronDown, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence, Reorder } from "motion/react";
 import { useApp, Asset } from "@/src/context/AppContext";
@@ -10,6 +10,7 @@ import { AddAssetModal } from "@/src/components/AddAssetModal";
 import { EditAssetModal } from "@/src/components/EditAssetModal";
 import { TradeJourney } from "@/src/components/TradeJourney";
 import { cn } from "@/src/lib/utils";
+import { formatPnL, getPnLColor } from "@/src/lib/format";
 import { StockChart, fetchChartData, TimePeriod } from "@/src/components/StockChart";
 import Papa from "papaparse";
 import { GripVertical, Star } from "lucide-react";
@@ -302,8 +303,8 @@ function AssetDetailModal({ asset, isOpen, onClose, initialPeriod = "1m" }: Asse
                  <div className="w-2 h-2 rounded-full bg-[#4EDEA3]" />
                  <span className="text-xs font-medium text-gray-400">{t("unrealizedPL")}</span>
                </div>
-               <span className={cn("text-sm font-bold", (asset.valueUSD - (asset.avgCost || 0) * (asset.shares || 0)) >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
-                 {formatMoney(asset.valueUSD - (asset.avgCost || 0) * (asset.shares || 0))}
+               <span className={cn("text-sm font-bold", getPnLColor(asset.valueUSD - (asset.avgCost || 0) * (asset.shares || 0)))}>
+                 {formatPnL(asset.valueUSD - (asset.avgCost || 0) * (asset.shares || 0), formatMoney)}
                </span>
              </div>
              <div className="flex justify-between items-center">
@@ -311,8 +312,8 @@ function AssetDetailModal({ asset, isOpen, onClose, initialPeriod = "1m" }: Asse
                  <div className="w-2 h-2 rounded-full bg-[#ADC6FF]" />
                  <span className="text-xs font-medium text-gray-400">{t("realizedPL")}</span>
                </div>
-               <span className={cn("text-sm font-bold", (asset.realizedPL || 0) >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
-                 {formatMoney(asset.realizedPL || 0)}
+               <span className={cn("text-sm font-bold", getPnLColor(asset.realizedPL || 0))}>
+                 {formatPnL(asset.realizedPL || 0, formatMoney)}
                </span>
              </div>
              <div className="flex justify-between items-center pt-2 border-t border-white/5">
@@ -756,15 +757,15 @@ export default function PortfolioPage() {
             </motion.div>
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="bg-[#1C1B1B] p-3 sm:p-4 rounded-2xl border border-white/5">
               <p className="text-[9px] sm:text-[10px] font-black text-gray-500 uppercase tracking-wide mb-1">{t("unrealizedPL")}</p>
-              <h3 className={cn("text-sm sm:text-lg font-black tracking-tighter", totalUnrealizedPL >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
-                {totalUnrealizedPL >= 0 ? "+" : ""}{formatMoney(totalUnrealizedPL)}
+              <h3 className={cn("text-sm sm:text-lg font-black tracking-tighter", getPnLColor(totalUnrealizedPL))}>
+                {formatPnL(totalUnrealizedPL, formatMoney)}
               </h3>
               <p className="text-[8px] text-gray-600 mt-1">กำไร/ขาดทุนที่ยังไม่ขาย (ถืออยู่)</p>
             </motion.div>
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-[#1C1B1B] p-3 sm:p-4 rounded-2xl border border-white/5">
               <p className="text-[9px] sm:text-[10px] font-black text-gray-500 uppercase tracking-wide mb-1">{t("realizedPL")}</p>
-              <h3 className={cn("text-sm sm:text-lg font-black tracking-tighter", totalRealizedPL >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
-                {totalRealizedPL >= 0 ? "+" : ""}{formatMoney(totalRealizedPL)}
+              <h3 className={cn("text-sm sm:text-lg font-black tracking-tighter", getPnLColor(totalRealizedPL))}>
+                {formatPnL(totalRealizedPL, formatMoney)}
               </h3>
               <p className="text-[8px] text-gray-600 mt-1">กำไร/ขาดทุนที่ขายไปแล้ว (จาก SELL trades)</p>
             </motion.div>
@@ -834,6 +835,52 @@ export default function PortfolioPage() {
               <RiskItem label={t("highRisk")} value={riskDist.high} color="#FFB4AB" />
               <RiskItem label={t("moderateRisk")} value={riskDist.moderate} color="#E9C349" />
               <RiskItem label={t("conservativeRisk")} value={riskDist.conservative} color="#4EDEA3" />
+            </div>
+          </div>
+
+          {/* Portfolio Warnings */}
+          <div className="bg-[#1C1B1B] p-4 sm:p-6 rounded-2xl sm:rounded-[1.5rem] border border-white/5">
+            <h3 className="text-xs font-bold text-white mb-4 flex items-center gap-2">
+              <AlertCircle size={12} className="text-[#FFB4AB]" />
+              {t("portfolioWarnings") || "Portfolio Risk Warnings"}
+            </h3>
+            <div className="space-y-3">
+              {assets.length > 0 ? (
+                <>
+                  {allocationSegments.some(s => s.pct > 40) && (
+                    <div className="flex items-start gap-2 text-xs">
+                      <AlertCircle size={14} className="text-[#FFB4AB] mt-0.5 flex-shrink-0" />
+                      <div>
+                        <span className="font-bold text-white">Sector Concentration</span>
+                        <p className="text-[10px] text-gray-500 mt-0.5">High allocation in a single sector ({allocationSegments.find(s => s.pct > 40)?.label}). Recommended: &lt; 40%.</p>
+                      </div>
+                    </div>
+                  )}
+                  {assets.filter(a => a.currency !== currency).reduce((sum, a) => sum + a.valueUSD, 0) / (assets.reduce((sum, a) => sum + a.valueUSD, 0) || 1) > 0.5 && (
+                    <div className="flex items-start gap-2 text-xs">
+                      <AlertCircle size={14} className="text-[#E9C349] mt-0.5 flex-shrink-0" />
+                      <div>
+                        <span className="font-bold text-white">Currency Exposure Risk</span>
+                        <p className="text-[10px] text-gray-500 mt-0.5">Over 50% of portfolio is exposed to foreign currency fluctuations.</p>
+                      </div>
+                    </div>
+                  )}
+                  {assets.length < 5 && (
+                    <div className="flex items-start gap-2 text-xs">
+                      <AlertCircle size={14} className="text-[#E9C349] mt-0.5 flex-shrink-0" />
+                      <div>
+                        <span className="font-bold text-white">Diversification Risk</span>
+                        <p className="text-[10px] text-gray-500 mt-0.5">Low number of assets may lead to high correlation and volatility.</p>
+                      </div>
+                    </div>
+                  )}
+                  {!allocationSegments.some(s => s.pct > 40) && assets.length >= 5 && (
+                    <span className="text-[10px] text-[#4EDEA3] font-medium">Portfolio is well-diversified. No warnings detected.</span>
+                  )}
+                </>
+              ) : (
+                <span className="text-[10px] text-gray-500 font-medium">No warnings detected.</span>
+              )}
             </div>
           </div>
         </div>

@@ -10,13 +10,14 @@ export type Currency = "USD" | "THB" | "JPY" | "EUR";
 export interface Trade {
   id: number;
   asset: string;
-  type: "BUY" | "SELL" | "DIVIDEND" | "IMPORT";
+  type: "BUY" | "SELL" | "DIVIDEND" | "IMPORT" | "SHORT" | "COVER";
   amountUSD: number;
   date: string;
   rateAtTime: number;
   currency: string;
   shares?: number;
   pricePerUnit?: number;
+  fees?: number;
   sourceBucketId?: string;
   tag?: string;
   dbId?: string;
@@ -211,7 +212,7 @@ const translations: Record<Language, Record<string, string>> = {
     sell: "SELL",
     addTrade: "Add Trade",
     assetName: "Asset Name",
-    amountUsd: "Amount",
+    amountUsd: "Notional Value",
     confirm: "Confirm",
     cancel: "Cancel",
     searchPlaceholder: "Search assets, trades...",
@@ -315,7 +316,7 @@ const translations: Record<Language, Record<string, string>> = {
     chart5y: "5Y",
     performanceTitle: "Performance",
     livePrice: "Live Price",
-    avgCost: "Avg Cost",
+    avgCost: "Cost Basis",
     close: "Close",
     investmentJourney: "Investment Journey",
     initialPurchase: "Initial Purchase",
@@ -684,7 +685,7 @@ const translations: Record<Language, Record<string, string>> = {
     totalInvested: "Total Invested",
     unrealizedPL: "Unrealized P/L",
     realizedPL: "Realized P/L",
-    realized: "Realized",
+    realized: "Realized P/L",
     dividends: "Dividends",
     sourceBucket: "Source Bucket",
     selectSourceBucket: "Select source bucket",
@@ -848,7 +849,7 @@ const translations: Record<Language, Record<string, string>> = {
     tradePrice: "ราคาตอนที่ซื้อ",
     sharesFromTrade: "จำนวนที่ซื้อได้",
     currentPortfolioShares: "จำนวนพอร์ตปัจจุบัน",
-    overallAvgCost: "ต้นทุนเฉลี่ยรวม (พอร์ต)",
+    overallAvgCost: "ราคาทุนเฉลี่ยรวม",
     currentValueThisTrade: "มูลค่าปัจจุบัน (ออเดอร์นี้)",
     portfolioBalanced: "พอร์ตของคุณสมดุลดีเยี่ยมแล้ว",
 
@@ -1084,7 +1085,7 @@ const translations: Record<Language, Record<string, string>> = {
     sell: "ขาย",
     addTrade: "เพิ่มรายการ",
     assetName: "ชื่อสินทรัพย์",
-    amountUsd: "จำนวนเงิน",
+    amountUsd: "มูลค่าสัญญา",
     confirm: "ยืนยัน",
     cancel: "ยกเลิก",
     searchPlaceholder: "ค้นหาสินทรัพย์, รายการ...",
@@ -1107,7 +1108,7 @@ const translations: Record<Language, Record<string, string>> = {
 
     totalImpact: "ผลกระทบรวม",
     markets: "ตลาด",
-    amount: "จำนวนเงิน",
+    amount: "มูลค่าสัญญา",
     investedAmount: "เงินลงทุน",
     valueAtTradeTime: "มูลค่า ณ วันที่ซื้อ",
     valueNow: "มูลค่าปัจจุบัน",
@@ -1182,7 +1183,7 @@ const translations: Record<Language, Record<string, string>> = {
     typeToSearch: "พิมพ์ชื่อหรือสัญลักษณ์สินทรัพย์เพื่อค้นหา",
     change: "เปลี่ยน",
     quantitySharesCoins: "จำนวน (หุ้น/เหรียญ)",
-    avgCostPerUnit: "ต้นทุนเฉลี่ยต่อหน่วย",
+    avgCostPerUnit: "ราคาทุนเฉลี่ยต่อหน่วย",
     totalInvestment: "ยอดลงทุนรวม",
     // StockChart
     period1d: "1วัน",
@@ -1227,9 +1228,9 @@ const translations: Record<Language, Record<string, string>> = {
 
     // Enhanced P/L
     totalInvested: "ลงทุนรวม",
-    unrealizedPL: "กำไรยังไม่ขาย",
-    realizedPL: "กำไรขายแล้ว",
-    realized: "ขายแล้ว",
+    unrealizedPL: "กำไร/ขาดทุนที่ยังไม่รับรู้",
+    realizedPL: "กำไร/ขาดทุนที่รับรู้แล้ว",
+    realized: "ที่รับรู้แล้ว",
     dividends: "เงินปันผล",
     sourceBucket: "กระเป๋าต้นทาง",
     selectSourceBucket: "เลือกกระเป๋าต้นทาง",
@@ -1271,7 +1272,7 @@ const translations: Record<Language, Record<string, string>> = {
     portfolioGrowth: "การเติบโตของพอร์ต",
     progress: "ความคืบหน้า",
     performance: "ผลงาน",
-    winRate: "อัตราชนะ",
+    winRate: "อัตราการชนะ",
     wins: "ชนะ",
     losses: "แพ้",
     avgWin: "ชนะเฉลี่ย",
@@ -1344,6 +1345,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [trades, setTrades] = useState<Trade[]>(defaultTrades);
   const [allocations, setAllocations] = useState<Allocation[]>(defaultAllocations);
   const [assets, setAssets] = useState<Asset[]>(defaultAssets);
+  const assetsRef = React.useRef<Asset[]>(assets);
+  useEffect(() => {
+    assetsRef.current = assets;
+  }, [assets]);
   const [cashActivities, setCashActivities] = useState<CashActivity[]>([]);
   const [moneyBuckets, setMoneyBuckets] = useState<MoneyBucket[]>(defaultMoneyBuckets);
   const [bucketActivities, setBucketActivities] = useState<BucketActivity[]>([]);
@@ -1463,19 +1468,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 id: a.id,
                 name: a.name,
                 symbol: a.symbol,
-                valueUSD: a.value_usd,
+                valueUSD: (() => {
+                  if (a.current_price && a.quantity) return a.current_price * a.quantity;
+                  if (a.avg_purchase_price && a.quantity) return a.avg_purchase_price * a.quantity;
+                  return a.value_usd || 0;
+                })(),
                 change: a.change_percentage || 0,
                 allocation: a.asset_type || 'Equities',
                 shares: a.quantity,
                 avgCost: a.avg_purchase_price || 0,
-                currentPrice: a.current_price || (a.quantity && a.quantity > 0 ? a.value_usd / a.quantity : 0),
+                currentPrice: a.current_price || a.avg_purchase_price || (a.quantity && a.quantity > 0 ? (a.value_usd || 0) / a.quantity : 0),
                 isFavorite: a.is_favorite,
                 sortOrder: a.sort_order,
                 is_active: a.is_active
               });
             }
           });
-          setAssets(Array.from(uniqueAssetsMap.values()));
+          const newAssetsArray = Array.from(uniqueAssetsMap.values());
+          setAssets(newAssetsArray);
+          // Sync to localStorage to prevent stale data flash on refresh
+          localStorage.setItem("fintrack-assets", JSON.stringify(newAssetsArray));
         } else {
           setAssets([]);
         }
@@ -1689,19 +1701,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       
       const s = stats[sym];
       const tradeShares = trade.shares || (trade.pricePerUnit && trade.pricePerUnit > 0 ? trade.amountUSD / trade.pricePerUnit : 0);
+      const fee = trade.fees || 0;
 
       if (trade.type === "BUY" || trade.type === "IMPORT") {
         s.shares += tradeShares;
-        s.totalCost += trade.amountUSD;
+        s.totalCost += trade.amountUSD + fee;
       } else if (trade.type === "SELL") {
         if (s.shares > 0) {
           const costOfSharesSold = (tradeShares / s.shares) * s.totalCost;
-          s.realizedPL += (trade.amountUSD - costOfSharesSold);
+          s.realizedPL += (trade.amountUSD - fee - costOfSharesSold);
           s.shares -= tradeShares;
           s.totalCost -= costOfSharesSold;
+        } else if (trade.type === "SHORT") {
+          // Open short position
+          s.shares -= tradeShares;
+          s.totalCost += trade.amountUSD - fee;
+        } else if (trade.type === "COVER") {
+          // Close short position
+          const costOfSharesCovered = (tradeShares / Math.abs(s.shares)) * s.totalCost;
+          s.realizedPL += (costOfSharesCovered - trade.amountUSD - fee);
+          s.shares += tradeShares;
+          s.totalCost -= costOfSharesCovered;
         } else {
           // Short selling or selling without buy record
-          s.realizedPL += trade.amountUSD;
+          s.realizedPL += trade.amountUSD - fee;
         }
       } else if (trade.type === "DIVIDEND") {
         s.dividendTotal += trade.amountUSD;
@@ -1729,7 +1752,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             shares: s.shares,
             avgCost: s.shares > 0 ? s.totalCost / s.shares : 0,
             realizedPL: s.realizedPL,
-            dividendTotal: s.dividendTotal
+            dividendTotal: s.dividendTotal,
+            valueUSD: asset.currentPrice ? (asset.currentPrice * s.shares) : s.totalCost,
+            currentPrice: asset.currentPrice || (s.shares > 0 ? s.totalCost / s.shares : 0)
           };
           delete stats[asset.symbol.toUpperCase()];
         }
@@ -1760,116 +1785,117 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
       // Deduplicate to avoid React key collisions
       const deduplicatedAssets = Array.from(new Map(newAssets.map(item => [item.symbol.toUpperCase(), item])).values());
+      localStorage.setItem("fintrack-assets", JSON.stringify(deduplicatedAssets));
       return deduplicatedAssets;
     });
   }, [trades, isDataLoaded]);
 
-  // Fetch Live Market Data with caching and optimistic updates
+  // Fetch Live Market Data and persist prices to Supabase
   useEffect(() => {
     if (!isDataLoaded) return;
 
     let mounted = true;
-    const CACHE_KEY = 'fintrack-market-cache';
-    const CACHE_DURATION = 30000; // 30 seconds cache
 
-    const getCachedData = () => {
-      try {
-        const cached = localStorage.getItem(CACHE_KEY);
-        if (cached) {
-          const { data, timestamp } = JSON.parse(cached);
-          if (Date.now() - timestamp < CACHE_DURATION) {
-            return data;
-          }
-        }
-      } catch {}
-      return null;
-    };
-
-    const setCacheData = (data: any) => {
-      try {
-        localStorage.setItem(CACHE_KEY, JSON.stringify({ data, timestamp: Date.now() }));
-      } catch {}
+    const mapToMarketSymbol = (sym: string) => {
+      const upper = sym.toUpperCase();
+      // Handle crypto pairs like BTCUSD, ETHUSD → BTC-USD, ETH-USD
+      const CRYPTO_BASES = ['BTC', 'ETH', 'SOL', 'DOGE', 'XRP', 'USDT', 'BNB', 'ADA', 'AVAX', 'LINK'];
+      for (const base of CRYPTO_BASES) {
+        if (upper === base) return `${base}-USD`;
+        if (upper === `${base}USD`) return `${base}-USD`;
+        if (upper === `${base}USDT`) return `${base}-USD`;
+      }
+      return upper;
     };
 
     const fetchMarketData = async () => {
-      setAssets(currentAssets => {
-        if (currentAssets.length === 0) return currentAssets;
+      // Snapshot current assets using the ref to get the latest state immediately
+      const snapshot = assetsRef.current;
+      if (snapshot.length === 0) return;
 
-        // First: Try cache immediately for fast UI
-        const cachedData = getCachedData();
-        let updated = currentAssets;
+      // Apply interim cost-based values while API loads
+      setAssets(prev => prev.map(asset => ({
+        ...asset,
+        valueUSD: asset.currentPrice && asset.shares
+          ? asset.shares * asset.currentPrice
+          : (asset.avgCost && asset.shares ? asset.avgCost * asset.shares : asset.valueUSD),
+        currentPrice: asset.currentPrice || asset.avgCost || 0,
+      })));
 
-        if (cachedData?.results && Array.isArray(cachedData.results)) {
-          updated = currentAssets.map(asset => {
-            const marketSym = mapToMarketSymbol(asset.symbol);
-            const liveData = cachedData.results.find((r: any) => r.symbol === marketSym);
-            if (liveData) {
-              const calculatedValue = asset.shares ? (asset.shares * liveData.price) : asset.valueUSD;
-              return {
-                ...asset,
-                change: Number(liveData.changePercent.toFixed(2)),
-                valueUSD: calculatedValue,
-                currentPrice: liveData.price,
-                name: liveData.name || asset.name,
-                chartData: liveData.chartData || asset.chartData,
-                intradayData: liveData.intradayData || asset.intradayData,
-              };
-            }
-            return asset;
-          });
-        }
+      const symbolsQuery = snapshot.map(a => mapToMarketSymbol(a.symbol)).join(',');
+      if (!symbolsQuery) return;
 
-        // Background: Fetch fresh data
-        const symbolsQuery = currentAssets.map(a => mapToMarketSymbol(a.symbol)).join(',');
-
-        fetch(`/api/market?symbols=${symbolsQuery}`, {
+      try {
+        const res = await fetch(`/api/market?symbols=${symbolsQuery}`, {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache' }
-        })
-          .then(res => res.ok ? res.json() : null)
-          .then(data => {
-            if (mounted && data?.results && Array.isArray(data.results)) {
-              setCacheData(data);
-              setAssets(prev => prev.map(asset => {
-                const marketSym = mapToMarketSymbol(asset.symbol);
-                const liveData = data.results.find((r: any) => r.symbol === marketSym);
-                if (liveData) {
-                  const calculatedValue = asset.shares ? (asset.shares * liveData.price) : asset.valueUSD;
-                  return {
-                    ...asset,
-                    change: Number(liveData.changePercent.toFixed(2)),
-                    valueUSD: calculatedValue,
-                    currentPrice: liveData.price,
-                    name: liveData.name || asset.name,
-                    chartData: liveData.chartData || asset.chartData,
-                    intradayData: liveData.intradayData || asset.intradayData,
-                  };
-                }
-                return asset;
-              }));
-            }
-          })
-          .catch(e => {
-            console.debug("Market fetch failed, using cached data");
-          });
+        });
+        if (!res.ok || !mounted) return;
+        const data = await res.json();
+        if (!data?.results || !Array.isArray(data.results) || !mounted) return;
 
-        return updated;
-      });
-    };
+        // 1. Update React state with live prices
+        setAssets(prev => prev.map(asset => {
+          const marketSym = mapToMarketSymbol(asset.symbol);
+          const liveData = data.results.find((r: any) => r.symbol === marketSym);
+          if (!liveData) return asset;
+          return {
+            ...asset,
+            change: Number(liveData.changePercent.toFixed(2)),
+            valueUSD: asset.shares ? asset.shares * liveData.price : asset.valueUSD,
+            currentPrice: liveData.price,
+            name: liveData.name || asset.name,
+            chartData: liveData.chartData || asset.chartData,
+            intradayData: liveData.intradayData || asset.intradayData,
+          };
+        }));
 
-    const mapToMarketSymbol = (sym: string) => {
-      if (['BTC', 'ETH', 'SOL', 'USDT', 'DOGE', 'XRP'].includes(sym.toUpperCase())) return `${sym.toUpperCase()}-USD`;
-      return sym.toUpperCase();
+        // 2. Write live prices back to Supabase so next refresh is instant
+        if (user && mounted) {
+          const writes = snapshot
+            .filter(a => a.id)
+            .map(a => {
+              const marketSym = mapToMarketSymbol(a.symbol);
+              const liveData = data.results.find((r: any) => r.symbol === marketSym);
+              if (!liveData) return null;
+              const newValueUSD = a.shares ? a.shares * liveData.price : a.valueUSD;
+              const updatePayload = {
+                current_price: liveData.price,
+                value_usd: newValueUSD,
+                change_24h: Number((liveData.price - liveData.price / (1 + liveData.changePercent / 100)).toFixed(2)),
+                change_percentage: liveData.changePercent,
+                updated_at: new Date().toISOString(),
+              };
+              console.log("Updating Supabase for", a.symbol, updatePayload);
+              return supabase
+                .from('assets')
+                .update(updatePayload)
+                .eq('id', a.id)
+                .eq('user_id', user.id)
+                .select();
+            })
+            .filter(Boolean);
+
+          try {
+            await Promise.all(writes);
+          } catch (e) {
+            console.error('Price write-back failed:', e);
+          }
+        }
+      } catch (err) {
+        console.debug('Market fetch failed', err);
+      }
     };
 
     fetchMarketData();
-    const interval = setInterval(fetchMarketData, 30000); // 30 seconds refresh
+    const interval = setInterval(fetchMarketData, 30000);
 
     return () => {
       mounted = false;
       clearInterval(interval);
     };
-  }, [isDataLoaded]);
+  }, [isDataLoaded, user]);
+
 
   const fetchAssetMarketData = async (symbol: string) => {
     try {
@@ -1983,6 +2009,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         amount_usd: tradeData.amountUSD,
         quantity: tradeData.shares || 0,
         price_at_execution: tradeData.pricePerUnit || 0,
+        fees: tradeData.fees || 0,
         execution_date: new Date(tradeData.date).toISOString(),
         exchange_rate_at_time: tradeData.rateAtTime || 1,
         currency: tradeData.currency || "USD",
@@ -2371,6 +2398,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         amount_usd: t.amountUSD,
         quantity: t.shares || 0,
         price_at_execution: t.pricePerUnit || 0,
+        fees: t.fees || 0,
         execution_date: new Date(t.date).toISOString(),
         exchange_rate_at_time: t.rateAtTime || 1,
         currency: t.currency || "USD",

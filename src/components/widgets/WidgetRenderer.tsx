@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 import Link from "next/link";
+import { calcExpectancy, calcStreak } from "@/src/lib/finance";
 
 // ─── Equity Curve Widget ───────────────────────────────────────────────────────
 function EquityCurveWidget() {
@@ -214,14 +215,43 @@ function WatchlistWidget() {
 
 // ─── Daily Journal Widget ──────────────────────────────────────────────────────
 function DailyJournalWidget() {
-  const { t, trades, formatMoney } = useApp();
+  const { t, trades, formatMoney, assets } = useApp();
   const today = new Date().toISOString().split("T")[0];
   const todayTrades = trades.filter(tr => tr.date === today);
   const recentTrades = todayTrades.length > 0 ? todayTrades : trades.slice(0, 5);
 
+  // Approximate metrics since trades don't have PnL yet
+  const tradePnLs = assets.map(a => a.realizedPL || 0).filter(p => p !== 0);
+  const wins = tradePnLs.filter(p => p > 0);
+  const losses = tradePnLs.filter(p => p < 0);
+  const winRate = tradePnLs.length > 0 ? wins.length / tradePnLs.length : 0;
+  const avgWin = wins.length > 0 ? wins.reduce((a, b) => a + b, 0) / wins.length : 0;
+  const avgLoss = losses.length > 0 ? losses.reduce((a, b) => a + b, 0) / losses.length : 0;
+  
+  const expectancy = calcExpectancy(winRate, avgWin, avgLoss);
+  const { currentStreak, maxWinStreak, maxLossStreak } = calcStreak(tradePnLs);
+
   return (
     <div className="h-full flex flex-col">
       <span className="text-[10px] font-black text-gray-500 uppercase tracking-wide mb-2">{t("widgetDailyJournal")}</span>
+      
+      {tradePnLs.length > 0 && (
+        <div className="flex items-center justify-between mb-3 bg-white/5 p-2 rounded-xl">
+          <div className="text-center">
+            <div className="text-[9px] text-gray-500 uppercase font-black">Expectancy</div>
+            <div className={cn("text-xs font-black", expectancy >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>{formatMoney(expectancy)}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-[9px] text-gray-500 uppercase font-black">Win Streak</div>
+            <div className="text-xs font-black text-[#4EDEA3]">{maxWinStreak}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-[9px] text-gray-500 uppercase font-black">Loss Streak</div>
+            <div className="text-xs font-black text-[#FFB4AB]">{maxLossStreak}</div>
+          </div>
+        </div>
+      )}
+
       <div className="flex-1 space-y-1.5 overflow-y-auto pr-1 custom-scrollbar">
         {recentTrades.length === 0 ? (
           <EmptyWidget label={t("noDataYet")} />

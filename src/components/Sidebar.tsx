@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { LayoutDashboard, Wallet, Settings, HelpCircle, Crown, Calendar, User, LineChart, Banknote, PiggyBank, CandlestickChart } from "lucide-react";
+import { LayoutDashboard, Wallet, Settings, HelpCircle, Calendar, User, LineChart, Banknote, PiggyBank, CandlestickChart } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 import { useApp } from "@/src/context/AppContext";
 import Link from "next/link";
@@ -26,7 +26,7 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
     { icon: Banknote, label: t("cashflowOverview"), href: "/cashflow" },
     { icon: CandlestickChart, label: "Trade Assistant", href: "/trade" },
     { icon: PiggyBank, label: t("budgetPage"), href: "/budget" },
-    { icon: Crown, label: t("pricing") || "Pricing", href: "/#pricing" },
+
     { icon: Settings, label: t("settings"), href: "/settings" },
   ];
 
@@ -94,18 +94,6 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
       </nav>
 
       <div className="px-4 mt-auto space-y-3">
-        <div className="bg-gradient-to-br from-[#4EDEA3] to-[#3CC992] p-4 rounded-xl shadow-lg shadow-[#4EDEA3]/10">
-          <div className="flex items-center gap-2 mb-1">
-            <Crown size={12} className="text-[#0E0E0E]" />
-            <span className="text-[10px] font-black uppercase tracking-wide text-[#0E0E0E]">{t("eliteAccess") || "Elite Access"}</span>
-          </div>
-          <p className="text-xs font-medium text-[#0E0E0E] leading-tight">
-            {t("upgradeDesc") || "Upgrade to Gold for AI-powered insights."}
-          </p>
-          <button className="w-full mt-2.5 py-2 bg-[#0E0E0E] text-[#4EDEA3] rounded-lg font-bold text-[10px] uppercase tracking-wide hover:brightness-125 transition-all">
-            {t("upgradeNow") || "Upgrade Now"}
-          </button>
-        </div>
 
         <a href="#" className="flex items-center gap-2.5 text-gray-500 px-4 py-2.5 hover:text-white transition-all">
           <HelpCircle size={16} />

@@ -183,6 +183,13 @@ export default function CashflowPage() {
   const totalExpenses = allCashflowActivities.filter(c => (c.type === 'EXPENSE' || c.type === 'WITHDRAW') && !c.isTransfer).reduce((acc, c) => acc + c.amountUSD, 0);
   const netCashflow = totalIncome - totalExpenses;
 
+  const savingsRate = totalIncome > 0 ? Math.max(0, (netCashflow / totalIncome) * 100) : 0;
+  const totalInvestedFlow = allCashflowActivities
+    .filter(c => c.isTransfer && (c.category?.toLowerCase().includes('invest') || c.note?.toLowerCase().includes('invest')))
+    .reduce((acc, c) => acc + c.amountUSD, 0) + 
+    bucketActivities.filter(ba => ba.type === 'invest').reduce((acc, ba) => acc + ba.amount, 0);
+  const investmentRatio = totalIncome > 0 ? (totalInvestedFlow / totalIncome) * 100 : 0;
+
   // Category icons mapping (#18)
   const getCategoryIcon = (category: string): string => {
     const cat = category.toLowerCase();
@@ -282,7 +289,7 @@ export default function CashflowPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 sm:gap-4">
         <div className="bg-gradient-to-br from-[#1C1B1B] to-[#0E0E0E] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5 relative overflow-hidden">
           <div className="absolute -right-4 -top-4 w-20 h-20 bg-[#ADC6FF]/10 blur-3xl rounded-full" />
           <p className="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">{t("netCashflow")}</p>
@@ -297,6 +304,14 @@ export default function CashflowPage() {
         <div className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
           <p className="text-[10px] sm:text-xs font-bold text-[#FFB4AB] uppercase tracking-wide mb-1">{t("totalExpenses")}</p>
           <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tighter">{formatMoney(totalExpenses)}</h3>
+        </div>
+        <div className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
+          <p className="text-[10px] sm:text-xs font-bold text-[#ADC6FF] uppercase tracking-wide mb-1">Savings Rate</p>
+          <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tighter">{savingsRate.toFixed(1)}%</h3>
+        </div>
+        <div className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
+          <p className="text-[10px] sm:text-xs font-bold text-[#E9C349] uppercase tracking-wide mb-1">Investment Ratio</p>
+          <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tighter">{investmentRatio.toFixed(1)}%</h3>
         </div>
         {/* Monthly Bar Chart Mini (#19) */}
         <div className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">

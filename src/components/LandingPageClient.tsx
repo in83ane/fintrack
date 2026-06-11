@@ -4,14 +4,12 @@ import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   ArrowRight,
-  Check,
   Shield,
   Zap,
   Globe,
   BarChart3,
   PieChart,
   TrendingUp,
-  ChevronRight,
   ChevronDown
 } from "lucide-react";
 import Link from "next/link";
@@ -36,55 +34,7 @@ export default function LandingPageClient({ initialIsLogged }: { initialIsLogged
     }
   };
 
-  const tiers = [
-    {
-      name: t("starter") || "Starter",
-      price: "0",
-      description: t("starterDesc") || "Perfect for individuals just starting their investment journey.",
-      features: [
-        t("featureStarter1") || "Up to 5 Portfolio Assets",
-        t("featureStarter2") || "Basic Performance Tracking",
-        t("featureStarter3") || "Daily Market Updates",
-        t("featureStarter4") || "Community Support",
-        t("featureStarter5") || "Standard Security"
-      ],
-      cta: isLogged ? (t("goToDashboard") || "Go to Dashboard") : (t("startForFree") || "Start for Free"),
-      ctaLink: isLogged ? "/dashboard" : "/login?mode=register",
-      highlight: false
-    },
-    {
-      name: t("pro") || "Pro",
-      price: "29",
-      description: t("proDesc") || "Advanced tools for serious investors looking for an edge.",
-      features: [
-        t("featurePro1") || "Unlimited Portfolio Assets",
-        t("featurePro2") || "Real-time Analytics",
-        t("featurePro3") || "AI-Powered Insights",
-        t("featurePro4") || "Priority Support",
-        t("featurePro5") || "Advanced Risk Analysis",
-        t("featurePro6") || "Custom Export Formats"
-      ],
-      cta: isLogged ? (t("goToDashboard") || "Go to Dashboard") : (t("getStartedNow") || "Get Started"),
-      ctaLink: isLogged ? "/dashboard" : "/login?mode=register",
-      highlight: true
-    },
-    {
-      name: t("enterprise") || "Enterprise",
-      price: "99",
-      description: t("enterpriseDesc") || "Custom solutions for institutional-grade portfolio management.",
-      features: [
-        t("featureEnt1") || "Multi-User Collaboration",
-        t("featureEnt2") || "Dedicated Account Manager",
-        t("featureEnt3") || "Custom API Access",
-        t("featureEnt4") || "White-label Reports",
-        t("featureEnt5") || "SLA Guarantee",
-        t("featureEnt6") || "Advanced Compliance Tools"
-      ],
-      cta: isLogged ? (t("goToDashboard") || "Go to Dashboard") : (t("contactSales") || "Contact Sales"),
-      ctaLink: isLogged ? "/dashboard" : "/login?mode=register",
-      highlight: false
-    }
-  ];
+
 
   return (
     <div className="min-h-screen bg-[#0E0E0E] text-white selection:bg-[#4EDEA3] selection:text-[#0E0E0E] scroll-smooth">
@@ -110,13 +60,7 @@ export default function LandingPageClient({ initialIsLogged }: { initialIsLogged
               >
                 {t("featuresNav") || "Features"}
               </a>
-              <a
-                href="#pricing"
-                onClick={(e) => scrollToSection(e, "pricing")}
-                className="text-sm font-bold uppercase tracking-wide text-gray-400 hover:text-white transition-colors cursor-pointer"
-              >
-                {t("pricingNav") || "Pricing"}
-              </a>
+
             </div>
             
             {/* Language Selector */}
@@ -209,13 +153,7 @@ export default function LandingPageClient({ initialIsLogged }: { initialIsLogged
               <Link href={isLogged ? "/dashboard" : "/login?mode=register"} className="w-full sm:w-auto px-10 py-5 bg-[#4EDEA3] text-[#0E0E0E] rounded-2xl font-bold text-sm uppercase tracking-wide hover:brightness-110 transition-all flex items-center justify-center gap-2">
                  {isLogged ? (t("goToDashboard") || "Go to Dashboard") : (t("startYourJourney") || "Start Your Journey")} <ArrowRight size={16} />
               </Link>
-              <a
-                href="#pricing"
-                onClick={(e) => scrollToSection(e, "pricing")}
-                className="w-full sm:w-auto px-10 py-5 bg-white/5 border border-white/10 rounded-2xl font-bold text-sm uppercase tracking-wide hover:bg-white/10 transition-all flex items-center justify-center gap-2 cursor-pointer"
-              >
-                {t("viewPricing") || "View Pricing"}
-              </a>
+
             </div>
           </motion.div>
 
@@ -270,65 +208,7 @@ export default function LandingPageClient({ initialIsLogged }: { initialIsLogged
         </div>
       </section>
 
-      {/* Pricing Section */}
-      <section id="pricing" className="py-32 bg-[#131313]">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-20">
-            <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">{t("chooseYourTier") || "Choose Your Tier"}</h2>
-            <p className="text-gray-500 font-medium uppercase tracking-wide text-sm">{t("transparentPricing") || "Transparent pricing for every stage of growth"}</p>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {tiers.map((tier, i) => (
-              <div 
-                key={i} 
-                className={`relative p-10 rounded-[2.5rem] border ${
-                  tier.highlight 
-                    ? "bg-[#1C1B1B] border-[#4EDEA3]"
-                    : "bg-[#0E0E0E] border-white/5"
-                }`}
-              >
-                {tier.highlight && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-[#4EDEA3] text-[#0E0E0E] rounded-full text-sm font-bold uppercase tracking-wide">
-                    {t("mostPopular") || "Most Popular"}
-                  </div>
-                )}
-                
-                <div className="mb-8">
-                  <h3 className="text-2xl font-bold mb-2">{tier.name}</h3>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-bold tracking-tighter">${tier.price}</span>
-                    <span className="text-gray-500 text-sm font-bold uppercase tracking-wide">{t("perMonth") || "/month"}</span>
-                  </div>
-                  <p className="mt-4 text-gray-500 text-sm leading-relaxed">{tier.description}</p>
-                </div>
-
-                <div className="space-y-4 mb-10">
-                  {tier.features.map((feature, j) => (
-                    <div key={j} className="flex items-center gap-3">
-                      <div className="w-5 h-5 rounded-full bg-[#4EDEA3]/10 flex items-center justify-center">
-                        <Check size={12} className="text-[#4EDEA3]" />
-                      </div>
-                      <span className="text-sm text-gray-400">{feature}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <Link 
-                  href={tier.ctaLink}
-                  className={`w-full py-4 rounded-2xl font-bold text-sm uppercase tracking-wide transition-all flex items-center justify-center gap-2 ${
-                    tier.highlight 
-                      ? "bg-[#4EDEA3] text-[#0E0E0E] hover:brightness-110" 
-                      : "bg-white/5 text-white hover:bg-white/10 border border-white/10"
-                  }`}
-                >
-                  {tier.cta} <ChevronRight size={16} />
-                </Link>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
 
       {/* CTA Section */}
       <section className="py-32">
@@ -373,7 +253,7 @@ export default function LandingPageClient({ initialIsLogged }: { initialIsLogged
               <h4 className="text-sm font-bold uppercase tracking-wide text-white mb-6">{t("product") || "Product"}</h4>
               <ul className="space-y-4 text-sm text-gray-500">
                 <li><a href="#features" onClick={(e) => scrollToSection(e, "features")} className="hover:text-[#4EDEA3] transition-colors cursor-pointer">{t("featuresNav") || "Features"}</a></li>
-                <li><a href="#pricing" onClick={(e) => scrollToSection(e, "pricing")} className="hover:text-[#4EDEA3] transition-colors cursor-pointer">{t("pricingNav") || "Pricing"}</a></li>
+
                 <li><a href="#" className="hover:text-[#4EDEA3] transition-colors">{t("security") || "Security"}</a></li>
               </ul>
             </div>

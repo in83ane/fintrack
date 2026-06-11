@@ -6,6 +6,7 @@ import { Modal } from "@/src/components/Modal";
 import { ConfirmModal } from "@/src/components/ConfirmModal";
 import { useApp, Asset } from "@/src/context/AppContext";
 import { cn } from "@/src/lib/utils";
+import { formatPnL, getPnLColor } from "@/src/lib/format";
 import { motion } from "motion/react";
 
 interface EditAssetModalProps {
@@ -154,8 +155,8 @@ export function EditAssetModal({ asset, isOpen, onClose, onDelete }: EditAssetMo
             </div>
             <div className="bg-[#1C1B1B] p-3 rounded-xl border border-white/5">
               <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">{t("unrealizedPL")}</p>
-              <p className={cn("text-sm font-bold", unrealizedPL >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
-                {unrealizedPL >= 0 ? "+" : ""}{formatMoney(unrealizedPL)}
+              <p className={cn("text-sm font-bold", getPnLColor(unrealizedPL))}>
+                {formatPnL(unrealizedPL, (v) => formatMoney(v))}
               </p>
             </div>
           </div>
@@ -167,8 +168,8 @@ export function EditAssetModal({ asset, isOpen, onClose, onDelete }: EditAssetMo
                 <TrendingUp size={14} className="text-[#ADC6FF]" />
                 <p className="text-xs font-bold text-gray-400 uppercase">{t("realizedPL")}</p>
               </div>
-              <p className={cn("text-sm font-black", realizedPL >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
-                {realizedPL >= 0 ? "+" : ""}{formatMoney(realizedPL)}
+              <p className={cn("text-sm font-black", getPnLColor(realizedPL))}>
+                {formatPnL(realizedPL, (v) => formatMoney(v))}
               </p>
             </div>
             <p className="text-[10px] text-gray-600 italic">

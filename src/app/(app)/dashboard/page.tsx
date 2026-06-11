@@ -11,6 +11,8 @@ import { AddCashflowModal } from "@/src/components/AddCashflowModal";
 import DashboardGrid from "@/src/components/widgets/DashboardGrid";
 import { AnimatedNumber } from "@/src/components/AnimatedNumber";
 import { SkeletonDashboard } from "@/src/components/SkeletonLoader";
+import { formatPnL, getPnLColor, formatPercent } from "@/src/lib/format";
+import { calcMaxDrawdown, calcProfitFactor } from "@/src/lib/finance";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Papa from "papaparse";
@@ -325,6 +327,21 @@ export default function DashboardPage() {
   const initialCapital = currentNetWorth - totalProfit;
   const netWorthReturnPct = initialCapital > 0 ? (totalProfit / initialCapital) * 100 : 0;
 
+  const { grossProfit, grossLoss } = React.useMemo(() => {
+    let gp = 0, gl = 0;
+    assets.forEach(a => {
+      if (a.realizedPL && a.realizedPL > 0) gp += a.realizedPL;
+      if (a.realizedPL && a.realizedPL < 0) gl += Math.abs(a.realizedPL);
+      const unreal = a.valueUSD - (a.avgCost || 0) * (a.shares || 0);
+      if (unreal > 0) gp += unreal;
+      if (unreal < 0) gl += Math.abs(unreal);
+    });
+    return { grossProfit: gp, grossLoss: gl };
+  }, [assets]);
+  
+  const profitFactor = calcProfitFactor(grossProfit, grossLoss);
+  const maxDrawdown = calcMaxDrawdown(netWorthHistory.map(h => h.value));
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTrade.asset || !newTrade.amountUSD) return;
@@ -552,10 +569,10 @@ export default function DashboardPage() {
                 <AnimatedNumber value={netWorthHistory[netWorthHistory.length - 1]?.value || 0} formatter={(v) => formatMoney(v)} />
               </h1>
               <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                <div className={cn("flex items-center gap-1", netWorthReturnPct >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
+                <div className={cn("flex items-center gap-1", getPnLColor(netWorthReturnPct))}>
                   {netWorthReturnPct >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
                   <span className="text-xs sm:text-sm font-bold">
-                    {netWorthReturnPct > 0 ? "+" : ""}{netWorthReturnPct.toFixed(1)}%
+                    {formatPercent(netWorthReturnPct, 1)}
                   </span>
                 </div>
                 <span className="text-gray-500 text-[10px] sm:text-xs font-medium uppercase tracking-wide">
@@ -861,7 +878,7 @@ export default function DashboardPage() {
       </section>
 
       {/* P/L Summary Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 sm:gap-4">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-gradient-to-br from-[#1C1B1B] to-[#151515] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5 relative overflow-hidden">
           <div className="absolute -right-6 -top-6 w-20 h-20 bg-[#ADC6FF]/10 blur-3xl rounded-full" />
           <p className="text-[10px] sm:text-xs font-black text-[#ADC6FF] uppercase tracking-wide mb-1">{t("totalInvested")}</p>
@@ -869,19 +886,31 @@ export default function DashboardPage() {
         </motion.div>
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
           <p className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide mb-1">{t("unrealizedPL")}</p>
-          <h3 className={cn("text-lg sm:text-2xl font-black tracking-tighter", totalUnrealizedPL >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
-            {totalUnrealizedPL >= 0 ? "+" : ""}{formatMoney(totalUnrealizedPL)}
+          <h3 className={cn("text-lg sm:text-2xl font-black tracking-tighter", getPnLColor(totalUnrealizedPL))}>
+            {formatPnL(totalUnrealizedPL, formatMoney)}
           </h3>
         </motion.div>
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
           <p className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide mb-1">{t("realizedPL")}</p>
-          <h3 className={cn("text-lg sm:text-2xl font-black tracking-tighter", totalRealizedPL >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
-            {totalRealizedPL >= 0 ? "+" : ""}{formatMoney(totalRealizedPL)}
+          <h3 className={cn("text-lg sm:text-2xl font-black tracking-tighter", getPnLColor(totalRealizedPL))}>
+            {formatPnL(totalRealizedPL, formatMoney)}
           </h3>
         </motion.div>
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
           <p className="text-[10px] sm:text-xs font-black text-[#E9C349] uppercase tracking-wide mb-1">{t("dividends")}</p>
           <h3 className="text-lg sm:text-2xl font-black text-white tracking-tighter">{formatMoney(totalDividends)}</h3>
+        </motion.div>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
+          <p className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide mb-1">Max Drawdown</p>
+          <h3 className="text-lg sm:text-2xl font-black text-[#FFB4AB] tracking-tighter">
+            -{maxDrawdown.toFixed(2)}%
+          </h3>
+        </motion.div>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
+          <p className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide mb-1">Profit Factor</p>
+          <h3 className={cn("text-lg sm:text-2xl font-black tracking-tighter", profitFactor >= 1.5 ? "text-[#4EDEA3]" : "text-white")}>
+            {profitFactor === Number.POSITIVE_INFINITY ? "∞" : profitFactor.toFixed(2)}
+          </h3>
         </motion.div>
       </div>
 

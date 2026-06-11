@@ -160,7 +160,10 @@ export async function fetchChartData(symbol: string, period: TimePeriod): Promis
   const url = `/api/chart?symbol=${encodeURIComponent(symbol)}&interval=${yahooInterval}&range=${yahooRange}`;
 
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) {
+    console.warn(`Chart data fetch failed for ${symbol}: HTTP ${res.status}`);
+    return [];
+  }
   const json = await res.json();
 
   if (json?.chartData && Array.isArray(json.chartData)) {

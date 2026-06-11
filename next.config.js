@@ -61,7 +61,7 @@ const nextConfig = {
         },
         {
           key: 'Content-Security-Policy',
-          value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https: http:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://query1.finance.yahoo.com https://www.google-analytics.com https://region1.google-analytics.com; frame-src 'self' https://www.tradingview.com; object-src 'none'; base-uri 'self'; form-action 'self'",
+          value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https: http:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://query1.finance.yahoo.com https://www.google-analytics.com https://region1.google-analytics.com https://*.supabase.co; frame-src 'self' https://www.tradingview.com; object-src 'none'; base-uri 'self'; form-action 'self'",
         },
       ],
     },
