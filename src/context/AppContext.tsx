@@ -116,6 +116,7 @@ export interface Asset {
   sortOrder?: number;
   is_active?: boolean;
   currentPrice?: number;
+  currency?: string;
 }
 
 export type WidgetType = 'watchlist' | 'monthly_summary' | 'allocation_pie' | 'daily_journal' | 'equity_curve' | 'bucket_overview' | 'pl_calendar_mini' | 'top_movers';
@@ -1712,20 +1713,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           s.realizedPL += (trade.amountUSD - fee - costOfSharesSold);
           s.shares -= tradeShares;
           s.totalCost -= costOfSharesSold;
-        } else if (trade.type === "SHORT") {
-          // Open short position
-          s.shares -= tradeShares;
-          s.totalCost += trade.amountUSD - fee;
-        } else if (trade.type === "COVER") {
-          // Close short position
-          const costOfSharesCovered = (tradeShares / Math.abs(s.shares)) * s.totalCost;
-          s.realizedPL += (costOfSharesCovered - trade.amountUSD - fee);
-          s.shares += tradeShares;
-          s.totalCost -= costOfSharesCovered;
         } else {
-          // Short selling or selling without buy record
+          // Selling without buy record
           s.realizedPL += trade.amountUSD - fee;
         }
+      } else if (trade.type === "SHORT") {
+        // Open short position
+        s.shares -= tradeShares;
+        s.totalCost += trade.amountUSD - fee;
+      } else if (trade.type === "COVER") {
+        // Close short position
+        const costOfSharesCovered = (tradeShares / Math.abs(s.shares)) * s.totalCost;
+        s.realizedPL += (costOfSharesCovered - trade.amountUSD - fee);
+        s.shares += tradeShares;
+        s.totalCost -= costOfSharesCovered;
       } else if (trade.type === "DIVIDEND") {
         s.dividendTotal += trade.amountUSD;
       }

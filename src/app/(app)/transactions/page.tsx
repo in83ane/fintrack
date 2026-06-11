@@ -25,7 +25,7 @@ import { calcExpectancy, calcStreak } from "@/src/lib/finance";
 
 interface UnifiedTransaction {
   id: string;
-  type: 'BUY' | 'SELL' | 'DIVIDEND' | 'IMPORT';
+  type: 'BUY' | 'SELL' | 'DIVIDEND' | 'IMPORT' | 'SHORT' | 'COVER';
   category: 'trade' | 'bucket' | 'cash';
   asset: string;
   amount: number;
