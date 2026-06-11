@@ -2006,7 +2006,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         asset_id: null,
         asset_name: tradeData.asset,
         symbol: tradeData.asset,
-        type: tradeData.type === "IMPORT" ? "BUY" : tradeData.type,
+        type: tradeData.type,
         amount_usd: tradeData.amountUSD,
         quantity: tradeData.shares || 0,
         price_at_execution: tradeData.pricePerUnit || 0,
@@ -2025,19 +2025,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           id: parseInt(data.id.split('-')[0], 16) || Date.now(),
           dbId: data.id
         }]);
+
+        // Refetch cash activities to sync with backend triggers
+        const { data: newCashActivities } = await db.cashActivities.getAll(user.id);
+        if (newCashActivities) {
+          setCashActivities(newCashActivities.map(ca => ({
+            id: ca.id,
+            type: ca.type,
+            amountUSD: ca.amount,
+            category: ca.category,
+            date: ca.date,
+            note: ca.note || undefined
+          })));
+        }
       }
     } catch (err) {
       console.error("Failed to add trade to Supabase", err);
     }
-
-    // Also log as cash activity for Cashflow tracking
-    await addCashActivity({
-      type: tradeData.type === "BUY" ? "EXPENSE" : "INCOME",
-      amountUSD: tradeData.amountUSD,
-      category: "investment",
-      date: tradeData.date,
-      note: `${tradeData.type} ${tradeData.asset} | ${tradeData.shares ? `${tradeData.shares} shares @ ${tradeData.pricePerUnit?.toFixed(2)}` : ""} | Total: ${tradeData.amountUSD.toFixed(2)} ${tradeData.sourceBucketId ? `| Wallet: ${moneyBuckets.find(b => b.id === tradeData.sourceBucketId)?.name || "Unknown"}` : ""}`
-    });
 
     // If SELL, distribute the income to buckets automatically
     if (tradeData.type === "SELL" && moneyBuckets.length > 0) {
@@ -2395,7 +2399,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         asset_id: null,
         asset_name: t.asset,
         symbol: t.asset,
-        type: t.type === "IMPORT" ? "BUY" : t.type,
+        type: t.type,
         amount_usd: t.amountUSD,
         quantity: t.shares || 0,
         price_at_execution: t.pricePerUnit || 0,
@@ -2415,6 +2419,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           id: parseInt(data[i].id.split('-')[0], 16) || Date.now() + i 
         }));
         setTrades(prev => [...tradesWithIds, ...prev]);
+
+        // Refetch cash activities to sync with backend triggers
+        const { data: newCashActivities } = await db.cashActivities.getAll(user.id);
+        if (newCashActivities) {
+          setCashActivities(newCashActivities.map(ca => ({
+            id: ca.id,
+            type: ca.type,
+            amountUSD: ca.amount,
+            category: ca.category,
+            date: ca.date,
+            note: ca.note || undefined
+          })));
+        }
       }
     } catch (err) {
       console.error("Failed to bulk add trades to Supabase", err);
