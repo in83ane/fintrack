@@ -777,13 +777,13 @@ export default function LedgerPage() {
           <div className="flex gap-3 mt-4">
             <div className="flex-1 bg-white/4 border border-white/6 rounded-2xl p-3.5">
               <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-1 truncate">
-                {t("ledgerFilterIn")} ยท {periodLabel}
+                {t("ledgerFilterIn")} • {periodLabel}
               </p>
               <AnimatedNumber value={periodStats.inc} formatter={(v) => formatMoney(v)} className="text-lg font-black text-[#4EDEA3] tracking-tighter" />
             </div>
             <div className="flex-1 bg-white/4 border border-white/6 rounded-2xl p-3.5">
               <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-1 truncate">
-                {t("ledgerFilterOut")} ยท {periodLabel}
+                {t("ledgerFilterOut")} • {periodLabel}
               </p>
               <AnimatedNumber value={periodStats.exp} formatter={(v) => formatMoney(v)} className="text-lg font-black text-[#FFB4AB] tracking-tighter" />
             </div>
