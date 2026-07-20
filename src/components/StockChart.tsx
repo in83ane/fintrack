@@ -408,8 +408,9 @@ export function StockChart({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
+              transition={{ duration: 0.12 }}
             >
+              {/* Vertical crosshair */}
               <line
                 x1={cx(hoveredIndex)}
                 y1={PAD.top}
@@ -419,27 +420,107 @@ export function StockChart({
                 strokeWidth={1}
                 strokeDasharray="4,4"
               />
+              {/* Horizontal crosshair */}
+              <line
+                x1={PAD.left}
+                y1={cy(hov.price)}
+                x2={W - PAD.right}
+                y2={cy(hov.price)}
+                stroke="rgba(173, 198, 255, 0.3)"
+                strokeWidth={1}
+                strokeDasharray="4,4"
+              />
+              {/* Crosshair dot */}
               <circle cx={cx(hoveredIndex)} cy={cy(hov.price)} r={4} fill={strokeColor} stroke="#1C1B1B" strokeWidth={2} />
+              {/* Y-axis price pill */}
+              <rect
+                x={W - PAD.right + 2}
+                y={cy(hov.price) - 9}
+                width={52}
+                height={18}
+                rx={4}
+                fill={strokeColor}
+                opacity={0.95}
+              />
+              <text
+                x={W - PAD.right + 6}
+                y={cy(hov.price) + 3.5}
+                fill="#0E0E0E"
+                fontSize={9}
+                fontWeight="bold"
+                fontFamily="monospace"
+              >
+                {hov.price >= 1000 ? hov.price.toFixed(0) : hov.price.toFixed(2)}
+              </text>
+              {/* X-axis date pill */}
+              <rect
+                x={cx(hoveredIndex) - 30}
+                y={H - PAD.bottom + 4}
+                width={60}
+                height={16}
+                rx={4}
+                fill="#2A2A2A"
+                stroke="rgba(173,198,255,0.2)"
+                strokeWidth={0.5}
+              />
+              <text
+                x={cx(hoveredIndex)}
+                y={H - PAD.bottom + 15}
+                textAnchor="middle"
+                fill="#ADC6FF"
+                fontSize={8}
+                fontWeight="bold"
+              >
+                {period === "1d" || period === "5d" || period === "1w"
+                  ? (language === "th" ? formatThaiDate(hov.time, period) : formatEnglishDate(hov.time, period))
+                  : new Date(hov.time).toLocaleDateString(language === "th" ? "th-TH" : "en-US", { month: 'short', day: 'numeric' })}
+              </text>
             </motion.g>
           )}
         </AnimatePresence>
       </svg>
 
-      {showTooltip && hov && (
-        <motion.div
-          initial={{ opacity: 0, y: 5 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 5 }}
-          className="absolute top-2 left-4 bg-[#2A2A2A]/90 backdrop-blur-sm border border-white/10 rounded-lg px-3 py-1.5 pointer-events-none z-10"
-        >
-          <div className="text-xs text-gray-400">
-            {period === "1d" || period === "5d" || period === "1w"
-              ? (language === "th" ? formatFullThaiDate(hov.time, period) : formatFullEnglishDate(hov.time, period))
-              : new Date(hov.time).toLocaleDateString(language === "th" ? "th-TH" : "en-US", { month: 'short', day: 'numeric' })}
+      {showTooltip && hov && hoveredIndex !== null && (() => {
+        // Calculate tooltip position in screen coords
+        const containerEl = containerRef.current;
+        const svgEl = svgRef.current;
+        if (!containerEl || !svgEl) return null;
+        const svgRect = svgEl.getBoundingClientRect();
+        const containerRect = containerEl.getBoundingClientRect();
+        const scaleToScreen = svgRect.width / W;
+        const dotScreenX = cx(hoveredIndex) * scaleToScreen + (svgRect.left - containerRect.left);
+        const dotScreenY = cy(hov.price) * scaleToScreen + (svgRect.top - containerRect.top);
+        // Flip tooltip left if near right edge
+        const flipX = dotScreenX > containerRect.width * 0.7;
+        const tooltipX = flipX ? dotScreenX - 145 : dotScreenX + 16;
+        const tooltipY = Math.max(4, Math.min(dotScreenY - 20, containerRect.height - 50));
+        return (
+          <div
+            className="absolute top-0 left-0 bg-[#2A2A2A]/95 backdrop-blur-sm border border-white/10 rounded-xl px-3 py-2 pointer-events-none z-10 shadow-xl shadow-black/30"
+            style={{
+              transform: `translate3d(${tooltipX}px, ${tooltipY}px, 0)`,
+              willChange: 'transform',
+            }}
+          >
+            <div className="text-[10px] text-gray-400 mb-0.5">
+              {period === "1d" || period === "5d" || period === "1w"
+                ? (language === "th" ? formatFullThaiDate(hov.time, period) : formatFullEnglishDate(hov.time, period))
+                : new Date(hov.time).toLocaleDateString(language === "th" ? "th-TH" : "en-US", { month: 'short', day: 'numeric', year: 'numeric' })}
+            </div>
+            <div className="text-sm font-black text-white font-mono">${hov.price.toFixed(2)}</div>
+            {data.length > 1 && (() => {
+              const firstPrice = data[0].price;
+              const change = hov.price - firstPrice;
+              const changePct = (change / firstPrice) * 100;
+              return (
+                <div className={cn("text-[10px] font-bold mt-0.5", change >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
+                  {change >= 0 ? "+" : ""}{change.toFixed(2)} ({changePct >= 0 ? "+" : ""}{changePct.toFixed(2)}%)
+                </div>
+              );
+            })()}
           </div>
-          <div className="text-sm font-bold text-white">${hov.price.toFixed(2)}</div>
-        </motion.div>
-      )}
+        );
+      })()}
     </div>
   );
 }

@@ -27,11 +27,13 @@ export interface Asset {
   change_percentage: number | null;
   allocation_target: number | null;
   allocation_current: number | null;
+  allocation: string | null;
   sector: string | null;
   country: string | null;
   notes: string | null;
   is_active: boolean;
   is_favorite: boolean;
+  exclude_from_total: boolean;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -83,6 +85,8 @@ export interface BucketActivity {
   amount: number;
   note: string | null;
   date: string;
+  currency: string | null;
+  rate_at_time: number | null;
   created_at: string;
 }
 
@@ -95,6 +99,10 @@ export interface CashActivity {
   note: string | null;
   date: string;
   time: string | null;
+  bucket_id: string | null;
+  is_transfer: boolean;
+  currency: string | null;
+  rate_at_time: number | null;
   created_at: string;
 }
 
@@ -200,6 +208,9 @@ export const db = {
     insert: async (trade: Omit<Trade, 'id' | 'created_at'>) => {
       return await supabase.from('trades').insert(trade).select().single();
     },
+    update: async (id: string, updates: Partial<Trade>) => {
+      return await supabase.from('trades').update(updates).eq('id', id).select().single();
+    },
     delete: async (id: string) => {
       return await supabase.from('trades').delete().eq('id', id);
     },
@@ -288,6 +299,9 @@ export const db = {
     insert: async (activity: Omit<CashActivity, 'id' | 'created_at'>) => {
       return await supabase.from('cash_activities').insert(activity).select().single();
     },
+    update: async (id: string, updates: Partial<CashActivity>) => {
+      return await supabase.from('cash_activities').update(updates).eq('id', id).select().single();
+    },
     delete: async (id: string) => {
       return await supabase.from('cash_activities').delete().eq('id', id);
     },
@@ -336,6 +350,27 @@ export const db = {
       supabase.from(table).delete().eq('user_id', userId)
     );
     return await Promise.all(promises);
+  },
+
+  // User Custom Categories (for Ledger)
+  userCategories: {
+    getAll: async (userId: string) => {
+      return await supabase
+        .from('user_categories')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: true });
+    },
+    insert: async (userId: string, type: 'INCOME' | 'EXPENSE', label: string, icon: string) => {
+      return await supabase
+        .from('user_categories')
+        .insert({ user_id: userId, type, label, icon })
+        .select()
+        .single();
+    },
+    delete: async (id: string) => {
+      return await supabase.from('user_categories').delete().eq('id', id);
+    },
   },
 
   // Profile

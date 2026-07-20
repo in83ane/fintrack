@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { X, Wallet, ChevronDown, Loader2 } from "lucide-react";
+import { X, Wallet, ChevronDown, Loader2, Sparkles, TrendingUp, TrendingDown, Tag, Plus } from "lucide-react";
 import { Modal } from "@/src/components/Modal";
 import { useApp } from "@/src/context/AppContext";
 import { cn } from "@/src/lib/utils";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import { createPortal } from "react-dom";
+import { AnimatedNumber } from "@/src/components/AnimatedNumber";
 
 function SuccessConfetti({ active }: { active: boolean }) {
   const [particles, setParticles] = useState<any[]>([]);
@@ -67,7 +68,7 @@ interface AddCashflowModalProps {
 }
 
 export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }: AddCashflowModalProps) {
-  const { t, addCashActivity, moneyBuckets, updateMoneyBucket, addBucketActivity, formatMoney, language, addToast, currency } = useApp();
+  const { t, addCashActivity, moneyBuckets, updateMoneyBucket, addBucketActivity, formatMoney, language, addToast, currency, cashActivities, exchangeRates } = useApp();
 
   const [type, setType] = useState<"INCOME" | "EXPENSE" | "DEPOSIT" | "WITHDRAW">("INCOME");
   const [selectedBucketId, setSelectedBucketId] = useState<string>("<auto-distribute>");
@@ -89,43 +90,149 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
   }, [isOpen, presetType, presetBucketId, moneyBuckets]);
 
   const [amount, setAmount] = useState("");
+  const [inputCurrency, setInputCurrency] = useState<"USD" | "THB">(currency === "THB" ? "THB" : "USD");
   const [category, setCategory] = useState("salary");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [note, setNote] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [autoSuggested, setAutoSuggested] = useState(false);
+
+  // Calculate current month's net cashflow for preview
+  const currentNetCashflow = useMemo(() => {
+    const now = new Date();
+    const key = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const thisMonthCash = cashActivities.filter(a => a.date.startsWith(key));
+    
+    const income = thisMonthCash.filter(a => (a.type === 'INCOME' || a.type === 'DEPOSIT') && !a.isTransfer).reduce((s, a) => s + a.amountUSD, 0);
+    const expense = thisMonthCash.filter(a => (a.type === 'EXPENSE' || a.type === 'WITHDRAW') && !a.isTransfer).reduce((s, a) => s + a.amountUSD, 0);
+    return income - expense;
+  }, [cashActivities]);
+
+  const projectedNetCashflow = useMemo(() => {
+    const amt = Number(amount) || 0;
+    if (amt === 0) return currentNetCashflow;
+    if (type === "INCOME" || type === "DEPOSIT") return currentNetCashflow + amt;
+    return currentNetCashflow - amt;
+  }, [currentNetCashflow, amount, type]);
+
+  // Auto-categorization based on note
+  useEffect(() => {
+    if (!note || note.trim().length < 3) {
+      setAutoSuggested(false);
+      return;
+    }
+
+    const lowerNote = note.toLowerCase();
+    
+    // Keywords mapping
+    const categoryMap: Record<string, { type: "INCOME"| "EXPENSE", cat: string }> = {
+      // Income
+      'salary': { type: "INCOME", cat: "salary" },
+      'wage': { type: "INCOME", cat: "salary" },
+      'paycheck': { type: "INCOME", cat: "salary" },
+      'freelance': { type: "INCOME", cat: "salary" },
+      'เงินเดือน': { type: "INCOME", cat: "salary" },
+      'dividend': { type: "INCOME", cat: "investment" },
+      
+      // Expense - Food
+      'lunch': { type: "EXPENSE", cat: "food" },
+      'dinner': { type: "EXPENSE", cat: "food" },
+      'breakfast': { type: "EXPENSE", cat: "food" },
+      'coffee': { type: "EXPENSE", cat: "food" },
+      'starbucks': { type: "EXPENSE", cat: "food" },
+      'grocery': { type: "EXPENSE", cat: "food" },
+      'อาหาร': { type: "EXPENSE", cat: "food" },
+      'กาแฟ': { type: "EXPENSE", cat: "food" },
+      
+      // Expense - Transport
+      'uber': { type: "EXPENSE", cat: "transport" },
+      'grab': { type: "EXPENSE", cat: "transport" },
+      'taxi': { type: "EXPENSE", cat: "transport" },
+      'gas': { type: "EXPENSE", cat: "transport" },
+      'fuel': { type: "EXPENSE", cat: "transport" },
+      'train': { type: "EXPENSE", cat: "transport" },
+      'เดินทาง': { type: "EXPENSE", cat: "transport" },
+      
+      // Expense - Utilities
+      'rent': { type: "EXPENSE", cat: "utilities" },
+      'electric': { type: "EXPENSE", cat: "utilities" },
+      'water': { type: "EXPENSE", cat: "utilities" },
+      'internet': { type: "EXPENSE", cat: "utilities" },
+      'phone': { type: "EXPENSE", cat: "utilities" },
+      'ค่าเช่า': { type: "EXPENSE", cat: "utilities" },
+      
+      // Expense - Entertainment
+      'movie': { type: "EXPENSE", cat: "entertainment" },
+      'netflix': { type: "EXPENSE", cat: "entertainment" },
+      'spotify': { type: "EXPENSE", cat: "entertainment" },
+      'game': { type: "EXPENSE", cat: "entertainment" },
+      'shopping': { type: "EXPENSE", cat: "entertainment" },
+      'บันเทิง': { type: "EXPENSE", cat: "entertainment" },
+      
+      // Investment
+      'stock': { type: "EXPENSE", cat: "investment" },
+      'shares': { type: "EXPENSE", cat: "investment" },
+      'crypto': { type: "EXPENSE", cat: "investment" },
+      'btc': { type: "EXPENSE", cat: "investment" },
+      'dca': { type: "EXPENSE", cat: "investment" },
+      'หุ้น': { type: "EXPENSE", cat: "investment" },
+      'ลงทุน': { type: "EXPENSE", cat: "investment" }
+    };
+
+    for (const [keyword, suggestion] of Object.entries(categoryMap)) {
+      if (lowerNote.includes(keyword)) {
+        if (type !== suggestion.type && (type === "INCOME" || type === "EXPENSE")) {
+          setType(suggestion.type);
+        }
+        setCategory(suggestion.cat);
+        setAutoSuggested(true);
+        return;
+      }
+    }
+    
+    setAutoSuggested(false);
+  }, [note, type]);
 
   // Get buckets that are linked to expenses
   const linkedBuckets = useMemo(() => {
     return moneyBuckets.filter(b => b.linkedToExpenses);
   }, [moneyBuckets]);
 
-  // Available categories based on type
-  const incomeCategories = ["salary", "investment", "other"];
-  const expenseCategories = ["food", "transport", "utilities", "entertainment", "investment", "other"];
-  const depositCategories = ["salary", "investment", "other"];
-  const withdrawCategories = ["food", "transport", "utilities", "entertainment", "investment", "other"];
+  // All categories (preset + any previously used custom ones) 
+  const incomePresets = ["salary", "investment", "freelance", "dividend", "gift", "rental", "other"];
+  const expensePresets = ["food", "transport", "utilities", "entertainment", "shopping", "health", "education", "investment", "other"];
+  const depositPresets = ["salary", "investment", "other"];
+  const withdrawPresets = ["food", "transport", "utilities", "entertainment", "investment", "other"];
 
-  const currentCategories = type === "INCOME" ? incomeCategories
-    : type === "EXPENSE" ? expenseCategories
-    : type === "DEPOSIT" ? depositCategories
-    : withdrawCategories;
+  const currentPresets = type === "INCOME" ? incomePresets
+    : type === "EXPENSE" ? expensePresets
+    : type === "DEPOSIT" ? depositPresets
+    : withdrawPresets;
 
-  // Handle type change reset
+  const [showCustomCatInput, setShowCustomCatInput] = useState(false);
+  const [customCatDraft, setCustomCatDraft] = useState("");
+  const isCustomCategory = !currentPresets.includes(category);
+
   const handleTypeChange = (newType: "INCOME" | "EXPENSE" | "DEPOSIT" | "WITHDRAW") => {
     setType(newType);
     setCategory(newType === "INCOME" || newType === "DEPOSIT" ? "salary" : "food");
+    setShowCustomCatInput(false);
+    setCustomCatDraft("");
     // For EXPENSE/WITHDRAW, select first bucket; for INCOME/DEPOSIT, use auto-distribute
     setSelectedBucketId(
       newType === "INCOME" || newType === "DEPOSIT" ? "<auto-distribute>" : (moneyBuckets[0]?.id || "<no-bucket>")
     );
+    setAutoSuggested(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount || Number(amount) <= 0) return;
 
-    const amountNum = Number(amount);
+    const rawAmount = Number(amount);
+    const THB_RATE = exchangeRates['THB'] || 36.5;
+    const amountNum = inputCurrency === 'THB' ? rawAmount / THB_RATE : rawAmount;
 
     // Validate bucket deduction
     if ((type === "EXPENSE" || type === "WITHDRAW") && selectedBucketId !== "<no-bucket>") {
@@ -179,7 +286,9 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
         date: date === new Date().toISOString().split("T")[0] ? new Date().toISOString() : new Date(date).toISOString(),
         time: type === "DEPOSIT" || type === "WITHDRAW" ? currentTime : undefined,
         note: detailedNote,
-        bucketId: selectedBucketId !== "<no-bucket>" && selectedBucketId !== "<auto-distribute>" ? selectedBucketId : undefined
+        bucketId: selectedBucketId !== "<no-bucket>" && selectedBucketId !== "<auto-distribute>" ? selectedBucketId : undefined,
+        currency: inputCurrency,
+        rateAtTime: exchangeRates[inputCurrency] || 1
       });
 
       // Deduct from bucket if EXPENSE or WITHDRAW
@@ -264,6 +373,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
     setDate(new Date().toISOString().split("T")[0]);
     setNote("");
     setSelectedBucketId("<auto-distribute>");
+    setAutoSuggested(false);
   };
 
   // Get default bucket for EXPENSE/WITHDRAW
@@ -280,6 +390,36 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
       <Modal isOpen={isOpen} onClose={handleClose} title={t("logIncomeExpense")}>
         <form onSubmit={handleSubmit} className="space-y-6">
         
+        {/* Note (Moved up for auto-categorization) */}
+        <div className="space-y-2">
+          <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">
+            {t("note")} / Description
+          </label>
+          <div className="relative">
+            <input
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="e.g. Lunch at Starbucks, Salary..."
+              className="w-full px-4 py-4 bg-white/5 border border-white/10 rounded-2xl text-white text-sm font-medium placeholder-gray-600 focus:outline-none focus:border-[#ADC6FF]/50 transition-colors pr-10"
+              autoFocus
+            />
+            <AnimatePresence>
+              {autoSuggested && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#E9C349]"
+                  title="Auto-categorized based on description"
+                >
+                  <Sparkles size={16} />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+
         {/* Type Toggle */}
         <div className="grid grid-cols-4 gap-1 bg-white/5 p-1 rounded-2xl border border-white/10">
           <button
@@ -334,9 +474,46 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
 
         {/* Amount */}
         <div className="space-y-2">
-          <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">
-            {t("amount")}
-          </label>
+          <div className="flex justify-between items-end">
+            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">
+              {t("amount")}
+            </label>
+            {/* Projected Net Balance */}
+            <div className="flex items-center gap-1.5 text-[10px] bg-white/5 px-2 py-1 rounded-lg">
+              <span className="text-gray-500 uppercase font-bold">New Net:</span>
+              <span className={cn(
+                "font-black flex items-center gap-0.5",
+                projectedNetCashflow >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]"
+              )}>
+                {projectedNetCashflow >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                {formatMoney(projectedNetCashflow)}
+              </span>
+            </div>
+          </div>
+          
+          <div className="flex items-center justify-between mt-2 mb-2">
+            <label className="text-[10px] text-gray-500 uppercase tracking-wide"></label>
+            <div className="flex gap-1 p-0.5 bg-white/5 rounded-lg border border-white/10">
+              {(['USD', 'THB'] as const).map(cur => (
+                <button
+                  key={cur}
+                  type="button"
+                  onClick={() => setInputCurrency(cur)}
+                  className={cn(
+                    'px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wide transition-all',
+                    inputCurrency === cur
+                      ? cur === 'THB'
+                        ? 'bg-[#E9C349] text-[#241a00]'
+                        : 'bg-[#ADC6FF] text-[#00285d]'
+                      : 'text-gray-500 hover:text-gray-300'
+                  )}
+                >
+                  {cur === 'THB' ? '฿ THB' : '$ USD'}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="relative">
             <input
               type="number"
@@ -347,32 +524,122 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
               className="w-full px-4 py-4 bg-white/5 border border-white/10 rounded-2xl text-white text-sm font-medium placeholder-gray-600 focus:outline-none focus:border-[#ADC6FF]/50 transition-colors pr-12"
               required
             />
-            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-xs uppercase">{currency}</span>
+            <span className={cn(
+              "absolute right-4 top-1/2 -translate-y-1/2 font-black text-xs uppercase opacity-90",
+              inputCurrency === 'THB' ? 'text-[#E9C349]' : 'text-[#ADC6FF]'
+            )}>
+              {inputCurrency === 'THB' ? '฿' : '$'}
+            </span>
           </div>
         </div>
 
         {/* Category */}
         <div className="space-y-2">
-          <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">
-            {t("category")}
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            {currentCategories.map(cat => (
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">
+              {t("category")}
+            </label>
+            <AnimatePresence>
+              {autoSuggested && (
+                <motion.span 
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="text-[9px] bg-[#E9C349]/20 text-[#E9C349] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide"
+                >
+                  Auto-selected
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Preset chips */}
+          <div className="flex flex-wrap gap-2">
+            {currentPresets.map(cat => (
               <button
                 key={cat}
                 type="button"
-                onClick={() => setCategory(cat)}
+                onClick={() => { setCategory(cat); setAutoSuggested(false); setShowCustomCatInput(false); }}
                 className={cn(
-                  "p-3 text-xs font-bold rounded-xl border transition-all text-left",
-                  category === cat
-                    ? "bg-white/10 border-white/20 text-white"
-                    : "bg-transparent border-white/5 text-gray-500 hover:text-gray-300"
+                  "px-3 py-1.5 text-xs font-bold rounded-xl border transition-all",
+                  category === cat && !isCustomCategory
+                    ? "bg-white/10 border-white/25 text-white"
+                    : "bg-transparent border-white/8 text-gray-500 hover:text-gray-300 hover:border-white/15"
                 )}
               >
                 {t(cat)}
               </button>
             ))}
+
+            {/* Show active custom category chip */}
+            {isCustomCategory && category && !showCustomCatInput && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/25 bg-white/10 text-white text-xs font-bold">
+                <Tag size={10} />
+                {category}
+                <button
+                  type="button"
+                  onClick={() => { setCategory("other"); setShowCustomCatInput(false); }}
+                  className="ml-0.5 opacity-60 hover:opacity-100"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
+            {/* + Custom button */}
+            <button
+              type="button"
+              onClick={() => { setShowCustomCatInput(true); setTimeout(() => document.getElementById('custom-cat-input')?.focus(), 60); }}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-xl border border-dashed border-white/20 text-gray-500 hover:text-white hover:border-white/35 text-xs font-bold transition-all"
+            >
+              <Plus size={10} />
+              Custom
+            </button>
           </div>
+
+          {/* Custom category text input */}
+          <AnimatePresence>
+            {showCustomCatInput && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="flex gap-2 mt-1">
+                  <input
+                    id="custom-cat-input"
+                    type="text"
+                    value={customCatDraft}
+                    onChange={(e) => setCustomCatDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        if (customCatDraft.trim()) { setCategory(customCatDraft.trim()); setShowCustomCatInput(false); setCustomCatDraft(""); }
+                      }
+                      if (e.key === "Escape") setShowCustomCatInput(false);
+                    }}
+                    placeholder="Type your category name..."
+                    className="flex-1 px-3 py-2 bg-white/5 border border-white/15 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none focus:border-white/30 transition-colors"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => { if (customCatDraft.trim()) { setCategory(customCatDraft.trim()); setShowCustomCatInput(false); setCustomCatDraft(""); } }}
+                    className="px-4 py-2 bg-white/10 text-white rounded-xl text-xs font-bold hover:bg-white/15 transition-all"
+                  >
+                    Add
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowCustomCatInput(false)}
+                    className="p-2 text-gray-500 hover:text-white transition-colors"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Bucket Selection - Always visible if buckets exist */}
@@ -435,20 +702,6 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
           />
         </div>
 
-        {/* Note */}
-        <div className="space-y-2">
-          <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">
-            {t("note")}
-          </label>
-          <input
-            type="text"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder={`${t("note")}...`}
-            className="w-full px-4 py-4 bg-white/5 border border-white/10 rounded-2xl text-white text-sm font-medium placeholder-gray-600 focus:outline-none focus:border-[#ADC6FF]/50 transition-colors"
-          />
-        </div>
-
         {/* Buttons */}
         <div className="flex gap-4 pt-2">
           <button
@@ -465,9 +718,9 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
               "flex-1 py-4 rounded-full font-black text-sm uppercase tracking-tight transition-all flex items-center justify-center gap-2",
               isAdding || !amount || Number(amount) <= 0
                 ? "bg-white/5 text-gray-600 opacity-60 cursor-not-allowed"
-                : type === "INCOME" 
-                  ? "bg-[#4EDEA3] text-[#00285d] hover:brightness-110" 
-                  : "bg-[#FFB4AB] text-[#00285d] hover:brightness-110"
+                : type === "INCOME" || type === "DEPOSIT"
+                  ? "bg-[#4EDEA3] text-[#00285d] hover:brightness-110 shadow-[0_0_20px_rgba(78,222,163,0.3)]" 
+                  : "bg-[#FFB4AB] text-[#00285d] hover:brightness-110 shadow-[0_0_20px_rgba(255,180,171,0.3)]"
             )}
           >
             {isAdding && <Loader2 size={16} className="animate-spin" />}

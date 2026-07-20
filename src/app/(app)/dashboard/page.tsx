@@ -479,6 +479,51 @@ export default function DashboardPage() {
   const todayPL = totalUnrealizedPL;
   const totalBucketValue = moneyBuckets.reduce((s, b) => s + b.currentAmount, 0);
 
+  // Financial health score (0-100)
+  const healthScore = React.useMemo(() => {
+    let score = 50; // baseline
+    const totalVal = assets.reduce((s, a) => s + a.valueUSD, 0);
+    // Diversification bonus
+    if (assets.length >= 10) score += 15;
+    else if (assets.length >= 5) score += 10;
+    else if (assets.length >= 3) score += 5;
+    // Profit factor bonus
+    if (profitFactor >= 2) score += 15;
+    else if (profitFactor >= 1.5) score += 10;
+    else if (profitFactor >= 1) score += 5;
+    else if (profitFactor < 1 && profitFactor > 0) score -= 10;
+    // P/L trend bonus
+    if (totalUnrealizedPL > 0) score += 10;
+    else if (totalUnrealizedPL < 0) score -= 5;
+    // Bucket balance bonus
+    if (totalBucketValue > 0) score += 10;
+    // Drawdown penalty
+    if (maxDrawdown < -20) score -= 10;
+    else if (maxDrawdown < -10) score -= 5;
+    return Math.max(0, Math.min(100, score));
+  }, [assets, profitFactor, totalUnrealizedPL, totalBucketValue, maxDrawdown]);
+
+  const healthLabel = healthScore >= 80 ? 'Excellent' : healthScore >= 65 ? 'Good' : healthScore >= 45 ? 'Fair' : 'Needs Attention';
+  const healthColor = healthScore >= 80 ? '#4EDEA3' : healthScore >= 65 ? '#ADC6FF' : healthScore >= 45 ? '#E9C349' : '#FFB4AB';
+
+  // Monthly cashflow summary
+  const now2 = new Date();
+  const monthKey = `${now2.getFullYear()}-${String(now2.getMonth() + 1).padStart(2, '0')}`;
+  const monthIncome = cashActivities.filter(a => a.date.startsWith(monthKey) && a.type === 'INCOME').reduce((s, a) => s + a.amountUSD, 0);
+  const monthExpense = cashActivities.filter(a => a.date.startsWith(monthKey) && (a.type === 'EXPENSE' || a.type === 'WITHDRAW') && !a.isTransfer).reduce((s, a) => s + a.amountUSD, 0);
+  const monthNet = monthIncome - monthExpense;
+
+  // Top movers
+  const topMovers = React.useMemo(() => {
+    return [...assets]
+      .filter(a => a.is_active !== false)
+      .sort((a, b) => Math.abs(b.change) - Math.abs(a.change))
+      .slice(0, 5);
+  }, [assets]);
+
+  // FAB state
+  const [fabOpen, setFabOpen] = React.useState(false);
+
   // Empty state — no assets, no trades
   const isEmpty = assets.length === 0 && trades.length === 0;
 
@@ -533,6 +578,95 @@ export default function DashboardPage() {
         </button>
       </motion.div>
 
+      {/* ─── Financial Health Pulse Banner ─── */}
+      {!isEmpty && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.12 }}
+          className="bg-gradient-to-r from-[#1C1B1B] via-[#1a1a1a] to-[#1C1B1B] rounded-2xl border border-white/5 p-4 sm:p-5 overflow-hidden relative"
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.01] to-transparent" />
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+
+            {/* Health Score */}
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="relative w-12 h-12">
+                <svg viewBox="0 0 36 36" className="w-12 h-12 -rotate-90">
+                  <circle cx={18} cy={18} r={15.9} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={3} />
+                  <circle
+                    cx={18} cy={18} r={15.9} fill="none"
+                    stroke={healthColor} strokeWidth={3}
+                    strokeDasharray={`${healthScore} ${100 - healthScore}`}
+                    strokeLinecap="round"
+                    style={{ transition: 'stroke-dasharray 1s ease' }}
+                  />
+                </svg>
+                <span className="absolute inset-0 flex items-center justify-center text-[9px] font-black text-white">{healthScore}</span>
+              </div>
+              <div>
+                <p className="text-[9px] text-gray-500 uppercase font-bold tracking-wide">Health Score</p>
+                <p className="text-sm font-black" style={{ color: healthColor }}>{healthLabel}</p>
+              </div>
+            </div>
+
+            <div className="w-px h-8 bg-white/5 hidden sm:block shrink-0" />
+
+            {/* Month P&L */}
+            <div className="shrink-0">
+              <p className="text-[9px] text-gray-500 uppercase font-bold tracking-wide mb-0.5">{language === 'th' ? 'เดือนนี้' : 'This Month'}</p>
+              <p className={`text-sm font-black tracking-tighter ${monthNet >= 0 ? 'text-[#4EDEA3]' : 'text-[#FFB4AB]'}`}>
+                {monthNet >= 0 ? '+' : ''}{formatMoney(monthNet)}
+              </p>
+              <p className="text-[9px] text-gray-600">{formatMoney(monthIncome)} in · {formatMoney(monthExpense)} out</p>
+            </div>
+
+            <div className="w-px h-8 bg-white/5 hidden sm:block shrink-0" />
+
+            {/* Top Movers Ticker */}
+            {topMovers.length > 0 && (
+              <div className="flex-1 min-w-0">
+                <p className="text-[9px] text-gray-500 uppercase font-bold tracking-wide mb-1.5">Top Movers</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {topMovers.map(a => (
+                    <button
+                      key={a.symbol}
+                      onClick={() => router.push(`/trade/${a.symbol}`)}
+                      className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/[0.03] hover:bg-white/[0.07] transition-all border border-white/5"
+                    >
+                      <span className="text-[10px] font-black text-white">{a.symbol}</span>
+                      <span className={`text-[9px] font-bold ${a.change >= 0 ? 'text-[#4EDEA3]' : 'text-[#FFB4AB]'}`}>
+                        {a.change >= 0 ? '+' : ''}{a.change.toFixed(2)}%
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Portfolio P/L Badge */}
+            <div className="shrink-0 text-right">
+              <p className="text-[9px] text-gray-500 uppercase font-bold tracking-wide mb-0.5">Total P/L</p>
+              <p className={`text-sm font-black tracking-tighter ${totalUnrealizedPL + totalRealizedPL >= 0 ? 'text-[#4EDEA3]' : 'text-[#FFB4AB]'}`}>
+                {totalUnrealizedPL + totalRealizedPL >= 0 ? '+' : ''}{formatMoney(totalUnrealizedPL + totalRealizedPL)}
+              </p>
+              <p className="text-[9px] text-gray-600">{netWorthReturnPct >= 0 ? '+' : ''}{netWorthReturnPct.toFixed(2)}% return</p>
+            </div>
+          </div>
+
+          {/* Health Bar */}
+          <div className="mt-3 h-1 bg-white/5 rounded-full overflow-hidden">
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${healthScore}%` }}
+              transition={{ duration: 1.2, ease: 'easeOut', delay: 0.3 }}
+              className="h-full rounded-full"
+              style={{ backgroundColor: healthColor }}
+            />
+          </div>
+        </motion.div>
+      )}
+
       {/* Empty State */}
       {isEmpty && (
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-gradient-to-br from-[#1C1B1B] to-[#141414] rounded-3xl p-8 sm:p-12 border border-white/5 text-center relative overflow-hidden">
@@ -554,6 +688,7 @@ export default function DashboardPage() {
           </div>
         </motion.div>
       )}
+
 
       {/* Hero Section: Net Worth & Chart */}
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
@@ -1514,9 +1649,60 @@ export default function DashboardPage() {
           })()}
         </div>
       </Modal>
+
+      {/* ─── Floating Action Button (FAB) ─── */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2">
+        <AnimatePresence>
+          {fabOpen && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8, y: 10 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+              className="flex flex-col gap-2 items-end"
+            >
+              {[
+                { label: language === 'th' ? 'บันทึกรายได้' : 'Log Income', bg: '#4EDEA3', icon: '💰', onClick: () => { setIsAddCashflowOpen(true); setFabOpen(false); } },
+                { label: language === 'th' ? 'บันทึกรายจ่าย' : 'Log Expense', bg: '#FFB4AB', icon: '💸', onClick: () => { setIsAddCashflowOpen(true); setFabOpen(false); } },
+                { label: language === 'th' ? 'เพิ่มสินทรัพย์' : 'Add Asset', bg: '#ADC6FF', icon: '📈', onClick: () => { setIsAddAssetOpen(true); setFabOpen(false); } },
+                { label: language === 'th' ? 'เทรด' : 'Trade', bg: '#E9C349', icon: '⚡', onClick: () => { router.push('/trade'); setFabOpen(false); } },
+              ].map((action, i) => (
+                <motion.button
+                  key={action.label}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  transition={{ delay: i * 0.04 }}
+                  onClick={action.onClick}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-full shadow-xl text-[#0E0E0E] text-xs font-black tracking-wide hover:brightness-110 active:scale-95 transition-all"
+                  style={{ backgroundColor: action.bg }}
+                >
+                  <span>{action.icon}</span>
+                  <span>{action.label}</span>
+                </motion.button>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <motion.button
+          onClick={() => setFabOpen(v => !v)}
+          whileHover={{ scale: 1.08 }}
+          whileTap={{ scale: 0.93 }}
+          className="w-14 h-14 rounded-full bg-[#ADC6FF] text-[#00285d] shadow-2xl shadow-[#ADC6FF]/30 flex items-center justify-center transition-all"
+        >
+          <motion.span
+            animate={{ rotate: fabOpen ? 45 : 0 }}
+            transition={{ duration: 0.2 }}
+            className="text-2xl font-black leading-none"
+          >
+            +
+          </motion.span>
+        </motion.button>
+      </div>
     </div>
   );
 }
+
 
 function AllocationItem({ label, value, color }: { label: string, value: number, color: string }) {
   return (

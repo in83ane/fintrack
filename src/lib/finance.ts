@@ -146,3 +146,110 @@ export function calcSharpeRatioApprox(dailyReturns: number[], riskFreeRateDaily:
   
   return (avgExcessReturn / stdDev) * Math.sqrt(252);
 }
+
+// ─── OHLCV Types ──────────────────────────────────────────────────────────────
+
+export interface OHLCV {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+// ─── Heikin Ashi Transformation ───────────────────────────────────────────────
+// Converts standard OHLCV candles into Heikin Ashi candles for smoother
+// trend visualization. HA candles filter out noise and make trends clearer.
+
+export function computeHeikinAshi(ohlcv: OHLCV[]): OHLCV[] {
+  if (ohlcv.length === 0) return [];
+
+  const ha: OHLCV[] = [];
+
+  for (let i = 0; i < ohlcv.length; i++) {
+    const c = ohlcv[i];
+    const haClose = (c.open + c.high + c.low + c.close) / 4;
+
+    let haOpen: number;
+    if (i === 0) {
+      haOpen = (c.open + c.close) / 2;
+    } else {
+      haOpen = (ha[i - 1].open + ha[i - 1].close) / 2;
+    }
+
+    const haHigh = Math.max(c.high, haOpen, haClose);
+    const haLow = Math.min(c.low, haOpen, haClose);
+
+    ha.push({
+      time: c.time,
+      open: +haOpen.toFixed(4),
+      high: +haHigh.toFixed(4),
+      low: +haLow.toFixed(4),
+      close: +haClose.toFixed(4),
+      volume: c.volume,
+    });
+  }
+
+  return ha;
+}
+
+// ─── Fibonacci Level Calculation ──────────────────────────────────────────────
+// Computes standard Fibonacci retracement levels from an impulse wave defined
+// by a high and low price. Direction determines the level ordering.
+
+export interface FibLevel {
+  ratio: number;
+  price: number;
+  label: string;
+}
+
+export function computeFibLevels(
+  high: number,
+  low: number,
+  direction: 'up' | 'down'
+): FibLevel[] {
+  const ratios = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0];
+  const range = high - low;
+
+  return ratios.map(ratio => {
+    // In an uptrend, retracement is measured from the high downward
+    // In a downtrend, retracement is measured from the low upward
+    const price = direction === 'up'
+      ? high - range * ratio
+      : low + range * ratio;
+
+    return {
+      ratio,
+      price: +price.toFixed(4),
+      label: ratio === 0 ? '0%' : ratio === 1 ? '100%' : `${(ratio * 100).toFixed(1)}%`,
+    };
+  });
+}
+
+// ─── Price Level Clustering ──────────────────────────────────────────────────
+// Groups nearby price levels (within a % threshold) into consolidated
+// S/R levels, returning the average price of each cluster.
+
+export function clusterPriceLevels(levels: number[], thresholdPct: number = 1.0): number[] {
+  if (levels.length === 0) return [];
+
+  const sorted = [...levels].sort((a, b) => a - b);
+  const clusters: number[][] = [[sorted[0]]];
+
+  for (let i = 1; i < sorted.length; i++) {
+    const lastCluster = clusters[clusters.length - 1];
+    const clusterAvg = lastCluster.reduce((s, v) => s + v, 0) / lastCluster.length;
+    const diff = Math.abs(sorted[i] - clusterAvg) / clusterAvg * 100;
+
+    if (diff <= thresholdPct) {
+      lastCluster.push(sorted[i]);
+    } else {
+      clusters.push([sorted[i]]);
+    }
+  }
+
+  return clusters.map(cluster =>
+    +(cluster.reduce((s, v) => s + v, 0) / cluster.length).toFixed(4)
+  );
+}

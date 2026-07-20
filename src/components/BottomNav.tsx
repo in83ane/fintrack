@@ -2,16 +2,16 @@
 
 import React from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Briefcase, TrendingUp, Wallet, ArrowRightLeft } from "lucide-react";
+import { LayoutDashboard, Briefcase, TrendingUp, Wallet, ReceiptText } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 import { motion } from "motion/react";
 
 const NAV_ITEMS = [
   { path: "/dashboard", icon: LayoutDashboard, label: "Home" },
   { path: "/portfolio", icon: Briefcase, label: "Portfolio" },
+  { path: "/ledger", icon: ReceiptText, label: "Ledger" },
   { path: "/trade", icon: TrendingUp, label: "Trade" },
   { path: "/budget", icon: Wallet, label: "Budget" },
-  { path: "/cashflow", icon: ArrowRightLeft, label: "Cash" },
 ];
 
 export function BottomNav() {

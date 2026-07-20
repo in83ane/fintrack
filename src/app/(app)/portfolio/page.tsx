@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { Wallet, ArrowUpRight, ArrowDownRight, Filter, Upload, Download, Plus, X, ZoomIn, Trash2, TrendingUp, PieChart, ChevronDown, AlertCircle } from "lucide-react";
+import { Wallet, ArrowUpRight, ArrowDownRight, Filter, Upload, Download, Plus, X, ZoomIn, Trash2, TrendingUp, PieChart, ChevronDown, AlertCircle, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence, Reorder } from "motion/react";
 import { useApp, Asset } from "@/src/context/AppContext";
@@ -505,13 +505,15 @@ export default function PortfolioPage() {
   };
 
   // Allocation donut segments
-  const CRYPTO_ALLOC = ['BTC', 'ETH', 'SOL', 'USDT', 'DOGE', 'XRP'];
+  const CRYPTO_PREFIXES_ALLOC = ['BTC', 'ETH', 'SOL', 'USDT', 'DOGE', 'XRP', 'ADA', 'MATIC', 'AVAX', 'LINK', 'BNB', 'TRX', 'TON', 'SHIB'];
+  const GOLD_KEYWORDS = ['GOLD', 'XAU', 'GLD', 'IAU', 'SGOL', 'GOLDBAR', 'PHYSGOLD', 'PAXG', 'XAUT', 'SGLN', 'PHGP', 'IGLN', 'RMAU', 'BULG'];
   const getAutoAllocation = (symbol: string, allocation: string) => {
-    const knownCats = ['Equities', 'Fixed Income', 'Alternatives', 'Cash'];
+    const knownCats = ['Equities', 'Fixed Income', 'Alternatives', 'Cash', 'Gold'];
     if (knownCats.includes(allocation)) return allocation;
-    // Auto-categorize by symbol
     const sym = symbol.toUpperCase();
-    if (CRYPTO_ALLOC.includes(sym)) return 'Alternatives';
+    // Gold check first (GOLDBAR.TH should not fall into Thai Stock)
+    if (GOLD_KEYWORDS.some(k => sym.includes(k)) || sym.startsWith('XAU') || sym === 'GC=F' || sym === 'GLD965') return 'Gold';
+    if (CRYPTO_PREFIXES_ALLOC.some(p => sym === p || sym.startsWith(p + '-') || sym.startsWith(p + '/'))) return 'Alternatives';
     if (sym.endsWith('.BK') || sym.endsWith('.TH')) return 'Equities';
     return 'Equities';
   };
@@ -784,14 +786,25 @@ export default function PortfolioPage() {
             <div className="flex items-center gap-4">
               <svg viewBox="0 0 100 100" className="w-24 h-24 flex-shrink-0">
                 {(() => {
-                  let cumPct = 0;
                   const R = 40, C = 50;
+                  const visibleSegs = allocationSegments.filter(s => s.pct > 0);
+                  if (visibleSegs.length === 0) return <circle cx={C} cy={C} r={R} fill="#2A2A2A" />;
+                  if (visibleSegs.length === 1) {
+                    return <circle cx={C} cy={C} r={R} fill={visibleSegs[0].color} stroke="#0E0E0E" strokeWidth={1} />;
+                  }
+                  // Normalize visual pcts: give each non-zero seg at least 5% visually
+                  const MIN_V = 5;
+                  const forcedTotal = visibleSegs.length * MIN_V;
+                  const remainder = 99.99 - forcedTotal;
+                  const actualTotal = visibleSegs.reduce((s, seg) => s + seg.pct, 0) || 1;
+                  let cumPct = 0;
                   return allocationSegments.map((seg, i) => {
-                    const pct = Math.max(seg.pct, 0.5);
+                    if (seg.pct <= 0) return null;
+                    const visualPct = MIN_V + (seg.pct / actualTotal) * remainder;
                     const startAngle = cumPct * 3.6;
-                    cumPct += pct;
+                    cumPct += visualPct;
                     const endAngle = cumPct * 3.6;
-                    const largeArc = pct > 50 ? 1 : 0;
+                    const largeArc = visualPct > 50 ? 1 : 0;
                     const startRad = ((startAngle - 90) * Math.PI) / 180;
                     const endRad = ((endAngle - 90) * Math.PI) / 180;
                     const x1 = C + R * Math.cos(startRad);
@@ -821,12 +834,17 @@ export default function PortfolioPage() {
                       <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: seg.color }} />
                       <span className="text-[10px] text-gray-400 font-medium">{translateLabel(seg.label)}</span>
                     </div>
-                    <span className="text-[10px] text-white font-bold">{seg.pct.toFixed(1)}%</span>
+                    <span className="text-[10px] text-white font-bold">
+                      {seg.pct < 0.1 && seg.pct > 0 ? '< 0.1%' : `${seg.pct.toFixed(1)}%`}
+                    </span>
                   </div>
                 ))}
               </div>
             </div>
           </div>
+
+          {/* ─── Dynamic Trading Asset Allocation ──────────────────────── */}
+          <TerminalAllocation />
 
           {/* Risk Allocation */}
           <div className="bg-[#1C1B1B] p-4 sm:p-6 rounded-2xl sm:rounded-[1.5rem] border border-white/5">
@@ -838,51 +856,124 @@ export default function PortfolioPage() {
             </div>
           </div>
 
-          {/* Portfolio Warnings */}
+          {/* Portfolio Warnings + Position Sizing */}
           <div className="bg-[#1C1B1B] p-4 sm:p-6 rounded-2xl sm:rounded-[1.5rem] border border-white/5">
             <h3 className="text-xs font-bold text-white mb-4 flex items-center gap-2">
               <AlertCircle size={12} className="text-[#FFB4AB]" />
-              {t("portfolioWarnings") || "Portfolio Risk Warnings"}
+              {t("portfolioWarnings") || "Risk Alerts"}
             </h3>
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {assets.length > 0 ? (
                 <>
+                  {/* Sector concentration */}
                   {allocationSegments.some(s => s.pct > 40) && (
-                    <div className="flex items-start gap-2 text-xs">
-                      <AlertCircle size={14} className="text-[#FFB4AB] mt-0.5 flex-shrink-0" />
+                    <div className="flex items-start gap-2 text-xs p-2.5 rounded-xl bg-[#FFB4AB]/5 border border-[#FFB4AB]/10">
+                      <AlertCircle size={13} className="text-[#FFB4AB] mt-0.5 flex-shrink-0" />
                       <div>
                         <span className="font-bold text-white">Sector Concentration</span>
-                        <p className="text-[10px] text-gray-500 mt-0.5">High allocation in a single sector ({allocationSegments.find(s => s.pct > 40)?.label}). Recommended: &lt; 40%.</p>
+                        <p className="text-[10px] text-gray-500 mt-0.5">High allocation in <span className="text-[#FFB4AB]">{allocationSegments.find(s => s.pct > 40)?.label}</span> ({allocationSegments.find(s => s.pct > 40)?.pct.toFixed(1)}%). Recommend &lt;40%.</p>
                       </div>
                     </div>
                   )}
-                  {assets.filter(a => a.currency !== currency).reduce((sum, a) => sum + a.valueUSD, 0) / (assets.reduce((sum, a) => sum + a.valueUSD, 0) || 1) > 0.5 && (
-                    <div className="flex items-start gap-2 text-xs">
-                      <AlertCircle size={14} className="text-[#E9C349] mt-0.5 flex-shrink-0" />
+                  {/* Individual position sizing */}
+                  {assets.filter(a => totalValue > 0 && (a.valueUSD / totalValue) > 0.25).map(a => (
+                    <div key={a.symbol} className="flex items-start gap-2 text-xs p-2.5 rounded-xl bg-[#E9C349]/5 border border-[#E9C349]/10">
+                      <AlertCircle size={13} className="text-[#E9C349] mt-0.5 flex-shrink-0" />
                       <div>
-                        <span className="font-bold text-white">Currency Exposure Risk</span>
-                        <p className="text-[10px] text-gray-500 mt-0.5">Over 50% of portfolio is exposed to foreign currency fluctuations.</p>
+                        <span className="font-bold text-white">{a.symbol} Overweight</span>
+                        <p className="text-[10px] text-gray-500 mt-0.5">
+                          {((a.valueUSD / totalValue) * 100).toFixed(1)}% of portfolio — consider trimming to &lt;25%.
+                        </p>
                       </div>
                     </div>
-                  )}
+                  ))}
                   {assets.length < 5 && (
-                    <div className="flex items-start gap-2 text-xs">
-                      <AlertCircle size={14} className="text-[#E9C349] mt-0.5 flex-shrink-0" />
+                    <div className="flex items-start gap-2 text-xs p-2.5 rounded-xl bg-[#E9C349]/5 border border-[#E9C349]/10">
+                      <AlertCircle size={13} className="text-[#E9C349] mt-0.5 flex-shrink-0" />
                       <div>
-                        <span className="font-bold text-white">Diversification Risk</span>
-                        <p className="text-[10px] text-gray-500 mt-0.5">Low number of assets may lead to high correlation and volatility.</p>
+                        <span className="font-bold text-white">Low Diversification</span>
+                        <p className="text-[10px] text-gray-500 mt-0.5">Only {assets.length} asset{assets.length !== 1 ? 's' : ''}. Add 5+ for better risk spread.</p>
                       </div>
                     </div>
                   )}
-                  {!allocationSegments.some(s => s.pct > 40) && assets.length >= 5 && (
-                    <span className="text-[10px] text-[#4EDEA3] font-medium">Portfolio is well-diversified. No warnings detected.</span>
+                  {!allocationSegments.some(s => s.pct > 40) && assets.length >= 5 && !assets.some(a => totalValue > 0 && (a.valueUSD / totalValue) > 0.25) && (
+                    <div className="flex items-center gap-2 p-2.5 rounded-xl bg-[#4EDEA3]/5 border border-[#4EDEA3]/10">
+                      <span className="text-sm">✅</span>
+                      <span className="text-[10px] text-[#4EDEA3] font-bold">Portfolio is well-diversified. No risk alerts.</span>
+                    </div>
                   )}
                 </>
               ) : (
-                <span className="text-[10px] text-gray-500 font-medium">No warnings detected.</span>
+                <span className="text-[10px] text-gray-500 font-medium">Add assets to see risk analysis.</span>
               )}
             </div>
           </div>
+
+          {/* DCA Analysis Panel */}
+          {assets.some(a => {
+            const shares = a.shares || 0;
+            const livePrice = a.currentPrice || (shares > 0 ? a.valueUSD / shares : 0);
+            const avgCost = a.avgCost || livePrice;
+            return shares > 0 && avgCost > 0 && livePrice < avgCost;
+          }) && (
+            <div className="bg-[#1C1B1B] p-4 sm:p-6 rounded-2xl sm:rounded-[1.5rem] border border-white/5">
+              <h3 className="text-xs font-bold text-white mb-1 flex items-center gap-2">
+                <TrendingUp size={12} className="text-[#ADC6FF]" />
+                DCA Opportunities
+              </h3>
+              <p className="text-[9px] text-gray-600 mb-3 uppercase tracking-wide">Positions below average cost</p>
+              <div className="space-y-3">
+                {assets.filter(a => {
+                  const shares = a.shares || 0;
+                  const livePrice = a.currentPrice || (shares > 0 ? a.valueUSD / shares : 0);
+                  const avgCost = a.avgCost || livePrice;
+                  return shares > 0 && avgCost > 0 && livePrice < avgCost;
+                }).map(a => {
+                  const shares = a.shares || 0;
+                  const livePrice = a.currentPrice || (shares > 0 ? a.valueUSD / shares : 0);
+                  const avgCost = a.avgCost || livePrice;
+                  const unrealized = (livePrice - avgCost) * shares;
+                  const pct = avgCost > 0 ? ((livePrice - avgCost) / avgCost) * 100 : 0;
+                  // Recommended DCA: buy same number of shares at current price to lower avg
+                  const dcaShares = shares;
+                  const newAvg = ((avgCost * shares) + (livePrice * dcaShares)) / (shares + dcaShares);
+                  return (
+                    <div key={a.symbol} className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-white">{a.symbol}</span>
+                          <span className="text-[9px] bg-[#FFB4AB]/10 text-[#FFB4AB] px-1.5 py-0.5 rounded-full font-bold">
+                            {pct.toFixed(1)}%
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-[#FFB4AB] font-black">{formatMoney(unrealized)}</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-[9px]">
+                        <div>
+                          <p className="text-gray-600 uppercase font-bold">Avg Cost</p>
+                          <p className="text-white font-black">{formatMoney(avgCost)}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-600 uppercase font-bold">Current</p>
+                          <p className="text-[#FFB4AB] font-black">{formatMoney(livePrice)}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-600 uppercase font-bold">DCA Target</p>
+                          <p className="text-[#4EDEA3] font-black">{formatMoney(newAvg)}</p>
+                        </div>
+                      </div>
+                      <div className="mt-2 h-1 bg-white/5 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-[#FFB4AB] to-[#4EDEA3] rounded-full"
+                          style={{ width: `${Math.min(100, Math.max(5, (livePrice / avgCost) * 100))}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Assets Table */}
@@ -943,7 +1034,14 @@ export default function PortfolioPage() {
                             <AssetLogo symbol={asset.symbol} name={asset.name} />
                           </div>
                           <div className="min-w-0">
-                            <div className="text-xs sm:text-sm font-bold text-white truncate">{asset.name}</div>
+                            <div className="text-xs sm:text-sm font-bold text-white truncate flex items-center gap-1.5">
+                              {asset.name}
+                              {asset.excludeFromTotal && (
+                                <span title="Excluded from Net Worth" className="flex items-center text-gray-500">
+                                  <EyeOff size={12} className="flex-shrink-0" />
+                                </span>
+                              )}
+                            </div>
                             <div className="text-[10px] text-gray-500 font-medium">{shares.toLocaleString('en-US', { maximumFractionDigits: 4 })} {t("holdings")}</div>
                             <div className="text-[10px] sm:text-xs text-gray-500 font-medium uppercase tracking-wide">{asset.symbol}</div>
                           </div>
@@ -1177,6 +1275,188 @@ function RiskItem({ label, value, color }: { label: string, value: number, color
       <div className="h-1 bg-white/5 rounded-full overflow-hidden">
         <div className="h-full rounded-full" style={{ width: `${value}%`, backgroundColor: color }} />
       </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TERMINAL ALLOCATION — Dynamic Pie Chart (Auto-calculated)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const TERMINAL_CATEGORIES = [
+  { key: 'Gold', label: 'Gold', labelTh: 'ทองคำ', color: '#E9C349', icon: '🥇' },
+  { key: 'USA Stock', label: 'USA Stock', labelTh: 'หุ้นอเมริกา', color: '#4D8EFF', icon: '🇺🇸' },
+  { key: 'Thai Stock', label: 'Thai Stock', labelTh: 'หุ้นไทย', color: '#FF6B6B', icon: '🇹🇭' },
+  { key: 'Crypto', label: 'Crypto', labelTh: 'คริปโต', color: '#4EDEA3', icon: '₿' },
+  { key: 'Cash', label: 'Cash', labelTh: 'เงินสด', color: '#A78BFA', icon: '💵' },
+] as const;
+
+type CategoryKey = typeof TERMINAL_CATEGORIES[number]['key'];
+
+function TerminalAllocation() {
+  const { language, assets, formatMoney } = useApp();
+  const isTh = language === 'th';
+
+  const categoryValues = useMemo(() => {
+    const values: Record<CategoryKey, number> = { Gold: 0, 'USA Stock': 0, 'Thai Stock': 0, Crypto: 0, Cash: 0 };
+
+    // Crypto: match exact OR prefix+dash/slash (e.g. BTC-USD, ETH/USDT)
+    const CRYPTO_PREFIXES = ['BTC', 'ETH', 'SOL', 'USDT', 'DOGE', 'XRP', 'ADA', 'MATIC', 'AVAX', 'LINK', 'DOT', 'LTC', 'BCH', 'UNI', 'ATOM', 'FIL', 'NEAR', 'ALGO', 'XLM', 'ICP', 'VET', 'SAND', 'MANA', 'AXS', 'THETA', 'BNB', 'TRX', 'TON', 'SHIB', 'APT', 'ARB', 'OP', 'SUI', 'SEI'];
+    const isCryptoSymbol = (sym: string) => CRYPTO_PREFIXES.some(p => sym === p || sym.startsWith(p + '-') || sym.startsWith(p + '/'));
+
+    // Gold: exact tickers + keyword patterns + XAU pairs
+    // US: GLD, IAU, SGOL, GC=F, GOLD (Barrick classified as USA Stock, keyword 'GOLD' ETFs = gold)
+    // Thai gold ETFs on SET (BK): TGOLDETF, TGOLD, KTAM-GOLD
+    // London ECTs (.L): SGLN, PHGP, IGLN, RMAU, BULG, GLTR
+    const GOLD_EXACT = new Set(['GC=F', 'GLD', 'IAU', 'SGOL', 'XAUUSD', 'XAU/USD', 'XAUUSDT',
+      // Thai gold price symbol (MTS Gold / TradingView)
+      'GLD965', 'GLD9999', 'XAUTHB',
+      // Physical gold bars (manual assets)
+      'GOLDBAR', 'GOLDBAR.TH', 'GOLDBAR.UK', 'GOLDBAR.US', 'THGOLD', 'PHYSGOLD',
+      // Thai SET gold ETFs
+      'TGOLDETF', 'TGOLDETF.BK', 'TGOLD', 'TGOLD.BK', 'KTAM-GOLD', 'KTAM-GOLD.BK',
+      'SCBGOLD', 'SCBGOLD.BK', 'GOLDMUL', 'GOLDMUL.BK', '1AMJPNK-T', 'T-GOLDPVD', 'T-GOLDPVD.BK',
+      // London gold ETCs
+      'SGLN.L', 'PHGP.L', 'IGLN.L', 'RMAU.L', 'BULG.L', 'GLTR.L', 'VZLD.L', '3GOL.L',
+      // Generic
+      'XAU', 'PAXG', 'XAUT',
+    ]);
+    const isGoldSymbol = (sym: string) =>
+      GOLD_EXACT.has(sym) ||
+      sym.startsWith('XAU') ||          // XAU/USD, XAUUSD, XAUUSDT …
+      sym.includes('GOLD') ||           // TGOLDETF, KTAM-GOLD, SCBGOLD …
+      sym.includes('BULLION') ||
+      (sym.endsWith('.L') && ['SGLN', 'PHGP', 'IGLN', 'RMAU', 'BULG', 'GLTR'].some(g => sym.startsWith(g)));
+
+    assets.forEach(asset => {
+      const sym = asset.symbol.toUpperCase();
+      const alloc = asset.allocation || '';
+      const val = asset.valueUSD;
+
+      if (alloc === 'Cash' || sym === 'USD' || sym === 'THB' || sym === 'EUR') {
+        values['Cash'] += val;
+      } else if (isGoldSymbol(sym) || alloc === 'Gold') {
+        // Gold check before Thai Stock so TGOLDETF.BK → Gold, not Thai Stock
+        values['Gold'] += val;
+      } else if (sym.endsWith('.BK') || sym.endsWith('.TH') || alloc === 'Thai Stock') {
+        values['Thai Stock'] += val;
+      } else if (sym.endsWith('.L') || alloc === 'UK Stock') {
+        // London-listed non-gold ETFs/stocks → USA Stock bucket (or extend categories later)
+        values['USA Stock'] += val;
+      } else if (isCryptoSymbol(sym) || alloc === 'Crypto' || alloc === 'Alternatives') {
+        values['Crypto'] += val;
+      } else {
+        values['USA Stock'] += val;
+      }
+    });
+    return values;
+  }, [assets]);
+
+  const totalValue = useMemo(() =>
+    Object.values(categoryValues).reduce((s, v) => s + v, 0),
+    [categoryValues]
+  );
+
+  const segments = useMemo(() =>
+    TERMINAL_CATEGORIES.map(cat => ({
+      ...cat,
+      value: categoryValues[cat.key],
+      pct: totalValue > 0 ? (categoryValues[cat.key] / totalValue) * 100 : 0,
+    })),
+    [categoryValues, totalValue]
+  );
+
+  return (
+    <div className="bg-[#1C1B1B] p-4 sm:p-6 rounded-2xl sm:rounded-[1.5rem] border border-white/5">
+      <h3 className="text-xs font-bold text-white mb-4 flex items-center gap-2">
+        <PieChart size={12} className="text-[#A78BFA]" />
+        {isTh ? 'สัดส่วนพอร์ตการเทรด' : 'Trading Asset Allocation'}
+      </h3>
+
+      <div className="flex flex-col sm:flex-row items-center gap-6">
+        {/* Pie Chart */}
+        <div className="flex items-center justify-center relative w-32 h-32 flex-shrink-0">
+          <svg viewBox="0 0 100 100" className="w-full h-full">
+            {(() => {
+              const R = 40, C = 50;
+              if (totalValue === 0) {
+                return <circle cx={C} cy={C} r={R} fill="#2A2A2A" stroke="#333" strokeWidth={0.5} />;
+              }
+              const nonZeroSegs = segments.filter(s => s.pct > 0);
+              if (nonZeroSegs.length === 0) {
+                return <circle cx={C} cy={C} r={R} fill="#2A2A2A" stroke="#333" strokeWidth={0.5} />;
+              }
+              // Single segment — full circle
+              if (nonZeroSegs.length === 1) {
+                return <circle cx={C} cy={C} r={R} fill={nonZeroSegs[0].color} stroke="#0E0E0E" strokeWidth={1} />;
+              }
+              // Normalize visual pcts: give each non-zero seg at least 5% visually
+              const MIN_V = 5;
+              const remainder = 99.99 - nonZeroSegs.length * MIN_V;
+              const actualTotal = nonZeroSegs.reduce((s, seg) => s + seg.pct, 0) || 1;
+              let cumPct = 0;
+              return segments.map((seg, i) => {
+                if (seg.pct <= 0) return null;
+                const visualPct = MIN_V + (seg.pct / actualTotal) * remainder;
+                const startAngle = cumPct * 3.6;
+                cumPct += visualPct;
+                const endAngle = cumPct * 3.6;
+                const largeArc = visualPct > 50 ? 1 : 0;
+                const startRad = ((startAngle - 90) * Math.PI) / 180;
+                const endRad = ((endAngle - 90) * Math.PI) / 180;
+                const x1 = C + R * Math.cos(startRad);
+                const y1 = C + R * Math.sin(startRad);
+                const x2 = C + R * Math.cos(endRad);
+                const y2 = C + R * Math.sin(endRad);
+                return (
+                  <path
+                    key={i}
+                    d={`M ${C.toFixed(1)} ${C.toFixed(1)} L ${x1.toFixed(1)} ${y1.toFixed(1)} A ${R} ${R} 0 ${largeArc} 1 ${x2.toFixed(1)} ${y2.toFixed(1)} Z`}
+                    fill={seg.color}
+                    stroke="#0E0E0E"
+                    strokeWidth={1}
+                    className="transition-all duration-300 hover:opacity-80"
+                  />
+                );
+              });
+            })()}
+            <circle cx={50} cy={50} r={22} fill="#1C1B1B" />
+            <text x={50} y={48} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize="6.5" fontWeight="bold">
+              {totalValue > 0 ? formatMoney(totalValue) : '—'}
+            </text>
+            <text x={50} y={57} textAnchor="middle" fill="#6B7280" fontSize="4.5">
+              {isTh ? 'รวม' : 'TOTAL'}
+            </text>
+          </svg>
+        </div>
+
+        {/* Legend / Values */}
+        <div className="flex-1 w-full space-y-2">
+          {segments.map((seg) => (
+            <div key={seg.key} className="flex items-center justify-between p-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-3 h-3 rounded-full flex-shrink-0 shadow-sm" style={{ backgroundColor: seg.color }} />
+                <span className="text-xs text-gray-300 font-bold">
+                  {seg.icon} {isTh ? seg.labelTh : seg.label}
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-white font-mono font-bold">
+                  {formatMoney(seg.value)}
+                </span>
+                <span className="text-xs font-bold w-14 text-right" style={{ color: seg.pct > 0 ? seg.color : '#6B7280' }}>
+                  {seg.pct === 0 ? '—' : seg.pct < 0.1 ? '< 0.1%' : `${seg.pct.toFixed(1)}%`}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      {totalValue === 0 && (
+        <p className="text-[10px] text-gray-600 text-center mt-4">
+          {isTh ? 'ไม่พบข้อมูลสินทรัพย์' : 'No asset data available'}
+        </p>
+      )}
     </div>
   );
 }

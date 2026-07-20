@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Playfair_Display, Prompt } from "next/font/google";
 import "../index.css";
 import { AppProvider } from "@/src/context/AppContext";
@@ -8,10 +8,22 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-serif" });
 const prompt = Prompt({ subsets: ["latin", "thai"], weight: ["300", "400", "500", "600", "700", "800", "900"], variable: "--font-prompt" });
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
+
 export const metadata: Metadata = {
   title: "FinTrack | Portfolio Management",
   description: "Unified Investment Dashboard with real-time tracking and insights.",
   icons: "/fintrack-icon.svg",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "FinTrack",
+  },
 };
 
 export default function RootLayout({
@@ -32,3 +44,4 @@ export default function RootLayout({
     </html>
   );
 }
+

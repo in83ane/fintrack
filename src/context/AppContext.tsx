@@ -33,6 +33,8 @@ export interface CashActivity {
   note?: string;
   bucketId?: string;
   isTransfer?: boolean; // true = money moving between Cash ↔ Bucket (not income/expense)
+  currency?: string;
+  rateAtTime?: number;
 }
 
 export interface Allocation {
@@ -82,6 +84,8 @@ export interface BucketActivity {
   amount: number;
   date: string;
   note?: string;
+  currency?: string;
+  rateAtTime?: number;
 }
 
 // Extended CashActivity that includes bucket activities for Cashflow page
@@ -97,6 +101,8 @@ export interface CashflowActivity {
   bucketName?: string;
   isTransfer?: boolean;
   source: 'cash' | 'bucket'; // 'cash' = from cash_activities, 'bucket' = from bucket_activities
+  currency?: string;
+  rateAtTime?: number;
 }
 
 export interface Asset {
@@ -117,6 +123,16 @@ export interface Asset {
   is_active?: boolean;
   currentPrice?: number;
   currency?: string;
+  excludeFromTotal?: boolean;
+}
+
+export interface NetWorthSettings {
+  includeAssets: boolean;
+  includeBuckets: boolean;
+  includeCash: boolean;
+  cashflowIncludeCash: boolean;
+  cashflowIncludeBuckets: boolean;
+  cashflowIncludeAssets: boolean;
 }
 
 export type WidgetType = 'watchlist' | 'monthly_summary' | 'allocation_pie' | 'daily_journal' | 'equity_curve' | 'bucket_overview' | 'pl_calendar_mini' | 'top_movers';
@@ -130,6 +146,13 @@ export interface DashboardWidget {
   h: number;
   minW?: number;
   minH?: number;
+}
+
+export interface CustomCategory {
+  id: string;
+  type: 'INCOME' | 'EXPENSE';
+  label: string;
+  icon: string;
 }
 
 interface AppState {
@@ -158,9 +181,13 @@ interface AppState {
   updateAsset: (symbol: string, updates: Partial<Asset>) => void;
   reorderAssets: (reordered: Asset[]) => void;
   removeTrade: (id: number) => void;
+  updateTrade: (id: number, updates: Partial<Trade>) => void;
+  updateCashActivity: (id: string, updates: Partial<CashActivity>) => void;
   toasts: AppToast[];
-  addToast: (message: string, type?: 'success' | 'info' | 'warning' | 'error') => void;
+  addToast: (message: string, type?: AppToast['type']) => void;
   removeToast: (id: string) => void;
+  netWorthSettings: NetWorthSettings;
+  setNetWorthSettings: (settings: NetWorthSettings | ((prev: NetWorthSettings) => NetWorthSettings)) => void;
   darkMode: boolean;
   setDarkMode: (val: boolean) => void;
   notifications: AppNotification[];
@@ -184,6 +211,9 @@ interface AppState {
   totalUnrealizedPL: number;
   totalRealizedPL: number;
   totalDividends: number;
+  customCategories: CustomCategory[];
+  addCustomCategory: (type: 'INCOME' | 'EXPENSE', label: string, icon?: string) => Promise<void>;
+  removeCustomCategory: (id: string) => Promise<void>;
 }
 
 const translations: Record<Language, Record<string, string>> = {
@@ -733,6 +763,50 @@ const translations: Record<Language, Record<string, string>> = {
     losses: "Losses",
     avgWin: "Avg Win",
     avgLoss: "Avg Loss",
+
+    // Ledger Page
+    ledger: "Ledger",
+    ledgerSubtitle: "Daily Income & Expense Tracker",
+    ledgerThisMonthIn: "This Month In",
+    ledgerThisMonthOut: "This Month Out",
+    ledgerNet: "Net",
+    addIncome: "+ Income",
+    addExpense: "+ Expense",
+    addIncomeTitle: "Add Income",
+    addExpenseTitle: "Add Expense",
+    ledgerDescription: "Description (optional)",
+    ledgerDescPlaceholderIncome: "e.g. Monthly salary, Project payment...",
+    ledgerDescPlaceholderExpense: "e.g. Lunch with colleagues, Grab taxi...",
+    ledgerCategoryHint: "Category — pick or type your own",
+    ledgerCustomCategory: "+ Custom",
+    ledgerAddCategory: "Add",
+    ledgerTypeCategory: "Type your category name...",
+    ledgerDepositTo: "Deposit to",
+    ledgerDeductFrom: "Deduct from",
+    ledgerAutoSplit: "Auto-split",
+    ledgerSaveIncome: "Save Income",
+    ledgerSaveExpense: "Save Expense",
+    ledgerSearchPlaceholder: "Search transactions...",
+    ledgerFilterAll: "All",
+    ledgerFilterIn: "In",
+    ledgerFilterOut: "Out",
+    ledgerNoRecords: "No records yet",
+    ledgerNoRecordsHint: "Tap + Income or + Expense above to get started",
+    ledgerDeleteTitle: "Delete Record",
+    ledgerDeleteMessage: "Are you sure you want to delete this transaction?",
+    ledgerNewNet: "New net:",
+    ledgerToday: "Today",
+    ledgerYesterday: "Yesterday",
+    // preset categories
+    freelance: "Freelance",
+    dividend: "Dividend",
+    gift: "Gift",
+    rental: "Rental Income",
+    shopping: "Shopping",
+    health: "Health",
+    education: "Education",
+    coffee: "Coffee",
+    travel: "Travel",
   },
   th: {
     dashboard: "แผงควบคุม",
@@ -1278,6 +1352,50 @@ const translations: Record<Language, Record<string, string>> = {
     losses: "แพ้",
     avgWin: "ชนะเฉลี่ย",
     avgLoss: "แพ้เฉลี่ย",
+
+    // Ledger Page
+    ledger: "สมุดบัญชี",
+    ledgerSubtitle: "บันทึกรายรับ-รายจ่ายประจำวัน",
+    ledgerThisMonthIn: "รับเดือนนี้",
+    ledgerThisMonthOut: "จ่ายเดือนนี้",
+    ledgerNet: "สุทธิ",
+    addIncome: "+ รายรับ",
+    addExpense: "+ รายจ่าย",
+    addIncomeTitle: "เพิ่มรายรับ",
+    addExpenseTitle: "เพิ่มรายจ่าย",
+    ledgerDescription: "รายละเอียด (ไม่บังคับ)",
+    ledgerDescPlaceholderIncome: "เช่น เงินเดือนประจำเดือน, รับงานโปรเจกต์...",
+    ledgerDescPlaceholderExpense: "เช่น ข้าวกลางวันกับเพื่อน, แกร็บไปทำงาน...",
+    ledgerCategoryHint: "หมวดหมู่ — เลือกหรือพิมพ์เอง",
+    ledgerCustomCategory: "+ กำหนดเอง",
+    ledgerAddCategory: "เพิ่ม",
+    ledgerTypeCategory: "พิมพ์ชื่อหมวดหมู่...",
+    ledgerDepositTo: "ฝากเข้า",
+    ledgerDeductFrom: "หักจาก",
+    ledgerAutoSplit: "แบ่งอัตโนมัติ",
+    ledgerSaveIncome: "บันทึกรายรับ",
+    ledgerSaveExpense: "บันทึกรายจ่าย",
+    ledgerSearchPlaceholder: "ค้นหารายการ...",
+    ledgerFilterAll: "ทั้งหมด",
+    ledgerFilterIn: "รับ",
+    ledgerFilterOut: "จ่าย",
+    ledgerNoRecords: "ยังไม่มีรายการ",
+    ledgerNoRecordsHint: "กด + รายรับ หรือ + รายจ่าย ด้านบนเพื่อเริ่มต้น",
+    ledgerDeleteTitle: "ลบรายการ",
+    ledgerDeleteMessage: "คุณแน่ใจหรือไม่ที่จะลบรายการนี้?",
+    ledgerNewNet: "สุทธิใหม่:",
+    ledgerToday: "วันนี้",
+    ledgerYesterday: "เมื่อวาน",
+    // preset categories
+    freelance: "งานฟรีแลนซ์",
+    dividend: "เงินปันผล",
+    gift: "ของขวัญ",
+    rental: "ค่าเช่า",
+    shopping: "ช้อปปิ้ง",
+    health: "สุขภาพ",
+    education: "การศึกษา",
+    coffee: "กาแฟ",
+    travel: "ท่องเที่ยว",
   },
 };
 
@@ -1296,6 +1414,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const [darkMode, setDarkModeState] = useState(true);
 
+  const [netWorthSettings, setNetWorthSettings] = useState<NetWorthSettings>({
+    includeAssets: true,
+    includeBuckets: true,
+    includeCash: true,
+    cashflowIncludeCash: true,
+    cashflowIncludeBuckets: true,
+    cashflowIncludeAssets: false,
+  });
+
   // Initialize lang and theme from localStorage safely on client side
   useEffect(() => {
     try {
@@ -1307,8 +1434,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (storedTheme === "light") {
         setDarkModeState(false);
       }
+      const storedNWSettings = localStorage.getItem("fintrack-nw-settings");
+      if (storedNWSettings) {
+        const parsed = JSON.parse(storedNWSettings);
+        setNetWorthSettings({
+          includeAssets: parsed.includeAssets ?? true,
+          includeBuckets: parsed.includeBuckets ?? true,
+          includeCash: parsed.includeCash ?? true,
+          cashflowIncludeCash: parsed.cashflowIncludeCash ?? true,
+          cashflowIncludeBuckets: parsed.cashflowIncludeBuckets ?? true,
+          cashflowIncludeAssets: parsed.cashflowIncludeAssets ?? false,
+        });
+      }
     } catch {}
   }, []);
+
+  // Save netWorthSettings to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem("fintrack-nw-settings", JSON.stringify(netWorthSettings));
+    } catch {}
+  }, [netWorthSettings]);
 
   const setDarkMode = (isDark: boolean) => {
     setDarkModeState(isDark);
@@ -1359,6 +1505,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const deletedAssetSymbols = React.useRef<Set<string>>(new Set());
   const [toasts, setToasts] = useState<AppToast[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [customCategories, setCustomCategories] = useState<CustomCategory[]>([]);
 
   // Auth & Data Loading
   useEffect(() => {
@@ -1416,6 +1563,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const storedBuckets = localStorage.getItem("fintrack-buckets");
         const storedBucketActivities = localStorage.getItem("fintrack-bucket-activities");
         const storedCashActivities = localStorage.getItem("fintrack-cash-activities");
+        const storedCustomCategories = localStorage.getItem("fintrack-custom-categories");
 
         if (storedAssets) {
           const parsedAssets = JSON.parse(storedAssets);
@@ -1429,6 +1577,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (storedBuckets) setMoneyBuckets(JSON.parse(storedBuckets));
         if (storedBucketActivities) setBucketActivities(JSON.parse(storedBucketActivities));
         if (storedCashActivities) setCashActivities(JSON.parse(storedCashActivities));
+        if (storedCustomCategories) setCustomCategories(JSON.parse(storedCustomCategories));
       } catch (err) {
         console.error("Failed to load from localStorage", err);
       }
@@ -1444,14 +1593,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           { data: allocationsData },
           { data: bucketsData },
           { data: bucketActivitiesData },
-          { data: cashActivitiesData }
+          { data: cashActivitiesData },
+          { data: userCategoriesData },
         ] = await Promise.all([
           db.assets.getAll(user.id),
           db.trades.getAll(user.id),
           db.allocations.getAll(user.id),
           db.buckets.getAll(user.id),
           db.bucketActivities.getAll(user.id),
-          db.cashActivities.getAll(user.id)
+          db.cashActivities.getAll(user.id),
+          db.userCategories.getAll(user.id),
         ]);
 
         if (assetsData) {
@@ -1553,7 +1704,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             type: ba.type,
             amount: ba.amount,
             date: ba.date,
-            note: ba.note || undefined
+            note: ba.note || undefined,
+            currency: ba.currency || undefined,
+            rateAtTime: ba.rate_at_time || undefined
           })));
         } else {
           setBucketActivities([]);
@@ -1566,10 +1719,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             amountUSD: ca.amount,
             category: ca.category,
             date: ca.date,
-            note: ca.note || undefined
+            note: ca.note || undefined,
+            currency: ca.currency || undefined,
+            rateAtTime: ca.rate_at_time || undefined
           })));
         } else {
           setCashActivities([]);
+        }
+
+        if (userCategoriesData) {
+          setCustomCategories(userCategoriesData.map((c: any) => ({
+            id: c.id,
+            type: c.type,
+            label: c.label,
+            icon: c.icon,
+          })));
+        } else {
+          setCustomCategories([]);
         }
 
       } catch (err) {
@@ -1916,27 +2082,40 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const formatMoney = (amountUSD: number, originalCurrency?: Currency, originalRate?: number) => {
+    const targetCurrency = originalCurrency || currency;
     const rate = originalRate || exchangeRates[currency];
     const convertedAmount = amountUSD * rate;
-    
+
+    // For THB: force en-US locale which reliably returns ฿ (U+0E3F).
+    // th-TH locale may return "B" on some browsers/environments.
+    if (targetCurrency === "THB") {
+      const absFormatted = new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "THB",
+        currencyDisplay: "narrowSymbol",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(Math.abs(convertedAmount));
+      // en-US + THB narrowSymbol always returns "฿X,XXX.XX"
+      return (convertedAmount < 0 ? "-" : "") + absFormatted;
+    }
+
     const formatter = new Intl.NumberFormat(language === "th" ? "th-TH" : "en-US", {
       style: "currency",
-      currency: originalCurrency || currency,
+      currency: targetCurrency,
       minimumFractionDigits: 2,
       currencyDisplay: "narrowSymbol",
     });
 
     let formatted = formatter.format(convertedAmount);
-    // User-friendly fix for TH locale showing "US$" which looks chaotic.
-    if (language === "th" && (originalCurrency || currency) === "USD") {
+    // Fix TH locale showing "US$" → "$"
+    if (language === "th" && targetCurrency === "USD") {
       formatted = formatted.replace("US$", "$");
     }
-    
-    // Ensure THB is always "฿" regardless of locale overrides, to save space and avoid line breaks
-    formatted = formatted.replace("THB", "฿").replace("฿ ", "฿");
-    
+
     return formatted;
   };
+
 
   const addAsset = async (assetData: Asset) => {
     const existingIdx = assets.findIndex(a => a.symbol.toUpperCase() === assetData.symbol.toUpperCase());
@@ -1954,6 +2133,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         name: assetData.name,
         symbol: assetData.symbol,
         asset_type: assetData.allocation,
+        allocation: assetData.allocation,
         value_usd: assetData.valueUSD,
         quantity: assetData.shares || 0,
         avg_purchase_price: assetData.avgCost || 0,
@@ -1967,7 +2147,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         allocation_target: 0,
         allocation_current: 0,
         change_24h: 0,
-        change_percentage: assetData.change
+        change_percentage: assetData.change,
+        exclude_from_total: assetData.excludeFromTotal || false
       });
       if (data) {
         const newAsset = {
@@ -2114,7 +2295,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (updates.name !== undefined) supabaseUpdates.name = updates.name;
         if (updates.isFavorite !== undefined) supabaseUpdates.is_favorite = updates.isFavorite;
         if (updates.sortOrder !== undefined) supabaseUpdates.sort_order = updates.sortOrder;
-        if (updates.allocation !== undefined) supabaseUpdates.asset_type = updates.allocation;
+        if (updates.excludeFromTotal !== undefined) supabaseUpdates.exclude_from_total = updates.excludeFromTotal;
+        if (updates.allocation !== undefined) {
+          supabaseUpdates.asset_type = updates.allocation;
+          supabaseUpdates.allocation = updates.allocation;
+        }
         if (updates.is_active !== undefined) supabaseUpdates.is_active = updates.is_active;
         
         await db.assets.update(asset.id, supabaseUpdates);
@@ -2160,6 +2345,72 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setTrades(prev => prev.filter(t => t.id !== id));
     } catch (err) {
       console.error("Failed to remove trade from Supabase", err);
+    }
+  };
+
+  const updateTrade = async (id: number, updates: Partial<Trade>) => {
+    const tradeToUpdate = trades.find(t => t.id === id);
+    if (!tradeToUpdate) return;
+    
+    if (!user || !tradeToUpdate.dbId) {
+      setTrades(prev => {
+        const newTrades = prev.map(t => t.id === id ? { ...t, ...updates } : t);
+        localStorage.setItem("fintrack-trades", JSON.stringify(newTrades));
+        return newTrades;
+      });
+      return;
+    }
+    
+    // Update local state first for optimistic UI
+    setTrades(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+    
+    try {
+      // Map to db format if necessary, assuming simple mapping here
+      const dbUpdates: any = {};
+      if (updates.asset !== undefined) dbUpdates.asset = updates.asset;
+      if (updates.type !== undefined) dbUpdates.type = updates.type;
+      if (updates.amountUSD !== undefined) dbUpdates.amount_usd = updates.amountUSD;
+      if (updates.date !== undefined) dbUpdates.date = updates.date;
+      if (updates.shares !== undefined) dbUpdates.shares = updates.shares;
+      if (updates.pricePerUnit !== undefined) dbUpdates.price_per_unit = updates.pricePerUnit;
+      
+      if (Object.keys(dbUpdates).length > 0) {
+        await db.trades.update(tradeToUpdate.dbId, dbUpdates);
+      }
+    } catch (err) {
+      console.error("Failed to update trade in Supabase", err);
+    }
+  };
+
+  const updateCashActivity = async (id: string, updates: Partial<CashActivity>) => {
+    const activityToUpdate = cashActivities.find(c => c.id === id);
+    if (!activityToUpdate) return;
+    
+    if (!user) {
+      setCashActivities(prev => {
+        const newActivities = prev.map(c => c.id === id ? { ...c, ...updates } : c);
+        localStorage.setItem("fintrack-cash-activities", JSON.stringify(newActivities));
+        return newActivities;
+      });
+      return;
+    }
+    
+    // Optimistic
+    setCashActivities(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
+    
+    try {
+      const dbUpdates: any = {};
+      if (updates.type !== undefined) dbUpdates.type = updates.type;
+      if (updates.amountUSD !== undefined) dbUpdates.amount_usd = updates.amountUSD;
+      if (updates.category !== undefined) dbUpdates.category = updates.category;
+      if (updates.date !== undefined) dbUpdates.date = updates.date;
+      if (updates.note !== undefined) dbUpdates.note = updates.note;
+      
+      if (Object.keys(dbUpdates).length > 0) {
+        await db.cashActivities.update(id, dbUpdates);
+      }
+    } catch (err) {
+      console.error("Failed to update cash activity in Supabase", err);
     }
   };
 
@@ -2267,7 +2518,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         type: activity.type,
         amount: activity.amount,
         note: activity.note || null,
-        date: activity.date
+        date: activity.date,
+        currency: activity.currency || null,
+        rate_at_time: activity.rateAtTime || null
       } as any);
 
       if (error) {
@@ -2325,7 +2578,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         amount: activityData.amountUSD,
         category: activityData.category,
         date: activityData.date,
-        time: activityData.time || null
+        time: activityData.time || null,
+        bucket_id: activityData.bucketId || null,
+        is_transfer: activityData.isTransfer || false
       });
 
       const { data, error } = await db.cashActivities.insert({
@@ -2335,7 +2590,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         category: activityData.category,
         note: activityData.note || null,
         date: activityData.date,
-        time: activityData.time || null
+        time: activityData.time || null,
+        bucket_id: activityData.bucketId || null,
+        is_transfer: activityData.isTransfer || false,
+        currency: activityData.currency || null,
+        rate_at_time: activityData.rateAtTime || null
       } as any);
 
       console.log("Supabase insert result:", { data, error });
@@ -2429,7 +2688,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             amountUSD: ca.amount,
             category: ca.category,
             date: ca.date,
-            note: ca.note || undefined
+            note: ca.note || undefined,
+            currency: ca.currency || undefined,
+            rateAtTime: ca.rate_at_time || undefined
           })));
         }
       }
@@ -2464,24 +2725,74 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
 
-  // Computed P/L metrics
+  // Computed P/L metrics respecting excludeFromTotal
+  const includedAssets = React.useMemo(() => assets.filter(a => !a.excludeFromTotal), [assets]);
+
   const totalInvested = React.useMemo(() => {
-    return assets.reduce((acc, a) => acc + (a.avgCost || 0) * (a.shares || 0), 0);
-  }, [assets]);
+    return includedAssets.reduce((acc, a) => acc + (a.avgCost || 0) * (a.shares || 0), 0);
+  }, [includedAssets]);
 
   const totalUnrealizedPL = React.useMemo(() => {
-    const portfolioValue = assets.reduce((acc, a) => acc + a.valueUSD, 0);
-    const costBasis = assets.reduce((acc, a) => acc + (a.avgCost || 0) * (a.shares || 0), 0);
+    const portfolioValue = includedAssets.reduce((acc, a) => acc + a.valueUSD, 0);
+    const costBasis = includedAssets.reduce((acc, a) => acc + (a.avgCost || 0) * (a.shares || 0), 0);
     return portfolioValue - costBasis;
-  }, [assets]);
+  }, [includedAssets]);
 
   const totalRealizedPL = React.useMemo(() => {
-    return assets.reduce((acc, a) => acc + (a.realizedPL || 0), 0);
-  }, [assets]);
+    return includedAssets.reduce((acc, a) => acc + (a.realizedPL || 0), 0);
+  }, [includedAssets]);
 
   const totalDividends = React.useMemo(() => {
-    return assets.reduce((acc, a) => acc + (a.dividendTotal || 0), 0);
-  }, [assets]);
+    return includedAssets.reduce((acc, a) => acc + (a.dividendTotal || 0), 0);
+  }, [includedAssets]);
+
+  // ── Custom Category Actions ───────────────────────────────────
+  const addCustomCategory = async (type: 'INCOME' | 'EXPENSE', label: string, icon = '🏷️') => {
+    const trimmed = label.trim();
+    if (!trimmed) return;
+    // Optimistic update
+    const tempId = `local-${Date.now()}`;
+    setCustomCategories(prev => [...prev, { id: tempId, type, label: trimmed, icon }]);
+
+    if (!user) {
+      // Persist to localStorage for demo users
+      try {
+        const stored = JSON.parse(localStorage.getItem('fintrack-custom-categories') || '[]');
+        stored.push({ id: tempId, type, label: trimmed, icon });
+        localStorage.setItem('fintrack-custom-categories', JSON.stringify(stored));
+      } catch {}
+      return;
+    }
+
+    try {
+      const { data, error } = await db.userCategories.insert(user.id, type, trimmed, icon);
+      if (error) throw error;
+      if (data) {
+        // Replace temp with real DB id
+        setCustomCategories(prev => prev.map(c => c.id === tempId ? { id: data.id, type, label: trimmed, icon } : c));
+      }
+    } catch (err) {
+      // Rollback optimistic update
+      setCustomCategories(prev => prev.filter(c => c.id !== tempId));
+      addToast('Failed to save category', 'error');
+    }
+  };
+
+  const removeCustomCategory = async (id: string) => {
+    setCustomCategories(prev => prev.filter(c => c.id !== id));
+    if (!user) {
+      try {
+        const stored = JSON.parse(localStorage.getItem('fintrack-custom-categories') || '[]');
+        localStorage.setItem('fintrack-custom-categories', JSON.stringify(stored.filter((c: any) => c.id !== id)));
+      } catch {}
+      return;
+    }
+    try {
+      await db.userCategories.delete(id);
+    } catch (err) {
+      addToast('Failed to delete category', 'error');
+    }
+  };
 
   return (
     <AppContext.Provider value={{ 
@@ -2510,9 +2821,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updateAsset,
       reorderAssets,
       removeTrade,
+      updateTrade,
+      updateCashActivity,
       toasts,
       addToast,
       removeToast,
+      netWorthSettings,
+      setNetWorthSettings,
       darkMode,
       setDarkMode,
       notifications,
@@ -2535,7 +2850,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       totalInvested,
       totalUnrealizedPL,
       totalRealizedPL,
-      totalDividends
+      totalDividends,
+      customCategories,
+      addCustomCategory,
+      removeCustomCategory,
     }}>
       {children}
       

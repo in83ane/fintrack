@@ -1,7 +1,14 @@
 @import "tailwindcss";
 
+/* Fix for Thai Baht symbol (฿ U+0E3F) rendering bug in Prompt font */
+@font-face {
+  font-family: 'BahtFallback';
+  src: local('Segoe UI'), local('Helvetica Neue'), local('Arial'), sans-serif;
+  unicode-range: U+0E3F;
+}
+
 @theme {
-  --font-sans: var(--font-prompt), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-sans: 'BahtFallback', var(--font-prompt), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
   --font-serif: var(--font-serif), ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
   
   /* Fix: Map "font-black" (900) down to a highly readable "bold" (700) globally */
@@ -12,11 +19,14 @@
   --tracking-tight: 0em;
 }
 
+
 /* Global Typography Overrides for Thai Readability */
 body {
   font-feature-settings: "liga" 1, "calt" 1;
   /* Make standard body text height relaxed so Thai vowels aren't compressed */
   line-height: 1.6;
+  /* Prevent layout shift when scrollbar appears/disappears (e.g. modals, expanding panels) */
+  scrollbar-gutter: stable;
 }
 
 /* Give more breathing room to text in Thai context */
@@ -44,6 +54,17 @@ html[lang="en"] body {
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Emoji safety net: explicit font stack for any element that displays emoji or symbols */
+.emoji-text {
+  font-family: 'EmojiOverride', 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji',
+               'Twemoji Mozilla', 'Segoe UI Symbol', sans-serif !important;
+}
+
 .scrollbar-none {
   -ms-overflow-style: none;
   scrollbar-width: none;

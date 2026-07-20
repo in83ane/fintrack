@@ -1,13 +1,14 @@
 "use client";
 
 import React from "react";
-import { LayoutDashboard, Wallet, Settings, HelpCircle, Calendar, User, LineChart, Banknote, PiggyBank, CandlestickChart } from "lucide-react";
+import { LayoutDashboard, Wallet, Settings, HelpCircle, Calendar, User, LineChart, Banknote, PiggyBank, CandlestickChart, Monitor, ReceiptText } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 import { useApp } from "@/src/context/AppContext";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { supabase } from "@/src/lib/supabase";
 import { logoutAction } from "@/src/app/actions";
+import { SettingsModal } from "@/src/components/SettingsModal";
 
 interface SidebarProps {
   isMobile?: boolean;
@@ -17,6 +18,7 @@ interface SidebarProps {
 export function Sidebar({ isMobile, onClose }: SidebarProps) {
   const { t } = useApp();
   const pathname = usePathname();
+  const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
 
   const navItems = [
     { icon: LayoutDashboard, label: t("dashboard"), href: "/dashboard" },
@@ -24,7 +26,9 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
     { icon: Calendar, label: t("calendar"), href: "/calendar" },
     { icon: LineChart, label: t("transactions") || "Transactions", href: "/transactions" },
     { icon: Banknote, label: t("cashflowOverview"), href: "/cashflow" },
+    { icon: ReceiptText, label: "Ledger", href: "/ledger" },
     { icon: CandlestickChart, label: "Trade Assistant", href: "/trade" },
+    { icon: Monitor, label: "Terminal", href: "/terminal" },
     { icon: PiggyBank, label: t("budgetPage"), href: "/budget" },
 
     { icon: Settings, label: t("settings"), href: "/settings" },
@@ -101,6 +105,14 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
         </a>
 
         <button
+          onClick={() => setIsSettingsOpen(true)}
+          className="flex items-center gap-2.5 text-gray-500 px-4 py-2.5 hover:text-white transition-all w-full text-left"
+        >
+          <Settings size={16} />
+          <span className="text-sm">Global Settings</span>
+        </button>
+
+        <button
           onClick={handleLogout}
           className="flex items-center gap-2.5 text-[#FFB4AB] px-4 py-2.5 hover:bg-[#FFB4AB]/10 rounded-xl transition-all w-full"
         >
@@ -108,6 +120,8 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
           <span className="text-sm font-bold">{t("logout") || "Logout"}</span>
         </button>
       </div>
+
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </aside>
   );
 }

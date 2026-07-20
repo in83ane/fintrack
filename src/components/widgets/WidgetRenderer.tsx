@@ -94,7 +94,8 @@ function AllocationPieWidget() {
       <div className="flex-1 flex items-center gap-3 min-h-0">
         <svg viewBox="0 0 100 100" className="w-20 h-20 flex-shrink-0">
           {segments.map((seg, i) => {
-            const pct = Math.max(seg.value, 0.5);
+            let pct = Math.max(seg.value, 0.5);
+            if (pct >= 100) pct = 99.99;
             const startAngle = cumulativePercent * 3.6;
             cumulativePercent += pct;
             const endAngle = cumulativePercent * 3.6;

@@ -30,23 +30,42 @@ export function EditAssetModal({ asset, isOpen, onClose, onDelete }: EditAssetMo
   const [editedShares, setEditedShares] = useState("");
   const [editedAvgCost, setEditedAvgCost] = useState("");
   const [editedAllocation, setEditedAllocation] = useState("");
+  const [editedExcludeFromTotal, setEditedExcludeFromTotal] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [originalState, setOriginalState] = useState<Asset | null>(null);
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
+  const [inputCurrency, setInputCurrency] = useState<"USD" | "THB">(currency === "THB" ? "THB" : "USD");
+
+  const handleCurrencyChange = (newCur: "USD" | "THB") => {
+    if (newCur === inputCurrency) return;
+    const currentCost = parseFloat(editedAvgCost) || 0;
+    const THB_RATE = exchangeRates["THB"] || 36.5;
+    if (newCur === "THB") {
+      setEditedAvgCost((currentCost * THB_RATE).toFixed(2));
+    } else {
+      setEditedAvgCost((currentCost / THB_RATE).toFixed(2));
+    }
+    setInputCurrency(newCur);
+  };
 
   // Reset state when asset changes
   React.useEffect(() => {
     if (asset) {
       setEditedName(asset.name);
       setEditedShares(asset.shares?.toString() || "0");
-      setEditedAvgCost(asset.avgCost?.toString() || "0");
+      const thbRate = exchangeRates["THB"] || 36.5;
+      const initialCurr = currency === "THB" ? "THB" : "USD";
+      setInputCurrency(initialCurr);
+      const displayCost = initialCurr === "THB" ? (asset.avgCost || 0) * thbRate : (asset.avgCost || 0);
+      setEditedAvgCost(displayCost > 0 ? displayCost.toFixed(2) : "0");
       setEditedAllocation(asset.allocation);
+      setEditedExcludeFromTotal(asset.excludeFromTotal || false);
       setIsFavorite(asset.isFavorite || false);
       setOriginalState(asset);
       setIsEditing(false);
     }
-  }, [asset]);
+  }, [asset, currency, exchangeRates]);
 
   if (!asset || !originalState) return null;
 
@@ -60,11 +79,14 @@ export function EditAssetModal({ asset, isOpen, onClose, onDelete }: EditAssetMo
   const realizedPL = asset.realizedPL || 0;
 
   const handleSave = async () => {
+    const cost = parseFloat(editedAvgCost) || 0;
+    const finalCostUSD = inputCurrency === "THB" ? cost / THB_RATE : cost;
     const updates: Partial<Asset> = {
       name: editedName,
       shares: parseFloat(editedShares) || 0,
-      avgCost: parseFloat(editedAvgCost) || 0,
+      avgCost: finalCostUSD,
       allocation: editedAllocation,
+      excludeFromTotal: editedExcludeFromTotal,
     };
 
     updateAsset(asset.symbol, updates);
@@ -91,8 +113,13 @@ export function EditAssetModal({ asset, isOpen, onClose, onDelete }: EditAssetMo
     if (asset) {
       setEditedName(asset.name);
       setEditedShares(asset.shares?.toString() || "0");
-      setEditedAvgCost(asset.avgCost?.toString() || "0");
+      const thbRate = exchangeRates["THB"] || 36.5;
+      const initialCurr = currency === "THB" ? "THB" : "USD";
+      setInputCurrency(initialCurr);
+      const displayCost = initialCurr === "THB" ? (asset.avgCost || 0) * thbRate : (asset.avgCost || 0);
+      setEditedAvgCost(displayCost > 0 ? displayCost.toFixed(2) : "0");
       setEditedAllocation(asset.allocation);
+      setEditedExcludeFromTotal(asset.excludeFromTotal || false);
       setIsFavorite(asset.isFavorite || false);
     }
     setIsEditing(true);
@@ -102,8 +129,13 @@ export function EditAssetModal({ asset, isOpen, onClose, onDelete }: EditAssetMo
     if (originalState) {
       setEditedName(originalState.name);
       setEditedShares(originalState.shares?.toString() || "0");
-      setEditedAvgCost(originalState.avgCost?.toString() || "0");
+      const thbRate = exchangeRates["THB"] || 36.5;
+      const initialCurr = currency === "THB" ? "THB" : "USD";
+      setInputCurrency(initialCurr);
+      const displayCost = initialCurr === "THB" ? (originalState.avgCost || 0) * thbRate : (originalState.avgCost || 0);
+      setEditedAvgCost(displayCost > 0 ? displayCost.toFixed(2) : "0");
       setEditedAllocation(originalState.allocation);
+      setEditedExcludeFromTotal(originalState.excludeFromTotal || false);
       setIsFavorite(originalState.isFavorite || false);
     }
     setIsEditing(false);
@@ -204,7 +236,28 @@ export function EditAssetModal({ asset, isOpen, onClose, onDelete }: EditAssetMo
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-400 uppercase">{t("avgCostPerUnit")}</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-gray-400 uppercase">{t("avgCostPerUnit")}</label>
+                    <div className="flex gap-1 p-0.5 bg-white/5 rounded-lg border border-white/10">
+                      {(['USD', 'THB'] as const).map(cur => (
+                        <button
+                          key={cur}
+                          type="button"
+                          onClick={() => handleCurrencyChange(cur)}
+                          className={cn(
+                            'px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wide transition-all',
+                            inputCurrency === cur
+                              ? cur === 'THB'
+                                ? 'bg-[#E9C349] text-[#241a00]'
+                                : 'bg-[#ADC6FF] text-[#00285d]'
+                              : 'text-gray-500 hover:text-gray-300'
+                          )}
+                        >
+                          {cur}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <div className="relative">
                     <input
                       type="number"
@@ -213,7 +266,12 @@ export function EditAssetModal({ asset, isOpen, onClose, onDelete }: EditAssetMo
                       onChange={(e) => setEditedAvgCost(e.target.value)}
                       className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-[#ADC6FF]/50 pr-12"
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#ADC6FF] font-bold text-xs uppercase opacity-80">USD</span>
+                    <span className={cn(
+                      "absolute right-3 top-1/2 -translate-y-1/2 font-bold text-xs uppercase opacity-80",
+                      inputCurrency === 'THB' ? 'text-[#E9C349]' : 'text-[#ADC6FF]'
+                    )}>
+                      {inputCurrency}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -231,6 +289,28 @@ export function EditAssetModal({ asset, isOpen, onClose, onDelete }: EditAssetMo
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* Exclude from Net Worth Toggle */}
+              <div className="flex items-center justify-between py-2 mt-2">
+                <div>
+                  <p className="text-sm font-bold text-white">Exclude from Net Worth</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditedExcludeFromTotal(!editedExcludeFromTotal)}
+                  className={cn(
+                    "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                    editedExcludeFromTotal ? "bg-[#ADC6FF]" : "bg-gray-600"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                      editedExcludeFromTotal ? "translate-x-6" : "translate-x-1"
+                    )}
+                  />
+                </button>
               </div>
             </div>
           ) : (
@@ -257,6 +337,12 @@ export function EditAssetModal({ asset, isOpen, onClose, onDelete }: EditAssetMo
                 <span className="text-sm text-gray-500">Favorite</span>
                 <span className={cn("text-sm font-bold", isFavorite ? "text-[#E9C349]" : "text-gray-600")}>
                   {isFavorite ? "★ Favorited" : "☆ Not Favorited"}
+                </span>
+              </div>
+              <div className="flex justify-between items-center py-2">
+                <span className="text-sm text-gray-500">Exclude from Net Worth</span>
+                <span className={cn("text-sm font-bold", asset.excludeFromTotal ? "text-[#FFB4AB]" : "text-gray-600")}>
+                  {asset.excludeFromTotal ? "Yes (Excluded)" : "No (Included)"}
                 </span>
               </div>
             </div>

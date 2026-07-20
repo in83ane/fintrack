@@ -11,17 +11,21 @@ import {
   ArrowUpRight, 
   ArrowDownLeft,
   FileText,
-  X,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  BarChart3,
+  TrendingUp,
+  Activity
 } from "lucide-react";
 import { format } from "date-fns";
 import Papa from "papaparse";
 import { useApp, Trade, BucketActivity, CashActivity } from "@/src/context/AppContext";
+import { cn } from "@/src/lib/utils";
 import { AddAssetModal } from "@/src/components/AddAssetModal";
 import { ConfirmModal } from "@/src/components/ConfirmModal";
 import { TransactionDetailModal } from "@/src/components/TransactionDetailModal";
 import { calcExpectancy, calcStreak } from "@/src/lib/finance";
+import { DateRangeBar, DateRangeState, getDateBounds, isInRange } from "@/src/components/DateRangeBar";
 
 interface UnifiedTransaction {
   id: string;
@@ -45,10 +49,12 @@ export default function TransactionsPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
+  const [dateRange, setDateRange] = useState<DateRangeState>({ mode: "all" });
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [tradeToDelete, setTradeToDelete] = useState<number | null>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedHeatmapMonth, setSelectedHeatmapMonth] = useState(0); // 0 = current
 
   // Calculate trade metrics
   const tradePnLs = assets.map(a => a.realizedPL || 0).filter(p => p !== 0);
@@ -60,21 +66,62 @@ export default function TransactionsPage() {
   const expectancy = calcExpectancy(winRate, avgWin, avgLoss);
   const { maxWinStreak, maxLossStreak } = calcStreak(tradePnLs);
 
-  // Daily P/L for Heatmap
+  // Daily activity for Heatmap (shows transaction density)
   const now = new Date();
-  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).getDay();
+  const heatmapDate = new Date(now.getFullYear(), now.getMonth() - selectedHeatmapMonth, 1);
+  const daysInMonth = new Date(heatmapDate.getFullYear(), heatmapDate.getMonth() + 1, 0).getDate();
+  const firstDay = new Date(heatmapDate.getFullYear(), heatmapDate.getMonth(), 1).getDay();
+  const heatmapMonthKey = `${heatmapDate.getFullYear()}-${String(heatmapDate.getMonth() + 1).padStart(2, '0')}`;
 
+  // Daily P/L from cash activities (actual income/expense)
   const dailyPL: Record<number, number> = {};
-  trades.forEach(trade => {
-    const d = new Date(trade.date);
-    if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
+  const dailyCount: Record<number, number> = {};
+  cashActivities.forEach(ca => {
+    if (ca.date.startsWith(heatmapMonthKey)) {
+      const d = new Date(ca.date);
       const day = d.getDate();
       if (!dailyPL[day]) dailyPL[day] = 0;
-      const rate = exchangeRates[currency] || 1;
-      dailyPL[day] += trade.amountUSD * (rate - trade.rateAtTime) / rate;
+      if (!dailyCount[day]) dailyCount[day] = 0;
+      if (ca.type === 'INCOME' || ca.type === 'DEPOSIT') dailyPL[day] += ca.amountUSD;
+      else if (!ca.isTransfer) dailyPL[day] -= ca.amountUSD;
+      dailyCount[day]++;
     }
   });
+  trades.forEach(trade => {
+    if (trade.date.startsWith(heatmapMonthKey)) {
+      const d = new Date(trade.date);
+      const day = d.getDate();
+      if (!dailyCount[day]) dailyCount[day] = 0;
+      dailyCount[day]++;
+    }
+  });
+
+  // 6-month category spending trends
+  const categoryTrends = useMemo(() => {
+    const cats: Record<string, number[]> = {};
+    const monthLabels: string[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      monthLabels.push(format(d, 'MMM'));
+      const monthExpenses = cashActivities.filter(a =>
+        a.date.startsWith(key) && (a.type === 'EXPENSE' || a.type === 'WITHDRAW') && !a.isTransfer
+      );
+      const catTotals: Record<string, number> = {};
+      monthExpenses.forEach(a => {
+        catTotals[a.category] = (catTotals[a.category] || 0) + a.amountUSD;
+      });
+      for (const [cat, amt] of Object.entries(catTotals)) {
+        if (!cats[cat]) cats[cat] = Array(6).fill(0);
+        cats[cat][5 - i] = amt;
+      }
+    }
+    const topCats = Object.entries(cats)
+      .sort(([, a], [, b]) => b.reduce((s, v) => s + v, 0) - a.reduce((s, v) => s + v, 0))
+      .slice(0, 5);
+    const catColors = ['#FFB4AB', '#E9C349', '#ADC6FF', '#4EDEA3', '#A78BFA'];
+    return { months: monthLabels, categories: topCats.map(([cat, vals], i) => ({ cat, vals, color: catColors[i % catColors.length] })) };
+  }, [cashActivities]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -205,16 +252,18 @@ export default function TransactionsPage() {
       cashActivityType: ca.type,
     }));
 
-    return [...tradeItems, ...bucketItems, ...cashItems].sort((a, b) => {
+    return [...tradeItems, ...bucketItems].sort((a, b) => {
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
-  }, [trades, bucketActivities, cashActivities, moneyBuckets]);
+  }, [trades, bucketActivities, moneyBuckets]);
 
+  const txnBounds = getDateBounds(dateRange);
   const filteredTransactions = allTransactions.filter(txn => {
     const matchesSearch = txn.asset.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (txn.bucketName && txn.bucketName.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesFilter = filterType === "all" || txn.category === filterType;
-    return matchesSearch && matchesFilter;
+    const matchesDate = isInRange(txn.date, txnBounds);
+    return matchesSearch && matchesFilter && matchesDate;
   });
 
   return (
@@ -226,7 +275,12 @@ export default function TransactionsPage() {
           <p className="text-gray-500 font-medium uppercase tracking-wide text-xs">{t("auditDetail")}</p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+      </div>
+
+      {/* Date Range Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <DateRangeBar value={dateRange} onChange={setDateRange} />
+        <div className="flex flex-wrap gap-2 items-center">
           <button
             onClick={() => fileInputRef.current?.click()}
             className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-[#1C1B1B] text-white rounded-xl font-bold text-xs uppercase tracking-wide border border-white/5 hover:bg-white/5 transition-all"
@@ -268,7 +322,7 @@ export default function TransactionsPage() {
         <div className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
           <p className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide mb-1">{t("totalBalance")}</p>
           <h3 className="text-xl sm:text-2xl font-black text-white tracking-tighter">
-            {formatMoney(allTransactions.reduce((acc, t) => {
+            {formatMoney(filteredTransactions.reduce((acc, t) => {
               const isInflow = t.type === 'BUY' ||
                                (t.category === 'cash' && t.cashActivityType === 'INCOME') ||
                                (t.category === 'bucket' && (t.bucketActivityType === 'deposit' || t.bucketActivityType === 'income_split' || t.bucketActivityType === 'profit_split'));
@@ -284,7 +338,7 @@ export default function TransactionsPage() {
         <div className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
           <p className="text-[10px] sm:text-xs font-black text-[#4EDEA3] uppercase tracking-wide mb-1">{t("buyVolume")}</p>
           <h3 className="text-xl sm:text-2xl font-black text-white tracking-tighter">
-            {formatMoney(allTransactions.filter(t =>
+            {formatMoney(filteredTransactions.filter(t =>
               t.type === 'BUY' ||
               (t.category === 'cash' && t.cashActivityType === 'INCOME') ||
               (t.category === 'bucket' && (t.bucketActivityType === 'deposit' || t.bucketActivityType === 'income_split' || t.bucketActivityType === 'profit_split'))
@@ -294,7 +348,7 @@ export default function TransactionsPage() {
         <div className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
           <p className="text-[10px] sm:text-xs font-black text-[#FFB4AB] uppercase tracking-wide mb-1">{t("sellVolume")}</p>
           <h3 className="text-xl sm:text-2xl font-black text-white tracking-tighter">
-            {formatMoney(allTransactions.filter(t =>
+            {formatMoney(filteredTransactions.filter(t =>
               t.type === 'SELL' ||
               (t.category === 'cash' && t.cashActivityType === 'EXPENSE') ||
               (t.category === 'bucket' && (t.bucketActivityType === 'withdraw' || t.bucketActivityType === 'invest'))
@@ -324,7 +378,34 @@ export default function TransactionsPage() {
 
       {/* Heatmap Section */}
       <div className="bg-[#1C1B1B] p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-white/5">
-        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-4">Monthly P&L Heatmap</h3>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Activity size={14} className="text-[#ADC6FF]" />
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide">Activity Heat Map</h3>
+            <span className="text-[9px] text-gray-600 bg-white/5 px-2 py-0.5 rounded-full font-bold">
+              {format(heatmapDate, 'MMM yyyy')}
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            {[3, 2, 1, 0].map(offset => {
+              const d = new Date(now.getFullYear(), now.getMonth() - offset, 1);
+              return (
+                <button
+                  key={offset}
+                  onClick={() => setSelectedHeatmapMonth(offset)}
+                  className={cn(
+                    "px-2 py-1 rounded-lg text-[10px] font-bold transition-all",
+                    selectedHeatmapMonth === offset
+                      ? "bg-[#ADC6FF]/20 text-[#ADC6FF]"
+                      : "text-gray-600 hover:text-gray-400"
+                  )}
+                >
+                  {format(d, 'MMM')}
+                </button>
+              );
+            })}
+          </div>
+        </div>
         <div className="grid grid-cols-7 gap-1 sm:gap-2">
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
             <div key={d} className="text-center text-[9px] sm:text-xs font-bold text-gray-500 uppercase">{d}</div>
@@ -335,36 +416,101 @@ export default function TransactionsPage() {
           {Array.from({ length: daysInMonth }, (_, i) => {
             const day = i + 1;
             const pl = dailyPL[day];
-            const hasData = pl !== undefined;
-            const isProfit = pl > 0;
-            const isLoss = pl < 0;
+            const count = dailyCount[day] || 0;
+            const hasData = pl !== undefined || count > 0;
+            const isProfit = (pl || 0) > 0;
+            const isLoss = (pl || 0) < 0;
+            const intensity = Math.min(1, count / 5);
             
             return (
               <div 
                 key={day} 
-                className={`aspect-square rounded-lg flex flex-col items-center justify-center relative group transition-colors ${
+                className={cn(
+                  "aspect-square rounded-lg flex flex-col items-center justify-center relative group transition-all cursor-default",
                   !hasData ? 'bg-white/[0.02]' :
                   isProfit ? 'bg-[#4EDEA3]/20 text-[#4EDEA3]' :
                   isLoss ? 'bg-[#FFB4AB]/20 text-[#FFB4AB]' :
-                  'bg-white/10 text-white'
-                }`}
+                  'bg-[#ADC6FF]/20 text-[#ADC6FF]'
+                )}
+                style={count > 0 ? { opacity: 0.4 + intensity * 0.6 } : {}}
               >
-                <span className="text-[9px] sm:text-xs font-bold opacity-50">{day}</span>
+                <span className="text-[9px] sm:text-xs font-bold opacity-60">{day}</span>
                 {hasData && (
-                  <span className="text-[8px] sm:text-[10px] font-black hidden sm:block">
-                    {pl > 0 ? '+' : ''}{(pl >= 1000 || pl <= -1000) ? `${(pl/1000).toFixed(1)}k` : pl.toFixed(0)}
+                  <span className="text-[7px] sm:text-[9px] font-black hidden sm:block">
+                    {pl !== undefined ? `${(pl || 0) > 0 ? '+' : ''}${Math.abs(pl || 0) >= 1000 ? `${((pl || 0)/1000).toFixed(1)}k` : (pl || 0).toFixed(0)}` : `${count}tx`}
                   </span>
                 )}
                 {hasData && (
-                  <div className="absolute opacity-0 group-hover:opacity-100 bg-black text-white text-[10px] px-2 py-1 rounded-lg -top-8 whitespace-nowrap z-10 transition-opacity pointer-events-none">
-                    {formatMoney(pl)}
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 group-hover:opacity-100 bg-[#1C1B1B] border border-white/10 text-white text-[10px] px-2.5 py-1.5 rounded-xl whitespace-nowrap z-20 transition-opacity pointer-events-none shadow-xl">
+                    <p className="font-bold">{format(new Date(heatmapDate.getFullYear(), heatmapDate.getMonth(), day), 'MMM d')}</p>
+                    {pl !== undefined && <p className={cn("font-black", (pl || 0) >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>{(pl || 0) >= 0 ? '+' : ''}{formatMoney(pl || 0)}</p>}
+                    {count > 0 && <p className="text-gray-400">{count} transaction{count > 1 ? 's' : ''}</p>}
                   </div>
                 )}
               </div>
             );
           })}
         </div>
+        {/* Legend */}
+        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-white/5">
+          <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-[#4EDEA3]/40" /><span className="text-[9px] text-gray-500 font-bold">Positive</span></div>
+          <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-[#FFB4AB]/40" /><span className="text-[9px] text-gray-500 font-bold">Negative</span></div>
+          <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-[#ADC6FF]/40" /><span className="text-[9px] text-gray-500 font-bold">Neutral/Trade</span></div>
+        </div>
       </div>
+
+      {/* 6-Month Category Spending Trends */}
+      {categoryTrends.categories.length > 0 && (
+        <div className="bg-[#1C1B1B] p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-white/5">
+          <div className="flex items-center gap-2 mb-4">
+            <BarChart3 size={14} className="text-[#E9C349]" />
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide">6-Month Expense Trends by Category</h3>
+          </div>
+          <div className="space-y-4">
+            {categoryTrends.categories.map(({ cat, vals, color }) => {
+              const max = Math.max(...vals, 1);
+              const total = vals.reduce((s, v) => s + v, 0);
+              return (
+                <div key={cat}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">{cat}</span>
+                    <span className="text-[10px] font-black text-white">{formatMoney(total)} total</span>
+                  </div>
+                  <div className="flex items-end gap-1 h-10">
+                    {vals.map((v, i) => (
+                      <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
+                        <motion.div
+                          initial={{ height: 0 }}
+                          animate={{ height: `${Math.max(2, (v / max) * 36)}px` }}
+                          transition={{ duration: 0.6, delay: i * 0.05, ease: 'easeOut' }}
+                          className="w-full rounded-t"
+                          style={{ backgroundColor: v > 0 ? color : 'rgba(255,255,255,0.05)' }}
+                        />
+                        <span className="text-[7px] text-gray-600 font-bold">{categoryTrends.months[i]}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {/* Category total breakdown */}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-4 pt-3 border-t border-white/5">
+            {categoryTrends.categories.map(({ cat, vals, color }) => (
+              <div key={cat} className="p-2 rounded-xl" style={{ backgroundColor: `${color}10` }}>
+                <div className="flex items-center gap-1 mb-0.5">
+                  <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
+                  <span className="text-[9px] font-black text-gray-400 uppercase truncate">{cat}</span>
+                </div>
+                <p className="text-xs font-black text-white">{formatMoney(vals.reduce((s, v) => s + v, 0))}</p>
+                <p className="text-[8px] text-gray-600">
+                  Avg {formatMoney(vals.filter(v => v > 0).length > 0 ? vals.reduce((s, v) => s + v, 0) / vals.filter(v => v > 0).length : 0)}/mo
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Filters & Search */}
       <div className="flex flex-col gap-3 sm:gap-4 items-stretch sm:items-center bg-[#1C1B1B] p-3 sm:p-4 rounded-2xl sm:rounded-3xl border border-white/5">
@@ -379,7 +525,7 @@ export default function TransactionsPage() {
           />
         </div>
         <div className="flex gap-2 w-full">
-          {(['all', 'trade', 'bucket', 'cash'] as const).map((type) => (
+          {(['all', 'trade', 'bucket'] as const).map((type) => (
             <button
               key={type}
               onClick={() => setFilterType(type)}
@@ -389,13 +535,11 @@ export default function TransactionsPage() {
                     ? "bg-[#4EDEA3] text-[#0E0E0E]"
                     : type === 'bucket'
                       ? "bg-[#ADC6FF] text-[#0E0E0E]"
-                      : type === 'cash'
-                        ? "bg-[#E9C349] text-[#0E0E0E]"
-                        : "bg-[#1C1B1B] text-white border border-white/10"
+                      : "bg-[#1C1B1B] text-white border border-white/10"
                   : "bg-[#0E0E0E] text-gray-500 hover:text-white"
               }`}
             >
-              {type === 'all' ? t('all') : type === 'trade' ? 'Trades' : type === 'bucket' ? 'Buckets' : 'Cash'}
+              {type === 'all' ? t('all') : type === 'trade' ? 'Trades' : 'Buckets'}
             </button>
           ))}
         </div>

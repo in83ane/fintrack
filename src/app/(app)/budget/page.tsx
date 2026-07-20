@@ -57,6 +57,8 @@ export default function BudgetPage() {
   } = useApp();
 
   const toUSD = (displayAmount: number) => displayAmount / (exchangeRates[currency] || 1);
+  const inputToUSD = (displayAmount: number) => displayAmount / (exchangeRates[inputCurrency] || 1);
+  const toDisplay = (usdAmount: number) => usdAmount * (exchangeRates[currency] || 1);
 
   const formatDisplay = (displayAmount: number) => {
     const formatter = new Intl.NumberFormat(language === "th" ? "th-TH" : "en-US", {
@@ -72,6 +74,24 @@ export default function BudgetPage() {
   };
   const currencySymbol = formatDisplay(0).replace(/[0-9,.\s-]/g, "");
 
+  const [inputCurrency, setInputCurrency] = useState<"USD" | "THB">(currency === "THB" ? "THB" : "USD");
+
+  const handleCurrencyChange = (newCur: "USD" | "THB") => {
+    if (newCur === inputCurrency) return;
+    const THB_RATE = exchangeRates["THB"] || 36.5;
+    
+    // Convert existing form values to new currency display
+    if (bucketForm.targetAmount) {
+      const currentTarget = parseFloat(bucketForm.targetAmount) || 0;
+      setBucketForm(prev => ({ ...prev, targetAmount: (newCur === "THB" ? currentTarget * THB_RATE : currentTarget / THB_RATE).toFixed(2) }));
+    }
+    if (bucketForm.currentAmount) {
+      const currentAmount = parseFloat(bucketForm.currentAmount) || 0;
+      setBucketForm(prev => ({ ...prev, currentAmount: (newCur === "THB" ? currentAmount * THB_RATE : currentAmount / THB_RATE).toFixed(2) }));
+    }
+    
+    setInputCurrency(newCur);
+  };
 
   const [incomeAmount, setIncomeAmount] = useState("");
   const [showIncomePreview, setShowIncomePreview] = useState(false);
@@ -190,7 +210,7 @@ export default function BudgetPage() {
     const now = new Date().toISOString();
     moneyBuckets.forEach((b) => {
       const splitDisplay = totalTargetPercent > 0 ? (incomeNum * b.targetPercent) / totalTargetPercent : 0;
-      const splitUSD = toUSD(splitDisplay);
+      const splitUSD = inputToUSD(splitDisplay);
       if (splitUSD > 0) {
         updateMoneyBucket(b.id, { currentAmount: b.currentAmount + splitUSD });
         addBucketActivity({
@@ -200,6 +220,8 @@ export default function BudgetPage() {
           amount: splitUSD,
           date: now,
           note: `${t("distributed")} ${b.targetPercent}% → ${t(b.name) || b.name}`,
+          currency: inputCurrency,
+          rateAtTime: exchangeRates[inputCurrency] || 1,
         });
         // Add cash activity for Cashflow page
         addCashActivity({
@@ -209,6 +231,8 @@ export default function BudgetPage() {
           date: now,
           bucketId: b.id,
           note: `Income distribution ${b.targetPercent}% - ${t(b.name) || b.name}`,
+          currency: inputCurrency,
+          rateAtTime: exchangeRates[inputCurrency] || 1,
         });
       }
     });
@@ -225,8 +249,8 @@ export default function BudgetPage() {
     if (profitNum <= 0) return;
     const halfADisplay = Math.floor(profitNum * 100 / 2) / 100;
     const halfBDisplay = Math.round((profitNum - halfADisplay) * 100) / 100;
-    const halfAUSD = toUSD(halfADisplay);
-    const halfBUSD = toUSD(halfBDisplay);
+    const halfAUSD = inputToUSD(halfADisplay);
+    const halfBUSD = inputToUSD(halfBDisplay);
     const now = new Date().toISOString();
     if (emergencyBucket) {
       updateMoneyBucket(emergencyBucket.id, { currentAmount: emergencyBucket.currentAmount + halfAUSD });
@@ -237,6 +261,8 @@ export default function BudgetPage() {
         amount: halfAUSD,
         date: now,
         note: `${t("suggestSafeHaven")} — 50%`,
+        currency: inputCurrency,
+        rateAtTime: exchangeRates[inputCurrency] || 1,
       });
       // Add cash activity for Cashflow page
       addCashActivity({
@@ -246,6 +272,8 @@ export default function BudgetPage() {
         date: now,
         bucketId: emergencyBucket.id,
         note: `Profit split 50% - ${t(emergencyBucket.name) || emergencyBucket.name}`,
+        currency: inputCurrency,
+        rateAtTime: exchangeRates[inputCurrency] || 1,
       });
     }
     if (investBucket) {
@@ -257,6 +285,8 @@ export default function BudgetPage() {
         amount: halfBUSD,
         date: now,
         note: `${t("suggestReinvest")} — 50%`,
+        currency: inputCurrency,
+        rateAtTime: exchangeRates[inputCurrency] || 1,
       });
       // Add cash activity for Cashflow page
       addCashActivity({
@@ -266,6 +296,8 @@ export default function BudgetPage() {
         date: now,
         bucketId: investBucket.id,
         note: `Profit split 50% - ${t(investBucket.name) || investBucket.name}`,
+        currency: inputCurrency,
+        rateAtTime: exchangeRates[inputCurrency] || 1,
       });
     }
     addToast(`${t("profitAdded")} ${formatDisplay(profitNum)}`, "success");
@@ -282,7 +314,7 @@ export default function BudgetPage() {
     if (!displayAmt || displayAmt <= 0 || !investModal) return;
     const bucket = moneyBuckets.find((b) => b.id === investModal.sourceBucketId);
     if (!bucket) return;
-    const amtUSD = toUSD(displayAmt);
+    const amtUSD = inputToUSD(displayAmt);
     if (amtUSD > bucket.currentAmount) {
       addToast(t("amountExceedsBalance"), "error");
       return;
@@ -295,6 +327,8 @@ export default function BudgetPage() {
       amount: amtUSD,
       date: new Date().toISOString(),
       note: `${t("investedFromBucket")} ${t(bucket.name) || bucket.name}`,
+      currency: inputCurrency,
+      rateAtTime: exchangeRates[inputCurrency] || 1,
     });
     // Add cash activity for Cashflow page (Invest = money leaves the system)
     addCashActivity({
@@ -304,6 +338,8 @@ export default function BudgetPage() {
       date: new Date().toISOString(),
       bucketId: bucket.id,
       note: `Invest from ${t(bucket.name) || bucket.name}`,
+      currency: inputCurrency,
+      rateAtTime: exchangeRates[inputCurrency] || 1,
     });
     addToast(`${t("investedFromBucket")}: -${formatDisplay(displayAmt)} ← ${t(bucket.name) || bucket.name}`, "success");
     setInvestModal(null);
@@ -315,11 +351,16 @@ export default function BudgetPage() {
     const otherBucketsPercent = totalTargetPercent - (editingBucket ? (moneyBuckets.find(b => b.id === editingBucket)?.targetPercent || 0) : 0);
     const maxAllowed = Math.max(1, 100 - otherBucketsPercent);
     const safePercent = Math.min(Math.max(1, Number(bucketForm.targetPercent) || 1), maxAllowed);
+    
+    const thbRate = exchangeRates["THB"] || 36.5;
+    const targetUSD = inputCurrency === "THB" ? (Number(bucketForm.targetAmount) || 0) / thbRate : (Number(bucketForm.targetAmount) || 0);
+    const currentUSD = inputCurrency === "THB" ? (Number(bucketForm.currentAmount) || 0) / thbRate : (Number(bucketForm.currentAmount) || 0);
+
     if (editingBucket) {
       updateMoneyBucket(editingBucket, {
         name: bucketForm.name,
         targetPercent: safePercent,
-        targetAmount: toUSD(Number(bucketForm.targetAmount) || 0),
+        targetAmount: targetUSD,
         color: bucketForm.color,
         icon: bucketForm.icon,
         linkedToExpenses: bucketForm.linkedToExpenses,
@@ -328,8 +369,8 @@ export default function BudgetPage() {
       addMoneyBucket({
         name: bucketForm.name,
         targetPercent: safePercent,
-        targetAmount: toUSD(Number(bucketForm.targetAmount) || 0),
-        currentAmount: toUSD(Number(bucketForm.currentAmount) || 0),
+        targetAmount: targetUSD,
+        currentAmount: currentUSD,
         color: bucketForm.color,
         icon: bucketForm.icon,
         linkedToExpenses: bucketForm.linkedToExpenses,
@@ -362,6 +403,8 @@ export default function BudgetPage() {
       amount: valUSD,
       date: now,
       note: `${inlineAction.type === "deposit" ? "+" : "-"}${formatDisplay(displayVal)} → ${t(bucket.name) || bucket.name}`,
+      currency: currency,
+      rateAtTime: exchangeRates[currency] || 1,
     });
     // No cash activity created - bucket transactions are standalone
     addToast(
@@ -413,6 +456,8 @@ export default function BudgetPage() {
               const presetColors = ["#4EDEA3", "#ADC6FF", "#E9C349", "#FF8B9A", "#FFB4AB", "#A78BFA", "#60A5FA", "#F97316"];
               const usedColorsList = moneyBuckets.map(b => b.color);
               const unusedColor = presetColors.find(c => !usedColorsList.includes(c)) || "#4EDEA3";
+              const initialCurr = currency === "THB" ? "THB" : "USD";
+              setInputCurrency(initialCurr);
               setBucketForm({ name: "", targetPercent: "", targetAmount: "", currentAmount: "", color: unusedColor, icon: "💰", linkedToExpenses: false });
               setIsBucketModalOpen(true);
             }}
@@ -453,7 +498,8 @@ export default function BudgetPage() {
                   let cumPct = 0;
                   const R = 38, r = 26, C = 50;
                   return moneyBuckets.map((b, i) => {
-                    const pct = totalAllocated > 0 ? Math.max((b.currentAmount / totalAllocated) * 100, 0.5) : (100 / moneyBuckets.length);
+                    let pct = totalAllocated > 0 ? Math.max((b.currentAmount / totalAllocated) * 100, 0.5) : (100 / moneyBuckets.length);
+                    if (pct >= 100) pct = 99.99;
                     const startAngle = cumPct * 3.6;
                     cumPct += pct;
                     const endAngle = cumPct * 3.6;
@@ -563,7 +609,20 @@ export default function BudgetPage() {
                       onClick={(e) => {
                         e.stopPropagation();
                         setEditingBucket(bucket.id);
-                        setBucketForm({ name: bucket.name, targetPercent: bucket.targetPercent.toString(), targetAmount: (bucket.targetAmount || 0).toString(), currentAmount: bucket.currentAmount.toString(), color: bucket.color, icon: bucket.icon, linkedToExpenses: bucket.linkedToExpenses || false });
+                        const initialCurr = currency === "THB" ? "THB" : "USD";
+                        setInputCurrency(initialCurr);
+                        const thbRate = exchangeRates["THB"] || 36.5;
+                        const targetVal = initialCurr === "THB" ? (bucket.targetAmount || 0) * thbRate : (bucket.targetAmount || 0);
+                        const currentVal = initialCurr === "THB" ? bucket.currentAmount * thbRate : bucket.currentAmount;
+                        setBucketForm({ 
+                          name: bucket.name, 
+                          targetPercent: bucket.targetPercent.toString(), 
+                          targetAmount: targetVal > 0 ? targetVal.toFixed(2) : "",
+                          currentAmount: currentVal > 0 ? currentVal.toFixed(2) : "0", 
+                          color: bucket.color, 
+                          icon: bucket.icon, 
+                          linkedToExpenses: bucket.linkedToExpenses || false 
+                        });
                         setIsBucketModalOpen(true);
                       }}
                       className="p-1 sm:p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/10 transition-all"
@@ -698,6 +757,8 @@ export default function BudgetPage() {
               const presetColors = ["#4EDEA3", "#ADC6FF", "#E9C349", "#FF8B9A", "#FFB4AB", "#A78BFA", "#60A5FA", "#F97316"];
               const usedColorsList = moneyBuckets.map(b => b.color);
               const unusedColor = presetColors.find(c => !usedColorsList.includes(c)) || "#4EDEA3";
+              const initialCurr = currency === "THB" ? "THB" : "USD";
+              setInputCurrency(initialCurr);
               setBucketForm({ name: "", targetPercent: "", targetAmount: "", currentAmount: "", color: unusedColor, icon: "💰", linkedToExpenses: false });
               setIsBucketModalOpen(true);
             }}
@@ -771,9 +832,27 @@ export default function BudgetPage() {
                   setIncomeAmount(val);
                   setShowIncomePreview(!!val && parseFloat(val) > 0);
                 }}
-                className="w-full bg-white/5 border border-white/10 rounded-xl sm:rounded-2xl px-3 sm:px-4 py-3 pr-12 text-white text-sm outline-none focus:border-[#ADC6FF]/50 transition-all placeholder:text-gray-600"
+                className="w-full bg-white/5 border border-white/10 rounded-xl sm:rounded-2xl px-3 sm:px-4 py-3 pr-20 text-white text-sm outline-none focus:border-[#ADC6FF]/50 transition-all placeholder:text-gray-600"
               />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-xs uppercase">{currency}</span>
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 p-0.5 bg-white/5 rounded-lg border border-white/10">
+                {(['USD', 'THB'] as const).map(cur => (
+                  <button
+                    key={cur}
+                    type="button"
+                    onClick={() => handleCurrencyChange(cur)}
+                    className={cn(
+                      'px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wide transition-all',
+                      inputCurrency === cur
+                        ? cur === 'THB'
+                          ? 'bg-[#E9C349] text-[#241a00]'
+                          : 'bg-[#ADC6FF] text-[#00285d]'
+                        : 'text-gray-500 hover:text-gray-300'
+                    )}
+                  >
+                    {cur}
+                  </button>
+                ))}
+              </div>
             </div>
             <AnimatePresence>
               {showIncomePreview && incomeNum > 0 && (
@@ -833,9 +912,27 @@ export default function BudgetPage() {
                   setProfitAmount(val);
                   setShowProfitSuggestion(!!val && parseFloat(val) > 0);
                 }}
-                className="w-full bg-white/5 border border-white/10 rounded-xl sm:rounded-2xl px-3 sm:px-4 py-3 pr-12 text-white text-sm outline-none focus:border-[#4EDEA3]/50 transition-all placeholder:text-gray-600"
+                className="w-full bg-white/5 border border-white/10 rounded-xl sm:rounded-2xl px-3 sm:px-4 py-3 pr-20 text-white text-sm outline-none focus:border-[#4EDEA3]/50 transition-all placeholder:text-gray-600"
               />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-xs uppercase">{currency}</span>
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 p-0.5 bg-white/5 rounded-lg border border-white/10">
+                {(['USD', 'THB'] as const).map(cur => (
+                  <button
+                    key={cur}
+                    type="button"
+                    onClick={() => handleCurrencyChange(cur)}
+                    className={cn(
+                      'px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wide transition-all',
+                      inputCurrency === cur
+                        ? cur === 'THB'
+                          ? 'bg-[#E9C349] text-[#241a00]'
+                          : 'bg-[#ADC6FF] text-[#00285d]'
+                        : 'text-gray-500 hover:text-gray-300'
+                    )}
+                  >
+                    {cur}
+                  </button>
+                ))}
+              </div>
             </div>
             <AnimatePresence>
               {showProfitSuggestion && profitNum > 0 && (
@@ -922,7 +1019,10 @@ export default function BudgetPage() {
                     </p>
                   </div>
                   <span className="text-xs sm:text-sm font-black shrink-0" style={{ color: activityColor(act.type) }}>
-                    {act.type === "withdraw" || act.type === "invest" ? "-" : "+"}{formatMoney(act.amount)}
+                    {act.type === "withdraw" || act.type === "invest" ? "-" : "+"}
+                    {act.currency && act.rateAtTime
+                      ? formatMoney(act.amount, act.currency as any, act.rateAtTime)
+                      : formatMoney(act.amount)}
                   </span>
                 </motion.div>
               ))}
@@ -1087,7 +1187,28 @@ export default function BudgetPage() {
             })()}
           </div>
           <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">{t("targetAmount")}</label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">{t("targetAmount")}</label>
+              <div className="flex gap-1 p-0.5 bg-white/5 rounded-lg border border-white/10">
+                {(['USD', 'THB'] as const).map(cur => (
+                  <button
+                    key={cur}
+                    type="button"
+                    onClick={() => handleCurrencyChange(cur)}
+                    className={cn(
+                      'px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wide transition-all',
+                      inputCurrency === cur
+                        ? cur === 'THB'
+                          ? 'bg-[#E9C349] text-[#241a00]'
+                          : 'bg-[#ADC6FF] text-[#00285d]'
+                        : 'text-gray-500 hover:text-gray-300'
+                    )}
+                  >
+                    {cur === 'THB' ? '฿ THB' : '$ USD'}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="relative">
               <input
                 type="number"
@@ -1099,14 +1220,39 @@ export default function BudgetPage() {
                 }}
                 onChange={(e) => setBucketForm((prev) => ({ ...prev, targetAmount: e.target.value }))}
                 placeholder="0.00"
-                className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white text-sm outline-none focus:border-[#E9C349]/50 transition-all"
+                className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white text-sm outline-none focus:border-[#E9C349]/50 transition-all pr-12"
               />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-xs uppercase">{currency}</span>
+              <span className={cn(
+                "absolute right-4 top-1/2 -translate-y-1/2 font-black text-xs uppercase opacity-90",
+                inputCurrency === 'THB' ? 'text-[#E9C349]' : 'text-[#ADC6FF]'
+              )}>
+                {inputCurrency === 'THB' ? '฿' : '$'}
+              </span>
             </div>
           </div>
           {!editingBucket && (
             <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">{t("currentAmount")}</label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">{t("currentAmount")}</label>
+                <div className="flex gap-1 p-0.5 bg-white/5 rounded-lg border border-white/10 opacity-50 pointer-events-none">
+                  {(['USD', 'THB'] as const).map(cur => (
+                    <button
+                      key={cur}
+                      type="button"
+                      className={cn(
+                        'px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wide transition-all',
+                        inputCurrency === cur
+                          ? cur === 'THB'
+                            ? 'bg-[#E9C349] text-[#241a00]'
+                            : 'bg-[#ADC6FF] text-[#00285d]'
+                          : 'text-gray-500'
+                      )}
+                    >
+                      {cur === 'THB' ? '฿' : '$'}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="relative">
                 <input
                   type="number"
@@ -1114,9 +1260,14 @@ export default function BudgetPage() {
                   value={bucketForm.currentAmount}
                   onChange={(e) => setBucketForm((prev) => ({ ...prev, currentAmount: e.target.value }))}
                   placeholder="0.00"
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white text-sm outline-none focus:border-[#E9C349]/50 transition-all"
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white text-sm outline-none focus:border-[#E9C349]/50 transition-all pr-12"
                 />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-xs uppercase">{currency}</span>
+                <span className={cn(
+                  "absolute right-4 top-1/2 -translate-y-1/2 font-black text-xs uppercase opacity-90",
+                  inputCurrency === 'THB' ? 'text-[#E9C349]' : 'text-[#ADC6FF]'
+                )}>
+                  {inputCurrency === 'THB' ? '฿' : '$'}
+                </span>
               </div>
             </div>
           )}
@@ -1165,9 +1316,27 @@ export default function BudgetPage() {
                 }}
                 placeholder="0.00"
                 autoFocus
-                className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-4 pr-12 text-white text-lg font-black outline-none focus:border-[#FF8B9A]/50 transition-all text-center"
+                className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-4 pr-24 text-white text-lg font-black outline-none focus:border-[#FF8B9A]/50 transition-all text-center"
               />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-xs uppercase">{currency}</span>
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 p-0.5 bg-white/5 rounded-lg border border-white/10">
+                {(['USD', 'THB'] as const).map(cur => (
+                  <button
+                    key={cur}
+                    type="button"
+                    onClick={() => handleCurrencyChange(cur)}
+                    className={cn(
+                      'px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-wide transition-all',
+                      inputCurrency === cur
+                        ? cur === 'THB'
+                          ? 'bg-[#E9C349] text-[#241a00]'
+                          : 'bg-[#ADC6FF] text-[#00285d]'
+                        : 'text-gray-500 hover:text-gray-300'
+                    )}
+                  >
+                    {cur}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
           <div className="flex gap-4">
