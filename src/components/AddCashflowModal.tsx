@@ -97,6 +97,11 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
   const [isAdding, setIsAdding] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const [autoSuggested, setAutoSuggested] = useState(false);
+  const convertCurrency = (amount: number, from: "USD" | "THB", to: "USD" | "THB") => {
+    const usd = amount / (exchangeRates[from] || 1);
+    return usd * (exchangeRates[to] || 1);
+  };
+  const bucketCurrency = (bucket: { currency?: string }) => (bucket.currency === "THB" ? "THB" : "USD");
 
   // Calculate current month's net cashflow for preview
   const currentNetCashflow = useMemo(() => {
@@ -104,13 +109,16 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
     const key = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const thisMonthCash = cashActivities.filter(a => a.date.startsWith(key));
     
-    const income = thisMonthCash.filter(a => (a.type === 'INCOME' || a.type === 'DEPOSIT') && !a.isTransfer).reduce((s, a) => s + a.amountUSD, 0);
-    const expense = thisMonthCash.filter(a => (a.type === 'EXPENSE' || a.type === 'WITHDRAW') && !a.isTransfer).reduce((s, a) => s + a.amountUSD, 0);
+    const getEntryAmount = (a: any) => a.amountUSD ?? a.amount ?? 0;
+
+    const income = thisMonthCash.filter(a => (a.type === 'INCOME' || a.type === 'DEPOSIT') && !a.isTransfer).reduce((s, a) => s + getEntryAmount(a), 0);
+    const expense = thisMonthCash.filter(a => (a.type === 'EXPENSE' || a.type === 'WITHDRAW') && !a.isTransfer).reduce((s, a) => s + getEntryAmount(a), 0);
     return income - expense;
   }, [cashActivities]);
 
   const projectedNetCashflow = useMemo(() => {
     const amt = Number(amount) || 0;
+    
     if (amt === 0) return currentNetCashflow;
     if (type === "INCOME" || type === "DEPOSIT") return currentNetCashflow + amt;
     return currentNetCashflow - amt;
@@ -237,7 +245,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
     // Validate bucket deduction
     if ((type === "EXPENSE" || type === "WITHDRAW") && selectedBucketId !== "<no-bucket>") {
       const bucket = moneyBuckets.find(b => b.id === selectedBucketId);
-      if (bucket && bucket.currentAmount < amountNum) {
+      if (bucket && bucket.currentAmount < convertCurrency(rawAmount, inputCurrency, bucketCurrency(bucket))) {
         addToast(
           t("insufficientBucketBalance").replace("{bucket}", t(bucket.name) || bucket.name),
           "error"
@@ -279,7 +287,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
         bucketId: selectedBucketId !== "<no-bucket>" && selectedBucketId !== "<auto-distribute>" ? selectedBucketId : undefined
       });
 
-      addCashActivity({
+      const savedActivity = await addCashActivity({
         type,
         amountUSD: amountNum,
         category: category,
@@ -288,22 +296,28 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
         note: detailedNote,
         bucketId: selectedBucketId !== "<no-bucket>" && selectedBucketId !== "<auto-distribute>" ? selectedBucketId : undefined,
         currency: inputCurrency,
-        rateAtTime: exchangeRates[inputCurrency] || 1
+        rateAtTime: exchangeRates[inputCurrency] || 1,
+        originalAmount: rawAmount
       });
+      if (!savedActivity) return;
 
       // Deduct from bucket if EXPENSE or WITHDRAW
       if ((type === "EXPENSE" || type === "WITHDRAW") && selectedBucketId !== "<no-bucket>") {
         const bucket = moneyBuckets.find(b => b.id === selectedBucketId);
         if (bucket) {
-          const newAmount = Math.max(0, bucket.currentAmount - amountNum);
+          const bucketAmount = convertCurrency(rawAmount, inputCurrency, bucketCurrency(bucket));
+          const newAmount = Math.max(0, bucket.currentAmount - bucketAmount);
           updateMoneyBucket(bucket.id, { currentAmount: newAmount });
           addBucketActivity({
             bucketId: bucket.id,
             bucketName: bucket.name,
             type: "withdraw",
-            amount: amountNum,
+            amount: bucketAmount,
             date: new Date().toISOString(),
             note: `${t("deductFromBucket")}: ${t(category) || category}${note ? ` - ${note}` : ""}`,
+            currency: bucketCurrency(bucket),
+            rateAtTime: exchangeRates[bucketCurrency(bucket)] || 1,
+            originalAmount: bucketAmount,
           });
         }
       }
@@ -315,7 +329,8 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
           if (totalAllocated > 0) {
             for (const bucket of moneyBuckets) {
               const pct = bucket.targetPercent || 0;
-              const share = (pct / totalAllocated) * amountNum;
+              const originalShare = (pct / totalAllocated) * rawAmount;
+              const share = convertCurrency(originalShare, inputCurrency, bucketCurrency(bucket));
               if (share > 0) {
                 updateMoneyBucket(bucket.id, { currentAmount: bucket.currentAmount + share });
                 addBucketActivity({
@@ -325,6 +340,9 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
                   amount: share,
                   date: new Date().toISOString(),
                   note: `${type === "DEPOSIT" ? t("deposit") : t("income")}: ${t(category) || category}${note ? ` - ${note}` : ""}`,
+                  currency: bucketCurrency(bucket),
+                  rateAtTime: exchangeRates[bucketCurrency(bucket)] || 1,
+                  originalAmount: share,
                 });
               }
             }
@@ -333,14 +351,18 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
           // Deposit entirely into one specific bucket
           const bucket = moneyBuckets.find(b => b.id === selectedBucketId);
           if (bucket) {
-            updateMoneyBucket(bucket.id, { currentAmount: bucket.currentAmount + amountNum });
+            const bucketAmount = convertCurrency(rawAmount, inputCurrency, bucketCurrency(bucket));
+            updateMoneyBucket(bucket.id, { currentAmount: bucket.currentAmount + bucketAmount });
             addBucketActivity({
               bucketId: bucket.id,
               bucketName: bucket.name,
               type: "deposit",
-              amount: amountNum,
+              amount: bucketAmount,
               date: new Date().toISOString(),
               note: `${type === "DEPOSIT" ? t("deposit") : t("income")}: ${t(category) || category}${note ? ` - ${note}` : ""}`,
+              currency: bucketCurrency(bucket),
+              rateAtTime: exchangeRates[bucketCurrency(bucket)] || 1,
+              originalAmount: bucketAmount,
             });
           }
         }
@@ -486,7 +508,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
                 projectedNetCashflow >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]"
               )}>
                 {projectedNetCashflow >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-                {formatMoney(projectedNetCashflow)}
+                {formatMoney(Math.abs(projectedNetCashflow))}
               </span>
             </div>
           </div>
@@ -664,7 +686,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
                     </option>
                     {moneyBuckets.map(bucket => (
                       <option key={bucket.id} value={bucket.id} className="bg-[#1C1B1B]">
-                        {bucket.icon} {t(bucket.name) || bucket.name} ({formatMoney(bucket.currentAmount)})
+                        {bucket.icon} {t(bucket.name) || bucket.name} ({formatMoney(bucket.currentAmount / (exchangeRates[bucket.currency || 'USD'] || 1), bucket.currency as any, undefined, bucket.currentAmount)})
                       </option>
                     ))}
                   </>
@@ -672,7 +694,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
                   <>
                     {moneyBuckets.map(bucket => (
                       <option key={bucket.id} value={bucket.id} className="bg-[#1C1B1B]">
-                        {bucket.icon} {t(bucket.name) || bucket.name} ({formatMoney(bucket.currentAmount)})
+                        {bucket.icon} {t(bucket.name) || bucket.name} ({formatMoney(bucket.currentAmount / (exchangeRates[bucket.currency || 'USD'] || 1), bucket.currency as any, undefined, bucket.currentAmount)})
                       </option>
                     ))}
                     <option value="<no-bucket>" className="bg-[#1C1B1B]">

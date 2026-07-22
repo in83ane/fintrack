@@ -56,23 +56,37 @@ export default function BudgetPage() {
     addToast,
   } = useApp();
 
-  const toUSD = (displayAmount: number) => displayAmount / (exchangeRates[currency] || 1);
-  const inputToUSD = (displayAmount: number) => displayAmount / (exchangeRates[inputCurrency] || 1);
-  const toDisplay = (usdAmount: number) => usdAmount * (exchangeRates[currency] || 1);
+  const convertCurrency = (amount: number, from: "USD" | "THB", to: "USD" | "THB") => {
+    const usd = amount / (exchangeRates[from] || 1);
+    return usd * (exchangeRates[to] || 1);
+  };
+  const toUSD = (displayAmount: number, from: "USD" | "THB" = currency as "USD" | "THB") => convertCurrency(displayAmount, from, "USD");
 
-  const formatDisplay = (displayAmount: number) => {
+  const formatDisplay = (displayAmount: number, displayCurrency: "USD" | "THB" = currency as "USD" | "THB") => {
     const formatter = new Intl.NumberFormat(language === "th" ? "th-TH" : "en-US", {
       style: "currency",
-      currency: currency,
+      currency: displayCurrency,
       minimumFractionDigits: 2,
       currencyDisplay: "narrowSymbol",
     });
     let formatted = formatter.format(displayAmount);
-    if (language === "th" && currency === "USD") formatted = formatted.replace("US$", "$");
+    if (language === "th" && displayCurrency === "USD") formatted = formatted.replace("US$", "$");
     formatted = formatted.replace("THB", "฿").replace("฿ ", "฿");
     return formatted;
   };
   const currencySymbol = formatDisplay(0).replace(/[0-9,.\s-]/g, "");
+  const bucketCurrency = (bucket: { currency?: string }) => (bucket.currency === "THB" ? "THB" : "USD");
+  const formatBucketAmount = (bucket: { currency?: string }, amount: number) => {
+    const bCur = bucketCurrency(bucket) as "USD" | "THB";
+    const targetCur = currency as "USD" | "THB";
+    
+    if (bCur === targetCur) {
+      return formatDisplay(amount, targetCur);
+    } else {
+      const converted = convertCurrency(amount, bCur, targetCur);
+      return formatDisplay(converted, targetCur);
+    }
+  };
 
   const [inputCurrency, setInputCurrency] = useState<"USD" | "THB">(currency === "THB" ? "THB" : "USD");
 
@@ -183,7 +197,7 @@ export default function BudgetPage() {
     };
   }, [updateScrollState, moneyBuckets]);
 
-  const totalAllocated = useMemo(() => moneyBuckets.reduce((s, b) => s + b.currentAmount, 0), [moneyBuckets]);
+  const totalAllocated = useMemo(() => moneyBuckets.reduce((s, b) => s + (b.currentAmount / (exchangeRates[b.currency || 'USD'] || 1)), 0), [moneyBuckets, exchangeRates]);
   const totalTargetPercent = useMemo(() => moneyBuckets.reduce((s, b) => s + b.targetPercent, 0), [moneyBuckets]);
 
   const canAddMoreBuckets = totalTargetPercent < 100;
@@ -210,18 +224,21 @@ export default function BudgetPage() {
     const now = new Date().toISOString();
     moneyBuckets.forEach((b) => {
       const splitDisplay = totalTargetPercent > 0 ? (incomeNum * b.targetPercent) / totalTargetPercent : 0;
-      const splitUSD = inputToUSD(splitDisplay);
-      if (splitUSD > 0) {
-        updateMoneyBucket(b.id, { currentAmount: b.currentAmount + splitUSD });
+      const targetCurrency = bucketCurrency(b);
+      const splitBucketAmount = convertCurrency(splitDisplay, inputCurrency, targetCurrency);
+      const splitUSD = toUSD(splitDisplay, inputCurrency);
+      if (splitBucketAmount > 0) {
+        updateMoneyBucket(b.id, { currentAmount: b.currentAmount + splitBucketAmount });
         addBucketActivity({
           bucketId: b.id,
           bucketName: b.name,
           type: "income_split",
-          amount: splitUSD,
+          amount: splitBucketAmount,
           date: now,
           note: `${t("distributed")} ${b.targetPercent}% → ${t(b.name) || b.name}`,
-          currency: inputCurrency,
-          rateAtTime: exchangeRates[inputCurrency] || 1,
+          currency: targetCurrency,
+          rateAtTime: exchangeRates[targetCurrency] || 1,
+          originalAmount: splitBucketAmount,
         });
         // Add cash activity for Cashflow page
         addCashActivity({
@@ -233,6 +250,7 @@ export default function BudgetPage() {
           note: `Income distribution ${b.targetPercent}% - ${t(b.name) || b.name}`,
           currency: inputCurrency,
           rateAtTime: exchangeRates[inputCurrency] || 1,
+          originalAmount: splitDisplay,
         });
       }
     });
@@ -249,8 +267,8 @@ export default function BudgetPage() {
     if (profitNum <= 0) return;
     const halfADisplay = Math.floor(profitNum * 100 / 2) / 100;
     const halfBDisplay = Math.round((profitNum - halfADisplay) * 100) / 100;
-    const halfAUSD = inputToUSD(halfADisplay);
-    const halfBUSD = inputToUSD(halfBDisplay);
+    const halfAUSD = toUSD(halfADisplay, inputCurrency);
+    const halfBUSD = toUSD(halfBDisplay, inputCurrency);
     const now = new Date().toISOString();
     if (emergencyBucket) {
       updateMoneyBucket(emergencyBucket.id, { currentAmount: emergencyBucket.currentAmount + halfAUSD });
@@ -314,7 +332,7 @@ export default function BudgetPage() {
     if (!displayAmt || displayAmt <= 0 || !investModal) return;
     const bucket = moneyBuckets.find((b) => b.id === investModal.sourceBucketId);
     if (!bucket) return;
-    const amtUSD = inputToUSD(displayAmt);
+    const amtUSD = toUSD(displayAmt, inputCurrency);
     if (amtUSD > bucket.currentAmount) {
       addToast(t("amountExceedsBalance"), "error");
       return;
@@ -352,15 +370,16 @@ export default function BudgetPage() {
     const maxAllowed = Math.max(1, 100 - otherBucketsPercent);
     const safePercent = Math.min(Math.max(1, Number(bucketForm.targetPercent) || 1), maxAllowed);
     
-    const thbRate = exchangeRates["THB"] || 36.5;
-    const targetUSD = inputCurrency === "THB" ? (Number(bucketForm.targetAmount) || 0) / thbRate : (Number(bucketForm.targetAmount) || 0);
-    const currentUSD = inputCurrency === "THB" ? (Number(bucketForm.currentAmount) || 0) / thbRate : (Number(bucketForm.currentAmount) || 0);
+    const targetAmount = Number(bucketForm.targetAmount) || 0;
+    const currentAmount = Number(bucketForm.currentAmount) || 0;
 
     if (editingBucket) {
       updateMoneyBucket(editingBucket, {
         name: bucketForm.name,
         targetPercent: safePercent,
-        targetAmount: targetUSD,
+        targetAmount,
+        currentAmount,
+        currency: inputCurrency,
         color: bucketForm.color,
         icon: bucketForm.icon,
         linkedToExpenses: bucketForm.linkedToExpenses,
@@ -369,8 +388,9 @@ export default function BudgetPage() {
       addMoneyBucket({
         name: bucketForm.name,
         targetPercent: safePercent,
-        targetAmount: targetUSD,
-        currentAmount: currentUSD,
+        targetAmount,
+        currentAmount,
+        currency: inputCurrency,
         color: bucketForm.color,
         icon: bucketForm.icon,
         linkedToExpenses: bucketForm.linkedToExpenses,
@@ -385,26 +405,28 @@ export default function BudgetPage() {
     if (!displayVal || displayVal <= 0 || !inlineAction) return;
     const bucket = moneyBuckets.find((b) => b.id === inlineAction.id);
     if (!bucket) return;
-    const valUSD = toUSD(displayVal);
-    if (inlineAction.type === "withdraw" && valUSD > bucket.currentAmount) {
+    const targetCurrency = bucketCurrency(bucket);
+    const bucketAmount = convertCurrency(displayVal, currency as "USD" | "THB", targetCurrency);
+    if (inlineAction.type === "withdraw" && bucketAmount > bucket.currentAmount) {
       addToast(t("amountExceedsBalance"), "error");
       return;
     }
     const newAmount =
       inlineAction.type === "deposit"
-        ? bucket.currentAmount + valUSD
-        : Math.max(0, bucket.currentAmount - valUSD);
+        ? bucket.currentAmount + bucketAmount
+        : Math.max(0, bucket.currentAmount - bucketAmount);
     const now = new Date().toISOString();
     updateMoneyBucket(bucket.id, { currentAmount: newAmount });
     addBucketActivity({
       bucketId: bucket.id,
       bucketName: bucket.name,
       type: inlineAction.type,
-      amount: valUSD,
+      amount: bucketAmount,
       date: now,
       note: `${inlineAction.type === "deposit" ? "+" : "-"}${formatDisplay(displayVal)} → ${t(bucket.name) || bucket.name}`,
-      currency: currency,
-      rateAtTime: exchangeRates[currency] || 1,
+      currency: targetCurrency,
+      rateAtTime: exchangeRates[targetCurrency] || 1,
+      originalAmount: bucketAmount,
     });
     // No cash activity created - bucket transactions are standalone
     addToast(
@@ -609,11 +631,10 @@ export default function BudgetPage() {
                       onClick={(e) => {
                         e.stopPropagation();
                         setEditingBucket(bucket.id);
-                        const initialCurr = currency === "THB" ? "THB" : "USD";
+                        const initialCurr = bucketCurrency(bucket);
                         setInputCurrency(initialCurr);
-                        const thbRate = exchangeRates["THB"] || 36.5;
-                        const targetVal = initialCurr === "THB" ? (bucket.targetAmount || 0) * thbRate : (bucket.targetAmount || 0);
-                        const currentVal = initialCurr === "THB" ? bucket.currentAmount * thbRate : bucket.currentAmount;
+                        const targetVal = bucket.targetAmount || 0;
+                        const currentVal = bucket.currentAmount;
                         setBucketForm({ 
                           name: bucket.name, 
                           targetPercent: bucket.targetPercent.toString(), 
@@ -642,13 +663,13 @@ export default function BudgetPage() {
                     {bucket.targetAmount && bucket.targetAmount > 0 ? t("savings") : t("currentAmount")}
                   </span>
                   <div className="flex items-baseline gap-1 mt-1">
-                    <span className="text-[#8c909f] font-light text-lg sm:text-xl">{currencySymbol}</span>
+                    <span className="text-[#8c909f] font-light text-lg sm:text-xl">{formatBucketAmount(bucket, 0).replace(/[0-9,.\s-]/g, "")}</span>
                     <span className="text-3xl sm:text-4xl font-black tracking-[-0.04em] text-white">
-                      {formatMoney(bucket.currentAmount).replace(/[^0-9,.]/g, "")}
+                      {formatBucketAmount(bucket, bucket.currentAmount).replace(/[^0-9,.]/g, "")}
                     </span>
                     {bucket.targetAmount && bucket.targetAmount > 0 ? (
                       <span className="text-sm sm:text-base font-bold text-[#8c909f]/60 ml-1 tracking-tight">
-                        / {formatMoney(bucket.targetAmount).replace(/[^0-9,.]/g, "")}
+                        / {formatBucketAmount(bucket, bucket.targetAmount).replace(/[^0-9,.]/g, "")}
                       </span>
                     ) : null}
                   </div>
@@ -660,7 +681,7 @@ export default function BudgetPage() {
                         setInvestModal({ sourceBucketId: bucket.id });
                       }}
                     >
-                      💡 {t("suggestionInvest")} {formatMoney(bucket.currentAmount - bucket.targetAmount)}
+                      💡 {t("suggestionInvest")} {formatBucketAmount(bucket, bucket.currentAmount - bucket.targetAmount)}
                     </div>
                   ) : null}
                 </div>
@@ -1296,7 +1317,7 @@ export default function BudgetPage() {
                 <span className="text-xl">{bucket.icon}</span>
                 <div>
                   <p className="text-xs font-bold text-white">{t(bucket.name) || bucket.name}</p>
-                  <p className="text-xs text-gray-500">{t("currentAmount")}: {formatMoney(bucket.currentAmount)}</p>
+                  <p className="text-xs text-gray-500">{t("currentAmount")}: {formatBucketAmount(bucket, bucket.currentAmount)}</p>
                 </div>
               </div>
             ) : null;

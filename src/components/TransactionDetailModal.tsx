@@ -36,6 +36,7 @@ interface TransactionDetailModalProps {
     tag?: string;
     rateAtTime?: number;
     currency?: string;
+    originalAmount?: number;
     // For bucket/cash activities
     bucketName?: string;
     category?: string;
@@ -47,7 +48,7 @@ interface TransactionDetailModalProps {
 }
 
 export function TransactionDetailModal({ isOpen, onClose, transaction }: TransactionDetailModalProps) {
-  const { t, formatMoney, moneyBuckets, language } = useApp();
+  const { t, formatMoney, moneyBuckets, language, exchangeRates } = useApp();
 
   if (!transaction) return null;
 
@@ -160,7 +161,7 @@ export function TransactionDetailModal({ isOpen, onClose, transaction }: Transac
             )}>
               {(transaction.type === 'BUY' || transaction.type === 'IMPORT' || transaction.type === 'INCOME' || transaction.type === 'DEPOSIT') ? '+' : ''}
               {(transaction.type === 'SELL' || transaction.type === 'EXPENSE' || transaction.type === 'WITHDRAW') ? '-' : ''}
-              {formatMoney(transaction.amountUSD)}
+              {formatMoney(transaction.amountUSD, transaction.currency as any, transaction.rateAtTime, transaction.originalAmount)}
             </p>
           </div>
         </div>
@@ -208,7 +209,7 @@ export function TransactionDetailModal({ isOpen, onClose, transaction }: Transac
                 <TrendingUp size={14} className="text-[#ADC6FF]" />
               </div>
               <p className="text-2xl font-black text-white">
-                {formatMoney(transaction.amountUSD)}
+                {formatMoney(transaction.amountUSD, transaction.currency as any, transaction.rateAtTime, transaction.originalAmount)}
               </p>
             </div>
 
@@ -229,7 +230,7 @@ export function TransactionDetailModal({ isOpen, onClose, transaction }: Transac
                         {t(sourceBucket.name) || sourceBucket.name}
                       </p>
                       <p className="text-[10px] text-gray-500">
-                        {formatMoney(sourceBucket.currentAmount)} {t("remaining") || "remaining"}
+                        {formatMoney(sourceBucket.currentAmount / (exchangeRates[sourceBucket.currency || 'USD'] || 1), sourceBucket.currency as any, undefined, sourceBucket.currentAmount)} {t("remaining") || "remaining"}
                       </p>
                     </div>
                   </div>

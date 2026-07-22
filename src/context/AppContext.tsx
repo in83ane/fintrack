@@ -15,6 +15,7 @@ export interface Trade {
   date: string;
   rateAtTime: number;
   currency: string;
+  originalAmount?: number;
   shares?: number;
   pricePerUnit?: number;
   fees?: number;
@@ -35,6 +36,7 @@ export interface CashActivity {
   isTransfer?: boolean; // true = money moving between Cash ↔ Bucket (not income/expense)
   currency?: string;
   rateAtTime?: number;
+  originalAmount?: number;
 }
 
 export interface Allocation {
@@ -71,6 +73,7 @@ export interface MoneyBucket {
   targetPercent: number;
   targetAmount?: number;
   currentAmount: number;
+  currency?: Currency;
   color: string;
   icon: string;
   linkedToExpenses?: boolean;
@@ -86,6 +89,7 @@ export interface BucketActivity {
   note?: string;
   currency?: string;
   rateAtTime?: number;
+  originalAmount?: number;
 }
 
 // Extended CashActivity that includes bucket activities for Cashflow page
@@ -103,6 +107,7 @@ export interface CashflowActivity {
   source: 'cash' | 'bucket'; // 'cash' = from cash_activities, 'bucket' = from bucket_activities
   currency?: string;
   rateAtTime?: number;
+  originalAmount?: number;
 }
 
 export interface Asset {
@@ -161,12 +166,12 @@ interface AppState {
   setLanguage: (lang: Language) => void;
   setCurrency: (curr: Currency) => void;
   t: (key: string) => string;
-  formatMoney: (amount: number, originalCurrency?: Currency, originalRate?: number) => string;
+  formatMoney: (amount: number, originalCurrency?: Currency, originalRate?: number, originalAmount?: number) => string;
   exchangeRates: Record<Currency, number>;
   trades: Trade[];
   addTrade: (trade: Omit<Trade, "id">) => void;
   cashActivities: CashActivity[];
-  addCashActivity: (activity: Omit<CashActivity, "id">) => void;
+  addCashActivity: (activity: Omit<CashActivity, "id">) => Promise<CashActivity | null>;
   removeCashActivity: (id: string) => void;
   allocations: Allocation[];
   updateAllocation: (label: string, value: number) => void;
@@ -1423,12 +1428,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     cashflowIncludeAssets: false,
   });
 
-  // Initialize lang and theme from localStorage safely on client side
+  // Initialize lang, theme and currency from localStorage safely on client side
   useEffect(() => {
     try {
       const storedLang = localStorage.getItem("preferred-lang") as Language;
       if (storedLang === "en" || storedLang === "th") {
         setLanguage(storedLang);
+      }
+      const storedCurrency = localStorage.getItem("preferred-currency") as Currency;
+      if (storedCurrency === "USD" || storedCurrency === "THB") {
+        setCurrency(storedCurrency);
       }
       const storedTheme = localStorage.getItem("theme");
       if (storedTheme === "light") {
@@ -1479,6 +1488,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   }, [language]);
 
+  // Save currency to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem("preferred-currency", currency);
+    } catch {}
+  }, [currency]);
+
   const defaultTrades: Trade[] = [];
   const defaultAllocations: Allocation[] = [
     { label: "Equities", value: 60, color: "#ADC6FF" },
@@ -1501,11 +1517,68 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [bucketActivities, setBucketActivities] = useState<BucketActivity[]>([]);
   const [userProfile, setUserProfile] = useState<{ email: string; avatarUrl: string; initials: string } | undefined>();
   const [user, setUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(false);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const deletedAssetSymbols = React.useRef<Set<string>>(new Set());
   const [toasts, setToasts] = useState<AppToast[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [customCategories, setCustomCategories] = useState<CustomCategory[]>([]);
+
+  const loadFromLocalStorage = React.useCallback(() => {
+    let hasLocalData = false;
+    const readArray = (key: string): any[] => {
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    };
+
+    const storedAssets = readArray("fintrack-assets");
+    const storedTrades = readArray("fintrack-trades");
+    const storedAllocations = readArray("fintrack-allocations");
+    const storedBuckets = readArray("fintrack-buckets");
+    const storedBucketActivities = readArray("fintrack-bucket-activities");
+    const storedCashActivities = readArray("fintrack-cash-activities");
+    const storedCustomCategories = readArray("fintrack-custom-categories");
+
+    if (storedAssets.length > 0) {
+      const uniqueAssets = Array.from(
+        new Map(storedAssets.map((item: Asset) => [item.symbol.toUpperCase(), item])).values()
+      );
+      setAssets(uniqueAssets as Asset[]);
+      hasLocalData = true;
+    }
+    if (storedTrades.length > 0) {
+      setTrades(storedTrades as Trade[]);
+      hasLocalData = true;
+    }
+    if (storedAllocations.length > 0) {
+      setAllocations(storedAllocations as Allocation[]);
+      hasLocalData = true;
+    }
+    if (storedBuckets.length > 0) {
+      setMoneyBuckets(storedBuckets as MoneyBucket[]);
+      hasLocalData = true;
+    }
+    if (storedBucketActivities.length > 0) {
+      setBucketActivities(storedBucketActivities as BucketActivity[]);
+      hasLocalData = true;
+    }
+    if (storedCashActivities.length > 0) {
+      setCashActivities(storedCashActivities as CashActivity[]);
+      hasLocalData = true;
+    }
+    if (storedCustomCategories.length > 0) {
+      setCustomCategories(storedCustomCategories as CustomCategory[]);
+      hasLocalData = true;
+    }
+
+    return hasLocalData;
+  }, []);
 
   // Auth & Data Loading
   useEffect(() => {
@@ -1521,31 +1594,38 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       } else {
         setUserProfile(undefined);
       }
+      if (_event !== "INITIAL_SESSION") {
+        setAuthReady(true);
+      }
     });
 
     // 2. Initial session check
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session) {
-        setUser(session.user);
-      } else {
-        // Fallback: Check server cookies if client storage is empty
-        try {
-          const { getSessionTokensAction } = await import('@/src/app/actions');
-          const tokens = await getSessionTokensAction();
-          if (tokens?.access_token) {
-            const { data } = await supabase.auth.setSession({
-              access_token: tokens.access_token,
-              refresh_token: tokens.refresh_token
-            });
-            if (data.session) {
-              setUser(data.session.user);
-              return;
+      try {
+        if (session) {
+          setUser(session.user);
+        } else {
+          // Fallback: Check server cookies if client storage is empty
+          try {
+            const { getSessionTokensAction } = await import('@/src/app/actions');
+            const tokens = await getSessionTokensAction();
+            if (tokens?.access_token) {
+              const { data } = await supabase.auth.setSession({
+                access_token: tokens.access_token,
+                refresh_token: tokens.refresh_token
+              });
+              if (data.session) {
+                setUser(data.session.user);
+                return;
+              }
             }
+          } catch (e) {
+            console.error("Failed to sync session from server", e);
           }
-        } catch (e) {
-          console.error("Failed to sync session from server", e);
+          setUser(null);
         }
-        setUser(null);
+      } finally {
+        setAuthReady(true);
       }
     });
 
@@ -1554,30 +1634,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Fetch data when user changes
   useEffect(() => {
+    if (!authReady) return;
+
+    setIsDataLoaded(false);
+
     if (!user) {
       // Load from localStorage for offline mode
       try {
-        const storedAssets = localStorage.getItem("fintrack-assets");
-        const storedTrades = localStorage.getItem("fintrack-trades");
-        const storedAllocations = localStorage.getItem("fintrack-allocations");
-        const storedBuckets = localStorage.getItem("fintrack-buckets");
-        const storedBucketActivities = localStorage.getItem("fintrack-bucket-activities");
-        const storedCashActivities = localStorage.getItem("fintrack-cash-activities");
-        const storedCustomCategories = localStorage.getItem("fintrack-custom-categories");
-
-        if (storedAssets) {
-          const parsedAssets = JSON.parse(storedAssets);
-          if (Array.isArray(parsedAssets)) {
-            const uniqueAssets = Array.from(new Map(parsedAssets.map(item => [item.symbol.toUpperCase(), item])).values());
-            setAssets(uniqueAssets as Asset[]);
-          }
-        }
-        if (storedTrades) setTrades(JSON.parse(storedTrades));
-        if (storedAllocations) setAllocations(JSON.parse(storedAllocations));
-        if (storedBuckets) setMoneyBuckets(JSON.parse(storedBuckets));
-        if (storedBucketActivities) setBucketActivities(JSON.parse(storedBucketActivities));
-        if (storedCashActivities) setCashActivities(JSON.parse(storedCashActivities));
-        if (storedCustomCategories) setCustomCategories(JSON.parse(storedCustomCategories));
+        loadFromLocalStorage();
       } catch (err) {
         console.error("Failed to load from localStorage", err);
       }
@@ -1588,13 +1652,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const loadData = async () => {
       try {
         const [
-          { data: assetsData },
-          { data: tradesData },
-          { data: allocationsData },
-          { data: bucketsData },
-          { data: bucketActivitiesData },
-          { data: cashActivitiesData },
-          { data: userCategoriesData },
+          { data: assetsData, error: assetsError },
+          { data: tradesData, error: tradesError },
+          { data: allocationsData, error: allocationsError },
+          { data: bucketsData, error: bucketsError },
+          { data: bucketActivitiesData, error: bucketActivitiesError },
+          { data: cashActivitiesData, error: cashActivitiesError },
+          { data: userCategoriesData, error: userCategoriesError },
         ] = await Promise.all([
           db.assets.getAll(user.id),
           db.trades.getAll(user.id),
@@ -1604,6 +1668,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           db.cashActivities.getAll(user.id),
           db.userCategories.getAll(user.id),
         ]);
+
+        const loadErrors = [
+          ["assets", assetsError],
+          ["trades", tradesError],
+          ["allocations", allocationsError],
+          ["money_buckets", bucketsError],
+          ["bucket_activities", bucketActivitiesError],
+          ["cash_activities", cashActivitiesError],
+          ["user_categories", userCategoriesError],
+        ].filter(([, error]) => Boolean(error));
+
+        if (loadErrors.length > 0) {
+          console.error("Supabase data load errors:", loadErrors);
+        }
+
+        const remoteHasData = [
+          assetsData,
+          tradesData,
+          allocationsData,
+          bucketsData,
+          bucketActivitiesData,
+          cashActivitiesData,
+          userCategoriesData,
+        ].some((data) => Array.isArray(data) && data.length > 0);
+
+        if (!remoteHasData && loadFromLocalStorage()) {
+          return;
+        }
 
         if (assetsData) {
           // Populate deleted symbols so trades don't recreate them
@@ -1660,6 +1752,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               date: t.execution_date,
               rateAtTime: t.exchange_rate_at_time || 1,
               currency: t.currency || 'USD',
+              originalAmount: t.original_amount || undefined,
               shares: t.quantity || 0,
               pricePerUnit: t.price_at_execution || 0,
               sourceBucketId: sourceBucketId,
@@ -1688,6 +1781,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             targetPercent: b.target_percent,
             targetAmount: b.target_amount,
             currentAmount: b.current_amount,
+            currency: (b.currency as Currency) || "USD",
             color: b.color,
             icon: b.icon,
             linkedToExpenses: b.linked_to_expenses
@@ -1706,7 +1800,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             date: ba.date,
             note: ba.note || undefined,
             currency: ba.currency || undefined,
-            rateAtTime: ba.rate_at_time || undefined
+            rateAtTime: ba.rate_at_time || undefined,
+            originalAmount: ba.original_amount || undefined
           })));
         } else {
           setBucketActivities([]);
@@ -1721,7 +1816,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             date: ca.date,
             note: ca.note || undefined,
             currency: ca.currency || undefined,
-            rateAtTime: ca.rate_at_time || undefined
+            rateAtTime: ca.rate_at_time || undefined,
+            originalAmount: ca.original_amount || undefined
           })));
         } else {
           setCashActivities([]);
@@ -1746,7 +1842,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
 
     loadData();
-  }, [user]);
+  }, [user, authReady, loadFromLocalStorage]);
 
   // Sync state to local storage is no longer needed as primary source, 
   // but we can keep it as a backup for transient state if we want.
@@ -1795,7 +1891,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Compute net worth history from actual trade data + current portfolio value
   const netWorthHistory = React.useMemo(() => {
-    const currentCashUSD = moneyBuckets.reduce((acc, curr) => acc + curr.currentAmount, 0) / (exchangeRates[currency] || 1);
+    const toUSD = (amount: number, fromCurrency: Currency = "USD") => {
+      return amount / (exchangeRates[fromCurrency] || 1);
+    };
+    const currentCashUSD = moneyBuckets.reduce(
+      (acc, curr) => acc + toUSD(curr.currentAmount, curr.currency || "USD"),
+      0
+    );
     const currentTotalUSD = assets.reduce((acc, curr) => acc + curr.valueUSD, 0) + currentCashUSD;
     const now = new Date();
     const currentDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -1829,7 +1931,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     return history;
-  }, [assets, trades, moneyBuckets, currency, exchangeRates]);
+  }, [assets, trades, moneyBuckets]);
 
 
   // Update userProfile when Supabase user session changes
@@ -2081,10 +2183,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return translations[language][key] || key;
   };
 
-  const formatMoney = (amountUSD: number, originalCurrency?: Currency, originalRate?: number) => {
+  const formatMoney = (amountUSD: number, originalCurrency?: Currency, originalRate?: number, originalAmount?: number) => {
     const targetCurrency = originalCurrency || currency;
     const rate = originalRate || exchangeRates[currency];
-    const convertedAmount = amountUSD * rate;
+    
+    // If the requested target currency matches the original currency and we have the exact original amount,
+    // use it directly to bypass floating-point math drift (e.g. 50.00 THB vs 50.01 THB).
+    const isExactMatch = originalAmount !== undefined && originalCurrency === targetCurrency;
+    const convertedAmount = isExactMatch ? originalAmount! : (amountUSD * rate);
 
     // For THB: force en-US locale which reliably returns ฿ (U+0E3F).
     // th-TH locale may return "B" on some browsers/environments.
@@ -2195,6 +2301,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         execution_date: new Date(tradeData.date).toISOString(),
         exchange_rate_at_time: tradeData.rateAtTime || 1,
         currency: tradeData.currency || "USD",
+        original_amount: tradeData.originalAmount || null,
         total_cost: tradeData.amountUSD,
         status: "completed",
         notes: tradeData.sourceBucketId ? `Source Wallet ID: ${tradeData.sourceBucketId}` : null,
@@ -2373,6 +2480,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (updates.date !== undefined) dbUpdates.date = updates.date;
       if (updates.shares !== undefined) dbUpdates.shares = updates.shares;
       if (updates.pricePerUnit !== undefined) dbUpdates.price_per_unit = updates.pricePerUnit;
+      if (updates.originalAmount !== undefined) dbUpdates.original_amount = updates.originalAmount;
+      if (updates.currency !== undefined) dbUpdates.currency = updates.currency;
+      if (updates.rateAtTime !== undefined) dbUpdates.exchange_rate_at_time = updates.rateAtTime;
       
       if (Object.keys(dbUpdates).length > 0) {
         await db.trades.update(tradeToUpdate.dbId, dbUpdates);
@@ -2401,10 +2511,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const dbUpdates: any = {};
       if (updates.type !== undefined) dbUpdates.type = updates.type;
-      if (updates.amountUSD !== undefined) dbUpdates.amount_usd = updates.amountUSD;
+      if (updates.amountUSD !== undefined) dbUpdates.amount = updates.amountUSD;
       if (updates.category !== undefined) dbUpdates.category = updates.category;
       if (updates.date !== undefined) dbUpdates.date = updates.date;
       if (updates.note !== undefined) dbUpdates.note = updates.note;
+      if (updates.originalAmount !== undefined) dbUpdates.original_amount = updates.originalAmount;
+      if (updates.currency !== undefined) dbUpdates.currency = updates.currency;
+      if (updates.rateAtTime !== undefined) dbUpdates.rate_at_time = updates.rateAtTime;
       
       if (Object.keys(dbUpdates).length > 0) {
         await db.cashActivities.update(id, dbUpdates);
@@ -2428,18 +2541,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const tempId = Date.now().toString();
     setMoneyBuckets(prev => [...prev, { ...bucket, id: tempId }]);
     try {
-      const { data, error } = await db.buckets.insert({
+      let { data, error } = await db.buckets.insert({
         user_id: user.id,
         name: bucket.name,
         target_percent: bucket.targetPercent,
         target_amount: bucket.targetAmount || 0,
         current_amount: bucket.currentAmount,
+        currency: bucket.currency || "USD",
         color: bucket.color,
         icon: bucket.icon,
         linked_to_expenses: bucket.linkedToExpenses || false
       } as any);
       if (error) {
-        console.error("Supabase bucket insert error:", error);
+        console.error("Supabase bucket insert error:", error.message || error);
         // Replace tempId with itself — state stays, DB failed silently
         return;
       }
@@ -2465,6 +2579,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const supabaseUpdates: any = {};
       if (updates.name !== undefined) supabaseUpdates.name = updates.name;
       if (updates.currentAmount !== undefined) supabaseUpdates.current_amount = updates.currentAmount;
+      if (updates.currency !== undefined) supabaseUpdates.currency = updates.currency;
       if (updates.targetPercent !== undefined) supabaseUpdates.target_percent = updates.targetPercent;
       if (updates.targetAmount !== undefined) supabaseUpdates.target_amount = updates.targetAmount;
       if (updates.color !== undefined) supabaseUpdates.color = updates.color;
@@ -2520,11 +2635,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         note: activity.note || null,
         date: activity.date,
         currency: activity.currency || null,
-        rate_at_time: activity.rateAtTime || null
+        rate_at_time: activity.rateAtTime || null,
+        original_amount: activity.originalAmount || null
       } as any);
 
       if (error) {
-        console.error("Supabase bucket_activities insert error:", error);
+        console.error("Supabase bucket_activities insert error:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+        setBucketActivities(prev => prev.filter(a => a.id !== tempId));
         return;
       }
 
@@ -2553,36 +2670,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const addCashActivity = async (activityData: Omit<CashActivity, "id">) => {
-    console.log("addCashActivity called:", activityData);
-    console.log("User:", user);
-
+  const addCashActivity = async (activityData: Omit<CashActivity, "id">): Promise<CashActivity | null> => {
     if (!user) {
-      console.log("No user, saving to localStorage");
       const id = Math.random().toString(36).substr(2, 9);
+      const newActivity = { ...activityData, id };
       setCashActivities(prev => {
-        const newActivities = [...prev, { ...activityData, id }];
+        const newActivities = [...prev, newActivity];
         localStorage.setItem("fintrack-cash-activities", JSON.stringify(newActivities));
         return newActivities;
       });
-      return;
+      return newActivity;
     }
 
     const tempId = Math.random().toString(36).substr(2, 9);
-    setCashActivities(prev => [...prev, { ...activityData, id: tempId }]);
+    const optimisticActivity = { ...activityData, id: tempId };
+    setCashActivities(prev => [...prev, optimisticActivity]);
 
     try {
-      console.log("Inserting to Supabase:", {
-        user_id: user.id,
-        type: activityData.type,
-        amount: activityData.amountUSD,
-        category: activityData.category,
-        date: activityData.date,
-        time: activityData.time || null,
-        bucket_id: activityData.bucketId || null,
-        is_transfer: activityData.isTransfer || false
-      });
-
       const { data, error } = await db.cashActivities.insert({
         user_id: user.id,
         type: activityData.type,
@@ -2594,37 +2698,82 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         bucket_id: activityData.bucketId || null,
         is_transfer: activityData.isTransfer || false,
         currency: activityData.currency || null,
-        rate_at_time: activityData.rateAtTime || null
+        rate_at_time: activityData.rateAtTime || null,
+        original_amount: activityData.originalAmount || null
       } as any);
 
-      console.log("Supabase insert result:", { data, error });
-
       if (error) {
-        console.error("Supabase cash_activities insert error:", error);
-        console.error("Failed to insert cash activity:", activityData);
-        return;
+        console.error("Supabase cash_activities insert error:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+        console.error("Failed to insert cash activity:", JSON.stringify(activityData, Object.getOwnPropertyNames(activityData), 2));
+        setCashActivities(prev => prev.filter(a => a.id !== tempId));
+        addToast(t("errorOccurred") || "Failed to save record", "error");
+        return null;
       }
       
       if (data) {
-        setCashActivities(prev => prev.map(a => a.id === tempId ? { ...activityData, id: data.id } : a));
+        const savedActivity = { ...activityData, id: data.id };
+        setCashActivities(prev => prev.map(a => a.id === tempId ? savedActivity : a));
+        return savedActivity;
       }
+      return optimisticActivity;
     } catch (err) {
       console.error("Failed to add cash activity to Supabase", err);
+      setCashActivities(prev => prev.filter(a => a.id !== tempId));
+      addToast(t("errorOccurred") || "Failed to save record", "error");
+      return null;
     }
   };
 
   const removeCashActivity = async (id: string) => {
+    const activity = cashActivities.find(a => a.id === id);
+    if (!activity) return;
+
+    // Bucket reversion logic
+    const revertBucket = () => {
+      if (activity.bucketId && activity.bucketId !== "<no-bucket>" && activity.bucketId !== "<auto-distribute>") {
+        const bucket = moneyBuckets.find(b => b.id === activity.bucketId);
+        if (bucket) {
+          const bCur = bucket.currency === "THB" ? "THB" : "USD";
+          // @ts-ignore - we assume exchangeRates is available in the same scope since this is inside AppContext.tsx
+          const bRate = (typeof exchangeRates !== 'undefined' && exchangeRates[bCur]) || 1;
+          const amountInBucketCur = (activity.amountUSD ?? 0) * bRate;
+          
+          let newAmount = bucket.currentAmount;
+          if (activity.type === "EXPENSE" || activity.type === "WITHDRAW") {
+            newAmount = bucket.currentAmount + amountInBucketCur; // Revert withdrawal by adding back
+          } else if (activity.type === "INCOME" || activity.type === "DEPOSIT") {
+            newAmount = Math.max(0, bucket.currentAmount - amountInBucketCur); // Revert deposit by subtracting
+          }
+          
+          updateMoneyBucket(bucket.id, { currentAmount: newAmount });
+          addBucketActivity({
+            bucketId: bucket.id,
+            bucketName: bucket.name,
+            type: (activity.type === "EXPENSE" || activity.type === "WITHDRAW") ? "deposit" : "withdraw",
+            amount: amountInBucketCur,
+            date: new Date().toISOString(),
+            note: "Revert: " + (activity.note || activity.category),
+            currency: bCur,
+            rateAtTime: bRate,
+            originalAmount: amountInBucketCur,
+          });
+        }
+      }
+    };
+
     if (!user) {
       setCashActivities(prev => {
         const newActivities = prev.filter(a => a.id !== id);
         localStorage.setItem("fintrack-cash-activities", JSON.stringify(newActivities));
         return newActivities;
       });
+      revertBucket();
       return;
     }
     try {
       await db.cashActivities.delete(id);
       setCashActivities(prev => prev.filter(a => a.id !== id));
+      revertBucket();
     } catch (err) {
       console.error("Failed to remove cash activity from Supabase", err);
     }
@@ -2702,7 +2851,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const addTradeFromBucket = async (tradeData: Omit<Trade, 'id'>, bucketId: string) => {
     const bucket = moneyBuckets.find(b => b.id === bucketId);
     if (!bucket) return;
-    if (tradeData.amountUSD > bucket.currentAmount) {
+    const bucketCurrency = bucket.currency || "USD";
+    const tradeAmountInBucketCurrency = tradeData.amountUSD * (exchangeRates[bucketCurrency] || 1);
+    if (tradeAmountInBucketCurrency > bucket.currentAmount) {
       addToast(t("amountExceedsBalance"), 'error');
       return;
     }
@@ -2711,14 +2862,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await addTrade({ ...tradeData, sourceBucketId: bucketId });
 
     // Deduct from bucket
-    await updateMoneyBucket(bucketId, { currentAmount: bucket.currentAmount - tradeData.amountUSD });
+    await updateMoneyBucket(bucketId, { currentAmount: bucket.currentAmount - tradeAmountInBucketCurrency });
 
     // Log activity
     await addBucketActivity({
       bucketId: bucket.id,
       bucketName: bucket.name,
       type: 'invest',
-      amount: tradeData.amountUSD,
+      amount: tradeAmountInBucketCurrency,
       date: new Date().toISOString(),
       note: `Trade ${tradeData.asset} — ${t('deductedFromBucket')}`,
     });

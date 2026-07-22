@@ -452,7 +452,7 @@ export function AddAssetModal({ isOpen, onClose }: AddAssetModalProps) {
                             <span>{t(b.name) || b.name}</span>
                           </span>
                           <span className={cn("text-xs font-bold", hasEnough || totalCost === 0 ? "text-gray-500" : "text-[#FFB4AB]")}>
-                            {formatMoney(b.currentAmount)}
+                            {formatMoney(b.currentAmount / (exchangeRates[b.currency || 'USD'] || 1), b.currency as any, undefined, b.currentAmount)}
                           </span>
                         </button>
                       );

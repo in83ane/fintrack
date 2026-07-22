@@ -270,7 +270,7 @@ export function AIFinancialAdvisor() {
     cashActivities, bucketActivities,
     assets, trades, totalInvested, totalUnrealizedPL, totalRealizedPL, totalDividends,
     moneyBuckets, netWorthHistory,
-    addCashActivity, addToast, t,
+    addCashActivity, addToast, t, exchangeRates,
   } = useApp();
 
   const isTh = language === "th";
@@ -294,35 +294,38 @@ export function AIFinancialAdvisor() {
 
     const thisMonthCash = cashActivities.filter(a => a.date.startsWith(thisMonthKey));
     const prevMonthCash = cashActivities.filter(a => a.date.startsWith(prevMonthKey));
+    const getEntryAmount = (entry: { amountUSD?: number; amount?: number; originalAmount?: number }) => {
+      return entry.amountUSD ?? entry.amount ?? 0;
+    };
 
     const monthIncome = thisMonthCash
       .filter(a => a.type === "INCOME" || a.type === "DEPOSIT")
-      .reduce((s, a) => s + a.amountUSD, 0);
+      .reduce((s, a) => s + getEntryAmount(a), 0);
     const monthExpenses = thisMonthCash
       .filter(a => (a.type === "EXPENSE" || a.type === "WITHDRAW") && !a.isTransfer)
-      .reduce((s, a) => s + a.amountUSD, 0);
+      .reduce((s, a) => s + getEntryAmount(a), 0);
     const monthNet = monthIncome - monthExpenses;
     const savingsRate = monthIncome > 0 ? Math.max(0, (monthNet / monthIncome) * 100) : 0;
 
     // Previous month stats
     const prevMonthIncome = prevMonthCash
       .filter(a => a.type === "INCOME" || a.type === "DEPOSIT")
-      .reduce((s, a) => s + a.amountUSD, 0);
+      .reduce((s, a) => s + getEntryAmount(a), 0);
     const prevMonthExpenses = prevMonthCash
       .filter(a => (a.type === "EXPENSE" || a.type === "WITHDRAW") && !a.isTransfer)
-      .reduce((s, a) => s + a.amountUSD, 0);
+      .reduce((s, a) => s + getEntryAmount(a), 0);
     const prevMonthNet = prevMonthIncome - prevMonthExpenses;
 
     const monthInvested = bucketActivities
       .filter(ba => ba.type === "invest" && ba.date.startsWith(thisMonthKey))
-      .reduce((s, ba) => s + ba.amount, 0);
+      .reduce((s, ba) => s + getEntryAmount(ba), 0);
     const investRatio = monthIncome > 0 ? (monthInvested / monthIncome) * 100 : 0;
 
     const expenseByCategory: Record<string, number> = {};
     thisMonthCash
       .filter(a => a.type === "EXPENSE" || a.type === "WITHDRAW")
       .forEach(a => {
-        expenseByCategory[a.category] = (expenseByCategory[a.category] || 0) + a.amountUSD;
+        expenseByCategory[a.category] = (expenseByCategory[a.category] || 0) + getEntryAmount(a);
       });
 
     const totalPortfolioValue = assets.reduce((s, a) => s + a.valueUSD, 0);
@@ -347,10 +350,10 @@ export function AIFinancialAdvisor() {
       const label = d.toLocaleDateString("en-US", { month: "short" });
       const inc = cashActivities
         .filter(a => a.date.startsWith(key) && (a.type === "INCOME" || a.type === "DEPOSIT"))
-        .reduce((s, a) => s + a.amountUSD, 0);
+        .reduce((s, a) => s + getEntryAmount(a), 0);
       const exp = cashActivities
         .filter(a => a.date.startsWith(key) && (a.type === "EXPENSE" || a.type === "WITHDRAW") && !a.isTransfer)
-        .reduce((s, a) => s + a.amountUSD, 0);
+        .reduce((s, a) => s + getEntryAmount(a), 0);
       if (inc > 0 || exp > 0) monthlyTrend.push({ label, income: inc, expense: exp });
     }
 
@@ -358,13 +361,13 @@ export function AIFinancialAdvisor() {
       .sort(([, a], [, b]) => b - a)
       .slice(0, 5);
 
-    const liquidity = moneyBuckets.reduce((s, b) => s + b.currentAmount, 0);
+    const liquidity = moneyBuckets.reduce((s, b) => s + (b.currentAmount / (exchangeRates[b.currency || 'USD'] || 1)), 0);
 
     // Budget health per bucket
     const bucketHealth = moneyBuckets.map(b => {
       const bucketExpenses = thisMonthCash
         .filter(a => (a.type === "EXPENSE" || a.type === "WITHDRAW") && a.bucketId === b.id)
-        .reduce((s, a) => s + a.amountUSD, 0);
+        .reduce((s, a) => s + getEntryAmount(a), 0);
       const targetAmount = b.targetAmount || (b.targetPercent > 0 && monthIncome > 0 ? (b.targetPercent / 100) * monthIncome : 0);
       return {
         name: b.name,
@@ -389,10 +392,10 @@ export function AIFinancialAdvisor() {
     // All-time income & expenses
     const allTimeIncome = cashActivities
       .filter(a => a.type === "INCOME" || a.type === "DEPOSIT")
-      .reduce((s, a) => s + a.amountUSD, 0);
+      .reduce((s, a) => s + getEntryAmount(a), 0);
     const allTimeExpenses = cashActivities
       .filter(a => (a.type === "EXPENSE" || a.type === "WITHDRAW") && !a.isTransfer)
-      .reduce((s, a) => s + a.amountUSD, 0);
+      .reduce((s, a) => s + getEntryAmount(a), 0);
 
     return {
       monthIncome, monthExpenses, monthNet, savingsRate,

@@ -262,11 +262,13 @@ function CategoryPicker({
 // ── Quick Add Panel ──โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 function QuickAddPanel({
   type,
+  defaultBucketId,
   onTypeChange,
   onClose,
   onSuccess,
 }: {
   type: "INCOME" | "EXPENSE";
+  defaultBucketId?: string;
   onTypeChange: (t: "INCOME" | "EXPENSE") => void;
   onClose: () => void;
   onSuccess: () => void;
@@ -282,7 +284,7 @@ function QuickAddPanel({
   const [note, setNote] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [selectedBucketId, setSelectedBucketId] = useState(
-    type === "INCOME" ? "<auto-distribute>" : (moneyBuckets[0]?.id || "<no-bucket>")
+    defaultBucketId ? defaultBucketId : (type === "INCOME" ? "<auto-distribute>" : (moneyBuckets[0]?.id || "<no-bucket>"))
   );
   const [isAdding, setIsAdding] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
@@ -291,17 +293,18 @@ function QuickAddPanel({
   useEffect(() => {
     setCategory(type === "INCOME" ? "salary" : "food");
     setSelectedBucketId(
-      type === "INCOME" ? "<auto-distribute>" : (moneyBuckets[0]?.id || "<no-bucket>")
+      defaultBucketId ? defaultBucketId : (type === "INCOME" ? "<auto-distribute>" : (moneyBuckets[0]?.id || "<no-bucket>"))
     );
-  }, [type]);
+  }, [type, defaultBucketId, moneyBuckets]);
 
   // Net preview
   const currentNet = useMemo(() => {
     const now = new Date();
     const key = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
     const m = cashActivities.filter((a) => a.date.startsWith(key));
-    const inc = m.filter((a) => a.type === "INCOME" || a.type === "DEPOSIT").reduce((s, a) => s + a.amountUSD, 0);
-    const exp = m.filter((a) => (a.type === "EXPENSE" || a.type === "WITHDRAW") && !a.isTransfer).reduce((s, a) => s + a.amountUSD, 0);
+    const getEntryAmount = (a: any) => a.amountUSD ?? a.amount ?? 0;
+    const inc = m.filter((a) => a.type === "INCOME" || a.type === "DEPOSIT").reduce((s, a) => s + getEntryAmount(a), 0);
+    const exp = m.filter((a) => (a.type === "EXPENSE" || a.type === "WITHDRAW") && !a.isTransfer).reduce((s, a) => s + getEntryAmount(a), 0);
     return inc - exp;
   }, [cashActivities]);
 
@@ -309,7 +312,8 @@ function QuickAddPanel({
     const n = Number(amount) || 0;
     if (n === 0) return currentNet;
     const rate = exchangeRates[inputCurrency] || 1;
-    return type === "INCOME" ? currentNet + n / rate : currentNet - n / rate;
+    const nUSD = n / rate;
+    return type === "INCOME" ? currentNet + nUSD : currentNet - nUSD;
   }, [currentNet, amount, type, inputCurrency, exchangeRates]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -330,7 +334,7 @@ function QuickAddPanel({
         }
       }
 
-      addCashActivity({
+      const savedActivity = await addCashActivity({
         type,
         amountUSD: amountNum,
         category,
@@ -339,25 +343,43 @@ function QuickAddPanel({
         bucketId: selectedBucketId !== "<no-bucket>" && selectedBucketId !== "<auto-distribute>" ? selectedBucketId : undefined,
         currency: inputCurrency,
         rateAtTime: rate,
+        originalAmount: raw,
       });
+      if (!savedActivity) return;
 
       // Bucket logic
       if (type === "EXPENSE" && selectedBucketId !== "<no-bucket>") {
         const bucket = moneyBuckets.find((b) => b.id === selectedBucketId);
         if (bucket) {
-          updateMoneyBucket(bucket.id, { currentAmount: Math.max(0, bucket.currentAmount - amountNum) });
-          addBucketActivity({ bucketId: bucket.id, bucketName: bucket.name, type: "withdraw", amount: amountNum, date: now, note: t(category) || category, currency: inputCurrency, rateAtTime: rate });
+          const bCur = bucket.currency === "THB" ? "THB" : "USD";
+          const bRate = exchangeRates[bCur] || 1;
+          const bucketAmount = amountNum * bRate;
+          updateMoneyBucket(bucket.id, { currentAmount: Math.max(0, bucket.currentAmount - bucketAmount) });
+          addBucketActivity({ bucketId: bucket.id, bucketName: bucket.name, type: "withdraw", amount: bucketAmount, date: now, note: t(category) || category, currency: inputCurrency, rateAtTime: rate, originalAmount: raw });
         }
       } else if (type === "INCOME" && moneyBuckets.length > 0 && selectedBucketId === "<auto-distribute>") {
         const total = moneyBuckets.reduce((s, b) => s + (b.targetPercent || 0), 0);
         if (total > 0) {
           for (const b of moneyBuckets) {
-            const share = ((b.targetPercent || 0) / total) * amountNum;
-            if (share > 0) {
-              updateMoneyBucket(b.id, { currentAmount: b.currentAmount + share });
-              addBucketActivity({ bucketId: b.id, bucketName: b.name, type: "deposit", amount: share, date: now, note: t(category) || category, currency: inputCurrency, rateAtTime: rate });
+            const shareUSD = ((b.targetPercent || 0) / total) * amountNum;
+            if (shareUSD > 0) {
+              const bCur = b.currency === "THB" ? "THB" : "USD";
+              const bRate = exchangeRates[bCur] || 1;
+              const shareBucketCur = shareUSD * bRate;
+              updateMoneyBucket(b.id, { currentAmount: b.currentAmount + shareBucketCur });
+              const originalShare = ((b.targetPercent || 0) / total) * raw;
+              addBucketActivity({ bucketId: b.id, bucketName: b.name, type: "deposit", amount: shareBucketCur, date: now, note: t(category) || category, currency: inputCurrency, rateAtTime: rate, originalAmount: originalShare });
             }
           }
+        }
+      } else if (type === "INCOME" && selectedBucketId !== "<no-bucket>" && selectedBucketId !== "<auto-distribute>") {
+        const bucket = moneyBuckets.find((b) => b.id === selectedBucketId);
+        if (bucket) {
+          const bCur = bucket.currency === "THB" ? "THB" : "USD";
+          const bRate = exchangeRates[bCur] || 1;
+          const bucketAmount = amountNum * bRate;
+          updateMoneyBucket(bucket.id, { currentAmount: bucket.currentAmount + bucketAmount });
+          addBucketActivity({ bucketId: bucket.id, bucketName: bucket.name, type: "deposit", amount: bucketAmount, date: now, note: t(category) || category, currency: inputCurrency, rateAtTime: rate, originalAmount: raw });
         }
       }
 
@@ -424,7 +446,7 @@ function QuickAddPanel({
               <div className="flex items-center gap-2">
                 <span className="text-[10px] text-gray-600">{t("ledgerNewNet")}</span>
                 <span className={cn("text-[10px] font-black", projected >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
-                  {projected >= 0 ? "+" : ""}{formatMoney(projected)}
+                  {projected >= 0 ? "+" : "-"}{formatMoney(Math.abs(projected))}
                 </span>
               </div>
             </div>
@@ -512,7 +534,7 @@ function QuickAddPanel({
                   >
                     {isIncome ? (
                       <>
-                        <option value="<auto-distribute>" className="bg-[#141414]">โก {t("ledgerAutoSplit")}</option>
+                        <option value="<auto-distribute>" className="bg-[#141414]">⚡ {t("ledgerAutoSplit")}</option>
                         {moneyBuckets.map((b) => (
                           <option key={b.id} value={b.id} className="bg-[#141414]">{b.icon} {b.name}</option>
                         ))}
@@ -554,7 +576,7 @@ function QuickAddPanel({
   );
 }
 
-// ── Helpers ──โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+
 function getCategoryIcon(cat: string): string {
   const c = cat.toLowerCase();
   if (c.includes("food") || c.includes("อาหาร") || c.includes("lunch") || c.includes("dinner")) return "🍔";
@@ -590,7 +612,7 @@ function formatDateGroup(dateStr: string, todayLabel: string, yesterdayLabel: st
   return d.toLocaleDateString(locale, { day: "numeric", month: "long", year: "numeric" });
 }
 
-// ── Month Navigator ──โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+
 function MonthNavigator({
   value,
   onChange,
@@ -666,16 +688,17 @@ function MonthNavigator({
   );
 }
 
-// ── Main Page ──โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+
 export default function LedgerPage() {
   const {
-    t, formatMoney, cashActivities, removeCashActivity, language,
+    t, formatMoney, cashActivities, moneyBuckets, removeCashActivity, language, currency, exchangeRates
   } = useApp();
 
   const [activePanel, setActivePanel] = useState<"INCOME" | "EXPENSE" | null>(null);
   const [panelType, setPanelType] = useState<"INCOME" | "EXPENSE">("INCOME");
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<"all" | "INCOME" | "EXPENSE">("all");
+  const [selectedBucket, setSelectedBucket] = useState<string>("all");
   const [toDelete, setToDelete] = useState<string | null>(null);
 
   const todayKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
@@ -691,12 +714,13 @@ export default function LedgerPage() {
     return [...keys].sort();
   }, [cashActivities]);
 
-  // Records filtered by month + type + search
+  // Records filtered by month + type + search + bucket
   const records = useMemo(() => {
     return cashActivities
       .filter((a) => a.type === "INCOME" || a.type === "EXPENSE")
       .filter((a) => selectedMonth === "all" || a.date.startsWith(selectedMonth))
       .filter((a) => filterType === "all" || a.type === filterType)
+      .filter((a) => selectedBucket === "all" || (selectedBucket === "unassigned" ? !a.bucketId : a.bucketId === selectedBucket))
       .filter((a) => {
         if (!search) return true;
         const q = search.toLowerCase();
@@ -707,17 +731,19 @@ export default function LedgerPage() {
         );
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [cashActivities, selectedMonth, search, filterType, language]);
+  }, [cashActivities, selectedMonth, search, filterType, language, selectedBucket]);
 
   // Stats for selected period
   const periodStats = useMemo(() => {
     const base = cashActivities
       .filter((a) => a.type === "INCOME" || a.type === "EXPENSE")
-      .filter((a) => selectedMonth === "all" || a.date.startsWith(selectedMonth));
-    const inc = base.filter((a) => a.type === "INCOME").reduce((s, a) => s + a.amountUSD, 0);
-    const exp = base.filter((a) => a.type === "EXPENSE").reduce((s, a) => s + a.amountUSD, 0);
+      .filter((a) => selectedMonth === "all" || a.date.startsWith(selectedMonth))
+      .filter((a) => selectedBucket === "all" || (selectedBucket === "unassigned" ? !a.bucketId : a.bucketId === selectedBucket));
+    const getEntryAmount = (a: any) => a.amountUSD ?? a.amount ?? 0;
+    const inc = base.filter((a) => a.type === "INCOME").reduce((s, a) => s + getEntryAmount(a), 0);
+    const exp = base.filter((a) => a.type === "EXPENSE").reduce((s, a) => s + getEntryAmount(a), 0);
     return { inc, exp, net: inc - exp };
-  }, [cashActivities, selectedMonth]);
+  }, [cashActivities, selectedMonth, currency, exchangeRates, selectedBucket]);
 
   // Group by date
   const grouped = useMemo(() => {
@@ -773,6 +799,42 @@ export default function LedgerPage() {
             />
           </div>
 
+          {/* Bucket Picker */}
+          <div className="mt-4 flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+            <button
+              onClick={() => setSelectedBucket("all")}
+              className={cn(
+                "px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all",
+                selectedBucket === "all" ? "bg-white text-black" : "bg-white/10 text-gray-400 hover:bg-white/20 hover:text-white"
+              )}
+            >
+              {t("allWallets") || "All Wallets"}
+            </button>
+            <button
+              onClick={() => setSelectedBucket("unassigned")}
+              className={cn(
+                "px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2",
+                selectedBucket === "unassigned" ? "bg-white text-black" : "bg-white/10 text-gray-400 hover:bg-white/20 hover:text-white"
+              )}
+            >
+              <Wallet size={12} />
+              {t("unassigned") || "Unassigned"}
+            </button>
+            {moneyBuckets.map(b => (
+              <button
+                key={b.id}
+                onClick={() => setSelectedBucket(b.id)}
+                className={cn(
+                  "px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2",
+                  selectedBucket === b.id ? "bg-white text-black" : "bg-white/10 text-gray-400 hover:bg-white/20 hover:text-white"
+                )}
+              >
+                <span>{b.icon}</span>
+                {t(b.name) || b.name}
+              </button>
+            ))}
+          </div>
+
           {/* Stats for selected period */}
           <div className="flex gap-3 mt-4">
             <div className="flex-1 bg-white/4 border border-white/6 rounded-2xl p-3.5">
@@ -791,7 +853,7 @@ export default function LedgerPage() {
               <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-1">{t("ledgerNet")}</p>
               <AnimatedNumber
                 value={periodStats.net}
-                formatter={(v) => `${v >= 0 ? "+" : ""}${formatMoney(v)}`}
+                formatter={(v) => `${v >= 0 ? "+" : ""}${formatMoney(Math.abs(v))}`}
                 className={cn("text-lg font-black tracking-tighter", periodStats.net >= 0 ? "text-white" : "text-[#FFB4AB]")}
               />
             </div>
@@ -835,6 +897,7 @@ export default function LedgerPage() {
           {activePanel !== null && (
             <QuickAddPanel
               type={panelType}
+              defaultBucketId={selectedBucket !== "all" && selectedBucket !== "unassigned" ? selectedBucket : undefined}
               onTypeChange={setPanelType}
               onClose={() => setActivePanel(null)}
               onSuccess={handleSuccess}
@@ -894,7 +957,11 @@ export default function LedgerPage() {
         ) : (
           <div className="space-y-5">
             {grouped.map(([dateKey, txns]) => {
-              const dayTotal = txns.reduce((s, tx) => tx.type === "INCOME" ? s + tx.amountUSD : s - tx.amountUSD, 0);
+              const dayTotal = txns.reduce((s, tx) => {
+                const getEntryAmount = (a: any) => a.amountUSD ?? a.amount ?? 0;
+                const val = getEntryAmount(tx);
+                return tx.type === "INCOME" ? s + val : s - val;
+              }, 0);
               return (
                 <div key={dateKey}>
                   <div className="flex items-center justify-between mb-2 px-1">
@@ -904,10 +971,9 @@ export default function LedgerPage() {
                         {formatDateGroup(dateKey, t("ledgerToday"), t("ledgerYesterday"), language)}
                       </span>
                     </div>
-                    <span className={cn("text-xs font-black", dayTotal >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}
-                    >
-                      {dayTotal >= 0 ? "+" : ""}{formatMoney(dayTotal)}
-                    </span>
+                    <div className={cn("text-xs font-black tracking-tighter", dayTotal >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
+                      {dayTotal >= 0 ? "+" : ""}{formatMoney(Math.abs(dayTotal))}
+                    </div>
                   </div>
 
                   <div className="bg-[#141414] border border-white/6 rounded-2xl overflow-hidden divide-y divide-white/4">
@@ -946,9 +1012,7 @@ export default function LedgerPage() {
                             <span className={cn("text-sm font-black tracking-tighter", isIncome ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}
                             >
                               {isIncome ? "+" : "-"}
-                              {txn.currency && txn.rateAtTime
-                                ? formatMoney(txn.amountUSD, txn.currency as any, txn.rateAtTime)
-                                : formatMoney(txn.amountUSD)}
+                              {formatMoney(txn.amountUSD ?? txn.amount ?? 0, txn.currency as any, txn.rateAtTime ?? 1, txn.originalAmount)}
                             </span>
                             <p className="text-[10px] text-gray-600 mt-0.5">
                               {new Date(txn.date).toLocaleTimeString(language === "th" ? "th-TH" : "en-US", { hour: "2-digit", minute: "2-digit" })}

@@ -42,6 +42,7 @@ interface UnifiedTransaction {
   cashActivityType?: CashActivity['type'];
   rateAtTime?: number;
   currency?: string;
+  originalAmount?: number;
 }
 
 export default function TransactionsPage() {
@@ -223,6 +224,7 @@ export default function TransactionsPage() {
         bucketIcon: sourceBucket?.icon || undefined,
         rateAtTime: t.rateAtTime,
         currency: t.currency,
+        originalAmount: t.originalAmount,
       };
     });
 
@@ -239,6 +241,9 @@ export default function TransactionsPage() {
         bucketName: ba.bucketName,
         bucketIcon: bucket?.icon || undefined,
         bucketActivityType: ba.type,
+        currency: ba.currency,
+        rateAtTime: ba.rateAtTime,
+        originalAmount: ba.originalAmount,
       };
     });
 
@@ -250,6 +255,9 @@ export default function TransactionsPage() {
       amount: ca.amountUSD,
       date: ca.date,
       cashActivityType: ca.type,
+      currency: ca.currency,
+      rateAtTime: ca.rateAtTime,
+      originalAmount: ca.originalAmount,
     }));
 
     return [...tradeItems, ...bucketItems].sort((a, b) => {
@@ -644,7 +652,7 @@ export default function TransactionsPage() {
                         'text-[#ADC6FF]'
                       }`}>
                         {txn.type === 'BUY' || (txn.category === 'cash' && txn.cashActivityType === 'INCOME') ? '+' : '-'}
-                        {formatMoney(txn.amount)}
+                        {formatMoney(txn.amount, txn.currency as any, txn.rateAtTime, txn.originalAmount)}
                       </span>
                     </td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4 text-right">

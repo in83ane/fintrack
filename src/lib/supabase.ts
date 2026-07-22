@@ -51,6 +51,7 @@ export interface Trade {
   date: string;
   rate_at_time: number | null;
   currency: string | null;
+  original_amount: number | null;
   source_bucket_id: string | null;
   tag: string | null;
   created_at: string;
@@ -71,6 +72,7 @@ export interface MoneyBucket {
   target_percent: number;
   target_amount?: number;
   current_amount: number;
+  currency: string | null;
   color: string;
   icon: string;
   linked_to_expenses: boolean;
@@ -87,6 +89,7 @@ export interface BucketActivity {
   date: string;
   currency: string | null;
   rate_at_time: number | null;
+  original_amount: number | null;
   created_at: string;
 }
 
@@ -103,6 +106,7 @@ export interface CashActivity {
   is_transfer: boolean;
   currency: string | null;
   rate_at_time: number | null;
+  original_amount: number | null;
   created_at: string;
 }
 

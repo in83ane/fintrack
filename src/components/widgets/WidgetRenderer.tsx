@@ -137,14 +137,15 @@ function AllocationPieWidget() {
 
 // ─── Monthly Summary Widget ────────────────────────────────────────────────────
 function MonthlySummaryWidget() {
-  const { t, formatMoney, cashActivities } = useApp();
+  const { t, formatMoney, cashActivities, currency } = useApp();
   const now = new Date();
   const thisMonth = cashActivities.filter(a => {
     const d = new Date(a.date);
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   });
-  const income = thisMonth.filter(a => a.type === "INCOME").reduce((s, a) => s + a.amountUSD, 0);
-  const expense = thisMonth.filter(a => a.type === "EXPENSE").reduce((s, a) => s + a.amountUSD, 0);
+  const getEntryAmount = (a: any) => a.amountUSD ?? a.amount ?? 0;
+  const income = thisMonth.filter(a => a.type === "INCOME").reduce((s, a) => s + getEntryAmount(a), 0);
+  const expense = thisMonth.filter(a => a.type === "EXPENSE").reduce((s, a) => s + getEntryAmount(a), 0);
   const net = income - expense;
 
   return (
@@ -152,7 +153,7 @@ function MonthlySummaryWidget() {
       <span className="text-[10px] font-black text-gray-500 uppercase tracking-wide mb-3">{t("widgetMonthlySummary")}</span>
       <div className="flex-1 flex flex-col justify-center space-y-3">
         <div className={cn("text-2xl font-black tracking-tighter", net >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
-          {net >= 0 ? "+" : ""}{formatMoney(net)}
+          {net >= 0 ? "+" : ""}{formatMoney(Math.abs(net))}
         </div>
         <div className="space-y-2">
           <div className="flex justify-between items-center bg-white/5 p-2.5 rounded-xl">
@@ -271,7 +272,7 @@ function DailyJournalWidget() {
                 </div>
               </div>
               <span className={cn("text-[11px] font-black", trade.type === "BUY" || trade.type === "IMPORT" ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
-                {trade.type === "BUY" || trade.type === "IMPORT" ? "+" : "-"}{formatMoney(trade.amountUSD)}
+                {trade.type === "BUY" || trade.type === "IMPORT" ? "+" : "-"}{formatMoney(trade.amountUSD, trade.currency as any, trade.rateAtTime, trade.originalAmount)}
               </span>
             </div>
           ))
@@ -283,8 +284,8 @@ function DailyJournalWidget() {
 
 // ─── Bucket Overview Widget ────────────────────────────────────────────────────
 function BucketOverviewWidget() {
-  const { t, moneyBuckets, formatMoney } = useApp();
-  const total = moneyBuckets.reduce((s, b) => s + b.currentAmount, 0);
+  const { t, moneyBuckets, formatMoney, exchangeRates } = useApp();
+  const total = moneyBuckets.reduce((s, b) => s + (b.currentAmount / (exchangeRates[b.currency || 'USD'] || 1)), 0);
 
   return (
     <div className="h-full flex flex-col">
@@ -305,7 +306,7 @@ function BucketOverviewWidget() {
                   <span className="text-sm">{b.icon}</span>
                   <span className="text-[10px] font-bold text-gray-400">{t(b.name) || b.name}</span>
                 </div>
-                <span className="text-[10px] font-black text-white">{formatMoney(b.currentAmount)}</span>
+                <span className="text-[10px] font-black text-white">{formatMoney(b.currentAmount / (exchangeRates[b.currency || 'USD'] || 1), b.currency as any, undefined, b.currentAmount)}</span>
               </div>
               <div className="h-1 bg-white/5 rounded-full overflow-hidden">
                 <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: b.color }} />

@@ -477,7 +477,13 @@ export default function DashboardPage() {
   const greeting = greetingHour < 12 ? (language === 'th' ? 'สวัสดีตอนเช้า' : 'Good Morning') : greetingHour < 18 ? (language === 'th' ? 'สวัสดีตอนบ่าย' : 'Good Afternoon') : (language === 'th' ? 'สวัสดีตอนค่ำ' : 'Good Evening');
   const activePositions = assets.filter(a => a.is_active !== false).length;
   const todayPL = totalUnrealizedPL;
-  const totalBucketValue = moneyBuckets.reduce((s, b) => s + b.currentAmount, 0);
+  const totalBucketValue = moneyBuckets.reduce((s, b) => s + (b.currentAmount / (exchangeRates[b.currency || 'USD'] || 1)), 0);
+  const getEntryAmount = (entry: { amountUSD?: number; amount?: number; originalAmount?: number }) => {
+    return entry.amountUSD ?? entry.amount ?? 0;
+  };
+  const formatEntryMoney = (value: number) => {
+    return formatMoney(Math.abs(value));
+  };
 
   // Financial health score (0-100)
   const healthScore = React.useMemo(() => {
@@ -509,8 +515,8 @@ export default function DashboardPage() {
   // Monthly cashflow summary
   const now2 = new Date();
   const monthKey = `${now2.getFullYear()}-${String(now2.getMonth() + 1).padStart(2, '0')}`;
-  const monthIncome = cashActivities.filter(a => a.date.startsWith(monthKey) && a.type === 'INCOME').reduce((s, a) => s + a.amountUSD, 0);
-  const monthExpense = cashActivities.filter(a => a.date.startsWith(monthKey) && (a.type === 'EXPENSE' || a.type === 'WITHDRAW') && !a.isTransfer).reduce((s, a) => s + a.amountUSD, 0);
+  const monthIncome = cashActivities.filter(a => a.date.startsWith(monthKey) && a.type === 'INCOME').reduce((s, a) => s + getEntryAmount(a), 0);
+  const monthExpense = cashActivities.filter(a => a.date.startsWith(monthKey) && (a.type === 'EXPENSE' || a.type === 'WITHDRAW') && !a.isTransfer).reduce((s, a) => s + getEntryAmount(a), 0);
   const monthNet = monthIncome - monthExpense;
 
   // Top movers
@@ -616,9 +622,9 @@ export default function DashboardPage() {
             <div className="shrink-0">
               <p className="text-[9px] text-gray-500 uppercase font-bold tracking-wide mb-0.5">{language === 'th' ? 'เดือนนี้' : 'This Month'}</p>
               <p className={`text-sm font-black tracking-tighter ${monthNet >= 0 ? 'text-[#4EDEA3]' : 'text-[#FFB4AB]'}`}>
-                {monthNet >= 0 ? '+' : ''}{formatMoney(monthNet)}
+                {monthNet >= 0 ? '+' : '-'}{formatEntryMoney(monthNet)}
               </p>
-              <p className="text-[9px] text-gray-600">{formatMoney(monthIncome)} in · {formatMoney(monthExpense)} out</p>
+              <p className="text-[9px] text-gray-600">{formatEntryMoney(monthIncome)} in · {formatEntryMoney(monthExpense)} out</p>
             </div>
 
             <div className="w-px h-8 bg-white/5 hidden sm:block shrink-0" />
@@ -844,7 +850,7 @@ export default function DashboardPage() {
               {bucketActivities.slice(0, 5).map((act, idx) => {
                 const isPositive = act.type === "deposit" || act.type === "income_split" || act.type === "profit_split";
                 const barColor = isPositive ? "#4EDEA3" : act.type === "invest" ? "#ADC6FF" : "#FFB4AB";
-                const amountText = `${isPositive ? "+" : "-"}${formatMoney(act.amount)}`;
+                const amountText = `${isPositive ? "+" : "-"}${formatEntryMoney(getEntryAmount(act))}`;
                 const timeAgo = (() => {
                   const now = Date.now();
                   const actDate = new Date(act.date).getTime();
@@ -907,19 +913,19 @@ export default function DashboardPage() {
 
               const bucketIncome = thisMonthBucketActivities
                 .filter(a => a.type === "deposit" || a.type === "income_split" || a.type === "profit_split")
-                .reduce((sum, a) => sum + a.amount, 0);
+                .reduce((sum, a) => sum + getEntryAmount(a), 0);
 
               const bucketExpenses = thisMonthBucketActivities
                 .filter(a => a.type === "withdraw" || a.type === "invest")
-                .reduce((sum, a) => sum + a.amount, 0);
+                .reduce((sum, a) => sum + getEntryAmount(a), 0);
 
               const cashIncome = thisMonthCashActivities
                 .filter(a => a.type === "INCOME")
-                .reduce((sum, a) => sum + a.amountUSD, 0);
+                .reduce((sum, a) => sum + getEntryAmount(a), 0);
 
               const cashExpenses = thisMonthCashActivities
                 .filter(a => a.type === "EXPENSE")
-                .reduce((sum, a) => sum + a.amountUSD, 0);
+                .reduce((sum, a) => sum + getEntryAmount(a), 0);
 
               const totalIncome = bucketIncome + cashIncome;
               const totalExpenses = bucketExpenses + cashExpenses;
@@ -928,7 +934,7 @@ export default function DashboardPage() {
               return (
                 <div className="space-y-4">
                   <h2 className={cn("text-3xl font-black tracking-tighter mb-4", net >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
-                    {net >= 0 ? "+" : "-"}{formatMoney(Math.abs(net))}
+                    {net >= 0 ? "+" : "-"}{formatEntryMoney(net)}
                   </h2>
                   <div className="space-y-3">
                     <div className="flex justify-between items-center bg-white/5 p-3 rounded-2xl">
@@ -936,14 +942,14 @@ export default function DashboardPage() {
                         <div className="w-2 h-2 rounded-full bg-[#4EDEA3]" />
                         <span className="text-xs text-gray-400 font-bold">{t("income")}</span>
                       </div>
-                      <span className="text-sm text-white font-black">{formatMoney(totalIncome)}</span>
+                      <span className="text-sm text-white font-black">{formatEntryMoney(totalIncome)}</span>
                     </div>
                     <div className="flex justify-between items-center bg-white/5 p-3 rounded-2xl">
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-[#FFB4AB]" />
                         <span className="text-xs text-gray-400 font-bold">{t("expense")}</span>
                       </div>
-                      <span className="text-sm text-white font-black">{formatMoney(totalExpenses)}</span>
+                      <span className="text-sm text-white font-black">{formatEntryMoney(totalExpenses)}</span>
                     </div>
                   </div>
                 </div>
@@ -974,6 +980,7 @@ export default function DashboardPage() {
                   id: ba.id,
                   type: ba.type === "deposit" || ba.type === "income_split" || ba.type === "profit_split" ? "INCOME" : "EXPENSE",
                   amountUSD: ba.amount,
+                  originalAmount: ba.originalAmount,
                   category: ba.bucketName || ba.type,
                   date: ba.date,
                   note: ba.note
@@ -1001,7 +1008,7 @@ export default function DashboardPage() {
                         </p>
                       </div>
                       <span className={cn("text-xs font-black flex-shrink-0", isIncome ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
-                        {isIncome ? "+" : "-"}{formatMoney(act.amountUSD)}
+                        {isIncome ? "+" : "-"}{formatEntryMoney(getEntryAmount(act))}
                       </span>
                     </div>
                   );
@@ -1193,7 +1200,7 @@ export default function DashboardPage() {
                   {moneyBuckets.slice(0, 4).map(b => (
                     <div key={b.id} className="flex items-center gap-1 flex-shrink-0">
                       <span className="text-xs sm:text-sm">{b.icon}</span>
-                      <span className="text-[10px] font-bold text-gray-400">{formatMoney(b.currentAmount)}</span>
+                      <span className="text-[10px] font-bold text-gray-400">{formatMoney(b.currentAmount / (exchangeRates[b.currency || 'USD'] || 1), b.currency as any, undefined, b.currentAmount)}</span>
                     </div>
                   ))}
                 </div>
@@ -1390,7 +1397,7 @@ export default function DashboardPage() {
                       <div className="flex justify-between items-center">
                         <span className="text-xs font-bold text-gray-500">{t("amount")}</span>
                         <span className={cn("text-lg font-black", isPositive ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
-                          {isPositive ? "+" : "-"}{formatMoney(act.amount)}
+                          {isPositive ? "+" : "-"}{formatEntryMoney(getEntryAmount(act))}
                         </span>
                       </div>
                       {act.note && (

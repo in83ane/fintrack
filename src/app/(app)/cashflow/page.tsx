@@ -51,6 +51,12 @@ export default function CashflowPage() {
   
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const getEntryAmount = (entry: { amountUSD?: number; amount?: number; originalAmount?: number }) => {
+    return entry.amountUSD ?? entry.amount ?? 0;
+  };
+  const formatEntryMoney = (value: number) => {
+    return formatMoney(Math.abs(value));
+  };
 
   // Add source property to cash activities
   const cashActivitiesWithSource: CashActivityWithSource[] = cashActivities.map(ca => ({
@@ -84,6 +90,7 @@ export default function CashflowPage() {
       source: 'bucket' as const,
       currency: ba.currency,
       rateAtTime: ba.rateAtTime,
+      originalAmount: ba.originalAmount,
     };
   });
 
@@ -121,6 +128,7 @@ export default function CashflowPage() {
       type: activity.type,
       category: activity.category,
       amountUSD: activity.amountUSD,
+      originalAmount: activity.originalAmount,
       date: activity.date,
       time: activity.time,
       note: activity.note,
@@ -165,7 +173,7 @@ export default function CashflowPage() {
   const handleExportCSV = () => {
     const csv = Papa.unparse(allCashflowActivities.map(c => ({
       type: c.type,
-      amount: c.amountUSD,
+      amount: getEntryAmount(c),
       category: c.category,
       date: c.date,
       note: c.note || ""
@@ -228,14 +236,14 @@ export default function CashflowPage() {
   };
 
   // Calculate stats (exclude transfers - they're just moving money, not income/expense)
-  const totalIncome = filteredCashflow.filter(c => (c.type === 'INCOME' || c.type === 'DEPOSIT') && !c.isTransfer).reduce((acc, c) => acc + c.amountUSD, 0);
-  const totalExpenses = filteredCashflow.filter(c => (c.type === 'EXPENSE' || c.type === 'WITHDRAW') && !c.isTransfer).reduce((acc, c) => acc + c.amountUSD, 0);
+  const totalIncome = filteredCashflow.filter(c => (c.type === 'INCOME' || c.type === 'DEPOSIT') && !c.isTransfer).reduce((acc, c) => acc + getEntryAmount(c), 0);
+  const totalExpenses = filteredCashflow.filter(c => (c.type === 'EXPENSE' || c.type === 'WITHDRAW') && !c.isTransfer).reduce((acc, c) => acc + getEntryAmount(c), 0);
   const netCashflow = totalIncome - totalExpenses;
 
   const savingsRate = totalIncome > 0 ? Math.max(0, (netCashflow / totalIncome) * 100) : 0;
   const totalInvestedFlow = filteredCashflow
     .filter(c => c.isTransfer && (c.category?.toLowerCase().includes('invest') || c.note?.toLowerCase().includes('invest')))
-    .reduce((acc, c) => acc + c.amountUSD, 0) + 
+    .reduce((acc, c) => acc + getEntryAmount(c), 0) + 
     bucketActivities.filter(ba => ba.type === 'invest').reduce((acc, ba) => {
       // Need to apply dateRange filtering to bucketActivities here too for investment ratio?
       // Since filteredCashflow already contains bucketActivities (as cashflow), let's just use filteredCashflow for both.
@@ -246,7 +254,7 @@ export default function CashflowPage() {
   const simpleTotalInvestedFlow = filteredCashflow.filter(c => 
     (c.isTransfer && (c.category?.toLowerCase().includes('invest') || c.note?.toLowerCase().includes('invest'))) || 
     (c.source === 'bucket' && (c as any).type === 'WITHDRAW' && (c.category?.toLowerCase().includes('invest') || c.note?.toLowerCase().includes('invest')))
-  ).reduce((acc, c) => acc + c.amountUSD, 0);
+  ).reduce((acc, c) => acc + getEntryAmount(c), 0);
 
   const investmentRatio = totalIncome > 0 ? (simpleTotalInvestedFlow / totalIncome) * 100 : 0;
 
@@ -256,8 +264,8 @@ export default function CashflowPage() {
     const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const prevKey = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
     const prevCash = cashActivities.filter(a => a.date.startsWith(prevKey));
-    const prevIncome = prevCash.filter(a => a.type === 'INCOME' || a.type === 'DEPOSIT').reduce((s, a) => s + a.amountUSD, 0);
-    const prevExpense = prevCash.filter(a => (a.type === 'EXPENSE' || a.type === 'WITHDRAW') && !a.isTransfer).reduce((s, a) => s + a.amountUSD, 0);
+    const prevIncome = prevCash.filter(a => a.type === 'INCOME' || a.type === 'DEPOSIT').reduce((s, a) => s + getEntryAmount(a), 0);
+    const prevExpense = prevCash.filter(a => (a.type === 'EXPENSE' || a.type === 'WITHDRAW') && !a.isTransfer).reduce((s, a) => s + getEntryAmount(a), 0);
     return { income: prevIncome, expense: prevExpense, net: prevIncome - prevExpense };
   }, [cashActivities]);
 
@@ -266,8 +274,8 @@ export default function CashflowPage() {
     const now = new Date();
     const key = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const monthCash = cashActivities.filter(a => a.date.startsWith(key));
-    const income = monthCash.filter(a => a.type === 'INCOME' || a.type === 'DEPOSIT').reduce((s, a) => s + a.amountUSD, 0);
-    const expense = monthCash.filter(a => (a.type === 'EXPENSE' || a.type === 'WITHDRAW') && !a.isTransfer).reduce((s, a) => s + a.amountUSD, 0);
+    const income = monthCash.filter(a => a.type === 'INCOME' || a.type === 'DEPOSIT').reduce((s, a) => s + getEntryAmount(a), 0);
+    const expense = monthCash.filter(a => (a.type === 'EXPENSE' || a.type === 'WITHDRAW') && !a.isTransfer).reduce((s, a) => s + getEntryAmount(a), 0);
     const dayOfMonth = now.getDate();
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const dailyAvg = dayOfMonth > 0 ? expense / dayOfMonth : 0;
@@ -304,8 +312,8 @@ export default function CashflowPage() {
       const d = new Date(a.date);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       if (!months[key]) months[key] = { income: 0, expense: 0, label: format(d, 'MMM yy') };
-      if ((a.type === 'INCOME' || a.type === 'DEPOSIT') && !a.isTransfer) months[key].income += a.amountUSD;
-      if ((a.type === 'EXPENSE' || a.type === 'WITHDRAW') && !a.isTransfer) months[key].expense += a.amountUSD;
+      if ((a.type === 'INCOME' || a.type === 'DEPOSIT') && !a.isTransfer) months[key].income += getEntryAmount(a);
+      if ((a.type === 'EXPENSE' || a.type === 'WITHDRAW') && !a.isTransfer) months[key].expense += getEntryAmount(a);
     });
     return Object.values(months).slice(-6); // Last 6 months
   }, [allCashflowActivities]);
@@ -330,9 +338,9 @@ export default function CashflowPage() {
     const sorted = [...allCashflowActivities].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     sorted.forEach(txn => {
       if ((txn.type === 'INCOME' || txn.type === 'DEPOSIT') && !txn.isTransfer) {
-        running += txn.amountUSD;
+        running += getEntryAmount(txn);
       } else if ((txn.type === 'EXPENSE' || txn.type === 'WITHDRAW') && !txn.isTransfer) {
-        running -= txn.amountUSD;
+        running -= getEntryAmount(txn);
       }
       const dateKey = format(new Date(txn.date), 'yyyy-MM-dd');
       balances[dateKey] = running;
@@ -343,11 +351,11 @@ export default function CashflowPage() {
   // Net worth
   const latestNW = netWorthHistory.length > 0 ? netWorthHistory[netWorthHistory.length - 1].value : 0;
   const portfolioValue = assets.reduce((s, a) => s + a.valueUSD, 0);
-  const liquidity = moneyBuckets.reduce((s, b) => s + b.currentAmount, 0);
+  const liquidity = moneyBuckets.reduce((s, b) => s + (b.currentAmount / (exchangeRates[b.currency || 'USD'] || 1)), 0);
 
   // Budget health
   const budgetUsed = useMemo(() => {
-    const totalBudget = moneyBuckets.reduce((s, b) => s + (b.targetAmount || 0), 0);
+    const totalBudget = moneyBuckets.reduce((s, b) => s + ((b.targetAmount || 0) / (exchangeRates[b.currency || 'USD'] || 1)), 0);
     if (totalBudget === 0 && thisMonthStats.income > 0) return (thisMonthStats.expense / thisMonthStats.income) * 100;
     if (totalBudget > 0) return (thisMonthStats.expense / totalBudget) * 100;
     return 0;
@@ -461,7 +469,7 @@ export default function CashflowPage() {
             </div>
             <AnimatedNumber
               value={thisMonthStats.net}
-              formatter={(v) => `${v >= 0 ? "+" : ""}${formatMoney(v)}`}
+              formatter={(v) => `${v >= 0 ? "+" : "-"}${formatEntryMoney(v)}`}
               className={cn("text-xl sm:text-2xl font-black tracking-tighter", thisMonthStats.net >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}
             />
             {/* Mini sparkline approximation */}
@@ -517,7 +525,7 @@ export default function CashflowPage() {
                 <ArrowUp size={10} className="text-[#4EDEA3]" />
                 <AnimatedNumber
                   value={thisMonthStats.dailyIncomeAvg}
-                  formatter={(v) => formatMoney(v)}
+                  formatter={(v) => formatEntryMoney(v)}
                   className="text-sm font-black text-[#4EDEA3]"
                 />
                 <span className="text-[9px] text-gray-600">/day in</span>
@@ -526,7 +534,7 @@ export default function CashflowPage() {
                 <ArrowDown size={10} className="text-[#FFB4AB]" />
                 <AnimatedNumber
                   value={thisMonthStats.dailyAvg}
-                  formatter={(v) => formatMoney(v)}
+                  formatter={(v) => formatEntryMoney(v)}
                   className="text-sm font-black text-[#FFB4AB]"
                 />
                 <span className="text-[9px] text-gray-600">/day out</span>
@@ -558,7 +566,7 @@ export default function CashflowPage() {
           </div>
           <AnimatedNumber
             value={netCashflow}
-            formatter={(v) => `${v >= 0 ? "+" : ""}${formatMoney(v)}`}
+            formatter={(v) => `${v >= 0 ? "+" : "-"}${formatEntryMoney(v)}`}
             className={cn("text-xl sm:text-2xl font-bold tracking-tighter", netCashflow >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}
           />
         </div>
@@ -576,7 +584,7 @@ export default function CashflowPage() {
               );
             })()}
           </div>
-          <AnimatedNumber value={totalIncome} formatter={(v) => formatMoney(v)} className="text-xl sm:text-2xl font-bold text-white tracking-tighter" />
+          <AnimatedNumber value={totalIncome} formatter={(v) => formatEntryMoney(v)} className="text-xl sm:text-2xl font-bold text-white tracking-tighter" />
         </div>
         <div className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
           <div className="flex items-center justify-between mb-1">
@@ -592,7 +600,7 @@ export default function CashflowPage() {
               );
             })()}
           </div>
-          <AnimatedNumber value={totalExpenses} formatter={(v) => formatMoney(v)} className="text-xl sm:text-2xl font-bold text-white tracking-tighter" />
+          <AnimatedNumber value={totalExpenses} formatter={(v) => formatEntryMoney(v)} className="text-xl sm:text-2xl font-bold text-white tracking-tighter" />
         </div>
         <div className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
           <p className="text-[10px] sm:text-xs font-bold text-[#ADC6FF] uppercase tracking-wide mb-1">Savings Rate</p>
@@ -642,10 +650,10 @@ export default function CashflowPage() {
             <div className="sm:col-span-2">
               <div className="flex justify-between text-[10px] mb-1.5">
                 <span className="text-gray-400">
-                  Spent: <span className="text-white font-bold">{formatMoney(thisMonthStats.expense)}</span>
+                  Spent: <span className="text-white font-bold">{formatEntryMoney(thisMonthStats.expense)}</span>
                 </span>
                 <span className="text-gray-400">
-                  Last month: <span className="text-white font-bold">{formatMoney(prevMonthStats.expense)}</span>
+                  Last month: <span className="text-white font-bold">{formatEntryMoney(prevMonthStats.expense)}</span>
                 </span>
               </div>
               <div className="h-3 bg-white/5 rounded-full overflow-hidden relative">
@@ -686,7 +694,7 @@ export default function CashflowPage() {
                 return (
                   <>
                     <p className="text-[9px] font-bold text-gray-500 uppercase tracking-wide mb-0.5">Projected</p>
-                    <p className="text-lg font-black text-white tracking-tighter">{formatMoney(projected)}</p>
+                    <p className="text-lg font-black text-white tracking-tighter">{formatEntryMoney(projected)}</p>
                     <p className={cn(
                       "text-[10px] font-bold flex items-center gap-1",
                       projectedChange > 0 ? "text-[#FFB4AB]" : "text-[#4EDEA3]"
@@ -717,7 +725,7 @@ export default function CashflowPage() {
                 const categories = [...new Set(incomes.map(c => c.category))];
                 const colors = ['#4EDEA3', '#ADC6FF', '#E9C349', '#FF8B9A', '#A78BFA'];
                 return categories.map((cat, i) => {
-                  const total = incomes.filter(c => c.category === cat).reduce((s, c) => s + c.amountUSD, 0);
+                  const total = incomes.filter(c => c.category === cat).reduce((s, c) => s + getEntryAmount(c), 0);
                   const pct = totalIncome > 0 ? (total / totalIncome) * 100 : 0;
                   return (
                     <div key={cat}>
@@ -725,7 +733,7 @@ export default function CashflowPage() {
                         <span className="text-gray-400 flex items-center gap-1.5">
                           <span style={{ fontFamily: "'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif" }}>{getCategoryIcon(cat)}</span> {t(cat)}
                         </span>
-                        <span className="text-white">{formatMoney(total)} <span className="text-gray-500">({pct.toFixed(0)}%)</span></span>
+                        <span className="text-white">{formatEntryMoney(total)} <span className="text-gray-500">({pct.toFixed(0)}%)</span></span>
                       </div>
                       <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
                         <motion.div
@@ -755,7 +763,7 @@ export default function CashflowPage() {
                 const categories = [...new Set(expenses.map(c => c.category))];
                 const colors = ['#FFB4AB', '#E9C349', '#ADC6FF', '#A78BFA', '#4EDEA3'];
                 return categories.map((cat, i) => {
-                  const total = expenses.filter(c => c.category === cat).reduce((s, c) => s + c.amountUSD, 0);
+                  const total = expenses.filter(c => c.category === cat).reduce((s, c) => s + getEntryAmount(c), 0);
                   const pct = totalExpenses > 0 ? (total / totalExpenses) * 100 : 0;
                   return (
                     <div key={cat}>
@@ -763,7 +771,7 @@ export default function CashflowPage() {
                         <span className="text-gray-400 flex items-center gap-1.5">
                           <span style={{ fontFamily: "'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif" }}>{getCategoryIcon(cat)}</span> {t(cat)}
                         </span>
-                        <span className="text-white">{formatMoney(total)} <span className="text-gray-500">({pct.toFixed(0)}%)</span></span>
+                        <span className="text-white">{formatEntryMoney(total)} <span className="text-gray-500">({pct.toFixed(0)}%)</span></span>
                       </div>
                       <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
                         <motion.div
@@ -851,8 +859,8 @@ export default function CashflowPage() {
             </div>
           ) : (
             groupedByDate.map(([dateKey, txns]) => {
-              const dayIncome = txns.filter(t => (t.type === 'INCOME' || t.type === 'DEPOSIT') && !t.isTransfer).reduce((s, t) => s + t.amountUSD, 0);
-              const dayExpense = txns.filter(t => (t.type === 'EXPENSE' || t.type === 'WITHDRAW') && !t.isTransfer).reduce((s, t) => s + t.amountUSD, 0);
+              const dayIncome = txns.filter(t => (t.type === 'INCOME' || t.type === 'DEPOSIT') && !t.isTransfer).reduce((s, t) => s + getEntryAmount(t), 0);
+              const dayExpense = txns.filter(t => (t.type === 'EXPENSE' || t.type === 'WITHDRAW') && !t.isTransfer).reduce((s, t) => s + getEntryAmount(t), 0);
               const dayNet = dayIncome - dayExpense;
               const balance = runningBalances[dateKey] || 0;
 
@@ -876,9 +884,9 @@ export default function CashflowPage() {
                     </div>
                     <div className="text-right">
                       <p className={cn("text-sm font-black tracking-tighter", dayNet >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
-                        {dayNet >= 0 ? "+" : ""}{formatMoney(dayNet)}
+                        {dayNet >= 0 ? "+" : "-"}{formatEntryMoney(dayNet)}
                       </p>
-                      <p className="text-[9px] text-gray-600 font-bold">Balance: {formatMoney(balance)}</p>
+                      <p className="text-[9px] text-gray-600 font-bold">Balance: {formatEntryMoney(balance)}</p>
                     </div>
                   </div>
                   {/* Transactions */}
@@ -926,9 +934,7 @@ export default function CashflowPage() {
                                 : "text-[#FFB4AB]"
                             )}>
                               {txn.type === 'INCOME' || txn.type === 'DEPOSIT' ? "+" : "-"}
-                              {txn.currency && txn.rateAtTime
-                                ? formatMoney(txn.amountUSD, txn.currency as any, txn.rateAtTime)
-                                : formatMoney(txn.amountUSD)}
+                              {formatEntryMoney(getEntryAmount(txn))}
                             </span>
                             <p className="text-[9px] text-gray-600">
                               {txn.time || format(new Date(txn.date), 'HH:mm')}
@@ -1050,8 +1056,8 @@ export default function CashflowPage() {
                               : 'text-[#FFB4AB]'
                         }`}>
                           {txn.type === 'INCOME' || txn.type === 'DEPOSIT'
-                            ? `+${txn.currency && txn.rateAtTime ? formatMoney(txn.amountUSD, txn.currency as any, txn.rateAtTime) : formatMoney(txn.amountUSD)}`
-                            : `-${txn.currency && txn.rateAtTime ? formatMoney(txn.amountUSD, txn.currency as any, txn.rateAtTime) : formatMoney(txn.amountUSD)}`
+                            ? `+${formatEntryMoney(getEntryAmount(txn))}`
+                            : `-${formatEntryMoney(getEntryAmount(txn))}`
                           }
                         </span>
                       </td>
