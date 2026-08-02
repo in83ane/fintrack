@@ -20,6 +20,13 @@ import {
   MoreHorizontal,
   ChevronLeft,
   ChevronRight,
+  Banknote,
+  PiggyBank,
+  Check,
+  X,
+  CreditCard,
+  Target,
+  ArrowRightLeft,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/src/lib/utils";
@@ -113,6 +120,12 @@ export default function BudgetPage() {
   const [showProfitSuggestion, setShowProfitSuggestion] = useState(false);
   const [investModal, setInvestModal] = useState<{ sourceBucketId: string } | null>(null);
   const [investAmountValue, setInvestAmountValue] = useState("");
+  const [transferModal, setTransferModal] = useState<{ sourceBucketId: string; destinationBucketId: string; amount: string; currency: "USD" | "THB"; note: string } | null>(null);
+  const [transferDropdownOpen, setTransferDropdownOpen] = useState(false);
+  const [actionModal, setActionModal] = useState<{ id: string; type: "deposit" | "withdraw" } | null>(null);
+  const [actionAmount, setActionAmount] = useState("");
+  const [actionCurrency, setActionCurrency] = useState<"USD" | "THB">(currency as "USD" | "THB");
+  const [actionNote, setActionNote] = useState("");
   const [isBucketModalOpen, setIsBucketModalOpen] = useState(false);
   const [bucketToDelete, setBucketToDelete] = useState<string | null>(null);
   const [editingBucket, setEditingBucket] = useState<string | null>(null);
@@ -169,8 +182,7 @@ export default function BudgetPage() {
     return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
   };
 
-  const [inlineAction, setInlineAction] = useState<{ id: string; type: "deposit" | "withdraw" } | null>(null);
-  const [inlineAmount, setInlineAmount] = useState("");
+
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [isCarouselHovered, setIsCarouselHovered] = useState(false);
@@ -333,35 +345,131 @@ export default function BudgetPage() {
     const bucket = moneyBuckets.find((b) => b.id === investModal.sourceBucketId);
     if (!bucket) return;
     const amtUSD = toUSD(displayAmt, inputCurrency);
-    if (amtUSD > bucket.currentAmount) {
+    if (amtUSD <= 0) return;
+
+    if (displayAmt > bucket.currentAmount) {
       addToast(t("amountExceedsBalance"), "error");
       return;
     }
-    updateMoneyBucket(bucket.id, { currentAmount: bucket.currentAmount - amtUSD });
+
+    const bCur = bucketCurrency(bucket) as "USD" | "THB";
+    const convertedAmount = convertCurrency(displayAmt, inputCurrency, bCur);
+    updateMoneyBucket(bucket.id, {
+      currentAmount: Math.max(0, bucket.currentAmount - convertedAmount)
+    });
+
+    const now = new Date().toISOString();
     addBucketActivity({
       bucketId: bucket.id,
       bucketName: bucket.name,
-      type: "invest",
-      amount: amtUSD,
-      date: new Date().toISOString(),
-      note: `${t("investedFromBucket")} ${t(bucket.name) || bucket.name}`,
+      type: "withdraw",
+      amount: displayAmt,
+      date: now,
+      note: t("noteInvest") || "Move to Portfolio (Invest)",
       currency: inputCurrency,
       rateAtTime: exchangeRates[inputCurrency] || 1,
+      originalAmount: displayAmt,
     });
-    // Add cash activity for Cashflow page (Invest = money leaves the system)
     addCashActivity({
       type: "WITHDRAW",
       amountUSD: amtUSD,
-      category: t(bucket.name) || bucket.name,
-      date: new Date().toISOString(),
+      category: "invest",
+      date: now,
       bucketId: bucket.id,
-      note: `Invest from ${t(bucket.name) || bucket.name}`,
+      note: t("noteInvest") || "Move to Portfolio (Invest)",
       currency: inputCurrency,
       rateAtTime: exchangeRates[inputCurrency] || 1,
+      originalAmount: displayAmt,
     });
-    addToast(`${t("investedFromBucket")}: -${formatDisplay(displayAmt)} ← ${t(bucket.name) || bucket.name}`, "success");
+    addToast(`${t("movedToPortfolio")}: ${formatDisplay(displayAmt)}`, "success");
     setInvestModal(null);
     setInvestAmountValue("");
+  };
+
+  const handleTransfer = () => {
+    if (!transferModal) return;
+    const { sourceBucketId, destinationBucketId, amount, currency: inputCur, note } = transferModal;
+    const transferAmount = parseFloat(amount);
+    
+    if (transferAmount <= 0 || isNaN(transferAmount)) return;
+    if (sourceBucketId === destinationBucketId) {
+      addToast(t("errorOccurred") || "Source and destination cannot be the same", "error");
+      return;
+    }
+
+    const sourceBucket = moneyBuckets.find(b => b.id === sourceBucketId);
+    const destBucket = moneyBuckets.find(b => b.id === destinationBucketId);
+    
+    if (!sourceBucket || !destBucket) return;
+
+    const sourceCurrency = bucketCurrency(sourceBucket) as "USD" | "THB";
+    const destCurrency = bucketCurrency(destBucket) as "USD" | "THB";
+
+    const convertedToSourceCur = convertCurrency(transferAmount, inputCur, sourceCurrency);
+
+    if (convertedToSourceCur > sourceBucket.currentAmount) {
+      addToast(t("amountExceedsBalance"), "error");
+      return;
+    }
+
+    const amountUSD = toUSD(transferAmount, inputCur);
+    const destAmount = convertCurrency(transferAmount, inputCur, destCurrency);
+    const now = new Date().toISOString();
+
+    // Withdraw from Source
+    updateMoneyBucket(sourceBucket.id, { currentAmount: sourceBucket.currentAmount - convertedToSourceCur });
+    addBucketActivity({
+      bucketId: sourceBucket.id,
+      bucketName: sourceBucket.name,
+      type: "withdraw",
+      amount: convertedToSourceCur,
+      date: now,
+      note: note || `Transfer to ${t(destBucket.name) || destBucket.name}`,
+      currency: sourceCurrency,
+      rateAtTime: exchangeRates[sourceCurrency] || 1,
+      originalAmount: convertedToSourceCur,
+    });
+    addCashActivity({
+      type: "WITHDRAW",
+      amountUSD: amountUSD,
+      category: t(sourceBucket.name) || sourceBucket.name,
+      date: now,
+      bucketId: sourceBucket.id,
+      note: note || `Transfer to ${t(destBucket.name) || destBucket.name}`,
+      currency: inputCur,
+      rateAtTime: exchangeRates[inputCur] || 1,
+      originalAmount: transferAmount,
+      isTransfer: true,
+    });
+
+    // Deposit to Destination
+    updateMoneyBucket(destBucket.id, { currentAmount: destBucket.currentAmount + destAmount });
+    addBucketActivity({
+      bucketId: destBucket.id,
+      bucketName: destBucket.name,
+      type: "deposit",
+      amount: destAmount,
+      date: now,
+      note: note || `Transfer from ${t(sourceBucket.name) || sourceBucket.name}`,
+      currency: destCurrency,
+      rateAtTime: exchangeRates[destCurrency] || 1,
+      originalAmount: destAmount,
+    });
+    addCashActivity({
+      type: "DEPOSIT",
+      amountUSD: amountUSD,
+      category: t(destBucket.name) || destBucket.name,
+      date: now,
+      bucketId: destBucket.id,
+      note: note || `Transfer from ${t(sourceBucket.name) || sourceBucket.name}`,
+      currency: inputCur,
+      rateAtTime: exchangeRates[inputCur] || 1,
+      originalAmount: transferAmount,
+      isTransfer: true,
+    });
+
+    addToast(`${t("transfer")} ${formatDisplay(transferAmount)} ${inputCur === "THB" ? "฿" : "$"}`, "success");
+    setTransferModal(null);
   };
 
   const handleSaveBucket = () => {
@@ -400,41 +508,58 @@ export default function BudgetPage() {
     setIsBucketModalOpen(false);
   };
 
-  const handleInlineAction = () => {
-    const displayVal = Number(inlineAmount);
-    if (!displayVal || displayVal <= 0 || !inlineAction) return;
-    const bucket = moneyBuckets.find((b) => b.id === inlineAction.id);
+  const handleActionSubmit = () => {
+    const displayVal = Number(actionAmount);
+    if (!displayVal || displayVal <= 0 || !actionModal) return;
+    const bucket = moneyBuckets.find((b) => b.id === actionModal.id);
     if (!bucket) return;
-    const targetCurrency = bucketCurrency(bucket);
-    const bucketAmount = convertCurrency(displayVal, currency as "USD" | "THB", targetCurrency);
-    if (inlineAction.type === "withdraw" && bucketAmount > bucket.currentAmount) {
+    
+    const targetCurrency = bucketCurrency(bucket) as "USD" | "THB";
+    const bucketAmount = convertCurrency(displayVal, actionCurrency, targetCurrency);
+    
+    if (actionModal.type === "withdraw" && bucketAmount > bucket.currentAmount) {
       addToast(t("amountExceedsBalance"), "error");
       return;
     }
+    
     const newAmount =
-      inlineAction.type === "deposit"
+      actionModal.type === "deposit"
         ? bucket.currentAmount + bucketAmount
         : Math.max(0, bucket.currentAmount - bucketAmount);
+        
     const now = new Date().toISOString();
     updateMoneyBucket(bucket.id, { currentAmount: newAmount });
+    
     addBucketActivity({
       bucketId: bucket.id,
       bucketName: bucket.name,
-      type: inlineAction.type,
+      type: actionModal.type,
       amount: bucketAmount,
       date: now,
-      note: `${inlineAction.type === "deposit" ? "+" : "-"}${formatDisplay(displayVal)} → ${t(bucket.name) || bucket.name}`,
-      currency: targetCurrency,
-      rateAtTime: exchangeRates[targetCurrency] || 1,
-      originalAmount: bucketAmount,
+      note: actionNote || (`${actionModal.type === "deposit" ? "+" : "-"}${formatDisplay(displayVal)} ${actionCurrency}`),
+      currency: actionCurrency,
+      rateAtTime: exchangeRates[actionCurrency] || 1,
+      originalAmount: displayVal,
     });
-    // No cash activity created - bucket transactions are standalone
-    addToast(
-      `${inlineAction.type === "deposit" ? "+" : "-"}${formatDisplay(displayVal)} → ${t(bucket.name) || bucket.name}`,
-      "success"
-    );
-    setInlineAction(null);
-    setInlineAmount("");
+    
+    // Add cash activity so Ledger acts as the Single Source of Truth
+    const amtUSD = toUSD(displayVal, actionCurrency);
+    addCashActivity({
+      type: actionModal.type === "deposit" ? "DEPOSIT" : "WITHDRAW",
+      amountUSD: amtUSD,
+      category: t(bucket.name) || bucket.name,
+      date: now,
+      bucketId: bucket.id,
+      note: actionNote || (`${actionModal.type === "deposit" ? "Add to" : "Withdraw from"} ${t(bucket.name) || bucket.name}`),
+      currency: actionCurrency,
+      rateAtTime: exchangeRates[actionCurrency] || 1,
+      originalAmount: displayVal,
+    });
+    
+    addToast(`${actionModal.type === "deposit" ? t("deposit") : t("withdraw")} ${formatDisplay(displayVal)} ${actionCurrency}`, "success");
+    setActionModal(null);
+    setActionAmount("");
+    setActionNote("");
   };
 
   const activityIcon = (type: string) => {
@@ -695,56 +820,15 @@ export default function BudgetPage() {
                   </div>
                 </div>
 
-                {/* Inline Deposit/Withdraw */}
+                {/* Actions */}
                 <div className="mt-4 space-y-2">
-                  {inlineAction?.id === bucket.id ? (
-                    <div className="flex gap-2 items-center">
-                      <input
-                        type="number"
-                        step="any"
-                        min="0"
-                        value={inlineAmount}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val.includes('-')) return;
-                          setInlineAmount(val);
-                        }}
-                        placeholder="0.00"
-                        autoFocus
-                        className="flex-1 bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-white text-sm font-bold outline-none focus:border-[#E9C349]/50 transition-all text-center"
-                      />
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleInlineAction();
-                        }}
-                        className={cn(
-                          "px-3 py-2 rounded-xl font-black text-xs uppercase transition-all",
-                          inlineAction.type === "deposit"
-                            ? "bg-[#4EDEA3] text-[#00285d] hover:brightness-110"
-                            : "bg-[#FFB4AB] text-[#00285d] hover:brightness-110"
-                        )}
-                      >
-                        {inlineAction.type === "deposit" ? "+" : "-"}
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setInlineAction(null);
-                          setInlineAmount("");
-                        }}
-                        className="px-3 py-2 rounded-xl font-bold text-xs text-gray-400 hover:text-white hover:bg-white/10 transition-all"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ) : (
                     <div className="flex gap-2">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          setInlineAction({ id: bucket.id, type: "deposit" });
-                          setInlineAmount("");
+                          setActionModal({ id: bucket.id, type: "deposit" });
+                          setActionAmount("");
+                          setActionNote("");
                         }}
                         className="flex-1 py-2.5 rounded-xl font-black text-xs uppercase bg-[#4EDEA3]/10 text-[#4EDEA3] border border-[#4EDEA3]/20 hover:bg-[#4EDEA3]/20 transition-all flex items-center justify-center gap-1.5"
                       >
@@ -754,16 +838,26 @@ export default function BudgetPage() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          setInlineAction({ id: bucket.id, type: "withdraw" });
-                          setInlineAmount("");
+                          setActionModal({ id: bucket.id, type: "withdraw" });
+                          setActionAmount("");
+                          setActionNote("");
                         }}
                         className="flex-1 py-2.5 rounded-xl font-black text-xs uppercase bg-[#FFB4AB]/10 text-[#FFB4AB] border border-[#FFB4AB]/20 hover:bg-[#FFB4AB]/20 transition-all flex items-center justify-center gap-1.5"
                       >
                         <ArrowUpFromLine size={14} />
                         {t("withdraw")}
                       </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setTransferModal({ sourceBucketId: bucket.id, destinationBucketId: "", amount: "", currency: currency as "USD" | "THB", note: "" });
+                        }}
+                        className="flex-[0.5] py-2.5 rounded-xl font-black text-xs uppercase bg-[#ADC6FF]/10 text-[#ADC6FF] border border-[#ADC6FF]/20 hover:bg-[#ADC6FF]/20 transition-all flex items-center justify-center gap-1.5"
+                        title={t("transfer") || "Transfer"}
+                      >
+                        <ArrowRightLeft size={14} />
+                      </button>
                     </div>
-                  )}
                 </div>
 
                 </div>{/* end card surface */}
@@ -1371,6 +1465,241 @@ export default function BudgetPage() {
               {t("investFromBucket")}
             </button>
           </div>
+        </div>
+      </Modal>
+
+      {/* Transfer Modal */}
+      <Modal isOpen={!!transferModal} onClose={() => { setTransferModal(null); setTransferDropdownOpen(false); }} title={t("transfer") || "Transfer Funds"}>
+        <div className="space-y-5">
+          {transferModal && (() => {
+            const sourceBucket = moneyBuckets.find(b => b.id === transferModal.sourceBucketId);
+            return sourceBucket ? (
+              <>
+                <div className="bg-white/5 rounded-2xl p-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-400 font-bold mb-1 uppercase tracking-wider">{t("sourceBucket") || "From"}</p>
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs" style={{ backgroundColor: `${sourceBucket.color}20` }}>
+                        {sourceBucket.icon}
+                      </div>
+                      <span className="font-bold text-sm text-white">{t(sourceBucket.name) || sourceBucket.name}</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-400 font-bold mb-1 uppercase tracking-wider">{t("balance") || "Balance"}</p>
+                    <span className="font-bold text-[#E9C349] text-sm">
+                      {formatBucketAmount(sourceBucket, sourceBucket.currentAmount)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-2 relative">
+                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest pl-1">{t("destinationBucket") || "To Destination"}</label>
+                  <div className="relative">
+                    <button
+                      onClick={() => setTransferDropdownOpen(!transferDropdownOpen)}
+                      className="w-full bg-[#1a1a1a] border border-[#333] hover:border-[#4EDEA3] text-sm font-medium text-white px-4 py-3.5 rounded-xl outline-none transition-colors text-left flex justify-between items-center"
+                    >
+                      {transferModal.destinationBucketId 
+                        ? (() => {
+                            const db = moneyBuckets.find(b => b.id === transferModal.destinationBucketId);
+                            return db ? (
+                              <div className="flex items-center gap-2">
+                                <div className="w-5 h-5 rounded-full flex items-center justify-center text-[10px]" style={{ backgroundColor: `${db.color}20` }}>
+                                  {db.icon}
+                                </div>
+                                <span>{t(db.name) || db.name}</span>
+                              </div>
+                            ) : t("selectBucket") || "Select Bucket";
+                          })()
+                        : <span className="text-gray-400">{t("selectBucket") || "Select Bucket"}</span>
+                      }
+                      <span className="text-gray-500 text-[10px]">▼</span>
+                    </button>
+                    
+                    {transferDropdownOpen && (
+                      <div className="absolute top-full left-0 mt-2 w-full bg-[#1a1a1a] border border-[#333] rounded-xl overflow-hidden z-[60] shadow-2xl">
+                        <div className="max-h-60 overflow-y-auto custom-scrollbar">
+                          {moneyBuckets.filter(b => b.id !== sourceBucket.id).map(b => (
+                            <button
+                              key={b.id}
+                              onClick={() => {
+                                const currentDest = transferModal.destinationBucketId ? moneyBuckets.find(bk => bk.id === transferModal.destinationBucketId) : null;
+                                const defaultOldNote = currentDest ? `Transfer to ${t(currentDest.name) || currentDest.name}` : "";
+                                const newNote = (!transferModal.note || transferModal.note === defaultOldNote) 
+                                  ? `Transfer to ${t(b.name) || b.name}` 
+                                  : transferModal.note;
+                                
+                                setTransferModal({ ...transferModal, destinationBucketId: b.id, note: newNote });
+                                setTransferDropdownOpen(false);
+                              }}
+                              className="w-full text-left px-4 py-3 hover:bg-[#333] text-sm font-medium text-white transition-colors flex items-center gap-2"
+                            >
+                              <div className="w-5 h-5 rounded-full flex items-center justify-center text-[10px]" style={{ backgroundColor: `${b.color}20` }}>
+                                {b.icon}
+                              </div>
+                              {t(b.name) || b.name}
+                            </button>
+                          ))}
+                          {moneyBuckets.filter(b => b.id !== sourceBucket.id).length === 0 && (
+                            <div className="px-4 py-3 text-sm text-gray-500 italic">
+                              No other buckets available
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest pl-1">{t("amount") || "Amount"}</label>
+                  <div className="relative flex gap-2">
+                    <button
+                      onClick={() => setTransferModal({ ...transferModal, currency: transferModal.currency === "USD" ? "THB" : "USD" })}
+                      className="shrink-0 bg-[#1a1a1a] border border-[#333] hover:border-[#4EDEA3] hover:text-[#4EDEA3] text-gray-400 font-bold px-4 py-3.5 rounded-xl transition-colors flex items-center justify-center min-w-[70px]"
+                    >
+                      {transferModal.currency === "THB" ? "฿ THB" : "$ USD"}
+                    </button>
+                    <div className="relative flex-1">
+                      <input
+                        type="number"
+                        step="any"
+                        min="0"
+                        value={transferModal.amount}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val.includes('-')) return;
+                          setTransferModal({ ...transferModal, amount: val });
+                        }}
+                        placeholder="0.00"
+                        className="w-full bg-[#1a1a1a] border border-[#333] text-xl font-black text-white px-4 py-3.5 rounded-xl outline-none focus:border-[#4EDEA3] transition-colors"
+                      />
+                      <button
+                        onClick={() => {
+                          const maxAmount = transferModal.currency === bucketCurrency(sourceBucket) 
+                            ? sourceBucket.currentAmount 
+                            : convertCurrency(sourceBucket.currentAmount, bucketCurrency(sourceBucket) as "USD" | "THB", transferModal.currency);
+                          setTransferModal({ ...transferModal, amount: maxAmount.toString() });
+                        }}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black uppercase tracking-wider text-[#4EDEA3] bg-[#4EDEA3]/10 hover:bg-[#4EDEA3]/20 px-2 py-1 rounded-md transition-colors"
+                      >
+                        MAX
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest pl-1">{t("note") || "Note (Optional)"}</label>
+                  <input
+                    type="text"
+                    value={transferModal.note}
+                    onChange={(e) => setTransferModal({ ...transferModal, note: e.target.value })}
+                    placeholder={t("notePlaceholder") || "e.g. Savings"}
+                    className="w-full bg-[#1a1a1a] border border-[#333] text-sm font-medium text-white px-4 py-3.5 rounded-xl outline-none focus:border-[#4EDEA3] transition-colors"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button onClick={() => setTransferModal(null)} className="flex-1 py-4 text-gray-500 font-bold text-sm hover:text-white transition-colors">
+                    {t("cancel")}
+                  </button>
+                  <button 
+                    onClick={handleTransfer}
+                    disabled={!transferModal.destinationBucketId || !transferModal.amount || parseFloat(transferModal.amount) <= 0 || parseFloat(transferModal.amount) > sourceBucket.currentAmount}
+                    className="flex-[2] bg-[#4EDEA3] text-[#00285d] font-black text-sm uppercase tracking-wider py-4 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none"
+                  >
+                    {t("transfer") || "Transfer Now"}
+                  </button>
+                </div>
+              </>
+            ) : null;
+          })()}
+        </div>
+      </Modal>
+
+      {/* Action Modal (Deposit/Withdraw) */}
+      <Modal isOpen={!!actionModal} onClose={() => setActionModal(null)} title={actionModal?.type === "deposit" ? (t("deposit") || "Deposit") : (t("withdraw") || "Withdraw")}>
+        <div className="space-y-5">
+          {actionModal && (() => {
+            const bucket = moneyBuckets.find(b => b.id === actionModal.id);
+            if (!bucket) return null;
+            return (
+              <>
+                <div className="bg-white/5 rounded-2xl p-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-400 font-bold mb-1 uppercase tracking-wider">{t("bucket") || "Bucket"}</p>
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs" style={{ backgroundColor: `${bucket.color}20` }}>
+                        {bucket.icon}
+                      </div>
+                      <span className="font-bold text-sm text-white">{t(bucket.name) || bucket.name}</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-400 font-bold mb-1 uppercase tracking-wider">{t("balance") || "Balance"}</p>
+                    <span className="font-bold text-[#E9C349] text-sm">
+                      {formatBucketAmount(bucket, bucket.currentAmount)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest pl-1">{t("amount") || "Amount"}</label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setActionCurrency(actionCurrency === "USD" ? "THB" : "USD")}
+                      className="shrink-0 bg-[#1a1a1a] border border-[#333] hover:border-[#4EDEA3] hover:text-[#4EDEA3] text-gray-400 font-bold px-4 py-3.5 rounded-xl transition-colors flex items-center justify-center min-w-[70px]"
+                    >
+                      {actionCurrency === "THB" ? "฿ THB" : "$ USD"}
+                    </button>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={actionAmount}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val.includes('-')) return;
+                        setActionAmount(val);
+                      }}
+                      placeholder="0.00"
+                      className="flex-1 bg-[#1a1a1a] border border-[#333] text-xl font-black text-white px-4 py-3.5 rounded-xl outline-none focus:border-[#4EDEA3] transition-colors"
+                      autoFocus
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest pl-1">{t("note") || "Note (Optional)"}</label>
+                  <input
+                    type="text"
+                    value={actionNote}
+                    onChange={(e) => setActionNote(e.target.value)}
+                    placeholder={t("notePlaceholder") || "e.g. Salary, Food"}
+                    className="w-full bg-[#1a1a1a] border border-[#333] text-sm font-medium text-white px-4 py-3.5 rounded-xl outline-none focus:border-[#4EDEA3] transition-colors"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button onClick={() => setActionModal(null)} className="flex-1 py-4 text-gray-500 font-bold text-sm hover:text-white transition-colors">
+                    {t("cancel")}
+                  </button>
+                  <button 
+                    onClick={handleActionSubmit}
+                    disabled={!actionAmount || parseFloat(actionAmount) <= 0 || (actionModal.type === "withdraw" && convertCurrency(parseFloat(actionAmount), actionCurrency, bucketCurrency(bucket) as "USD" | "THB") > bucket.currentAmount)}
+                    className={cn(
+                      "flex-[2] text-[#00285d] font-black text-sm uppercase tracking-wider py-4 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none",
+                      actionModal.type === "deposit" ? "bg-[#4EDEA3]" : "bg-[#FFB4AB]"
+                    )}
+                  >
+                    {actionModal.type === "deposit" ? (t("deposit") || "Deposit") : (t("withdraw") || "Withdraw")}
+                  </button>
+                </div>
+              </>
+            );
+          })()}
         </div>
       </Modal>
 

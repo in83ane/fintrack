@@ -28,6 +28,7 @@ export interface CashActivity {
   id: string;
   type: "INCOME" | "EXPENSE" | "DEPOSIT" | "WITHDRAW";
   amountUSD: number;
+  amount?: number;
   category: string;
   date: string;
   time?: string;
@@ -97,6 +98,7 @@ export interface CashflowActivity {
   id: string;
   type: "INCOME" | "EXPENSE" | "DEPOSIT" | "WITHDRAW";
   amountUSD: number;
+  amount?: number;
   category: string;
   date: string;
   time?: string;
@@ -1817,7 +1819,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             note: ca.note || undefined,
             currency: ca.currency || undefined,
             rateAtTime: ca.rate_at_time || undefined,
-            originalAmount: ca.original_amount || undefined
+            originalAmount: ca.original_amount || undefined,
+            bucketId: ca.bucket_id || undefined,
+            isTransfer: ca.is_transfer || false
           })));
         } else {
           setCashActivities([]);
@@ -1889,12 +1893,40 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setNotifications([]);
   };
 
+  // Compute dynamic bucket balances directly from Ledger transactions (Single Source of Truth)
+  const dynamicMoneyBuckets = React.useMemo(() => {
+    return moneyBuckets.map(bucket => {
+      let currentAmount = 0;
+      const bCur = bucket.currency || "USD";
+      
+      const activities = cashActivities.filter(a => a.bucketId === bucket.id);
+      activities.forEach(a => {
+        let amountInBucketCur = 0;
+        // If the activity was recorded in the same currency, use originalAmount
+        if (a.currency === bCur && a.originalAmount !== undefined) {
+          amountInBucketCur = a.originalAmount;
+        } else {
+          // Otherwise use amountUSD converted to bucket currency at current rate
+          amountInBucketCur = a.amountUSD * (exchangeRates[bCur] || 1);
+        }
+
+        if (a.type === "INCOME" || a.type === "DEPOSIT") {
+          currentAmount += amountInBucketCur;
+        } else if (a.type === "EXPENSE" || a.type === "WITHDRAW") {
+          currentAmount -= amountInBucketCur;
+        }
+      });
+      
+      return { ...bucket, currentAmount };
+    });
+  }, [moneyBuckets, cashActivities, exchangeRates]);
+
   // Compute net worth history from actual trade data + current portfolio value
   const netWorthHistory = React.useMemo(() => {
     const toUSD = (amount: number, fromCurrency: Currency = "USD") => {
       return amount / (exchangeRates[fromCurrency] || 1);
     };
-    const currentCashUSD = moneyBuckets.reduce(
+    const currentCashUSD = dynamicMoneyBuckets.reduce(
       (acc, curr) => acc + toUSD(curr.currentAmount, curr.currency || "USD"),
       0
     );
@@ -2185,7 +2217,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const formatMoney = (amountUSD: number, originalCurrency?: Currency, originalRate?: number, originalAmount?: number) => {
     const targetCurrency = originalCurrency || currency;
-    const rate = originalRate || exchangeRates[currency];
+    const rate = originalRate || exchangeRates[targetCurrency];
     
     // If the requested target currency matches the original currency and we have the exact original amount,
     // use it directly to bypass floating-point math drift (e.g. 50.00 THB vs 50.01 THB).
@@ -2323,7 +2355,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             amountUSD: ca.amount,
             category: ca.category,
             date: ca.date,
-            note: ca.note || undefined
+            note: ca.note || undefined,
+            currency: ca.currency || undefined,
+            rateAtTime: ca.rate_at_time || undefined,
+            originalAmount: ca.original_amount || undefined,
+            bucketId: ca.bucket_id || undefined,
+            isTransfer: ca.is_transfer || false
           })));
         }
       }
@@ -2653,6 +2690,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+
+
   const removeBucketActivity = async (id: string) => {
     if (!user) {
       setBucketActivities(prev => {
@@ -2839,7 +2878,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             date: ca.date,
             note: ca.note || undefined,
             currency: ca.currency || undefined,
-            rateAtTime: ca.rate_at_time || undefined
+            rateAtTime: ca.rate_at_time || undefined,
+            originalAmount: ca.original_amount || undefined,
+            bucketId: ca.bucket_id || undefined,
+            isTransfer: ca.is_transfer || false
           })));
         }
       }
@@ -2988,7 +3030,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       isDataLoaded,
       notifPreferences,
       setNotifPreferences,
-      moneyBuckets,
+      moneyBuckets: dynamicMoneyBuckets,
       addMoneyBucket,
       updateMoneyBucket,
       removeMoneyBucket,
