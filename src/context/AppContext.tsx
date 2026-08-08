@@ -814,6 +814,12 @@ const translations: Record<Language, Record<string, string>> = {
     education: "Education",
     coffee: "Coffee",
     travel: "Travel",
+    last7Days: "Last 7 Days",
+    last30Days: "Last 30 Days",
+    thisMonth: "This Month",
+    lastMonth: "Last Month",
+    custom: "Custom",
+    from: "From",
   },
   th: {
     dashboard: "แผงควบคุม",
@@ -1403,6 +1409,12 @@ const translations: Record<Language, Record<string, string>> = {
     education: "การศึกษา",
     coffee: "กาแฟ",
     travel: "ท่องเที่ยว",
+    last7Days: "7 วันล่าสุด",
+    last30Days: "30 วันล่าสุด",
+    thisMonth: "เดือนนี้",
+    lastMonth: "เดือนที่แล้ว",
+    custom: "กำหนดเอง",
+    from: "จาก",
   },
 };
 

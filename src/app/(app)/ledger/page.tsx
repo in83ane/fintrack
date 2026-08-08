@@ -602,14 +602,18 @@ function formatDateGroup(dateStr: string, todayLabel: string, yesterdayLabel: st
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
+  const locale = language === "th" ? "th-TH" : "en-US";
+  const dateSuffix = d.toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" });
 
-  if (d.toDateString() === today.toDateString()) return todayLabel;
-  if (d.toDateString() === yesterday.toDateString()) return yesterdayLabel;
+  if (d.toDateString() === today.toDateString()) return `${todayLabel} (${dateSuffix})`;
+  if (d.toDateString() === yesterday.toDateString()) return `${yesterdayLabel} (${dateSuffix})`;
 
   const diffDays = Math.floor((today.getTime() - d.getTime()) / 86400000);
-  const locale = language === "th" ? "th-TH" : "en-US";
-  if (diffDays < 7) return d.toLocaleDateString(locale, { weekday: "long" });
-  return d.toLocaleDateString(locale, { day: "numeric", month: "long", year: "numeric" });
+  if (diffDays < 7) {
+    const weekday = d.toLocaleDateString(locale, { weekday: "long" });
+    return `${weekday} (${dateSuffix})`;
+  }
+  return d.toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 }
 
 
@@ -635,8 +639,8 @@ function MonthNavigator({
   };
 
   const idx = availableMonths.indexOf(value);
-  const canPrev = value !== "all" && idx > 0;
-  const canNext = value !== "all" && idx < availableMonths.length - 1;
+  const canPrev = value !== "all" && value !== "custom" && idx > 0;
+  const canNext = value !== "all" && value !== "custom" && idx < availableMonths.length - 1;
 
   return (
     <div className="flex items-center gap-2">
@@ -659,6 +663,18 @@ function MonthNavigator({
           )}
         >
           {t("ledgerFilterAll")}
+        </button>
+
+        <button
+          onClick={() => onChange("custom")}
+          className={cn(
+            "flex-shrink-0 px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wide transition-all border",
+            value === "custom"
+              ? "bg-[#E9C349]/20 border-[#E9C349]/40 text-[#E9C349]"
+              : "bg-white/4 border-white/8 text-gray-500 hover:text-white hover:bg-white/8"
+          )}
+        >
+          {t("custom") || "Custom"}
         </button>
 
         {recentMonths.map((m) => (
@@ -703,6 +719,8 @@ export default function LedgerPage() {
 
   const todayKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
   const [selectedMonth, setSelectedMonth] = useState<string>(todayKey);
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
 
   // All unique months that have records
   const availableMonths = useMemo(() => {
@@ -718,7 +736,15 @@ export default function LedgerPage() {
   const records = useMemo(() => {
     return cashActivities
       .filter((a) => a.type === "INCOME" || a.type === "EXPENSE")
-      .filter((a) => selectedMonth === "all" || a.date.startsWith(selectedMonth))
+      .filter((a) => {
+        if (selectedMonth === "custom") {
+          const aDate = a.date.split("T")[0];
+          if (startDate && aDate < startDate) return false;
+          if (endDate && aDate > endDate) return false;
+          return true;
+        }
+        return selectedMonth === "all" || a.date.startsWith(selectedMonth);
+      })
       .filter((a) => filterType === "all" || a.type === filterType)
       .filter((a) => selectedBucket === "all" || (selectedBucket === "unassigned" ? !a.bucketId : a.bucketId === selectedBucket))
       .filter((a) => {
@@ -731,19 +757,27 @@ export default function LedgerPage() {
         );
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [cashActivities, selectedMonth, search, filterType, language, selectedBucket]);
+  }, [cashActivities, selectedMonth, startDate, endDate, search, filterType, language, selectedBucket]);
 
   // Stats for selected period
   const periodStats = useMemo(() => {
     const base = cashActivities
       .filter((a) => a.type === "INCOME" || a.type === "EXPENSE")
-      .filter((a) => selectedMonth === "all" || a.date.startsWith(selectedMonth))
+      .filter((a) => {
+        if (selectedMonth === "custom") {
+          const aDate = a.date.split("T")[0];
+          if (startDate && aDate < startDate) return false;
+          if (endDate && aDate > endDate) return false;
+          return true;
+        }
+        return selectedMonth === "all" || a.date.startsWith(selectedMonth);
+      })
       .filter((a) => selectedBucket === "all" || (selectedBucket === "unassigned" ? !a.bucketId : a.bucketId === selectedBucket));
     const getEntryAmount = (a: any) => a.amountUSD ?? a.amount ?? 0;
     const inc = base.filter((a) => a.type === "INCOME").reduce((s, a) => s + getEntryAmount(a), 0);
     const exp = base.filter((a) => a.type === "EXPENSE").reduce((s, a) => s + getEntryAmount(a), 0);
     return { inc, exp, net: inc - exp };
-  }, [cashActivities, selectedMonth, currency, exchangeRates, selectedBucket]);
+  }, [cashActivities, selectedMonth, startDate, endDate, currency, exchangeRates, selectedBucket]);
 
   // Group by date
   const grouped = useMemo(() => {
@@ -758,6 +792,33 @@ export default function LedgerPage() {
 
   const handleSuccess = () => setActivePanel(null);
 
+  const setPresetDateRange = (preset: "7days" | "30days" | "thisMonth" | "lastMonth") => {
+    const today = new Date();
+    let start = new Date(today);
+    let end = new Date(today);
+
+    if (preset === "7days") {
+      start.setDate(today.getDate() - 6);
+    } else if (preset === "30days") {
+      start.setDate(today.getDate() - 29);
+    } else if (preset === "thisMonth") {
+      start = new Date(today.getFullYear(), today.getMonth(), 1);
+    } else if (preset === "lastMonth") {
+      start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      end = new Date(today.getFullYear(), today.getMonth(), 0);
+    }
+
+    const formatDt = (dt: Date) => {
+      const y = dt.getFullYear();
+      const m = String(dt.getMonth() + 1).padStart(2, '0');
+      const d = String(dt.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    };
+
+    setStartDate(formatDt(start));
+    setEndDate(formatDt(end));
+  };
+
   const handlePanelButton = (type: "INCOME" | "EXPENSE") => {
     if (activePanel !== null) {
       setPanelType(type);
@@ -768,9 +829,11 @@ export default function LedgerPage() {
   };
 
   const locale = language === "th" ? "th-TH" : "en-US";
-  const periodLabel = selectedMonth === "all"
-    ? t("ledgerFilterAll")
-    : new Date(selectedMonth + "-01").toLocaleDateString(locale, { month: "long", year: "numeric" });
+  const periodLabel = selectedMonth === "custom"
+    ? `${startDate || "?"} - ${endDate || "?"}`
+    : selectedMonth === "all"
+      ? t("ledgerFilterAll")
+      : new Date(selectedMonth + "-01").toLocaleDateString(locale, { month: "long", year: "numeric" });
 
   return (
     <div className="min-h-screen">
@@ -789,7 +852,7 @@ export default function LedgerPage() {
           <p className="text-gray-500 text-sm">{t("ledgerSubtitle")}</p>
 
           {/* Month Picker */}
-          <div className="mt-4">
+          <div className="mt-4 space-y-2">
             <MonthNavigator
               value={selectedMonth}
               onChange={setSelectedMonth}
@@ -797,6 +860,51 @@ export default function LedgerPage() {
               language={language}
               t={t}
             />
+            <AnimatePresence>
+              {selectedMonth === "custom" && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }} 
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="flex flex-col gap-3 overflow-hidden mt-1"
+                >
+                    <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar w-full mask-linear-fade">
+                      <button onClick={() => setPresetDateRange("7days")} className="shrink-0 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[10px] font-bold text-gray-300 transition-colors">
+                        {t("last7Days") || "Last 7 Days"}
+                      </button>
+                      <button onClick={() => setPresetDateRange("30days")} className="shrink-0 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[10px] font-bold text-gray-300 transition-colors">
+                        {t("last30Days") || "Last 30 Days"}
+                      </button>
+                      <button onClick={() => setPresetDateRange("thisMonth")} className="shrink-0 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[10px] font-bold text-gray-300 transition-colors">
+                        {t("thisMonth") || "This Month"}
+                      </button>
+                      <button onClick={() => setPresetDateRange("lastMonth")} className="shrink-0 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[10px] font-bold text-gray-300 transition-colors">
+                        {t("lastMonth") || "Last Month"}
+                      </button>
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-2 w-full">
+                      <div className="flex items-center bg-white/5 border border-white/10 rounded-xl px-3 py-2 flex-1 transition-colors focus-within:border-white/25">
+                        <span className="text-gray-500 text-[10px] uppercase font-bold mr-2 w-8">{t("from") || "From"}</span>
+                        <input 
+                          type="date" 
+                          value={startDate} 
+                          onChange={(e) => setStartDate(e.target.value)}
+                          className="bg-transparent text-white text-xs focus:outline-none w-full"
+                        />
+                      </div>
+                      <div className="flex items-center bg-white/5 border border-white/10 rounded-xl px-3 py-2 flex-1 transition-colors focus-within:border-white/25">
+                        <span className="text-gray-500 text-[10px] uppercase font-bold mr-2 w-8">{t("to") || "To"}</span>
+                        <input 
+                          type="date" 
+                          value={endDate} 
+                          onChange={(e) => setEndDate(e.target.value)}
+                          className="bg-transparent text-white text-xs focus:outline-none w-full"
+                        />
+                      </div>
+                    </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Bucket Picker */}
