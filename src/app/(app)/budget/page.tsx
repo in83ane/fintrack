@@ -1136,7 +1136,7 @@ export default function BudgetPage() {
                   <span className="text-xs sm:text-sm font-black shrink-0" style={{ color: activityColor(act.type) }}>
                     {act.type === "withdraw" || act.type === "invest" ? "-" : "+"}
                     {act.currency && act.rateAtTime
-                      ? formatMoney(act.amount, act.currency as any, act.rateAtTime)
+                      ? formatMoney(act.amount / (act.rateAtTime || 1), act.currency as any, act.rateAtTime, act.originalAmount ?? act.amount)
                       : formatMoney(act.amount)}
                   </span>
                 </motion.div>

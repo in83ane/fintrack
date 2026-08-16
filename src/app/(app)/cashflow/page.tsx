@@ -86,7 +86,7 @@ export default function CashflowPage() {
       time: undefined,
       note: ba.note || `${ba.type} - ${ba.bucketName}`,
       bucketId: ba.bucketId,
-      isTransfer: ba.type === 'invest' || ba.type === 'withdraw',
+      isTransfer: true, // Bucket activities are always internal transfers (not external income/expense)
       source: 'bucket' as const,
       currency: ba.currency,
       rateAtTime: ba.rateAtTime,
@@ -721,7 +721,7 @@ export default function CashflowPage() {
             </div>
             <div className="space-y-3">
               {(() => {
-                const incomes = allCashflowActivities.filter(c => c.type === 'INCOME' || c.type === 'DEPOSIT');
+                const incomes = allCashflowActivities.filter(c => (c.type === 'INCOME' || c.type === 'DEPOSIT') && !c.isTransfer);
                 const categories = [...new Set(incomes.map(c => c.category))];
                 const colors = ['#4EDEA3', '#ADC6FF', '#E9C349', '#FF8B9A', '#A78BFA'];
                 return categories.map((cat, i) => {
@@ -759,7 +759,7 @@ export default function CashflowPage() {
             </div>
             <div className="space-y-3">
               {(() => {
-                const expenses = allCashflowActivities.filter(c => c.type === 'EXPENSE' || c.type === 'WITHDRAW');
+                const expenses = allCashflowActivities.filter(c => (c.type === 'EXPENSE' || c.type === 'WITHDRAW') && !c.isTransfer);
                 const categories = [...new Set(expenses.map(c => c.category))];
                 const colors = ['#FFB4AB', '#E9C349', '#ADC6FF', '#A78BFA', '#4EDEA3'];
                 return categories.map((cat, i) => {

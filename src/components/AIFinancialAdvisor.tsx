@@ -375,6 +375,7 @@ export function AIFinancialAdvisor() {
         spent: bucketExpenses,
         target: targetAmount,
         current: b.currentAmount,
+        currency: b.currency || 'USD',
         pctUsed: targetAmount > 0 ? (bucketExpenses / targetAmount) * 100 : 0,
         isOverBudget: targetAmount > 0 && bucketExpenses > targetAmount,
       };
@@ -561,7 +562,7 @@ export function AIFinancialAdvisor() {
         const overBudget = snapshot.bucketHealth.filter(b => b.isOverBudget);
         const bucketLines = snapshot.bucketHealth.map(b => {
           const status = b.isOverBudget ? "🔴" : b.pctUsed > 80 ? "🟡" : "🟢";
-          return `${status} ${b.icon} **${b.name}**: ${formatMoney(b.current)} balance${b.target > 0 ? ` | ${b.pctUsed.toFixed(0)}% of budget used` : ""}`;
+          return `${status} ${b.icon} **${b.name}**: ${formatMoney(b.current / (exchangeRates[b.currency] || 1), b.currency as any, undefined, b.current)} balance${b.target > 0 ? ` | ${b.pctUsed.toFixed(0)}% of budget used` : ""}`;
         }).join("\n");
 
         content = `**💼 Budget Health Check**\n\n${bucketLines}\n\n${overBudget.length > 0 ? `⚠️ ${overBudget.length} bucket(s) over budget! Review: ${overBudget.map(b => b.name).join(", ")}` : "✅ All buckets within budget."}\n\n• Total Liquidity: ${formatMoney(snapshot.liquidity)}\n• Day ${snapshot.dayOfMonth}/${snapshot.daysInMonth} of month`;
