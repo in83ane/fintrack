@@ -10,19 +10,27 @@ export function SupportResistancePanel({ symbol = "XAUUSD", interval = "60" }: {
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
+    const controller = new AbortController();
+
     async function fetchData() {
+      setAnalysis(null);
       setLoading(true);
       try {
-        const res = await fetch(`/api/market/analysis?symbol=${symbol}&interval=${interval}`);
+        const res = await fetch(`/api/market/analysis?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(interval)}`, {
+          signal: controller.signal,
+          cache: "no-store",
+        });
+        if (!res.ok) throw new Error(`Market analysis request failed: ${res.status}`);
         const result = await res.json();
-        if (result.data) setAnalysis(result.data);
+        if (!controller.signal.aborted && result.data?.symbol === symbol.toUpperCase()) setAnalysis(result.data);
       } catch (err) {
-        console.error(err);
+        if ((err as Error).name !== "AbortError") console.error(err);
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     }
     fetchData();
+    return () => controller.abort();
   }, [symbol, interval]);
 
   let content = null;
@@ -112,21 +120,29 @@ export function FibonacciPanel({ symbol = "XAUUSD", interval = "60" }: { symbol?
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
+    const controller = new AbortController();
+
     async function fetchData() {
+      setData(null);
       setLoading(true);
       try {
-        const res = await fetch(`/api/market/fibo?symbol=${symbol}&interval=${interval}`);
+        const res = await fetch(`/api/market/fibo?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(interval)}`, {
+          signal: controller.signal,
+          cache: "no-store",
+        });
+        if (!res.ok) throw new Error(`Fibonacci request failed: ${res.status}`);
         const result = await res.json();
-        if (result.data && result.data.length > 0) {
+        if (!controller.signal.aborted && result.symbol === symbol.toUpperCase() && result.data?.length > 0) {
           setData(result.data);
         }
       } catch (err) {
-        console.error(err);
+        if ((err as Error).name !== "AbortError") console.error(err);
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     }
     fetchData();
+    return () => controller.abort();
   }, [symbol, interval]);
 
   let content = null;
@@ -377,19 +393,27 @@ export function AlertsPanel({ symbol = "XAUUSD", interval = "60" }: { symbol?: s
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
+    const controller = new AbortController();
+
     async function fetchData() {
+      setAnalysis(null);
       setLoading(true);
       try {
-        const res = await fetch(`/api/market/analysis?symbol=${symbol}&interval=${interval}`);
+        const res = await fetch(`/api/market/analysis?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(interval)}`, {
+          signal: controller.signal,
+          cache: "no-store",
+        });
+        if (!res.ok) throw new Error(`Market analysis request failed: ${res.status}`);
         const result = await res.json();
-        if (result.data) setAnalysis(result.data);
+        if (!controller.signal.aborted && result.data?.symbol === symbol.toUpperCase()) setAnalysis(result.data);
       } catch (err) {
-        console.error(err);
+        if ((err as Error).name !== "AbortError") console.error(err);
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     }
     fetchData();
+    return () => controller.abort();
   }, [symbol, interval]);
 
   let content = null;

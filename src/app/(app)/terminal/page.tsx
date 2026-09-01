@@ -213,13 +213,13 @@ export default function TerminalPage() {
                 ═══════════════════════════════════════════════════════════════ */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full">
               <div className="h-full">
-                <SupportResistancePanel symbol={symbol} interval={interval} />
+                <SupportResistancePanel key={`sr-${symbol}-${interval}`} symbol={symbol} interval={interval} />
               </div>
               <div className="h-full">
-                <FibonacciPanel symbol={symbol} interval={interval} />
+                <FibonacciPanel key={`fibo-${symbol}-${interval}`} symbol={symbol} interval={interval} />
               </div>
               <div className="h-full">
-                <AlertsPanel symbol={symbol} interval={interval} />
+                <AlertsPanel key={`alerts-${symbol}-${interval}`} symbol={symbol} interval={interval} />
               </div>
             </div>
 

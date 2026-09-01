@@ -50,6 +50,13 @@ async function yahooFetchWithRetry(url: string, retries = 2): Promise<Response> 
 // ─── Forex / Commodity / Index symbol mapping for Yahoo Finance ───────────────
 // TradingView uses symbols like "XAUUSD" but Yahoo Finance expects "GC=F" etc.
 const YAHOO_SYMBOL_MAP: Record<string, string> = {
+  // Cryptocurrencies
+  'BTCUSD': 'BTC-USD',
+  'ETHUSD': 'ETH-USD',
+  'SOLUSD': 'SOL-USD',
+  'XRPUSD': 'XRP-USD',
+  'ADAUSD': 'ADA-USD',
+  'DOGEUSD': 'DOGE-USD',
   // Commodities
   'XAUUSD': 'GC=F',      // Gold Futures
   'XAGUSD': 'SI=F',      // Silver Futures

@@ -54,7 +54,10 @@ export async function GET(request: Request) {
 
   try {
     const analysis = await analyzeTerminal(symbol, range, yahooInterval);
-    return NextResponse.json({ data: analysis });
+    return NextResponse.json(
+      { data: analysis },
+      { headers: { 'Cache-Control': 'no-store' } }
+    );
   } catch (error) {
     console.error('Market analysis error:', error);
     return NextResponse.json({ error: 'Failed to analyze symbol' }, { status: 500 });

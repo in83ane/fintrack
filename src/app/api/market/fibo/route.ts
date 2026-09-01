@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { fetchOHLCV } from '@/src/app/(app)/terminal/actions';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -7,14 +8,6 @@ export async function GET(request: Request) {
 
   if (!symbol) {
     return NextResponse.json({ error: 'Symbol is required' }, { status: 400 });
-  }
-
-  // Basic symbol mapping for Yahoo Finance
-  let formattedSymbol = symbol;
-  if (symbol === 'XAUUSD' || symbol === 'XAGUSD' || symbol === 'EURUSD' || symbol === 'GBPUSD' || symbol === 'USDJPY') {
-    formattedSymbol = `${symbol}=X`;
-  } else if (symbol.endsWith('USD') && symbol.length >= 6) {
-     formattedSymbol = symbol.replace('USD', '-USD');
   }
 
   let yahooInterval = '1h';
@@ -60,38 +53,11 @@ export async function GET(request: Request) {
   }
 
   try {
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${formattedSymbol}?interval=${yahooInterval}&range=${range}`;
-    
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      }
-    });
-    const data = await response.json();
-
-    if (data.chart.error) {
-      return NextResponse.json({ error: data.chart.error.description }, { status: 400 });
-    }
-
-    const result = data.chart.result[0];
-    const quote = result.indicators.quote[0];
-    
-    const highs = quote.high;
-    const lows = quote.low;
-    const timestamps = result.timestamp;
-
-    const cleanData = [];
-    for (let i = 0; i < timestamps.length; i++) {
-      if (highs[i] !== null && lows[i] !== null) {
-        cleanData.push({
-          timestamp: timestamps[i] * 1000,
-          high: highs[i],
-          low: lows[i],
-        });
-      }
-    }
-
-    return NextResponse.json({ data: cleanData, symbol: formattedSymbol });
+    const data = await fetchOHLCV(symbol, range, yahooInterval);
+    return NextResponse.json(
+      { data, symbol: symbol.toUpperCase() },
+      { headers: { 'Cache-Control': 'no-store' } }
+    );
   } catch (error) {
     console.error('Error fetching market data:', error);
     return NextResponse.json({ error: 'Failed to fetch market data' }, { status: 500 });
