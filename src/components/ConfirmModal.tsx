@@ -28,7 +28,7 @@ export function ConfirmModal({
     <Modal isOpen={isOpen} onClose={onClose} title={title}>
       <div className="space-y-6">
         <p className="text-gray-400 text-sm sm:text-base leading-relaxed">{message}</p>
-        <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
+        <div className="flex justify-end gap-3 pt-4 border-t border-border">
           <button
             onClick={onClose}
             className="px-6 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl font-black text-xs uppercase tracking-wide transition-colors"

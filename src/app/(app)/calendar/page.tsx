@@ -168,6 +168,19 @@ export default function CalendarPage() {
      };
   }, [filteredDailyStats, currentMonth, year]);
 
+  const monthlyCalendarSummary = useMemo(() => {
+    const prefix = `${year}-${String(currentMonth.getMonth() + 1).padStart(2, "0")}`;
+    const days = Object.entries(filteredDailyStats)
+      .filter(([date]) => date.startsWith(prefix))
+      .map(([, stats]) => stats);
+
+    return {
+      tradingDays: days.length,
+      profitableDays: days.filter((stats) => stats.profit >= 0).length,
+      losingDays: days.filter((stats) => stats.profit < 0).length,
+    };
+  }, [filteredDailyStats, currentMonth, year]);
+
   // Equity Curve data for this month
   const equityCurveData = useMemo(() => {
     const currentMonthPrefix = `${year}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`;
@@ -219,55 +232,61 @@ export default function CalendarPage() {
 
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-[1440px] mx-auto space-y-6 sm:space-y-8">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[1440px] mx-auto space-y-5 sm:space-y-6">
       {/* Header Section */}
-      <div className="flex flex-col gap-4 sm:gap-8">
-        <div className="space-y-2 sm:space-y-4">
-          <h2 className="text-xs uppercase tracking-wide text-[#E9C349] font-black">{t("performanceAudit")}</h2>
-          <div className="flex items-center bg-[#1C1B1B] border border-white/10 rounded-full p-1.5 shadow-xl max-w-fit">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="space-y-1">
+            <p className="text-[10px] font-black uppercase tracking-wide text-[#4EDEA3]">{t("performanceAudit")}</p>
+            <h1 className="text-2xl sm:text-3xl font-black text-white leading-none">Trading Calendar</h1>
+            <p className="text-xs sm:text-sm text-gray-500">Daily realized P/L and completed trade activity</p>
+          </div>
+          <div className="flex items-center self-start bg-surface border border-border rounded-xl p-1 sm:self-auto">
             <button
               onClick={prevMonth}
-              className="p-2 sm:p-2.5 hover:bg-white/10 rounded-full text-gray-400 hover:text-[#ADC6FF] transition-all"
+              className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-[#ADC6FF] transition-all"
             >
               <ChevronLeft size={18} />
             </button>
 
-            <h1 className="text-base sm:text-xl font-black tracking-tighter text-white leading-none w-40 sm:w-56 text-center select-none">
+            <h2 className="text-sm sm:text-base font-black text-white leading-none w-36 sm:w-48 text-center select-none">
               {monthName} <span className="text-gray-400 ml-1">{year}</span>
-            </h1>
+            </h2>
 
             <button
               onClick={nextMonth}
-              className="p-2 sm:p-2.5 hover:bg-white/10 rounded-full text-gray-400 hover:text-[#ADC6FF] transition-all"
+              className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-[#ADC6FF] transition-all"
             >
               <ChevronRight size={18} />
             </button>
 
-            <div className="w-[1px] h-6 sm:h-8 bg-white/10 mx-1 sm:mx-2" />
+            <div className="w-[1px] h-6 bg-white/10 mx-1" />
 
             <button
               onClick={() => setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1))}
-              className="px-3 sm:px-6 py-1.5 sm:py-2 mr-0.5 sm:mr-1 bg-white/5 hover:bg-white/10 rounded-full text-xs sm:text-sm font-bold text-white transition-all select-none"
+              className="px-3 py-1.5 mr-0.5 bg-white/5 hover:bg-white/10 rounded-lg text-xs font-bold text-white transition-all select-none"
             >
               {t("today")}
             </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-3">
-          <div className="bg-[#1C1B1B] p-3 sm:p-4 rounded-xl border border-white/5 min-w-[120px] relative overflow-hidden group">
-            <div className="absolute inset-0 bg-gradient-to-br from-[#4EDEA3]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-            <span className="text-[10px] sm:text-xs uppercase tracking-wide text-gray-500 font-bold block mb-2">{t("monthlyWinRate")}</span>
-            <span className="text-xl sm:text-2xl font-black text-[#4EDEA3] tracking-tighter">{monthlyWinRate.toFixed(1)}%</span>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="bg-surface p-4 rounded-xl border border-border min-w-0">
+            <span className="text-[10px] uppercase tracking-wide text-gray-500 font-bold block mb-2">This month</span>
+            <span className={cn("block truncate text-lg sm:text-xl font-black tabular-nums", netFintrackProfit >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>{netFintrackProfit >= 0 ? "+" : ""}{formatMoney(netFintrackProfit)}</span>
           </div>
-          <div className="bg-[#1C1B1B] p-3 sm:p-4 rounded-xl border border-white/5 min-w-[120px] relative overflow-hidden group">
-            <div className="absolute inset-0 bg-gradient-to-br from-[#FFB4AB]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-            <span className="text-[10px] sm:text-xs uppercase tracking-wide text-gray-500 font-bold block mb-2">{t("maxDrawdown")}</span>
-            <span className="text-xl sm:text-2xl font-black text-[#FFB4AB] tracking-tighter">{maxDrawdown.toFixed(1)}%</span>
+          <div className="bg-surface p-4 rounded-xl border border-border">
+            <span className="text-[10px] uppercase tracking-wide text-gray-500 font-bold block mb-2">Trading days</span>
+            <span className="text-xl font-black text-white tabular-nums">{monthlyCalendarSummary.tradingDays}</span>
           </div>
-          <div className="bg-[#2A2A2A] p-3 sm:p-4 rounded-xl border-l-[3px] sm:border-l-[4px] border-[#ADC6FF] min-w-[140px] sm:min-w-[180px] shadow-xl">
-            <span className="text-[10px] sm:text-xs uppercase tracking-wide text-[#4EDEA3] font-bold block mb-2">{t("netFintrackProfit")}</span>
-            <span className="text-lg sm:text-2xl font-black text-white tracking-tighter">{netFintrackProfit >= 0 ? '+' : ''}{formatMoney(netFintrackProfit)}</span>
+          <div className="bg-surface p-4 rounded-xl border border-border">
+            <span className="text-[10px] uppercase tracking-wide text-gray-500 font-bold block mb-2">Profitable days</span>
+            <span className="text-xl font-black text-[#4EDEA3] tabular-nums">{monthlyCalendarSummary.profitableDays}</span>
+          </div>
+          <div className="bg-surface p-4 rounded-xl border border-border">
+            <span className="text-[10px] uppercase tracking-wide text-gray-500 font-bold block mb-2">Losing days</span>
+            <span className="text-xl font-black text-[#FFB4AB] tabular-nums">{monthlyCalendarSummary.losingDays}</span>
           </div>
         </div>
       </div>
@@ -276,10 +295,10 @@ export default function CalendarPage() {
         {/* Left Column: Calendar + Chart */}
         <div className="lg:col-span-8 space-y-6 sm:space-y-8">
           {/* Calendar Grid */}
-          <div className="bg-[#1C1B1B] rounded-2xl sm:rounded-3xl overflow-hidden border border-white/5 shadow-2xl">
-          <div className="grid grid-cols-7 border-b border-white/5">
+          <div className="bg-surface rounded-2xl overflow-hidden border border-border shadow-xl">
+          <div className="grid grid-cols-7 border-b border-border">
             {currentDayNames.map((day, idx) => (
-              <div key={idx} className="py-2 sm:py-4 text-center text-[10px] sm:text-xs uppercase tracking-wide text-gray-500 font-black border-r border-white/5 last:border-r-0">
+              <div key={idx} className="py-3 text-center text-[10px] uppercase tracking-wide text-gray-500 font-black border-r border-border last:border-r-0">
                 {day}
               </div>
             ))}
@@ -288,7 +307,7 @@ export default function CalendarPage() {
           <div className="grid grid-cols-7">
             {calendarDays.map((day, idx) => {
               if (day === null) {
-                return <div key={`empty-${idx}`} className="aspect-[4/3] border-r border-b border-white/5" />;
+                return <div key={`empty-${idx}`} className="aspect-[4/3] border-r border-b border-border" />;
               }
 
               const dateStr = `${year}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -308,9 +327,9 @@ export default function CalendarPage() {
                   key={day}
                   onClick={() => setSelectedDate(dateStr)}
                   className={cn(
-                    "aspect-[4/3] p-2 sm:p-3 border-r border-b border-white/5 flex flex-col items-center justify-center gap-0.5 sm:gap-1 cursor-pointer transition-all group relative",
-                    isBottomLeft && "rounded-bl-2xl sm:rounded-bl-3xl",
-                    isBottomRight && "rounded-br-2xl sm:rounded-br-3xl",
+                    "min-h-[72px] sm:min-h-[88px] p-2 sm:p-3 border-r border-b border-border flex flex-col items-center justify-center gap-0.5 sm:gap-1 cursor-pointer transition-all group relative",
+                    isBottomLeft && "rounded-bl-2xl",
+                    isBottomRight && "rounded-br-2xl",
                     !stats && "hover:bg-white/5",
                     selectedDate === dateStr && "ring-2 ring-inset ring-[#ADC6FF] z-10"
                   )}
@@ -320,7 +339,7 @@ export default function CalendarPage() {
                       : `rgba(255, 180, 171, ${bgOpacity})`
                   } : undefined}
                 >
-                  <span className="absolute top-1 sm:top-2 left-2 sm:left-3 text-[10px] sm:text-xs font-bold text-gray-500">{day}</span>
+                  <span className="absolute top-2 left-2.5 sm:left-3 text-[10px] sm:text-xs font-bold text-gray-500">{day}</span>
                   {stats && (
                     <>
                       <span className={cn(
@@ -353,7 +372,7 @@ export default function CalendarPage() {
                   "px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-bold transition-all border",
                   selectedTag === tag.key
                     ? "bg-[#ADC6FF] text-[#00285d] border-[#ADC6FF]"
-                    : "bg-white/5 text-gray-400 border-white/10 hover:text-white hover:border-white/20"
+                    : "bg-white/5 text-gray-400 border-border hover:text-white hover:border-white/20"
                 )}
               >
                 {t(tag.labelKey)}
@@ -362,7 +381,7 @@ export default function CalendarPage() {
           </div>
 
           {/* Monthly Equity Curve */}
-          <div className="bg-[#1C1B1B] rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-white/5 shadow-xl">
+          <div className="bg-surface rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-border shadow-xl">
             <div className="flex justify-between items-center mb-3">
               <span className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide">{t("equityCurve")} — {t("cumulativePL")}</span>
               <span className={cn("text-xs sm:text-sm font-black", equityCurveData[equityCurveData.length - 1]?.cumPL >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
@@ -408,7 +427,7 @@ export default function CalendarPage() {
 
         {/* Right Column: Audit Detail Sidebar */}
         <div className="lg:col-span-4 space-y-4 sm:space-y-6">
-          <div className="bg-[#1C1B1B] rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-white/5 shadow-xl relative overflow-hidden">
+          <div className="bg-surface rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-border shadow-xl relative overflow-hidden">
             <div className="absolute top-0 right-0 w-24 sm:w-32 h-24 sm:h-32 bg-[#4EDEA3]/5 blur-[60px] rounded-full -mr-12 sm:-mr-16 -mt-12 sm:-mt-16" />
 
             <div className="flex justify-between items-start mb-4 sm:mb-8 relative z-10">
@@ -434,7 +453,7 @@ export default function CalendarPage() {
             <div className="space-y-2 sm:space-y-3 relative z-10">
               {selectedDayStats ? (
                 selectedDayStats.trades.map((trade, i) => (
-                  <div key={trade.id} className="group flex justify-between items-center p-3 sm:p-4 bg-[#0E0E0E] rounded-xl border border-white/5 hover:border-[#ADC6FF]/30 hover:bg-white/5 transition-all cursor-pointer">
+                  <div key={trade.id} className="group flex justify-between items-center p-3 sm:p-4 bg-background rounded-xl border border-border hover:border-[#ADC6FF]/30 hover:bg-white/5 transition-all cursor-pointer">
                     <div className="flex items-center gap-2 sm:gap-4">
                       <div className={cn(
                         "w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center transition-all",
@@ -476,7 +495,7 @@ export default function CalendarPage() {
           </div>
 
           {/* Correlations */}
-          <div className="bg-[#1C1B1B] rounded-2xl sm:rounded-3xl p-4 sm:p-8 border border-white/5 shadow-xl">
+          <div className="bg-surface rounded-2xl sm:rounded-3xl p-4 sm:p-8 border border-border shadow-xl">
             <h4 className="text-[10px] sm:text-xs uppercase tracking-wide text-gray-500 font-black mb-4 sm:mb-8">{t("marketCorrelations")}</h4>
             <div className="space-y-4 sm:space-y-6">
               <div className="space-y-2 sm:space-y-3">

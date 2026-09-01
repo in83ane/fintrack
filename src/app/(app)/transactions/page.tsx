@@ -291,7 +291,7 @@ export default function TransactionsPage() {
         <div className="flex flex-wrap gap-2 items-center">
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-[#1C1B1B] text-white rounded-xl font-bold text-xs uppercase tracking-wide border border-white/5 hover:bg-white/5 transition-all"
+            className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-surface text-white rounded-xl font-bold text-xs uppercase tracking-wide border border-border hover:bg-white/5 transition-all"
           >
             <Download size={14} className="text-[#4EDEA3]" />
             <span className="hidden sm:inline">{t("importCsv")}</span>
@@ -307,7 +307,7 @@ export default function TransactionsPage() {
 
           <button
             onClick={handleExportCSV}
-            className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-[#1C1B1B] text-white rounded-xl font-bold text-xs uppercase tracking-wide border border-white/5 hover:bg-white/5 transition-all"
+            className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-surface text-white rounded-xl font-bold text-xs uppercase tracking-wide border border-border hover:bg-white/5 transition-all"
           >
             <Upload size={14} className="text-[#ADC6FF]" />
             <span className="hidden sm:inline">{t("exportCsv")}</span>
@@ -327,7 +327,7 @@ export default function TransactionsPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4">
-        <div className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
+        <div className="bg-surface p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-border">
           <p className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide mb-1">{t("totalBalance")}</p>
           <h3 className="text-xl sm:text-2xl font-black text-white tracking-tighter">
             {formatMoney(filteredTransactions.reduce((acc, t) => {
@@ -343,7 +343,7 @@ export default function TransactionsPage() {
             }, 0))}
           </h3>
         </div>
-        <div className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
+        <div className="bg-surface p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-border">
           <p className="text-[10px] sm:text-xs font-black text-[#4EDEA3] uppercase tracking-wide mb-1">{t("buyVolume")}</p>
           <h3 className="text-xl sm:text-2xl font-black text-white tracking-tighter">
             {formatMoney(filteredTransactions.filter(t =>
@@ -353,7 +353,7 @@ export default function TransactionsPage() {
             ).reduce((acc, t) => acc + t.amount, 0))}
           </h3>
         </div>
-        <div className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
+        <div className="bg-surface p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-border">
           <p className="text-[10px] sm:text-xs font-black text-[#FFB4AB] uppercase tracking-wide mb-1">{t("sellVolume")}</p>
           <h3 className="text-xl sm:text-2xl font-black text-white tracking-tighter">
             {formatMoney(filteredTransactions.filter(t =>
@@ -363,13 +363,13 @@ export default function TransactionsPage() {
             ).reduce((acc, t) => acc + t.amount, 0))}
           </h3>
         </div>
-        <div className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
+        <div className="bg-surface p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-border">
           <p className="text-[10px] sm:text-xs font-black text-[#ADC6FF] uppercase tracking-wide mb-1">Expectancy</p>
           <h3 className={`text-xl sm:text-2xl font-black tracking-tighter ${expectancy >= 0 ? 'text-[#4EDEA3]' : 'text-[#FFB4AB]'}`}>
             {formatMoney(expectancy)}
           </h3>
         </div>
-        <div className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5 flex flex-col justify-between">
+        <div className="bg-surface p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-border flex flex-col justify-between">
           <p className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide mb-1">Max Streaks</p>
           <div className="flex gap-4">
             <div>
@@ -385,7 +385,7 @@ export default function TransactionsPage() {
       </div>
 
       {/* Heatmap Section */}
-      <div className="bg-[#1C1B1B] p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-white/5">
+      <div className="bg-surface p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-border">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Activity size={14} className="text-[#ADC6FF]" />
@@ -449,7 +449,7 @@ export default function TransactionsPage() {
                   </span>
                 )}
                 {hasData && (
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 group-hover:opacity-100 bg-[#1C1B1B] border border-white/10 text-white text-[10px] px-2.5 py-1.5 rounded-xl whitespace-nowrap z-20 transition-opacity pointer-events-none shadow-xl">
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 group-hover:opacity-100 bg-surface border border-border text-white text-[10px] px-2.5 py-1.5 rounded-xl whitespace-nowrap z-20 transition-opacity pointer-events-none shadow-xl">
                     <p className="font-bold">{format(new Date(heatmapDate.getFullYear(), heatmapDate.getMonth(), day), 'MMM d')}</p>
                     {pl !== undefined && <p className={cn("font-black", (pl || 0) >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>{(pl || 0) >= 0 ? '+' : ''}{formatMoney(pl || 0)}</p>}
                     {count > 0 && <p className="text-gray-400">{count} transaction{count > 1 ? 's' : ''}</p>}
@@ -460,7 +460,7 @@ export default function TransactionsPage() {
           })}
         </div>
         {/* Legend */}
-        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-white/5">
+        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border">
           <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-[#4EDEA3]/40" /><span className="text-[9px] text-gray-500 font-bold">Positive</span></div>
           <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-[#FFB4AB]/40" /><span className="text-[9px] text-gray-500 font-bold">Negative</span></div>
           <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-[#ADC6FF]/40" /><span className="text-[9px] text-gray-500 font-bold">Neutral/Trade</span></div>
@@ -469,7 +469,7 @@ export default function TransactionsPage() {
 
       {/* 6-Month Category Spending Trends */}
       {categoryTrends.categories.length > 0 && (
-        <div className="bg-[#1C1B1B] p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-white/5">
+        <div className="bg-surface p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-border">
           <div className="flex items-center gap-2 mb-4">
             <BarChart3 size={14} className="text-[#E9C349]" />
             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide">6-Month Expense Trends by Category</h3>
@@ -503,7 +503,7 @@ export default function TransactionsPage() {
             })}
           </div>
           {/* Category total breakdown */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-4 pt-3 border-t border-white/5">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-4 pt-3 border-t border-border">
             {categoryTrends.categories.map(({ cat, vals, color }) => (
               <div key={cat} className="p-2 rounded-xl" style={{ backgroundColor: `${color}10` }}>
                 <div className="flex items-center gap-1 mb-0.5">
@@ -521,7 +521,7 @@ export default function TransactionsPage() {
       )}
 
       {/* Filters & Search */}
-      <div className="flex flex-col gap-3 sm:gap-4 items-stretch sm:items-center bg-[#1C1B1B] p-3 sm:p-4 rounded-2xl sm:rounded-3xl border border-white/5">
+      <div className="flex flex-col gap-3 sm:gap-4 items-stretch sm:items-center bg-surface p-3 sm:p-4 rounded-2xl sm:rounded-3xl border border-border">
         <div className="relative w-full">
           <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
           <input
@@ -529,7 +529,7 @@ export default function TransactionsPage() {
             placeholder={t("searchTransactions") || "Search Ledger..."}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-[#0E0E0E] border-none rounded-xl sm:rounded-2xl py-2.5 sm:py-3 pl-10 sm:pl-12 pr-4 text-sm text-white focus:ring-2 focus:ring-[#4EDEA3]/20 transition-all"
+            className="w-full bg-background border-none rounded-xl sm:rounded-2xl py-2.5 sm:py-3 pl-10 sm:pl-12 pr-4 text-sm text-white focus:ring-2 focus:ring-[#4EDEA3]/20 transition-all"
           />
         </div>
         <div className="flex gap-2 w-full">
@@ -543,8 +543,8 @@ export default function TransactionsPage() {
                     ? "bg-[#4EDEA3] text-[#0E0E0E]"
                     : type === 'bucket'
                       ? "bg-[#ADC6FF] text-[#0E0E0E]"
-                      : "bg-[#1C1B1B] text-white border border-white/10"
-                  : "bg-[#0E0E0E] text-gray-500 hover:text-white"
+                      : "bg-surface text-white border border-border"
+                  : "bg-background text-gray-500 hover:text-white"
               }`}
             >
               {type === 'all' ? t('all') : type === 'trade' ? 'Trades' : 'Buckets'}
@@ -554,11 +554,11 @@ export default function TransactionsPage() {
       </div>
 
       {/* Table Section */}
-      <div className="bg-[#1C1B1B] rounded-2xl sm:rounded-[2rem] border border-white/5 overflow-hidden shadow-xl">
+      <div className="bg-surface rounded-2xl sm:rounded-[2rem] border border-border overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-white/5">
+              <tr className="border-b border-border">
                 <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide">{t("date")}</th>
                 <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide">{t("asset")}</th>
                 <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide">{t("flow")}</th>
@@ -711,8 +711,8 @@ export default function TransactionsPage() {
             exit={{ y: 50, opacity: 0 }}
             className={`fixed bottom-8 right-8 z-[100] flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl border ${
               notification.type === 'success' 
-                ? "bg-[#0E0E0E] border-[#4EDEA3]/20 text-[#4EDEA3]" 
-                : "bg-[#0E0E0E] border-[#FFB4AB]/20 text-[#FFB4AB]"
+                ? "bg-background border-[#4EDEA3]/20 text-[#4EDEA3]" 
+                : "bg-background border-[#FFB4AB]/20 text-[#FFB4AB]"
             }`}
           >
             {notification.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}

@@ -990,7 +990,7 @@ function LoginContent() {
       {/* Language Toggle */}
       <button
         onClick={toggleLang}
-        className="fixed top-6 right-6 z-50 flex items-center gap-2 px-4 py-2 bg-white/5 backdrop-blur-md border border-white/10 rounded-full text-white text-xs font-bold uppercase tracking-wide hover:bg-white/10 transition-all cursor-pointer shadow-lg pointer-events-auto"
+        className="fixed top-6 right-6 z-50 flex items-center gap-2 px-4 py-2 bg-white/5 backdrop-blur-md border border-border rounded-full text-white text-xs font-bold uppercase tracking-wide hover:bg-white/10 transition-all cursor-pointer shadow-lg pointer-events-auto"
       >
         <span className={lang === "th" ? "text-[#4EDEA3]" : "text-gray-500"}>TH</span>
         <span className="text-gray-600">|</span>
@@ -1016,7 +1016,7 @@ function LoginContent() {
         transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
         className="w-full max-w-md"
       >
-        <div className="bg-[#1C1B1B] rounded-3xl p-6 sm:p-8 border border-white/5 relative">
+        <div className="bg-surface rounded-3xl p-6 sm:p-8 border border-border relative">
           <div className="absolute inset-0 bg-gradient-to-b from-white/[0.02] to-transparent pointer-events-none rounded-3xl" />
 
           <div className="relative z-10 w-full mt-2">
@@ -1096,7 +1096,7 @@ function LoginContent() {
                         className={`w-full bg-white/5 border pl-12 pr-6 py-3.5 text-white outline-none transition-all text-sm disabled:opacity-50 rounded-lg ${
                           fieldErrors.email
                             ? "border-red-500/50 focus:border-red-500 focus:bg-red-500/5"
-                            : "border-white/10 focus:border-[#4EDEA3]/50 focus:bg-white/[0.07]"
+                            : "border-border focus:border-[#4EDEA3]/50 focus:bg-white/[0.07]"
                         }`}
                       />
                     </div>
@@ -1220,7 +1220,7 @@ function LoginContent() {
                         className={`w-full bg-white/5 border pl-12 pr-6 py-3.5 text-white outline-none transition-all text-sm disabled:opacity-50 rounded-lg ${
                           fieldErrors.email
                             ? "border-red-500/50 focus:border-red-500 focus:bg-red-500/5"
-                            : "border-white/10 focus:border-[#4EDEA3]/50 focus:bg-white/[0.07]"
+                            : "border-border focus:border-[#4EDEA3]/50 focus:bg-white/[0.07]"
                         }`}
                       />
                     </div>
@@ -1272,7 +1272,7 @@ function LoginContent() {
                           className={`w-full bg-white/5 border pl-12 pr-12 py-3.5 text-white outline-none transition-all text-sm disabled:opacity-50 rounded-lg ${
                             fieldErrors.password
                               ? "border-red-500/50 focus:border-red-500 focus:bg-red-500/5"
-                              : "border-white/10 focus:border-[#4EDEA3]/50 focus:bg-white/[0.07]"
+                              : "border-border focus:border-[#4EDEA3]/50 focus:bg-white/[0.07]"
                           }`}
                         />
                         <button
@@ -1292,7 +1292,7 @@ function LoginContent() {
                       {/* Password Strength Indicator */}
                       {isRegister && showPasswordStrength && password.length > 0 && (
                         <div
-                          className="mt-2 p-3 bg-[#141414] rounded-xl border border-white/10 shadow-xl shadow-black/60"
+                          className="mt-2 p-3 bg-background rounded-xl border border-border shadow-xl shadow-black/60"
                         >
                           <div className="flex items-center justify-between mb-2.5">
                             <span className="text-xs text-gray-500">{t.passwordRequirements}</span>
@@ -1366,7 +1366,7 @@ function LoginContent() {
                           className={`w-full bg-white/5 border pl-12 pr-12 py-3.5 text-white outline-none transition-all text-sm disabled:opacity-50 rounded-lg ${
                             fieldErrors.confirmPassword
                               ? "border-red-500/50 focus:border-red-500 focus:bg-red-500/5"
-                              : "border-white/10 focus:border-[#4EDEA3]/50 focus:bg-white/[0.07]"
+                              : "border-border focus:border-[#4EDEA3]/50 focus:bg-white/[0.07]"
                           }`}
                         />
                         <button
@@ -1432,10 +1432,10 @@ function LoginContent() {
 
                   <div className="relative py-4 z-10">
                     <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-white/10"></div>
+                      <div className="w-full border-t border-border"></div>
                     </div>
                     <div className="relative flex justify-center">
-                      <span className="bg-[#1C1B1B] px-4 text-xs text-gray-500">{t.orContinueWith}</span>
+                      <span className="bg-surface px-4 text-xs text-gray-500">{t.orContinueWith}</span>
                     </div>
                   </div>
 
@@ -1444,7 +1444,7 @@ function LoginContent() {
                       type="button"
                       onClick={handleGoogleLogin}
                       disabled={loading || accountLocked}
-                      className="w-full py-3.5 bg-white/5 text-white border border-white/10 rounded-xl font-semibold text-sm hover:bg-white/10 hover:border-white/20 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed group"
+                      className="w-full py-3.5 bg-white/5 text-white border border-border rounded-xl font-semibold text-sm hover:bg-white/10 hover:border-white/20 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed group"
                     >
                       <svg className="w-5 h-5 transition-transform group-hover:scale-110" viewBox="0 0 24 24">
                         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -1494,7 +1494,7 @@ function LoginContent() {
 function LoginSkeleton() {
   return (
     <div className="min-h-screen bg-[#131313] flex items-center justify-center p-6">
-      <div className="w-full max-w-md bg-[#1C1B1B] rounded-[2.5rem] p-10 border border-white/5">
+      <div className="w-full max-w-md bg-surface rounded-[2.5rem] p-10 border border-border">
         <div className="flex flex-col items-center space-y-4">
           <div className="w-16 h-16 bg-white/5 rounded-[1.5rem] animate-pulse" />
           <div className="w-32 h-8 bg-white/5 rounded-lg animate-pulse" />

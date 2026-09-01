@@ -9,6 +9,8 @@ export interface Profile {
   avatar_url: string | null;
   language: string | null;
   currency: string | null;
+  terminal_symbol: string | null;
+  terminal_interval: string | null;
   created_at: string;
   updated_at: string;
 }

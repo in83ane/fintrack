@@ -431,7 +431,7 @@ export function StockChart({
                 strokeDasharray="4,4"
               />
               {/* Crosshair dot */}
-              <circle cx={cx(hoveredIndex)} cy={cy(hov.price)} r={4} fill={strokeColor} stroke="#1C1B1B" strokeWidth={2} />
+              <circle cx={cx(hoveredIndex)} cy={cy(hov.price)} r={4} fill={strokeColor} stroke="rgba(255,255,255,0.03)" strokeWidth={2} />
               {/* Y-axis price pill */}
               <rect
                 x={W - PAD.right + 2}
@@ -445,7 +445,7 @@ export function StockChart({
               <text
                 x={W - PAD.right + 6}
                 y={cy(hov.price) + 3.5}
-                fill="#0E0E0E"
+                fill="#0f1115"
                 fontSize={9}
                 fontWeight="bold"
                 fontFamily="monospace"
@@ -496,7 +496,7 @@ export function StockChart({
         const tooltipY = Math.max(4, Math.min(dotScreenY - 20, containerRect.height - 50));
         return (
           <div
-            className="absolute top-0 left-0 bg-[#2A2A2A]/95 backdrop-blur-sm border border-white/10 rounded-xl px-3 py-2 pointer-events-none z-10 shadow-xl shadow-black/30"
+            className="absolute top-0 left-0 bg-[#2A2A2A]/95 backdrop-blur-sm border border-border rounded-xl px-3 py-2 pointer-events-none z-10 shadow-xl shadow-black/30"
             style={{
               transform: `translate3d(${tooltipX}px, ${tooltipY}px, 0)`,
               willChange: 'transform',

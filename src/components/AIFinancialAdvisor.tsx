@@ -124,7 +124,7 @@ function AsciiBarChart({ income, expenses, investments, savings }: {
     { label: "Savings    ", v: savings, color: "#E9C349" },
   ];
   return (
-    <div className="font-mono text-[11px] space-y-1.5 bg-black/30 rounded-xl p-3 border border-white/5">
+    <div className="font-mono text-[11px] space-y-1.5 bg-black/30 rounded-xl p-3 border border-border">
       {rows.map(r => (
         <div key={r.label} className="flex items-center gap-2">
           <span className="text-gray-400 w-28 flex-shrink-0">{r.label}</span>
@@ -667,9 +667,9 @@ export function AIFinancialAdvisor() {
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="bg-gradient-to-br from-[#1C1B1B] via-[#161616] to-[#0E0E0E] rounded-3xl border border-white/5 overflow-hidden shadow-2xl">
+    <div className="bg-gradient-to-br from-[#1C1B1B] via-[#161616] to-[#0E0E0E] rounded-3xl border border-border overflow-hidden shadow-2xl">
       {/* Header */}
-      <div className="p-4 sm:p-5 border-b border-white/5">
+      <div className="p-4 sm:p-5 border-b border-border">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-[#A78BFA] to-[#ADC6FF] rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/20 flex-shrink-0">
@@ -698,7 +698,7 @@ export function AIFinancialAdvisor() {
 
         {/* Key Stats Row */}
         <div className="mt-4 grid grid-cols-2 sm:grid-cols-5 gap-3">
-          <div className="col-span-2 sm:col-span-1 flex items-center gap-3 p-3 bg-white/[0.03] rounded-2xl border border-white/5">
+          <div className="col-span-2 sm:col-span-1 flex items-center gap-3 p-3 bg-white/[0.03] rounded-2xl border border-border">
             <HealthScoreRing score={snapshot.healthScore} />
           </div>
           {[
@@ -732,7 +732,7 @@ export function AIFinancialAdvisor() {
               subtitle: `${(snapshot.dayOfMonth / snapshot.daysInMonth * 100).toFixed(0)}% through`,
             },
           ].map(stat => (
-            <div key={stat.label} className="p-3 bg-white/[0.03] rounded-2xl border border-white/5">
+            <div key={stat.label} className="p-3 bg-white/[0.03] rounded-2xl border border-border">
               <div className="flex items-center gap-1.5 mb-1.5">
                 <stat.icon size={10} style={{ color: stat.color }} />
                 <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">{stat.label}</span>
@@ -767,7 +767,7 @@ export function AIFinancialAdvisor() {
             <div className="px-4 sm:px-5 pt-4 grid grid-cols-1 lg:grid-cols-2 gap-3">
               {/* Monthly Trend Chart */}
               {snapshot.monthlyTrend.length > 0 && (
-                <div className="bg-white/[0.03] rounded-2xl border border-white/5 p-4">
+                <div className="bg-white/[0.03] rounded-2xl border border-border p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <BarChart3 size={12} className="text-[#ADC6FF]" />
@@ -796,7 +796,7 @@ export function AIFinancialAdvisor() {
             {/* ASCII Bar Chart */}
             {snapshot.monthIncome > 0 && (
               <div className="px-4 sm:px-5 pt-3">
-                <div className="bg-white/[0.03] rounded-2xl border border-white/5 p-4">
+                <div className="bg-white/[0.03] rounded-2xl border border-border p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <Sparkles size={12} className="text-[#E9C349]" />
                     <span className="text-[10px] font-black text-gray-400 uppercase tracking-wide">Current Month Breakdown</span>
@@ -837,7 +837,7 @@ export function AIFinancialAdvisor() {
 
             {/* Chat Interface */}
             <div className="px-4 sm:px-5 pt-3 pb-4">
-              <div className="bg-white/[0.03] rounded-2xl border border-white/5 overflow-hidden">
+              <div className="bg-white/[0.03] rounded-2xl border border-border overflow-hidden">
                 {/* Messages */}
                 <div className="h-56 overflow-y-auto p-3 space-y-3" style={{ scrollbarWidth: "none" }}>
                   {messages.map(msg => (
@@ -894,12 +894,12 @@ export function AIFinancialAdvisor() {
                 </div>
 
                 {/* Quick Prompts */}
-                <div className="px-3 pt-2 pb-1 flex gap-1.5 flex-wrap border-t border-white/5">
+                <div className="px-3 pt-2 pb-1 flex gap-1.5 flex-wrap border-t border-border">
                   {quickPrompts.map(qp => (
                     <button
                       key={qp.label}
                       onClick={() => processInput(qp.label)}
-                      className="flex items-center gap-1.5 px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-[10px] text-gray-400 hover:text-white transition-all font-bold"
+                      className="flex items-center gap-1.5 px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-border rounded-full text-[10px] text-gray-400 hover:text-white transition-all font-bold"
                     >
                       <qp.icon size={9} />
                       {qp.label}
@@ -908,7 +908,7 @@ export function AIFinancialAdvisor() {
                 </div>
 
                 {/* Input */}
-                <div className="border-t border-white/5 px-3 py-2">
+                <div className="border-t border-border px-3 py-2">
                   <form onSubmit={e => { e.preventDefault(); processInput(input); }} className="flex gap-2 items-center">
                     <input
                       ref={inputRef}

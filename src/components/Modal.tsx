@@ -37,7 +37,7 @@ export function Modal({ isOpen, onClose, title, assetName, assetSymbol, children
           
           {/* Modal Container */}
           <div
-            className="relative w-full sm:max-w-lg max-h-[90dvh] bg-[#1C1B1B] sm:border sm:border-white/10 rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl overflow-hidden flex flex-col"
+            className="relative w-full sm:max-w-lg max-h-[90dvh] bg-background sm:border sm:border-border rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl overflow-hidden flex flex-col"
           >
             {/* Mobile Drag Handle Indicator */}
             <div className="shrink-0">
@@ -46,7 +46,7 @@ export function Modal({ isOpen, onClose, title, assetName, assetSymbol, children
               </div>
             </div>
             
-            <div className="flex justify-between items-center px-8 py-4 sm:py-6 border-b border-white/5 flex-shrink-0">
+            <div className="flex justify-between items-center px-8 py-4 sm:py-6 border-b border-border flex-shrink-0">
               <div className="flex items-center gap-3">
                 {assetName && (
                   <>

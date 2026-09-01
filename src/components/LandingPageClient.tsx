@@ -37,9 +37,9 @@ export default function LandingPageClient({ initialIsLogged }: { initialIsLogged
 
 
   return (
-    <div className="min-h-screen bg-[#0E0E0E] text-white selection:bg-[#4EDEA3] selection:text-[#0E0E0E] scroll-smooth">
+    <div className="min-h-screen bg-background text-white selection:bg-[#4EDEA3] selection:text-[#0E0E0E] scroll-smooth">
       {/* Navigation */}
-      <nav className="fixed top-0 w-full z-50 border-b border-white/5 bg-[#0E0E0E]/80 backdrop-blur-xl">
+      <nav className="fixed top-0 w-full z-50 border-b border-border bg-background/80 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-[#4EDEA3] rounded-xl flex items-center justify-center">
@@ -67,7 +67,7 @@ export default function LandingPageClient({ initialIsLogged }: { initialIsLogged
             <div className="relative">
               <button
                 onClick={() => setShowLangMenu(!showLangMenu)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-all"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-border hover:bg-white/10 transition-all"
               >
                 <Globe size={14} className="text-gray-400" />
                 <span className="text-xs font-black uppercase tracking-wide text-white">
@@ -82,7 +82,7 @@ export default function LandingPageClient({ initialIsLogged }: { initialIsLogged
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
-                    className="absolute top-full right-0 mt-2 w-32 bg-[#1C1B1B] border border-white/10 rounded-xl shadow-2xl overflow-hidden py-1 z-[60]"
+                    className="absolute top-full right-0 mt-2 w-32 bg-surface border border-border rounded-xl shadow-2xl overflow-hidden py-1 z-[60]"
                   >
                     {languages.map((lang) => (
                       <button
@@ -111,7 +111,7 @@ export default function LandingPageClient({ initialIsLogged }: { initialIsLogged
               </Link>
             ) : (
                 <>
-                <Link href="/login" className="hidden sm:block px-6 py-2.5 bg-white/5 border border-white/10 rounded-full text-sm font-bold uppercase tracking-wide hover:bg-white/10 transition-all">
+                <Link href="/login" className="hidden sm:block px-6 py-2.5 bg-white/5 border border-border rounded-full text-sm font-bold uppercase tracking-wide hover:bg-white/10 transition-all">
                   {t("loginBtn") || "Login"}
                 </Link>
                 <Link href="/login?mode=register" className="hidden md:block px-6 py-2.5 bg-[#4EDEA3] text-[#0E0E0E] rounded-full text-sm font-bold uppercase tracking-wide hover:brightness-110 transition-all">
@@ -137,7 +137,7 @@ export default function LandingPageClient({ initialIsLogged }: { initialIsLogged
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
           >
-            <span className="inline-block px-4 py-1.5 bg-white/5 border border-white/10 rounded-full text-sm font-bold uppercase tracking-wide text-[#4EDEA3] mb-8">
+            <span className="inline-block px-4 py-1.5 bg-white/5 border border-border rounded-full text-sm font-bold uppercase tracking-wide text-[#4EDEA3] mb-8">
               {t("futureOfWealth") || "The Future of Wealth Management"}
             </span>
             <h1 className="text-5xl md:text-8xl font-bold tracking-tighter leading-[1.1] mb-8">
@@ -165,13 +165,13 @@ export default function LandingPageClient({ initialIsLogged }: { initialIsLogged
             className="mt-24 relative"
           >
             <div className="absolute inset-0 bg-gradient-to-t from-[#0E0E0E] via-transparent to-transparent z-10" />
-            <div className="bg-[#1C1B1B] rounded-[2.5rem] border border-white/10 p-4 overflow-hidden aspect-video relative">
+            <div className="bg-surface rounded-[2.5rem] border border-border p-4 overflow-hidden aspect-video relative">
               <div className="absolute top-4 left-4 flex gap-2">
                 <div className="w-3 h-3 rounded-full bg-[#FFB4AB]/20" />
                 <div className="w-3 h-3 rounded-full bg-[#E9C349]/20" />
                 <div className="w-3 h-3 rounded-full bg-[#4EDEA3]/20" />
               </div>
-              <div className="w-full h-full bg-[#0E0E0E] rounded-2xl flex items-center justify-center">
+              <div className="w-full h-full bg-background rounded-2xl flex items-center justify-center">
                 <BarChart3 size={64} className="text-white/10 animate-pulse" />
               </div>
             </div>
@@ -196,7 +196,7 @@ export default function LandingPageClient({ initialIsLogged }: { initialIsLogged
               { icon: PieChart, title: t("assetAllocationFeature") || "Asset Allocation", desc: t("allocationDesc") || "Visualize your diversification and rebalance your portfolio with one click." },
               { icon: BarChart3, title: t("advancedReporting") || "Advanced Reporting", desc: t("reportingDesc") || "Generate professional-grade tax and performance reports in seconds." }
             ].map((feature, i) => (
-              <div key={i} className="group p-8 bg-[#1C1B1B] rounded-[2rem] border border-white/5 hover:border-[#4EDEA3]/30 transition-all">
+              <div key={i} className="group p-8 bg-surface rounded-[2rem] border border-border hover:border-[#4EDEA3]/30 transition-all">
                 <div className="w-12 h-12 bg-[#4EDEA3]/10 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                   <feature.icon className="text-[#4EDEA3]" size={24} />
                 </div>
@@ -213,7 +213,7 @@ export default function LandingPageClient({ initialIsLogged }: { initialIsLogged
       {/* CTA Section */}
       <section className="py-32">
         <div className="max-w-5xl mx-auto px-6">
-          <div className="bg-gradient-to-br from-[#1C1B1B] to-[#0E0E0E] rounded-[3rem] p-12 md:p-20 border border-white/5 text-center relative overflow-hidden">
+          <div className="bg-gradient-to-br from-[#1C1B1B] to-[#0E0E0E] rounded-[3rem] p-12 md:p-20 border border-border text-center relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-[#4EDEA3]/5 blur-[80px] rounded-full" />
             <div className="absolute bottom-0 left-0 w-64 h-64 bg-[#ADC6FF]/5 blur-[80px] rounded-full" />
             
@@ -232,7 +232,7 @@ export default function LandingPageClient({ initialIsLogged }: { initialIsLogged
       </section>
 
       {/* Footer */}
-      <footer className="py-20 border-t border-white/5">
+      <footer className="py-20 border-t border-border">
         <div className="max-w-7xl mx-auto px-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-20">
             <div className="col-span-1 md:col-span-2">
@@ -267,7 +267,7 @@ export default function LandingPageClient({ initialIsLogged }: { initialIsLogged
               </ul>
             </div>
           </div>
-          <div className="flex flex-col md:flex-row justify-between items-center gap-6 pt-8 border-t border-white/5">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-6 pt-8 border-t border-border">
             <p className="text-sm font-bold uppercase tracking-wide text-gray-600">© 2024 FinTrack OS. {t("allRightsReserved") || "All rights reserved."}</p>
             <div className="flex gap-8">
               <Link href="/privacy-policy" className="text-sm font-bold uppercase tracking-wide text-gray-600 hover:text-white transition-colors">{t("privacyPolicyDoc") || "Privacy Policy"}</Link>

@@ -439,7 +439,7 @@ function SVGChart({ data, isPositive, period, hoveredIndex, onHover, language, s
               <line x1={PAD.left} y1={cy(hov.price)} x2={W - PAD.right} y2={cy(hov.price)}
                 stroke="rgba(173, 198, 255, 0.2)" strokeWidth={1} strokeDasharray="4,4" />
               <circle cx={cx(hoveredIndex)} cy={cy(hov.price)} r={8} fill={strokeColor} opacity={0.3} />
-              <circle cx={cx(hoveredIndex)} cy={cy(hov.price)} r={5} fill={strokeColor} stroke="#1C1B1B" strokeWidth={2} />
+              <circle cx={cx(hoveredIndex)} cy={cy(hov.price)} r={5} fill={strokeColor} stroke="rgba(255,255,255,0.03)" strokeWidth={2} />
               <g>
                 <rect x={W - PAD.right + 5} y={cy(hov.price) - 12} width={60} height={24} rx={4} fill="#2A2A2A" stroke="rgba(255,255,255,0.1)" />
                 <text x={W - PAD.right + 35} y={cy(hov.price) + 4} textAnchor="middle" fill="#fff" fontSize={11} fontWeight={600}>

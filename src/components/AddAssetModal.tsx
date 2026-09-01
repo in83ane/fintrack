@@ -200,7 +200,7 @@ export function AddAssetModal({ isOpen, onClose }: AddAssetModalProps) {
               value={query}
               onChange={(e) => handleSearch(e.target.value)}
               placeholder={t("searchAssetPlaceholder")}
-              className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-2xl text-white text-sm font-medium placeholder-gray-500 focus:outline-none focus:border-[#ADC6FF]/50 transition-colors"
+              className="w-full pl-12 pr-4 py-4 bg-white/5 border border-border rounded-2xl text-white text-sm font-medium placeholder-gray-500 focus:outline-none focus:border-[#ADC6FF]/50 transition-colors"
               autoFocus
             />
             {isSearching && (
@@ -250,7 +250,7 @@ export function AddAssetModal({ isOpen, onClose }: AddAssetModalProps) {
                   <button
                     key={asset.symbol}
                     onClick={() => handleSelect(asset.symbol, asset.name)}
-                    className="flex flex-col text-left p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-[#ADC6FF]/30 transition-all group"
+                    className="flex flex-col text-left p-3 rounded-xl bg-white/5 border border-border hover:bg-white/10 hover:border-[#ADC6FF]/30 transition-all group"
                   >
                     <div className="flex justify-between items-center w-full mb-1">
                       <span className="text-sm font-black text-white group-hover:text-[#ADC6FF] transition-colors">{asset.symbol}</span>
@@ -267,7 +267,7 @@ export function AddAssetModal({ isOpen, onClose }: AddAssetModalProps) {
         /* Step 2: Enter details */
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Selected asset display */}
-          <div className="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/10">
+          <div className="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-border">
             <div className="w-12 h-12 bg-[#ADC6FF]/10 rounded-xl flex items-center justify-center text-[#ADC6FF] font-black text-sm">
               {selectedResult?.symbol.slice(0, 3)}
             </div>
@@ -285,7 +285,7 @@ export function AddAssetModal({ isOpen, onClose }: AddAssetModalProps) {
           </div>
 
           {/* Import / New Purchase Toggle */}
-          <div className="flex gap-2 p-1 bg-white/5 rounded-2xl border border-white/10">
+          <div className="flex gap-2 p-1 bg-white/5 rounded-2xl border border-border">
             <button
               type="button"
               onClick={() => { setIsImport(false); }}
@@ -333,7 +333,7 @@ export function AddAssetModal({ isOpen, onClose }: AddAssetModalProps) {
               value={shares}
               onChange={(e) => setShares(e.target.value)}
               placeholder="0.00"
-              className="w-full px-4 py-4 bg-white/5 border border-white/10 rounded-2xl text-white text-sm font-medium placeholder-gray-600 focus:outline-none focus:border-[#ADC6FF]/50 transition-colors"
+              className="w-full px-4 py-4 bg-white/5 border border-border rounded-2xl text-white text-sm font-medium placeholder-gray-600 focus:outline-none focus:border-[#ADC6FF]/50 transition-colors"
               required
             />
           </div>
@@ -345,7 +345,7 @@ export function AddAssetModal({ isOpen, onClose }: AddAssetModalProps) {
                 {t("avgCostPerUnit")}
               </label>
               {/* THB / USD toggle */}
-              <div className="flex gap-1 p-0.5 bg-white/5 rounded-lg border border-white/10">
+              <div className="flex gap-1 p-0.5 bg-white/5 rounded-lg border border-border">
                 {(['USD', 'THB'] as const).map(cur => (
                   <button
                     key={cur}
@@ -376,7 +376,7 @@ export function AddAssetModal({ isOpen, onClose }: AddAssetModalProps) {
                   "w-full px-4 py-4 bg-white/5 border rounded-2xl text-white text-sm font-medium placeholder-gray-600 focus:outline-none transition-colors pr-16",
                   priceCurrency === 'THB'
                     ? 'border-[#E9C349]/30 focus:border-[#E9C349]/60'
-                    : 'border-white/10 focus:border-[#ADC6FF]/50'
+                    : 'border-border focus:border-[#ADC6FF]/50'
                 )}
                 required
               />
@@ -408,7 +408,7 @@ export function AddAssetModal({ isOpen, onClose }: AddAssetModalProps) {
                   onClick={() => setShowBucketDropdown(!showBucketDropdown)}
                   className={cn(
                     "w-full px-4 py-3 bg-white/5 border rounded-2xl text-sm font-medium flex items-center justify-between transition-colors",
-                    selectedBucketId ? "border-[#ADC6FF]/30 text-white" : "border-white/10 text-gray-500"
+                    selectedBucketId ? "border-[#ADC6FF]/30 text-white" : "border-border text-gray-500"
                   )}
                 >
                   <span>
@@ -423,7 +423,7 @@ export function AddAssetModal({ isOpen, onClose }: AddAssetModalProps) {
                   <ChevronDown size={14} className={cn("transition-transform", showBucketDropdown && "rotate-180")} />
                 </button>
                 {showBucketDropdown && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-[#1C1B1B] border border-white/10 rounded-2xl overflow-hidden z-20 shadow-2xl">
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-border rounded-2xl overflow-hidden z-20 shadow-2xl">
                     <button
                       type="button"
                       onClick={() => { setSelectedBucketId(""); setShowBucketDropdown(false); }}
@@ -486,7 +486,7 @@ export function AddAssetModal({ isOpen, onClose }: AddAssetModalProps) {
                 const totalCost = Number(shares) * Number(avgCost);
                 const remaining = b.currentAmount - totalCost;
                 return (
-                  <div className="flex justify-between text-xs pt-1 border-t border-white/5">
+                  <div className="flex justify-between text-xs pt-1 border-t border-border">
                     <span className="text-gray-500 flex items-center gap-1">
                       <Wallet size={10} /> {t("bucketBalance")}: {b.icon} {t(b.name) || b.name}
                     </span>
@@ -500,7 +500,7 @@ export function AddAssetModal({ isOpen, onClose }: AddAssetModalProps) {
           )}
 
           {/* Exclude from Net Worth Toggle */}
-          <div className="flex items-center justify-between p-4 bg-white/5 border border-white/5 rounded-2xl">
+          <div className="flex items-center justify-between p-4 bg-white/5 border border-border rounded-2xl">
             <div>
               <p className="text-sm font-bold text-white">Exclude from Net Worth</p>
               <p className="text-xs text-gray-500 mt-0.5 max-w-[200px]">Asset value will be tracked but won&apos;t be added to your total portfolio balance.</p>

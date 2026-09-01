@@ -38,7 +38,7 @@ const statusConfig = {
   upcoming: {
     color: "#6B7280",
     bgColor: "bg-white/5",
-    borderColor: "border-white/10",
+    borderColor: "border-border",
     icon: Calendar,
   },
   target: {
@@ -131,7 +131,7 @@ export function VerticalTimeline({ items, currency = "USD", formatMoney }: Verti
 
                 {/* Value and Change */}
                 {(item.value !== undefined || item.change !== undefined) && (
-                  <div className="flex items-center gap-3 pt-2 border-t border-white/5">
+                  <div className="flex items-center gap-3 pt-2 border-t border-border">
                     {item.value !== undefined && (
                       <div className="flex items-center gap-1.5">
                         <span className="text-[10px] text-gray-500 font-medium uppercase">Value</span>

@@ -47,6 +47,41 @@ async function yahooFetchWithRetry(url: string, retries = 2): Promise<Response> 
   throw new Error('Max retries exceeded');
 }
 
+// ─── Forex / Commodity / Index symbol mapping for Yahoo Finance ───────────────
+// TradingView uses symbols like "XAUUSD" but Yahoo Finance expects "GC=F" etc.
+const YAHOO_SYMBOL_MAP: Record<string, string> = {
+  // Commodities
+  'XAUUSD': 'GC=F',      // Gold Futures
+  'XAGUSD': 'SI=F',      // Silver Futures
+  'XPTUSD': 'PL=F',      // Platinum Futures
+  'XPDUSD': 'PA=F',      // Palladium Futures
+  'WTIUSD': 'CL=F',      // Crude Oil WTI
+  'BCOUSD': 'BZ=F',      // Brent Crude Oil
+  'NGAS':   'NG=F',      // Natural Gas
+  // Major Forex pairs
+  'EURUSD': 'EURUSD=X',
+  'GBPUSD': 'GBPUSD=X',
+  'USDJPY': 'USDJPY=X',
+  'USDCHF': 'USDCHF=X',
+  'AUDUSD': 'AUDUSD=X',
+  'USDCAD': 'USDCAD=X',
+  'NZDUSD': 'NZDUSD=X',
+  'EURGBP': 'EURGBP=X',
+  'EURJPY': 'EURJPY=X',
+  'GBPJPY': 'GBPJPY=X',
+  'USDTHB': 'USDTHB=X',
+  // Indices
+  'US30':   'YM=F',      // Dow Jones Futures
+  'US500':  'ES=F',      // S&P 500 Futures
+  'NAS100': 'NQ=F',      // Nasdaq 100 Futures
+  'US100':  'NQ=F',
+  'SPX':    '^GSPC',
+  'DJI':    '^DJI',
+  'IXIC':   '^IXIC',
+  'VIX':    '^VIX',
+  'DXY':    'DX-Y.NYB',  // US Dollar Index
+};
+
 // ─── SET symbol detection ─────────────────────────────────────────────────────
 const SET_SYMBOLS = [
   "AOT","PTT","DELTA","SCB","CPALL","KBANK","BBL","TRUE","ADVANC","IVL",
@@ -57,6 +92,11 @@ const SET_SYMBOLS = [
 
 function resolveYahooSymbol(symbol: string): { yahooSymbol: string; isSET: boolean } {
   const s = symbol.toUpperCase().replace('.BK', '');
+
+  // Check forex/commodity/index mapping first
+  const mapped = YAHOO_SYMBOL_MAP[s];
+  if (mapped) return { yahooSymbol: mapped, isSET: false };
+
   const isProbablySET = /^[A-Z]+$/.test(s) && SET_SYMBOLS.includes(s);
   const yahooSymbol = isProbablySET ? `${s}.BK` : s;
   return { yahooSymbol, isSET: yahooSymbol.endsWith('.BK') };

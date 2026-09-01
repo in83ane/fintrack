@@ -20,7 +20,7 @@ export function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivEl
 // Pre-built skeleton patterns
 export function SkeletonCard() {
   return (
-    <div className="bg-[#1C1B1B] rounded-3xl p-6 border border-white/5 space-y-4">
+    <div className="bg-surface rounded-3xl p-6 border border-border space-y-4">
       <div className="flex items-center gap-3">
         <Skeleton className="w-10 h-10 rounded-full" />
         <div className="space-y-2 flex-1">
@@ -36,7 +36,7 @@ export function SkeletonCard() {
 
 export function SkeletonSignalCard() {
   return (
-    <div className="bg-[#1C1B1B] rounded-2xl p-4 border border-white/5 space-y-3">
+    <div className="bg-surface rounded-2xl p-4 border border-border space-y-3">
       <div className="flex justify-between">
         <div className="flex items-center gap-2">
           <Skeleton className="w-6 h-6 rounded" />
@@ -78,7 +78,7 @@ export function SkeletonAssetCard() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="bg-[#1C1B1B] rounded-2xl p-5 border border-white/5 space-y-3"
+      className="bg-surface rounded-2xl p-5 border border-border space-y-3"
     >
       <div className="flex justify-between items-start">
         <div className="flex items-center gap-3">

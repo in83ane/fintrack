@@ -111,7 +111,7 @@ export default function SettingsPage() {
       <div className="space-y-8">
         {/* Profile Card (#23) */}
         <section>
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-gradient-to-br from-[#1C1B1B] to-[#141414] p-6 rounded-3xl border border-white/5 relative overflow-hidden">
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-gradient-to-br from-[#1C1B1B] to-[#141414] p-6 rounded-3xl border border-border relative overflow-hidden">
             <div className="absolute -right-8 -top-8 w-32 h-32 bg-[#ADC6FF]/5 blur-3xl rounded-full" />
             <div className="flex items-center gap-4 relative z-10">
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#ADC6FF] to-[#4D8EFF] flex items-center justify-center text-xl font-bold text-white shadow-lg">
@@ -134,7 +134,7 @@ export default function SettingsPage() {
         <section className="space-y-4">
           <h2 className="text-sm font-bold uppercase tracking-wide text-gray-500 px-2">{t("regionalSettings")}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-[#1C1B1B] p-6 rounded-3xl border border-white/5 space-y-4">
+            <div className="bg-surface p-6 rounded-3xl border border-border space-y-4">
               <div className="flex items-center gap-3 text-[#ADC6FF]">
                 <Globe size={18} />
                 <span className="text-xs font-bold uppercase tracking-wide">{t("languageLabel")}</span>
@@ -148,7 +148,7 @@ export default function SettingsPage() {
                       "py-3 px-4 rounded-xl text-xs font-bold transition-all border",
                       language === lang.code 
                         ? "bg-[#ADC6FF] text-[#00285d] border-[#ADC6FF]" 
-                        : "bg-white/5 text-gray-400 border-white/5 hover:border-white/10"
+                        : "bg-white/5 text-gray-400 border-border hover:border-border"
                     )}
                   >
                     {lang.flag} {lang.label}
@@ -157,7 +157,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="bg-[#1C1B1B] p-6 rounded-3xl border border-white/5 space-y-4">
+            <div className="bg-surface p-6 rounded-3xl border border-border space-y-4">
               <div className="flex items-center gap-3 text-[#E9C349]">
                 <CreditCard size={18} />
                 <span className="text-xs font-bold uppercase tracking-wide">{t("baseCurrency")}</span>
@@ -171,7 +171,7 @@ export default function SettingsPage() {
                       "py-3 px-4 rounded-xl text-xs font-bold transition-all border",
                       currency === curr 
                         ? "bg-[#E9C349] text-[#241a00] border-[#E9C349]" 
-                        : "bg-white/5 text-gray-400 border-white/5 hover:border-white/10"
+                        : "bg-white/5 text-gray-400 border-border hover:border-border"
                     )}
                   >
                     {curr}
@@ -185,7 +185,7 @@ export default function SettingsPage() {
         {/* Appearance */}
         <section className="space-y-4">
           <h2 className="text-sm font-black uppercase tracking-wide text-gray-500 px-2">{t("appearance")}</h2>
-          <div className="bg-[#1C1B1B] rounded-3xl border border-white/5 p-6">
+          <div className="bg-surface rounded-3xl border border-border p-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#8B5CF615' }}>
@@ -216,7 +216,7 @@ export default function SettingsPage() {
         {/* Data Management */}
         <section className="space-y-4">
           <h2 className="text-sm font-black uppercase tracking-wide text-gray-500 px-2">{t("dataManagement")}</h2>
-          <div className="bg-[#1C1B1B] rounded-3xl border border-white/5 divide-y divide-white/5">
+          <div className="bg-surface rounded-3xl border border-border divide-y divide-white/5">
             <div className="p-6 flex items-center justify-between group">
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#4EDEA315' }}>
@@ -229,7 +229,7 @@ export default function SettingsPage() {
               </div>
               <button
                 onClick={handleExportData}
-                className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-xl text-xs font-bold transition-all border border-white/5"
+                className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-xl text-xs font-bold transition-all border border-border"
               >
                 Export
               </button>
@@ -244,7 +244,7 @@ export default function SettingsPage() {
                   <p className="text-xs text-gray-500 mt-0.5">{t("importDataDesc")}</p>
                 </div>
               </div>
-              <label className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-xl text-xs font-bold transition-all border border-white/5 cursor-pointer">
+              <label className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-xl text-xs font-bold transition-all border border-border cursor-pointer">
                 Import
                 <input type="file" accept=".json" onChange={handleImportData} className="hidden" />
               </label>
@@ -255,7 +255,7 @@ export default function SettingsPage() {
         {/* Notification Preferences */}
         <section className="space-y-4">
           <h2 className="text-sm font-black uppercase tracking-wide text-gray-500 px-2">{t("notifPreferences")}</h2>
-          <div className="bg-[#1C1B1B] rounded-3xl border border-white/5 divide-y divide-white/5">
+          <div className="bg-surface rounded-3xl border border-border divide-y divide-white/5">
             {[
               { key: 'priceAlerts' as const, label: t("priceAlerts"), desc: t("priceAlertsDesc"), color: "#E9C349" },
               { key: 'rebalanceAlerts' as const, label: t("rebalanceAlerts"), desc: t("rebalanceAlertsDesc"), color: "#ADC6FF" },
@@ -365,7 +365,7 @@ export default function SettingsPage() {
         </section>
       </div>
 
-      <div className="pt-8 border-t border-white/5">
+      <div className="pt-8 border-t border-border">
         <button 
           onClick={handleSave}
           className="px-8 py-4 bg-[#ADC6FF] text-[#00285d] rounded-full font-black text-sm uppercase tracking-tight hover:brightness-110 transition-all active:scale-95"
@@ -383,7 +383,7 @@ function SettingsSection({ icon: Icon, title, description, active, onClick }: an
       onClick={onClick}
       className={cn(
         "p-6 rounded-3xl border transition-all cursor-pointer group",
-        active ? "bg-[#ADC6FF]/5 border-[#ADC6FF]/20" : "bg-[#1C1B1B] border-white/5 hover:border-white/10"
+        active ? "bg-[#ADC6FF]/5 border-[#ADC6FF]/20" : "bg-surface border-border hover:border-border"
       )}
     >
       <div className="flex items-center gap-6">
@@ -398,7 +398,7 @@ function SettingsSection({ icon: Icon, title, description, active, onClick }: an
           <p className="text-xs text-gray-500 font-medium mt-1">{description}</p>
         </div>
         <div className={cn(
-          "w-8 h-8 rounded-full border border-white/5 flex items-center justify-center transition-all",
+          "w-8 h-8 rounded-full border border-border flex items-center justify-center transition-all",
           active ? "text-[#ADC6FF] rotate-90" : "text-gray-600 group-hover:text-white"
         )}>
           <ChevronRight size={14} />

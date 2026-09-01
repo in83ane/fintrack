@@ -39,11 +39,12 @@ const getSecurityHeaders = (nonce: string): Record<string, string> => ({
   // Content Security Policy with nonce (strict)
   "Content-Security-Policy": [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://s3.tradingview.com https://tv-static-assets.tradingview.com",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https:",
-    "font-src 'self'",
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+    "font-src 'self' data:",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.tradingview.com wss://*.tradingview.com",
+    "frame-src https://*.tradingview.com https://s.tradingview.com",
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -52,8 +53,7 @@ const getSecurityHeaders = (nonce: string): Record<string, string> => ({
   ].join("; "),
   // Cross Origin policies
   "Cross-Origin-Opener-Policy": "same-origin",
-  "Cross-Origin-Resource-Policy": "same-origin",
-  "Cross-Origin-Embedder-Policy": "require-corp",
+  "Cross-Origin-Resource-Policy": "cross-origin",
   // Cache control for sensitive pages
   "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
   "Pragma": "no-cache",
@@ -352,7 +352,14 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/portfolio") ||
     pathname.startsWith("/transactions") ||
     pathname.startsWith("/settings") ||
-    pathname.startsWith("/calendar");
+    pathname.startsWith("/calendar") ||
+    pathname.startsWith("/trader-hub") ||
+    pathname.startsWith("/terminal") ||
+    pathname.startsWith("/history") ||
+    pathname.startsWith("/cashflow") ||
+    pathname.startsWith("/ledger") ||
+    pathname.startsWith("/trade") ||
+    pathname.startsWith("/budget");
 
   // Redirect authenticated users away from auth pages
   if (isAuthPage && user) {

@@ -109,7 +109,7 @@ export function TradeJourney({ asset }: TradeJourneyProps) {
   if (milestones.length === 0) return null;
 
   return (
-    <div className="bg-[#1C1B1B] p-5 rounded-2xl border border-white/5 space-y-4">
+    <div className="bg-surface p-5 rounded-2xl border border-border space-y-4">
       <div className="flex items-center gap-2 mb-2">
         <Flag size={16} className="text-[#ADC6FF]" />
         <h3 className="text-sm font-bold text-white">{t("investmentJourney") || "Investment Journey"}</h3>

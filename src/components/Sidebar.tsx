@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { LayoutDashboard, Wallet, Settings, HelpCircle, Calendar, User, LineChart, Banknote, PiggyBank, CandlestickChart, Monitor, ReceiptText } from "lucide-react";
+import { LayoutDashboard, Wallet, Settings, HelpCircle, User, PiggyBank, CandlestickChart, Monitor, ReceiptText, CalendarDays, ArrowRightLeft } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 import { useApp } from "@/src/context/AppContext";
 import Link from "next/link";
@@ -16,27 +16,25 @@ interface SidebarProps {
 }
 
 export function Sidebar({ isMobile, onClose }: SidebarProps) {
-  const { t } = useApp();
+  const { t, language } = useApp();
   const pathname = usePathname();
   const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
 
   const navItems = [
     { icon: LayoutDashboard, label: t("dashboard"), href: "/dashboard" },
     { icon: Wallet, label: t("portfolio"), href: "/portfolio" },
-    { icon: Calendar, label: t("calendar"), href: "/calendar" },
-    { icon: LineChart, label: t("transactions") || "Transactions", href: "/transactions" },
-    { icon: Banknote, label: t("cashflowOverview"), href: "/cashflow" },
     { icon: ReceiptText, label: "Ledger", href: "/ledger" },
-    { icon: CandlestickChart, label: "Trade Assistant", href: "/trade" },
+    { icon: ArrowRightLeft, label: language === "th" ? "กระแสเงินสด" : "Cash Flow", href: "/cashflow" },
     { icon: Monitor, label: "Terminal", href: "/terminal" },
+    { icon: CandlestickChart, label: "Trade Assistant", href: "/trade" },
     { icon: PiggyBank, label: t("budgetPage"), href: "/budget" },
-
+    { icon: CalendarDays, label: "Calendar", href: "/calendar" },
     { icon: Settings, label: t("settings"), href: "/settings" },
   ];
 
   const sidebarClasses = cn(
-    "flex h-screen flex-col py-6 border-r border-white/5",
-    isMobile ? "w-full bg-[#0E0E0E]" : "hidden lg:flex w-64 fixed left-0 top-0 bg-[#0E0E0E] z-40"
+    "flex h-screen flex-col py-6 border-r border-border",
+    isMobile ? "w-full bg-background" : "hidden lg:flex w-64 fixed left-0 top-0 bg-background z-40"
   );
 
   const handleLogout = async () => {
@@ -60,8 +58,8 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
     <aside className={sidebarClasses}>
       <div className="px-6 mb-8">
         <Link href="/dashboard" onClick={onClose} className="flex items-center gap-3 group">
-          <div className="w-9 h-9 bg-[#4EDEA3] rounded-xl flex items-center justify-center shadow-lg shadow-[#4EDEA3]/20 group-hover:scale-105 transition-transform">
-            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <div className="w-9 h-9 bg-primary/20 rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 group-hover:scale-105 transition-transform">
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="var(--color-primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 3v18h18"></path>
               <path d="M7 16l4-6 4 4 4-8"></path>
             </svg>
@@ -86,11 +84,11 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
               className={cn(
                 "flex items-center gap-3 mx-3 py-2.5 px-4 rounded-xl transition-all duration-200",
                 isActive
-                  ? "bg-[#4EDEA3]/10 text-[#4EDEA3] font-semibold"
+                  ? "bg-primary/10 text-primary font-semibold"
                   : "text-gray-500 hover:bg-white/5 hover:text-white"
               )}
             >
-              <item.icon size={18} className={isActive ? "fill-[#4EDEA3]/20" : ""} />
+              <item.icon size={18} className={isActive ? "text-primary" : ""} />
               <span className="text-sm font-medium">{item.label}</span>
             </Link>
           );
@@ -114,7 +112,7 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
 
         <button
           onClick={handleLogout}
-          className="flex items-center gap-2.5 text-[#FFB4AB] px-4 py-2.5 hover:bg-[#FFB4AB]/10 rounded-xl transition-all w-full"
+          className="flex items-center gap-2.5 text-red-400 px-4 py-2.5 hover:bg-red-400/10 rounded-xl transition-all w-full"
         >
           <User size={16} />
           <span className="text-sm font-bold">{t("logout") || "Logout"}</span>

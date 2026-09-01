@@ -1,121 +1,81 @@
 "use client";
 
 import React, { useState, useMemo, useRef, useCallback } from "react";
-import { TrendingUp, TrendingDown, PlusCircle, MinusCircle, ArrowRight, Edit3, Info, History, Plus, Download, FileText, CheckCircle2, Trash2, Pencil, ArrowDownToLine, ArrowUpFromLine, PiggyBank, Briefcase, Wallet, BarChart3, Sparkles } from "lucide-react";
+import { TrendingUp, TrendingDown, Plus, ArrowRight, Briefcase, Wallet, BarChart3, Sparkles, ArrowUpRight, ArrowDownLeft, Download, Upload } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/src/lib/utils";
 import { useApp } from "@/src/context/AppContext";
-import { Modal } from "@/src/components/Modal";
 import { AddAssetModal } from "@/src/components/AddAssetModal";
 import { AddCashflowModal } from "@/src/components/AddCashflowModal";
-import DashboardGrid from "@/src/components/widgets/DashboardGrid";
 import { AnimatedNumber } from "@/src/components/AnimatedNumber";
-import { SkeletonDashboard } from "@/src/components/SkeletonLoader";
+import { Modal } from "@/src/components/Modal";
+import Papa from "papaparse";
 import { formatPnL, getPnLColor, formatPercent } from "@/src/lib/format";
 import { calcMaxDrawdown, calcProfitFactor } from "@/src/lib/finance";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import Papa from "papaparse";
+
+// ─── Net Worth Sparkline ──────────────────────────────────────────────────────
 
 interface NetWorthPoint {
   date: string;
   value: number;
 }
 
-interface DashboardChartProps {
-  data: NetWorthPoint[];
-  currency: string;
-  exchangeRates: Record<string, number>;
-  formatMoney: (amount: number, originalCurrency?: any, originalRate?: number) => string;
-  t: (key: string) => string;
-}
-
-function DashboardChart({ data, currency, exchangeRates, formatMoney, t }: DashboardChartProps) {
-  const svgRef = useRef<SVGSVGElement>(null);
+function NetWorthSparkline({ data, formatMoney, t }: { data: NetWorthPoint[]; formatMoney: (n: number) => string; t: (k: string) => string }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  const [dimensions, setDimensions] = React.useState({ width: 800, height: 192 });
+  const [dims, setDims] = React.useState({ width: 800, height: 160 });
 
-  const W = dimensions.width;
-  const H = dimensions.height;
-  const PAD = { top: 10, right: 20, bottom: 30, left: 60 };
+  const W = dims.width;
+  const H = dims.height;
+  const PAD = { top: 8, right: 16, bottom: 24, left: 50 };
 
   React.useEffect(() => {
-    const updateDimensions = () => {
+    const update = () => {
       if (containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
-        setDimensions({ width: rect.width, height: rect.height });
+        setDims({ width: rect.width, height: rect.height });
       }
     };
-
-    updateDimensions();
-    window.addEventListener('resize', updateDimensions);
-    return () => window.removeEventListener('resize', updateDimensions);
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
   }, []);
 
-  const { minP, maxP, yTicks, pathD, areaD, cx, cy, xTicks, isPositive } = useMemo(() => {
-    if (data.length < 2) return { minP: 0, maxP: 0, yTicks: [], pathD: "", areaD: "", cx: () => 0, cy: () => 0, xTicks: [], isPositive: true };
-
+  const { pathD, areaD, cx, cy, yTicks, xTicks, isPositive } = useMemo(() => {
+    if (data.length < 2) return { pathD: "", areaD: "", cx: () => 0, cy: () => 0, yTicks: [], xTicks: [], isPositive: true };
     const values = data.map(d => d.value);
     const minP = Math.min(...values);
     const maxP = Math.max(...values);
-    const paddingP = (maxP - minP) * 0.1;
-    const adjustedMinP = Math.max(0, minP - paddingP);
-    const adjustedMaxP = maxP + paddingP;
-    const rangeP = adjustedMaxP - adjustedMinP || 1;
+    const padding = (maxP - minP) * 0.1;
+    const adjMin = Math.max(0, minP - padding);
+    const adjMax = maxP + padding;
+    const range = adjMax - adjMin || 1;
+    const n = data.length;
 
-    const dataCount = data.length;
-    const cx = (index: number) => PAD.left + (index / (dataCount - 1)) * (W - PAD.left - PAD.right);
-    const cy = (p: number) => PAD.top + (1 - (p - adjustedMinP) / rangeP) * (H - PAD.top - PAD.bottom);
+    const cx = (i: number) => PAD.left + (i / (n - 1)) * (W - PAD.left - PAD.right);
+    const cy = (p: number) => PAD.top + (1 - (p - adjMin) / range) * (H - PAD.top - PAD.bottom);
 
-    // Y-axis ticks
-    const yTickCount = 4;
-    const yTicks = Array.from({ length: yTickCount }, (_, i) => adjustedMinP + (i / (yTickCount - 1)) * rangeP);
-
-    // X-axis ticks
-    const xTickCount = Math.min(6, dataCount);
-    const indexStep = Math.floor((dataCount - 1) / (xTickCount - 1)) || 1;
-    const xTicks = Array.from({ length: xTickCount }, (_, i) => {
-      const index = Math.min(i * indexStep, dataCount - 1);
-      return { ...data[index], index };
+    const yTicks = Array.from({ length: 3 }, (_, i) => adjMin + (i / 2) * range);
+    const xCount = Math.min(5, n);
+    const step = Math.floor((n - 1) / (xCount - 1)) || 1;
+    const xTicks = Array.from({ length: xCount }, (_, i) => {
+      const idx = Math.min(i * step, n - 1);
+      return { ...data[idx], index: idx };
     });
 
-    // Smooth line path
-    const points = data.map((d, i) => ({ x: cx(i), y: cy(d.value), i }));
-    let pathD = `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
-
+    const points = data.map((d, i) => ({ x: cx(i), y: cy(d.value) }));
+    let pathD = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
     for (let i = 1; i < points.length; i++) {
       const prev = points[i - 1];
       const curr = points[i];
-      const next = points[i + 1];
-
-      let cp1x, cp1y, cp2x, cp2y;
-
-      if (i === 1) {
-        cp1x = prev.x + (curr.x - prev.x) * 0.3;
-        cp1y = prev.y;
-      } else {
-        const prev2 = points[i - 2];
-        cp1x = prev.x + (curr.x - prev2.x) * 0.15;
-        cp1y = prev.y + (curr.y - prev2.y) * 0.15;
-      }
-
-      if (i === points.length - 1) {
-        cp2x = curr.x - (curr.x - prev.x) * 0.3;
-        cp2y = curr.y;
-      } else {
-        cp2x = curr.x - (next.x - prev.x) * 0.15;
-        cp2y = curr.y - (next.y - prev.y) * 0.15;
-      }
-
-      pathD += ` C ${cp1x.toFixed(2)} ${cp1y.toFixed(2)}, ${cp2x.toFixed(2)} ${cp2y.toFixed(2)}, ${curr.x.toFixed(2)} ${curr.y.toFixed(2)}`;
+      const cpx = (prev.x + curr.x) / 2;
+      pathD += ` C ${cpx.toFixed(1)} ${prev.y.toFixed(1)}, ${cpx.toFixed(1)} ${curr.y.toFixed(1)}, ${curr.x.toFixed(1)} ${curr.y.toFixed(1)}`;
     }
-
-    const areaD = `${pathD} L ${points[points.length - 1].x.toFixed(2)} ${(H - PAD.bottom).toFixed(2)} L ${points[0].x.toFixed(2)} ${(H - PAD.bottom).toFixed(2)} Z`;
-
+    const areaD = `${pathD} L ${points[points.length - 1].x.toFixed(1)} ${(H - PAD.bottom).toFixed(1)} L ${points[0].x.toFixed(1)} ${(H - PAD.bottom).toFixed(1)} Z`;
     const isPositive = data[data.length - 1].value >= data[0].value;
-
-    return { minP, maxP, yTicks, pathD, areaD, cx, cy, xTicks, isPositive };
+    return { pathD, areaD, cx, cy, yTicks, xTicks, isPositive };
   }, [data, W, H]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
@@ -123,17 +83,14 @@ function DashboardChart({ data, currency, exchangeRates, formatMoney, t }: Dashb
     const rect = svgRef.current.getBoundingClientRect();
     const scaleX = W / rect.width;
     const mouseX = (e.clientX - rect.left) * scaleX;
-
     const chartWidth = W - PAD.left - PAD.right;
-    const relativeX = Math.max(0, Math.min(mouseX - PAD.left, chartWidth));
-    const indexFloat = (relativeX / chartWidth) * (data.length - 1);
-    const closest = Math.round(Math.max(0, Math.min(indexFloat, data.length - 1)));
-
-    setHoveredIndex(closest);
+    const relX = Math.max(0, Math.min(mouseX - PAD.left, chartWidth));
+    const idx = Math.round((relX / chartWidth) * (data.length - 1));
+    setHoveredIndex(Math.max(0, Math.min(idx, data.length - 1)));
   }, [data.length, W]);
 
-  const strokeColor = isPositive ? "#4EDEA3" : "#FFB4AB";
-  const fillGradientId = `dashboard-gradient-${isPositive ? "pos" : "neg"}`;
+  const color = isPositive ? "#4EDEA3" : "#FFB4AB";
+  const hov = hoveredIndex != null ? data[hoveredIndex] : null;
 
   if (data.length < 2) {
     return (
@@ -142,8 +99,6 @@ function DashboardChart({ data, currency, exchangeRates, formatMoney, t }: Dashb
       </div>
     );
   }
-
-  const hov = hoveredIndex != null ? data[hoveredIndex] : null;
 
   return (
     <div ref={containerRef} className="w-full h-full relative">
@@ -156,139 +111,44 @@ function DashboardChart({ data, currency, exchangeRates, formatMoney, t }: Dashb
         style={{ overflow: 'visible' }}
       >
         <defs>
-          <linearGradient id={fillGradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={strokeColor} stopOpacity={0.4} />
-            <stop offset="50%" stopColor={strokeColor} stopOpacity={0.1} />
-            <stop offset="100%" stopColor={strokeColor} stopOpacity={0} />
+          <linearGradient id="nw-grad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity={0.3} />
+            <stop offset="100%" stopColor={color} stopOpacity={0} />
           </linearGradient>
-          <filter id="dashboard-glow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
-            <feMerge>
-              <feMergeNode in="coloredBlur"/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
         </defs>
-
-        {/* Grid lines */}
         {yTicks.map((v, i) => (
-          <line
-            key={`grid-${i}`}
-            x1={PAD.left}
-            y1={cy(v)}
-            x2={W - PAD.right}
-            y2={cy(v)}
-            stroke="rgba(255,255,255,0.05)"
-            strokeWidth={1}
-            strokeDasharray={i === 0 || i === yTicks.length - 1 ? "0" : "4,4"}
-          />
+          <g key={i}>
+            <line x1={PAD.left} y1={cy(v)} x2={W - PAD.right} y2={cy(v)} stroke="rgba(255,255,255,0.04)" strokeWidth={1} />
+            <text x={PAD.left - 6} y={cy(v) + 3} textAnchor="end" fill="#6B7280" fontSize={9} fontWeight={500}>
+              {formatMoney(v).replace(/[฿$]\s*/, '')}
+            </text>
+          </g>
         ))}
-
-        {/* Y-axis labels */}
-        {yTicks.map((v, i) => (
-          <text
-            key={`y-${i}`}
-            x={PAD.left - 8}
-            y={cy(v) + 4}
-            textAnchor="end"
-            fill="#6B7280"
-            fontSize={10}
-            fontWeight={500}
-          >
-            {formatMoney(v).replace(/[฿$]\s*/, '')}
-          </text>
-        ))}
-
-        {/* X-axis labels */}
         {xTicks.map((d, i) => (
-          <text
-            key={`x-${i}`}
-            x={cx(d.index)}
-            y={H - 8}
-            textAnchor={i === 0 ? "start" : i === xTicks.length - 1 ? "end" : "middle"}
-            fill="#6B7280"
-            fontSize={10}
-            fontWeight={500}
-          >
+          <text key={i} x={cx(d.index)} y={H - 6} textAnchor="middle" fill="#6B7280" fontSize={9} fontWeight={500}>
             {d.date}
           </text>
         ))}
-
-        {/* Area fill */}
-        <path d={areaD} fill={`url(#${fillGradientId})`} />
-
-        {/* Line */}
-        <path
-          d={pathD}
-          fill="none"
-          stroke={strokeColor}
-          strokeWidth={2.5}
-          strokeLinejoin="round"
-          strokeLinecap="round"
-          filter="url(#dashboard-glow)"
-        />
-
-        {/* Hover crosshair */}
-        <AnimatePresence>
-          {hov && hoveredIndex !== null && (
-            <motion.g
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-            >
-              <line
-                x1={cx(hoveredIndex)}
-                y1={PAD.top}
-                x2={cx(hoveredIndex)}
-                y2={H - PAD.bottom}
-                stroke="rgba(173, 198, 255, 0.3)"
-                strokeWidth={1}
-                strokeDasharray="4,4"
-              />
-              <line
-                x1={PAD.left}
-                y1={cy(hov.value)}
-                x2={W - PAD.right}
-                y2={cy(hov.value)}
-                stroke="rgba(173, 198, 255, 0.2)"
-                strokeWidth={1}
-                strokeDasharray="4,4"
-              />
-              <circle
-                cx={cx(hoveredIndex)}
-                cy={cy(hov.value)}
-                r={6}
-                fill={strokeColor}
-                opacity={0.3}
-              />
-              <circle
-                cx={cx(hoveredIndex)}
-                cy={cy(hov.value)}
-                r={4}
-                fill={strokeColor}
-                stroke="#1C1B1B"
-                strokeWidth={2}
-              />
-            </motion.g>
-          )}
-        </AnimatePresence>
+        <path d={areaD} fill="url(#nw-grad)" />
+        <path d={pathD} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+        {hov && hoveredIndex !== null && (
+          <g>
+            <line x1={cx(hoveredIndex)} y1={PAD.top} x2={cx(hoveredIndex)} y2={H - PAD.bottom} stroke="rgba(173,198,255,0.25)" strokeWidth={1} strokeDasharray="3,3" />
+            <circle cx={cx(hoveredIndex)} cy={cy(hov.value)} r={5} fill={color} opacity={0.3} />
+            <circle cx={cx(hoveredIndex)} cy={cy(hov.value)} r={3.5} fill={color} stroke="#0f1115" strokeWidth={1.5} />
+          </g>
+        )}
       </svg>
-
-      {/* Floating tooltip */}
       <AnimatePresence>
         {hov && (
           <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            transition={{ duration: 0.15 }}
-            className="absolute top-2 left-1/2 -translate-x-1/2 bg-[#2A2A2A]/95 backdrop-blur-sm border border-white/10 rounded-xl px-3 py-1.5 shadow-2xl pointer-events-none z-10"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="absolute top-1 left-1/2 -translate-x-1/2 bg-[#1e1e1e]/95 backdrop-blur-sm border border-border rounded-xl px-3 py-1.5 shadow-xl pointer-events-none z-10"
           >
-            <div className="text-xs text-gray-400 mb-0.5">{hov.date}</div>
-            <div className="text-sm font-bold text-white">
-              {formatMoney(hov.value)}
-            </div>
+            <div className="text-[10px] text-gray-400">{hov.date}</div>
+            <div className="text-sm font-bold text-white">{formatMoney(hov.value)}</div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -296,38 +156,110 @@ function DashboardChart({ data, currency, exchangeRates, formatMoney, t }: Dashb
   );
 }
 
-// Helper to translate asset class labels
-const assetClassKeyMap: Record<string, string> = {
-  Equities: "equities",
-  "Fixed Income": "fixedIncome",
-  Alternatives: "alternatives",
-  Cash: "cash",
-};
+// ═══════════════════════════════════════════════════════════════════════════════
+// DASHBOARD PAGE — Essential Only
+// ═══════════════════════════════════════════════════════════════════════════════
 
 export default function DashboardPage() {
-  const { t, formatMoney, currency, exchangeRates, trades, addTrade, bulkAddTrades, allocations, updateAllocation, netWorthHistory, assets, addToast, addNotification, language, cashActivities, moneyBuckets, bucketActivities, totalInvested, totalUnrealizedPL, totalRealizedPL, totalDividends } = useApp();
+  const {
+    t, formatMoney, currency, exchangeRates, trades, assets, language,
+    cashActivities, moneyBuckets, bucketActivities,
+    totalInvested, totalUnrealizedPL, totalRealizedPL, totalDividends,
+    fetchAssetMarketData, addAsset, addTrade,
+    netWorthHistory, addToast,
+  } = useApp();
   const router = useRouter();
-  const [isModalOpen, setIsModalOpen] = React.useState(false);
-  const [isCSVModalOpen, setIsCSVModalOpen] = React.useState(false);
-  const [isAddAssetOpen, setIsAddAssetOpen] = React.useState(false);
-  const [isAllocEditOpen, setIsAllocEditOpen] = React.useState(false);
-  const [isAddCashflowOpen, setIsAddCashflowOpen] = React.useState(false);
-  const [editAllocValues, setEditAllocValues] = React.useState<Record<string, number>>({});
+  const [isAddAssetOpen, setIsAddAssetOpen] = useState(false);
+  const [isAddCashflowOpen, setIsAddCashflowOpen] = useState(false);
+  const [isImportCSVOpen, setIsImportCSVOpen] = useState(false);
+  const [csvImportStatus, setCsvImportStatus] = useState<{ type: 'idle' | 'success' | 'error'; message: string }>({ type: 'idle', message: '' });
 
-  const translateLabel = (label: string) => {
-    const key = assetClassKeyMap[label];
-    return key ? t(key) : label;
+  const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        try {
+          let count = 0;
+          for (const row of results.data as any[]) {
+            const symbol = (row.symbol || row.Symbol || '').toUpperCase().trim();
+            const shares = parseFloat(row.shares || row.Shares || row.quantity || row.Quantity || '0');
+            const avgCostVal = parseFloat(row.avgCost || row.AvgCost || row.avg_cost || row.cost || '0');
+            if (!symbol || shares <= 0) continue;
+
+            try {
+              const liveData = await fetchAssetMarketData(symbol);
+              const livePrice = liveData?.price || avgCostVal || 0;
+              const CRYPTO = ['BTC', 'ETH', 'SOL', 'USDT', 'DOGE', 'XRP'];
+              const autoAllocation = CRYPTO.includes(symbol) ? 'Alternatives'
+                : (symbol.endsWith('.BK') || symbol.endsWith('.TH')) ? 'Equities'
+                : 'Equities';
+              addAsset({
+                name: liveData?.name || row.name || row.Name || symbol,
+                symbol: symbol,
+                valueUSD: livePrice * shares,
+                change: liveData?.changePercent || 0,
+                allocation: autoAllocation,
+                shares: shares,
+                avgCost: avgCostVal || livePrice,
+                chartData: liveData?.chartData,
+              });
+              addTrade({
+                asset: symbol,
+                type: 'BUY' as const,
+                amountUSD: avgCostVal * shares,
+                date: new Date().toISOString(),
+                rateAtTime: exchangeRates[currency],
+                currency: currency,
+                shares: shares,
+                pricePerUnit: avgCostVal,
+              });
+              count++;
+            } catch (err) {
+              console.error(`Failed to import ${symbol}:`, err);
+            }
+          }
+          if (count > 0) {
+            setCsvImportStatus({ type: 'success', message: `${count} ${t("csvImportedAssets") || "assets imported"}` });
+            addToast(`${count} ${t("csvImportedAssets") || "assets imported"}`, 'success');
+            setTimeout(() => { setIsImportCSVOpen(false); setCsvImportStatus({ type: 'idle', message: '' }); }, 1500);
+          } else {
+            setCsvImportStatus({ type: 'error', message: t("noValidTradesFound") || "No valid trades found" });
+          }
+        } catch {
+          setCsvImportStatus({ type: 'error', message: t("importError") || "Import error" });
+        }
+      },
+      error: () => {
+        setCsvImportStatus({ type: 'error', message: t("importError") || "Import error" });
+      }
+    });
+    e.target.value = '';
   };
-  const [newTrade, setNewTrade] = React.useState<{ asset: string; amountUSD: string; type: "BUY" | "SELL" }>({ asset: "", amountUSD: "", type: "BUY" });
-  const [importStatus, setImportStatus] = React.useState<{ type: 'idle' | 'success' | 'error', message: string }>({ type: 'idle', message: '' });
-  const [historySearchQuery, setHistorySearchQuery] = useState("");
 
+  // ─── Derived Data ──────────────────────────────────────────────────────
   const currentNetWorth = netWorthHistory[netWorthHistory.length - 1]?.value || 0;
   const totalProfit = totalUnrealizedPL + totalRealizedPL + totalDividends;
   const initialCapital = currentNetWorth - totalProfit;
   const netWorthReturnPct = initialCapital > 0 ? (totalProfit / initialCapital) * 100 : 0;
+  const activePositions = assets.filter(a => a.is_active !== false).length;
+  const totalBucketValue = moneyBuckets.reduce((s, b) => s + (b.currentAmount / (exchangeRates[b.currency || 'USD'] || 1)), 0);
 
-  const { grossProfit, grossLoss } = React.useMemo(() => {
+  const getEntryAmount = (entry: { amountUSD?: number; amount?: number }) => entry.amountUSD ?? entry.amount ?? 0;
+  const formatEntryMoney = (v: number) => formatMoney(Math.abs(v));
+
+  // Monthly cashflow
+  const now2 = new Date();
+  const monthKey = `${now2.getFullYear()}-${String(now2.getMonth() + 1).padStart(2, '0')}`;
+  const monthIncome = cashActivities.filter(a => a.date.startsWith(monthKey) && a.type === 'INCOME').reduce((s, a) => s + getEntryAmount(a), 0);
+  const monthExpense = cashActivities.filter(a => a.date.startsWith(monthKey) && (a.type === 'EXPENSE' || a.type === 'WITHDRAW') && !a.isTransfer).reduce((s, a) => s + getEntryAmount(a), 0);
+  const monthNet = monthIncome - monthExpense;
+
+  // P/L metrics
+  const { grossProfit, grossLoss } = useMemo(() => {
     let gp = 0, gl = 0;
     assets.forEach(a => {
       if (a.realizedPL && a.realizedPL > 0) gp += a.realizedPL;
@@ -338,1334 +270,269 @@ export default function DashboardPage() {
     });
     return { grossProfit: gp, grossLoss: gl };
   }, [assets]);
-  
   const profitFactor = calcProfitFactor(grossProfit, grossLoss);
   const maxDrawdown = calcMaxDrawdown(netWorthHistory.map(h => h.value));
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTrade.asset || !newTrade.amountUSD) return;
-
-    addTrade({
-      asset: newTrade.asset.toUpperCase(),
-      type: newTrade.type,
-      amountUSD: parseFloat(newTrade.amountUSD),
-      date: new Date().toISOString(),
-      rateAtTime: exchangeRates[currency],
-      currency: currency,
-    });
-
-    setNewTrade({ asset: "", amountUSD: "", type: "BUY" });
-    setIsModalOpen(false);
-  };
-
-  // Automated Rebalancing Engine Logic
-  const totalPortfolioUSD = useMemo(() => assets.reduce((acc, a) => acc + a.valueUSD, 0), [assets]);
-
-  const driftData = useMemo(() => {
-    return allocations.map(item => {
-      const categoryAssets = assets.filter(a => (a.allocation || "Other") === item.label);
-      const categoryUSD = categoryAssets.reduce((acc, a) => acc + a.valueUSD, 0);
-      const currentPct = totalPortfolioUSD > 0 ? (categoryUSD / totalPortfolioUSD) * 100 : 0;
-      const targetPct = item.value;
-      const delta = currentPct - targetPct;
-      
-      return {
-        ...item,
-        currentPct,
-        targetPct,
-        delta,
-        categoryUSD,
-        targetUSD: totalPortfolioUSD * (targetPct / 100),
-        assets: categoryAssets
-      };
-    });
-  }, [allocations, assets, totalPortfolioUSD]);
-
-  const { suggestedTrades, totalImpact } = useMemo(() => {
-    const trades: any[] = [];
-    let impact = 0;
-
-    driftData.forEach(d => {
-      // Suggest trades if drift is > 2% absolute
-      if (Math.abs(d.delta) > 2) {
-        const diffUSD = Math.abs(d.categoryUSD - d.targetUSD);
-        impact += diffUSD;
-        
-        let assetName = d.label;
-        if (d.assets.length > 0) {
-          const largestAsset = [...d.assets].sort((a,b) => b.valueUSD - a.valueUSD)[0];
-          assetName = largestAsset.symbol;
-        }
-
-        trades.push({
-           id: d.label,
-           rawType: d.delta > 0 ? "SELL" : "BUY",
-           type: d.delta > 0 ? t("sell") : t("buy"),
-           asset: assetName,
-           diffUSD: diffUSD,
-           desc: d.delta > 0 ? t("reduceOverExposure") : t("increaseAllocation"),
-           icon: d.delta > 0 ? MinusCircle : PlusCircle,
-           color: d.delta > 0 ? "#FFB4AB" : "#4EDEA3"
-        });
-      }
-    });
-    
-    return { suggestedTrades: trades, totalImpact: impact };
-  }, [driftData, t]);
-
-  const executeAllSuggestedTrades = () => {
-    if (suggestedTrades.length === 0) return;
-    
-    const newTrades = suggestedTrades.map(trade => ({
-      asset: trade.asset.toUpperCase(),
-      type: trade.rawType as "BUY" | "SELL",
-      amountUSD: trade.diffUSD,
-      date: new Date().toISOString(),
-      rateAtTime: exchangeRates[currency],
-      currency: currency,
-    }));
-
-    bulkAddTrades(newTrades);
-    addToast(t("importSuccess"), 'success');
-    addNotification(
-      t("executeAll"),
-      `${suggestedTrades.length} ${t("tradesExecuted")} — ${formatMoney(totalImpact)}`,
-      'trade'
-    );
-  };
-
-  const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        try {
-          const parsedTrades = results.data.map((row: any) => ({
-            asset: (row.asset || row.Asset || "").toUpperCase(),
-            type: (row.type || row.Type || "BUY").toUpperCase() as "BUY" | "SELL",
-            amountUSD: parseFloat(row.amountUSD || row.AmountUSD || row.amount || "0"),
-            date: row.date || row.Date || new Date().toISOString(),
-            rateAtTime: parseFloat(row.rateAtTime || row.RateAtTime || exchangeRates[currency].toString()),
-            currency: row.currency || row.Currency || currency,
-          })).filter(t => t.asset && t.amountUSD > 0);
-
-          if (parsedTrades.length > 0) {
-            bulkAddTrades(parsedTrades);
-            setImportStatus({ type: 'success', message: t("importSuccess") });
-            setTimeout(() => {
-              setIsCSVModalOpen(false);
-              setImportStatus({ type: 'idle', message: '' });
-            }, 600);
-          } else {
-            setImportStatus({ type: 'error', message: "No valid trades found in CSV." });
-          }
-        } catch (err) {
-          setImportStatus({ type: 'error', message: "Error parsing CSV format." });
-        }
-      },
-      error: () => {
-        setImportStatus({ type: 'error', message: "Failed to read file." });
-      }
-    });
-  };
-
-  const greetingHour = new Date().getHours();
-  const greeting = greetingHour < 12 ? (language === 'th' ? 'สวัสดีตอนเช้า' : 'Good Morning') : greetingHour < 18 ? (language === 'th' ? 'สวัสดีตอนบ่าย' : 'Good Afternoon') : (language === 'th' ? 'สวัสดีตอนค่ำ' : 'Good Evening');
-  const activePositions = assets.filter(a => a.is_active !== false).length;
-  const todayPL = totalUnrealizedPL;
-  const totalBucketValue = moneyBuckets.reduce((s, b) => s + (b.currentAmount / (exchangeRates[b.currency || 'USD'] || 1)), 0);
-  const getEntryAmount = (entry: { amountUSD?: number; amount?: number; originalAmount?: number }) => {
-    return entry.amountUSD ?? entry.amount ?? 0;
-  };
-  const formatEntryMoney = (value: number) => {
-    return formatMoney(Math.abs(value));
-  };
-
-  // Financial health score (0-100)
-  const healthScore = React.useMemo(() => {
-    let score = 50; // baseline
-    const totalVal = assets.reduce((s, a) => s + a.valueUSD, 0);
-    // Diversification bonus
-    if (assets.length >= 10) score += 15;
-    else if (assets.length >= 5) score += 10;
-    else if (assets.length >= 3) score += 5;
-    // Profit factor bonus
-    if (profitFactor >= 2) score += 15;
-    else if (profitFactor >= 1.5) score += 10;
-    else if (profitFactor >= 1) score += 5;
-    else if (profitFactor < 1 && profitFactor > 0) score -= 10;
-    // P/L trend bonus
-    if (totalUnrealizedPL > 0) score += 10;
-    else if (totalUnrealizedPL < 0) score -= 5;
-    // Bucket balance bonus
-    if (totalBucketValue > 0) score += 10;
-    // Drawdown penalty
-    if (maxDrawdown < -20) score -= 10;
-    else if (maxDrawdown < -10) score -= 5;
-    return Math.max(0, Math.min(100, score));
-  }, [assets, profitFactor, totalUnrealizedPL, totalBucketValue, maxDrawdown]);
-
-  const healthLabel = healthScore >= 80 ? 'Excellent' : healthScore >= 65 ? 'Good' : healthScore >= 45 ? 'Fair' : 'Needs Attention';
-  const healthColor = healthScore >= 80 ? '#4EDEA3' : healthScore >= 65 ? '#ADC6FF' : healthScore >= 45 ? '#E9C349' : '#FFB4AB';
-
-  // Monthly cashflow summary
-  const now2 = new Date();
-  const monthKey = `${now2.getFullYear()}-${String(now2.getMonth() + 1).padStart(2, '0')}`;
-  const monthIncome = cashActivities.filter(a => a.date.startsWith(monthKey) && a.type === 'INCOME').reduce((s, a) => s + getEntryAmount(a), 0);
-  const monthExpense = cashActivities.filter(a => a.date.startsWith(monthKey) && (a.type === 'EXPENSE' || a.type === 'WITHDRAW') && !a.isTransfer).reduce((s, a) => s + getEntryAmount(a), 0);
-  const monthNet = monthIncome - monthExpense;
+  // Recent activities (merged cash + bucket)
+  const recentActivities = useMemo(() => {
+    const merged = [
+      ...cashActivities.map(a => ({ id: a.id, type: a.type, amount: getEntryAmount(a), category: a.category || '', note: a.note || '', date: a.date, source: 'cash' as const })),
+      ...bucketActivities.map(a => ({
+        id: a.id,
+        type: (a.type === 'deposit' || a.type === 'income_split' || a.type === 'profit_split') ? 'INCOME' : 'EXPENSE',
+        amount: getEntryAmount(a),
+        category: a.bucketName || a.type,
+        note: a.note || '',
+        date: a.date,
+        source: 'bucket' as const,
+      })),
+    ];
+    return merged.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 6);
+  }, [cashActivities, bucketActivities]);
 
   // Top movers
-  const topMovers = React.useMemo(() => {
-    return [...assets]
-      .filter(a => a.is_active !== false)
-      .sort((a, b) => Math.abs(b.change) - Math.abs(a.change))
-      .slice(0, 5);
+  const topMovers = useMemo(() => {
+    return [...assets].filter(a => a.is_active !== false).sort((a, b) => Math.abs(b.change) - Math.abs(a.change)).slice(0, 4);
   }, [assets]);
 
-  // FAB state
-  const [fabOpen, setFabOpen] = React.useState(false);
-
-  // Empty state — no assets, no trades
   const isEmpty = assets.length === 0 && trades.length === 0;
+  const greetingHour = new Date().getHours();
+  const greeting = greetingHour < 12
+    ? (language === 'th' ? 'สวัสดีตอนเช้า' : 'Good Morning')
+    : greetingHour < 18
+      ? (language === 'th' ? 'สวัสดีตอนบ่าย' : 'Good Afternoon')
+      : (language === 'th' ? 'สวัสดีตอนค่ำ' : 'Good Evening');
+
+  // ─── FAB ──────────────────────────────────────────────────────────────
+  const [fabOpen, setFabOpen] = useState(false);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-4 sm:space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-4 sm:space-y-5 pb-24 sm:pb-8">
 
-      {/* Welcome Card */}
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-            {greeting} <span className="text-[#ADC6FF]">👋</span>
-          </h1>
-          <p className="text-xs text-gray-500 mt-0.5">{language === 'th' ? 'สรุปภาพรวมการเงินของคุณวันนี้' : 'Your financial overview for today'}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <kbd className="hidden sm:inline-flex px-2 py-1 rounded-lg bg-white/5 text-[10px] font-bold text-gray-500 border border-white/10">⌘K {language === 'th' ? 'ค้นหา' : 'Search'}</kbd>
-        </div>
+      {/* ─── Greeting ─────────────────────────────────────────────────── */}
+      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
+        <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+          {greeting} <span className="text-[#ADC6FF]">👋</span>
+        </h1>
+        <p className="text-xs text-gray-500 mt-0.5">
+          {language === 'th' ? 'สรุปภาพรวมการเงินของคุณวันนี้' : 'Your financial overview for today'}
+        </p>
       </motion.div>
 
-      {/* Quick Stats Bar */}
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: language === 'th' ? 'สินทรัพย์ทั้งหมด' : 'Total Assets', value: activePositions.toString(), icon: <Briefcase size={16} />, color: '#ADC6FF', onClick: () => router.push('/portfolio') },
-          { label: language === 'th' ? 'กำไร/ขาดทุนวันนี้' : "Today's P/L", value: `${todayPL >= 0 ? '+' : ''}${formatMoney(todayPL)}`, icon: <BarChart3 size={16} />, color: todayPL >= 0 ? '#4EDEA3' : '#FFB4AB', onClick: () => router.push('/portfolio') },
-          { label: language === 'th' ? 'เงินในกระเป๋า' : 'Bucket Balance', value: formatMoney(totalBucketValue), icon: <Wallet size={16} />, color: '#E9C349', onClick: () => router.push('/budget') },
-          { label: language === 'th' ? 'รายการเทรด' : 'Total Trades', value: trades.length.toString(), icon: <TrendingUp size={16} />, color: '#A78BFA', onClick: () => router.push('/transactions') },
-        ].map((stat, i) => (
-          <motion.button key={i} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={stat.onClick}
-            className="bg-[#1C1B1B] rounded-2xl p-4 border border-white/5 text-left hover:border-white/10 transition-all group">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${stat.color}15`, color: stat.color }}>{stat.icon}</div>
-            </div>
-            <div className="text-lg font-bold text-white tracking-tight">{stat.value}</div>
-            <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">{stat.label}</div>
-          </motion.button>
-        ))}
-      </motion.div>
-
-      {/* Quick Actions Row */}
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} className="flex flex-wrap gap-2">
-        <button onClick={() => setIsAddAssetOpen(true)} className="px-4 py-2 rounded-xl bg-[#ADC6FF]/10 text-[#ADC6FF] text-xs font-bold hover:bg-[#ADC6FF]/20 transition-all flex items-center gap-1.5 border border-[#ADC6FF]/10">
-          <Plus size={14} /> {t('addAsset')}
-        </button>
-        <button onClick={() => router.push('/trade')} className="px-4 py-2 rounded-xl bg-[#4EDEA3]/10 text-[#4EDEA3] text-xs font-bold hover:bg-[#4EDEA3]/20 transition-all flex items-center gap-1.5 border border-[#4EDEA3]/10">
-          <TrendingUp size={14} /> {language === 'th' ? 'เข้า Trade' : 'Trade'}
-        </button>
-        <button onClick={() => router.push('/budget')} className="px-4 py-2 rounded-xl bg-[#E9C349]/10 text-[#E9C349] text-xs font-bold hover:bg-[#E9C349]/20 transition-all flex items-center gap-1.5 border border-[#E9C349]/10">
-          <Wallet size={14} /> {language === 'th' ? 'แจกเงิน' : 'Distribute'}
-        </button>
-        <button onClick={() => setIsCSVModalOpen(true)} className="px-4 py-2 rounded-xl bg-white/5 text-gray-400 text-xs font-bold hover:bg-white/10 transition-all flex items-center gap-1.5 border border-white/5">
-          <Download size={14} /> {t('importCsv')}
-        </button>
-      </motion.div>
-
-      {/* ─── Financial Health Pulse Banner ─── */}
-      {!isEmpty && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.12 }}
-          className="bg-gradient-to-r from-[#1C1B1B] via-[#1a1a1a] to-[#1C1B1B] rounded-2xl border border-white/5 p-4 sm:p-5 overflow-hidden relative"
-        >
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.01] to-transparent" />
-          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-
-            {/* Health Score */}
-            <div className="flex items-center gap-3 shrink-0">
-              <div className="relative w-12 h-12">
-                <svg viewBox="0 0 36 36" className="w-12 h-12 -rotate-90">
-                  <circle cx={18} cy={18} r={15.9} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={3} />
-                  <circle
-                    cx={18} cy={18} r={15.9} fill="none"
-                    stroke={healthColor} strokeWidth={3}
-                    strokeDasharray={`${healthScore} ${100 - healthScore}`}
-                    strokeLinecap="round"
-                    style={{ transition: 'stroke-dasharray 1s ease' }}
-                  />
-                </svg>
-                <span className="absolute inset-0 flex items-center justify-center text-[9px] font-black text-white">{healthScore}</span>
-              </div>
-              <div>
-                <p className="text-[9px] text-gray-500 uppercase font-bold tracking-wide">Health Score</p>
-                <p className="text-sm font-black" style={{ color: healthColor }}>{healthLabel}</p>
-              </div>
-            </div>
-
-            <div className="w-px h-8 bg-white/5 hidden sm:block shrink-0" />
-
-            {/* Month P&L */}
-            <div className="shrink-0">
-              <p className="text-[9px] text-gray-500 uppercase font-bold tracking-wide mb-0.5">{language === 'th' ? 'เดือนนี้' : 'This Month'}</p>
-              <p className={`text-sm font-black tracking-tighter ${monthNet >= 0 ? 'text-[#4EDEA3]' : 'text-[#FFB4AB]'}`}>
-                {monthNet >= 0 ? '+' : '-'}{formatEntryMoney(monthNet)}
-              </p>
-              <p className="text-[9px] text-gray-600">{formatEntryMoney(monthIncome)} in · {formatEntryMoney(monthExpense)} out</p>
-            </div>
-
-            <div className="w-px h-8 bg-white/5 hidden sm:block shrink-0" />
-
-            {/* Top Movers Ticker */}
-            {topMovers.length > 0 && (
-              <div className="flex-1 min-w-0">
-                <p className="text-[9px] text-gray-500 uppercase font-bold tracking-wide mb-1.5">Top Movers</p>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {topMovers.map(a => (
-                    <button
-                      key={a.symbol}
-                      onClick={() => router.push(`/trade/${a.symbol}`)}
-                      className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/[0.03] hover:bg-white/[0.07] transition-all border border-white/5"
-                    >
-                      <span className="text-[10px] font-black text-white">{a.symbol}</span>
-                      <span className={`text-[9px] font-bold ${a.change >= 0 ? 'text-[#4EDEA3]' : 'text-[#FFB4AB]'}`}>
-                        {a.change >= 0 ? '+' : ''}{a.change.toFixed(2)}%
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Portfolio P/L Badge */}
-            <div className="shrink-0 text-right">
-              <p className="text-[9px] text-gray-500 uppercase font-bold tracking-wide mb-0.5">Total P/L</p>
-              <p className={`text-sm font-black tracking-tighter ${totalUnrealizedPL + totalRealizedPL >= 0 ? 'text-[#4EDEA3]' : 'text-[#FFB4AB]'}`}>
-                {totalUnrealizedPL + totalRealizedPL >= 0 ? '+' : ''}{formatMoney(totalUnrealizedPL + totalRealizedPL)}
-              </p>
-              <p className="text-[9px] text-gray-600">{netWorthReturnPct >= 0 ? '+' : ''}{netWorthReturnPct.toFixed(2)}% return</p>
-            </div>
-          </div>
-
-          {/* Health Bar */}
-          <div className="mt-3 h-1 bg-white/5 rounded-full overflow-hidden">
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: `${healthScore}%` }}
-              transition={{ duration: 1.2, ease: 'easeOut', delay: 0.3 }}
-              className="h-full rounded-full"
-              style={{ backgroundColor: healthColor }}
-            />
-          </div>
-        </motion.div>
-      )}
-
-      {/* Empty State */}
+      {/* ─── Empty State ──────────────────────────────────────────────── */}
       {isEmpty && (
-        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-gradient-to-br from-[#1C1B1B] to-[#141414] rounded-3xl p-8 sm:p-12 border border-white/5 text-center relative overflow-hidden">
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-gradient-to-br from-[#1C1B1B] to-[#141414] rounded-3xl p-8 sm:p-12 border border-border text-center relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-[#ADC6FF]/5 via-transparent to-[#4EDEA3]/5" />
           <div className="relative z-10">
             <div className="w-20 h-20 rounded-3xl bg-[#ADC6FF]/10 flex items-center justify-center mx-auto mb-6">
               <Sparkles size={36} className="text-[#ADC6FF]" />
             </div>
             <h2 className="text-2xl font-bold text-white mb-2">{language === 'th' ? 'ยินดีต้อนรับสู่ FinTrack' : 'Welcome to FinTrack'}</h2>
-            <p className="text-sm text-gray-400 max-w-md mx-auto mb-8">{language === 'th' ? 'เริ่มต้นเพิ่มสินทรัพย์แรกของคุณ หรือนำเข้าข้อมูลจาก CSV เพื่อเริ่มติดตามพอร์ต' : 'Add your first asset or import data from CSV to start tracking your portfolio'}</p>
+            <p className="text-sm text-gray-400 max-w-md mx-auto mb-8">{language === 'th' ? 'เริ่มต้นเพิ่มสินทรัพย์แรกของคุณ' : 'Add your first asset to start tracking'}</p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <button onClick={() => setIsAddAssetOpen(true)} className="px-6 py-3 rounded-2xl bg-[#ADC6FF] text-[#00285d] font-bold text-sm hover:brightness-110 transition-all flex items-center justify-center gap-2">
                 <Plus size={18} /> {language === 'th' ? 'เพิ่มสินทรัพย์แรก' : 'Add First Asset'}
               </button>
-              <button onClick={() => router.push('/trade')} className="px-6 py-3 rounded-2xl bg-white/5 text-white font-bold text-sm hover:bg-white/10 transition-all flex items-center justify-center gap-2 border border-white/10">
-                <TrendingUp size={18} /> {language === 'th' ? 'วิเคราะห์สัญญาณ' : 'Analyze Signals'}
+              <button onClick={() => router.push('/ledger')} className="px-6 py-3 rounded-2xl bg-white/5 text-white font-bold text-sm hover:bg-white/10 transition-all flex items-center justify-center gap-2 border border-border">
+                {language === 'th' ? 'จดรายรับรายจ่าย' : 'Record Transaction'}
               </button>
             </div>
           </div>
         </motion.div>
       )}
 
+      {/* ─── Quick Stats (4 cards) ─────────────────────────────────── */}
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: language === 'th' ? 'สินทรัพย์' : 'Assets', value: activePositions.toString(), icon: <Briefcase size={16} />, color: '#ADC6FF', onClick: () => router.push('/portfolio') },
+          { label: language === 'th' ? 'กำไร/ขาดทุน' : "P/L", value: `${totalUnrealizedPL >= 0 ? '+' : ''}${formatMoney(totalUnrealizedPL)}`, icon: <BarChart3 size={16} />, color: totalUnrealizedPL >= 0 ? '#4EDEA3' : '#FFB4AB', onClick: () => router.push('/portfolio') },
+          { label: language === 'th' ? 'เงินในกระเป๋า' : 'Buckets', value: formatMoney(totalBucketValue), icon: <Wallet size={16} />, color: '#E9C349', onClick: () => router.push('/budget') },
+          { label: language === 'th' ? 'เดือนนี้' : 'This Month', value: `${monthNet >= 0 ? '+' : ''}${formatEntryMoney(monthNet)}`, icon: <TrendingUp size={16} />, color: monthNet >= 0 ? '#4EDEA3' : '#FFB4AB', onClick: () => router.push('/cashflow') },
+        ].map((stat, i) => (
+          <motion.button key={i} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={stat.onClick}
+            className="bg-surface/50 backdrop-blur-xl rounded-2xl p-4 border border-border text-left hover:border-white/10 transition-all group">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${stat.color}15`, color: stat.color }}>{stat.icon}</div>
+            </div>
+            <div className="text-lg font-bold text-white tracking-tight truncate">{stat.value}</div>
+            <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">{stat.label}</div>
+          </motion.button>
+        ))}
+      </motion.div>
 
-      {/* Hero Section: Net Worth & Chart */}
-      <section className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="lg:col-span-8 bg-[#1C1B1B] rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 relative overflow-hidden group shadow-xl border border-white/5"
-        >
-          <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-4 sm:mb-6 relative z-10">
-            <div className="space-y-1 w-full sm:w-auto">
-              <span className="text-xs sm:text-sm font-semibold text-gray-400 uppercase tracking-wide">{t("totalNetWorth")}</span>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tighter text-white leading-none">
-                <AnimatedNumber value={netWorthHistory[netWorthHistory.length - 1]?.value || 0} formatter={(v) => formatMoney(v)} />
-              </h1>
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                <div className={cn("flex items-center gap-1", getPnLColor(netWorthReturnPct))}>
-                  {netWorthReturnPct >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                  <span className="text-xs sm:text-sm font-bold">
-                    {formatPercent(netWorthReturnPct, 1)}
-                  </span>
-                </div>
-                <span className="text-gray-500 text-[10px] sm:text-xs font-medium uppercase tracking-wide">
-                  Rate: 1 USD = {exchangeRates[currency]} {currency}
-                </span>
+      {/* ─── Net Worth Hero + Chart ───────────────────────────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="bg-surface/50 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-4 sm:p-6 relative overflow-hidden border border-border shadow-xl"
+      >
+        <div className="flex flex-col sm:flex-row justify-between items-start gap-3 mb-4 relative z-10">
+          <div className="space-y-1">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{t("totalNetWorth")}</span>
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tighter text-white leading-none">
+              <AnimatedNumber value={currentNetWorth} formatter={(v) => formatMoney(v)} />
+            </h1>
+            <div className="flex items-center gap-2">
+              <div className={cn("flex items-center gap-1", getPnLColor(netWorthReturnPct))}>
+                {netWorthReturnPct >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                <span className="text-xs sm:text-sm font-bold">{formatPercent(netWorthReturnPct, 1)}</span>
               </div>
-            </div>
-
-            <div className="flex gap-2 w-full sm:w-auto">
-              <button
-                onClick={() => setIsAddAssetOpen(true)}
-                className="flex-1 sm:flex-none px-3 sm:px-4 py-2.5 sm:py-3 bg-[#ADC6FF] text-[#00285d] rounded-xl sm:rounded-2xl font-black text-xs tracking-tight flex items-center justify-center gap-2 hover:brightness-110 transition-all"
-              >
-                <Plus size={14} />
-                <span className="hidden sm:inline">{t("addAsset")}</span>
-                <span className="sm:hidden">Add</span>
-              </button>
-              <button
-                onClick={() => setIsCSVModalOpen(true)}
-                className="p-2.5 sm:p-3 bg-white/5 border border-white/10 rounded-xl sm:rounded-2xl text-gray-400 hover:text-white transition-all flex-shrink-0"
-                title={t("importCsv")}
-              >
-                <Download size={18} />
-              </button>
+              <span className="text-gray-500 text-[10px] font-medium uppercase">
+                Rate: 1 USD = {exchangeRates[currency]} {currency}
+              </span>
             </div>
           </div>
-
-          {/* Dashboard Chart */}
-          <div className="h-48 mt-4 min-w-0" style={{ minHeight: 192 }}>
-            <DashboardChart
-              data={netWorthHistory}
-              currency={currency}
-              exchangeRates={exchangeRates}
-              formatMoney={formatMoney}
-              t={t}
-            />
-          </div>
-        </motion.div>
-
-        {/* Top Movers / Quick Actions */}
-        <div className="lg:col-span-4 flex flex-col justify-between gap-4">
-          <div className="flex justify-between items-center px-1">
-            <h2 className="text-sm sm:text-base font-bold tracking-tight text-white">{t("quickActions")}</h2>
-            <span className="text-[10px] sm:text-xs font-black text-[#4EDEA3] uppercase tracking-wide">FinTrack OS</span>
-          </div>
-
-          <div className="space-y-2 sm:space-y-3 flex-1">
-            <motion.button
-              whileHover={{ x: 5 }}
-              onClick={() => setIsModalOpen(true)}
-              className="w-full p-3 sm:p-4 bg-[#1C1B1B] border border-white/5 rounded-xl sm:rounded-2xl flex items-center justify-between group hover:bg-white/5 transition-all"
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setIsAddAssetOpen(true)}
+              className="px-4 py-2 bg-white/5 text-[#ADC6FF] border border-[#ADC6FF]/30 rounded-xl font-black text-xs flex items-center gap-1.5 hover:bg-[#ADC6FF]/10 transition-all"
             >
-              <div className="flex items-center gap-3 sm:gap-4">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-[#ADC6FF]/10 flex items-center justify-center text-[#ADC6FF] flex-shrink-0">
-                  <Plus size={16} />
-                </div>
-                <div className="text-left min-w-0">
-                  <h4 className="font-black text-xs sm:text-sm text-white leading-tight truncate">{t("addTrade")}</h4>
-                  <p className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wide hidden sm:block">{t("manualEntry")}</p>
-                </div>
-              </div>
-              <ArrowRight size={14} className="text-gray-600 group-hover:text-[#ADC6FF] transition-colors flex-shrink-0" />
-            </motion.button>
-
-            <motion.button
-              whileHover={{ x: 5 }}
-              onClick={() => setIsCSVModalOpen(true)}
-              className="w-full p-3 sm:p-4 bg-[#1C1B1B] border border-white/5 rounded-xl sm:rounded-2xl flex items-center justify-between group hover:bg-white/5 transition-all"
+              <Plus size={14} /> {t("addAsset") || "Add Asset"}
+            </button>
+            <button
+              onClick={() => router.push('/trade')}
+              className="px-4 py-2 bg-[#4EDEA3]/10 text-[#4EDEA3] border border-[#4EDEA3]/30 rounded-xl font-black text-xs flex items-center gap-1.5 hover:bg-[#4EDEA3]/20 transition-all"
             >
-              <div className="flex items-center gap-3 sm:gap-4">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-[#E9C349]/10 flex items-center justify-center text-[#E9C349] flex-shrink-0">
-                  <Download size={16} />
-                </div>
-                <div className="text-left min-w-0">
-                  <h4 className="font-black text-xs sm:text-sm text-white leading-tight truncate">{t("importCsv")}</h4>
-                  <p className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wide hidden sm:block">{t("bulkImport")}</p>
-                </div>
-              </div>
-              <ArrowRight size={14} className="text-gray-600 group-hover:text-[#ADC6FF] transition-colors flex-shrink-0" />
-            </motion.button>
+              <TrendingUp size={14} /> {t("trade") || "Trade"}
+            </button>
+            <button
+              onClick={() => router.push('/budget')}
+              className="px-4 py-2 bg-[#E9C349]/10 text-[#E9C349] border border-[#E9C349]/30 rounded-xl font-black text-xs flex items-center gap-1.5 hover:bg-[#E9C349]/20 transition-all"
+            >
+              <Wallet size={14} /> {t("distribute") || "Distribute"}
+            </button>
+            <button
+              onClick={() => setIsImportCSVOpen(true)}
+              className="px-4 py-2 bg-white/5 text-gray-300 border border-border rounded-xl font-black text-xs flex items-center gap-1.5 hover:bg-white/10 transition-all"
+            >
+              <Download size={14} /> {t("importCsv") || "Import CSV"}
+            </button>
           </div>
-
-          <button className="w-full py-3 sm:py-3.5 bg-gradient-to-r from-[#ADC6FF] to-[#4D8EFF] text-[#00285d] rounded-full font-black text-xs tracking-tight shadow-[0_10px_30px_rgba(173,198,255,0.2)]">
-            {t("calculate")}
-          </button>
         </div>
-      </section>
+        <div className="h-40 sm:h-44 min-w-0" style={{ minHeight: 160 }}>
+          <NetWorthSparkline data={netWorthHistory} formatMoney={formatMoney} t={t} />
+        </div>
+      </motion.div>
 
-      {/* Draggable Widgets Section */}
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-        {/* Performance Chart Widget */}
-        <div className="lg:col-span-2 bg-[#1C1B1B] rounded-2xl sm:rounded-3xl p-4 sm:p-6 relative group shadow-lg border border-white/5">
-          <div className="flex justify-between items-start mb-4 sm:mb-6">
+      {/* ─── Main Grid: P/L Metrics + Cashflow + Top Movers ─────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+        {/* P/L Summary (compact 6 metrics) */}
+        <div className="lg:col-span-5 grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {[
+            { label: t("totalInvested"), value: formatMoney(totalInvested), color: '#ADC6FF' },
+            { label: t("unrealizedPL"), value: formatPnL(totalUnrealizedPL, formatMoney), color: totalUnrealizedPL >= 0 ? '#4EDEA3' : '#FFB4AB' },
+            { label: t("realizedPL"), value: formatPnL(totalRealizedPL, formatMoney), color: totalRealizedPL >= 0 ? '#4EDEA3' : '#FFB4AB' },
+            { label: t("dividends"), value: formatMoney(totalDividends), color: '#E9C349' },
+            { label: 'Max DD', value: `-${maxDrawdown.toFixed(1)}%`, color: '#FFB4AB' },
+            { label: 'PF', value: profitFactor === Number.POSITIVE_INFINITY ? '∞' : profitFactor.toFixed(2), color: profitFactor >= 1.5 ? '#4EDEA3' : '#9CA3AF' },
+          ].map((m, i) => (
+            <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 + i * 0.03 }}
+              className="bg-surface/50 p-3 sm:p-4 rounded-2xl border border-border">
+              <p className="text-[9px] font-bold uppercase tracking-wide mb-1" style={{ color: m.color }}>{m.label}</p>
+              <h3 className="text-sm sm:text-lg font-bold text-white tracking-tight truncate">{m.value}</h3>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Cashflow + Recent */}
+        <div className="lg:col-span-4 bg-surface/50 rounded-2xl border border-border p-4 flex flex-col">
+          <div className="flex justify-between items-center mb-3">
             <div>
-              <span className="text-[10px] sm:text-xs text-[#E9C349] uppercase tracking-wide font-black">{t("globalPerformance")}</span>
-              <h3 className="text-sm sm:text-lg font-bold text-white">{t("growthVelocity")}</h3>
+              <span className="text-[10px] text-[#ADC6FF] uppercase tracking-wide font-bold">{t("cashflowOverview")}</span>
+              <h3 className="text-sm font-bold text-white">{t("netCashflow")}</h3>
             </div>
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/5 flex items-center justify-center cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity">
-              <Edit3 size={12} className="text-gray-400" />
-            </div>
+            <button onClick={() => setIsAddCashflowOpen(true)}
+              className="w-7 h-7 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors">
+              <Plus size={12} className="text-[#ADC6FF]" />
+            </button>
           </div>
-          <div className="w-full h-40 sm:h-48 relative mt-2 sm:mt-4 min-w-0" style={{ minHeight: 160 }}>
-            <DashboardChart
-              data={netWorthHistory}
-              currency={currency}
-              exchangeRates={exchangeRates}
-              formatMoney={formatMoney}
-              t={t}
-            />
-          </div>
-          <div className="flex justify-between mt-4 sm:mt-6 text-gray-500 text-[10px] sm:text-xs font-black uppercase tracking-wide overflow-x-auto scrollbar-none">
-            <span className="flex-shrink-0">{t("chartMonthJan")}</span><span className="flex-shrink-0">{t("chartMonthFeb")}</span><span className="flex-shrink-0">{t("chartMonthMar")}</span><span className="flex-shrink-0">{t("chartMonthApr")}</span><span className="flex-shrink-0">{t("chartMonthMay")}</span><span className="flex-shrink-0">{t("chartMonthJun")}</span>
-          </div>
-        </div>
 
-        {/* Vault Activity Widget - Real data from bucketActivities */}
-        <div className="bg-[#1C1B1B] rounded-2xl sm:rounded-3xl p-4 sm:p-6 group relative overflow-hidden border border-white/5 shadow-lg">
-          <div className="flex justify-between items-start mb-4 sm:mb-6">
-            <div>
-              <span className="text-[10px] sm:text-xs text-[#E9C349] uppercase tracking-wide font-black">{t("securityLogs")}</span>
-              <h3 className="text-sm sm:text-lg font-bold text-white">{t("vaultActivity")}</h3>
+          <h2 className={cn("text-2xl font-bold tracking-tight mb-3", monthNet >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
+            {monthNet >= 0 ? "+" : "-"}{formatEntryMoney(monthNet)}
+          </h2>
+
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            <div className="flex items-center gap-2 bg-white/5 px-3 py-2 rounded-xl">
+              <div className="w-1.5 h-1.5 rounded-full bg-[#4EDEA3]" />
+              <span className="text-[10px] text-gray-400 font-bold">{t("income")}</span>
+              <span className="text-xs text-white font-bold ml-auto">{formatEntryMoney(monthIncome)}</span>
             </div>
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/5 flex items-center justify-center cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity">
-              <Edit3 size={12} className="text-gray-400" />
+            <div className="flex items-center gap-2 bg-white/5 px-3 py-2 rounded-xl">
+              <div className="w-1.5 h-1.5 rounded-full bg-[#FFB4AB]" />
+              <span className="text-[10px] text-gray-400 font-bold">{t("expense")}</span>
+              <span className="text-xs text-white font-bold ml-auto">{formatEntryMoney(monthExpense)}</span>
             </div>
-          </div>
-          {bucketActivities.length === 0 ? (
-            <div className="py-8 flex flex-col items-center gap-2 opacity-40">
-              <History size={20} className="text-white" />
-              <p className="text-[10px] text-gray-500 font-bold uppercase">{t("noActivityYet")}</p>
-            </div>
-          ) : (
-            <div className="space-y-3 sm:space-y-4">
-              {bucketActivities.slice(0, 5).map((act, idx) => {
-                const isPositive = act.type === "deposit" || act.type === "income_split" || act.type === "profit_split";
-                const barColor = isPositive ? "#4EDEA3" : act.type === "invest" ? "#ADC6FF" : "#FFB4AB";
-                const amountText = `${isPositive ? "+" : "-"}${formatEntryMoney(getEntryAmount(act))}`;
-                const timeAgo = (() => {
-                  const now = Date.now();
-                  const actDate = new Date(act.date).getTime();
-                  const diffMs = now - actDate;
-                  const diffMins = Math.floor(diffMs / 60000);
-                  const diffHours = Math.floor(diffMins / 60);
-                  const diffDays = Math.floor(diffHours / 24);
-
-                  if (diffMins < 1) return t("justNow");
-                  if (diffMins < 60) return t("minsAgo").replace("{n}", diffMins.toString());
-                  if (diffHours < 24) return t("hoursAgo").replace("{n}", diffHours.toString());
-                  return t("daysAgo").replace("{n}", diffDays.toString());
-                })();
-                return (
-                  <div key={`${act.id}-${idx}`} className="flex gap-3 sm:gap-4">
-                    <div className="w-1 bg-{barColor} rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: barColor }}></div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[10px] sm:text-xs font-bold text-white leading-tight truncate">{act.note || act.type}</p>
-                      <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5 sm:mt-1 uppercase tracking-wide">{timeAgo} • {act.bucketName}</p>
-                      <p className={`text-xs font-black mt-0.5 sm:mt-1 ${isPositive ? "text-[#4EDEA3]" : "text-[#FFB4AB]"}`}>{amountText}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          <Link href="/budget" className="w-full mt-4 sm:mt-6 py-2 sm:py-2.5 rounded-xl border border-white/10 text-[10px] sm:text-xs font-black uppercase tracking-wide text-gray-400 hover:bg-white/5 transition-all block text-center">
-            {t("viewFullAudit")}
-          </Link>
-        </div>
-
-        {/* Cashflow Widget */}
-        <div className="bg-[#1C1B1B] rounded-2xl sm:rounded-3xl p-4 sm:p-6 relative overflow-hidden border border-white/5 shadow-lg group flex flex-col">
-          <div>
-            <div className="flex justify-between items-start mb-3 sm:mb-4">
-              <div>
-                <span className="text-[10px] sm:text-xs text-[#ADC6FF] uppercase tracking-wide font-black">{t("cashflowOverview")}</span>
-                <h3 className="text-sm sm:text-lg font-bold text-white">{t("netCashflow")}</h3>
-              </div>
-              <button onClick={() => setIsAddCashflowOpen(true)} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors flex-shrink-0">
-                <PlusCircle size={12} className="text-[#ADC6FF]" />
-              </button>
-            </div>
-
-            {(() => {
-              const currentMonth = new Date().getMonth();
-              const currentYear = new Date().getFullYear();
-
-              // Get cash activities
-              const thisMonthCashActivities = cashActivities.filter(a => {
-                const date = new Date(a.date);
-                return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
-              });
-
-              // Get bucket activities (deposit = income, withdraw/invest = expense)
-              const thisMonthBucketActivities = bucketActivities.filter(a => {
-                const date = new Date(a.date);
-                return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
-              });
-
-              const bucketIncome = thisMonthBucketActivities
-                .filter(a => a.type === "deposit" || a.type === "income_split" || a.type === "profit_split")
-                .reduce((sum, a) => sum + getEntryAmount(a), 0);
-
-              const bucketExpenses = thisMonthBucketActivities
-                .filter(a => a.type === "withdraw" || a.type === "invest")
-                .reduce((sum, a) => sum + getEntryAmount(a), 0);
-
-              const cashIncome = thisMonthCashActivities
-                .filter(a => a.type === "INCOME")
-                .reduce((sum, a) => sum + getEntryAmount(a), 0);
-
-              const cashExpenses = thisMonthCashActivities
-                .filter(a => a.type === "EXPENSE")
-                .reduce((sum, a) => sum + getEntryAmount(a), 0);
-
-              const totalIncome = bucketIncome + cashIncome;
-              const totalExpenses = bucketExpenses + cashExpenses;
-              const net = totalIncome - totalExpenses;
-
-              return (
-                <div className="space-y-4">
-                  <h2 className={cn("text-3xl font-black tracking-tighter mb-4", net >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
-                    {net >= 0 ? "+" : "-"}{formatEntryMoney(net)}
-                  </h2>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center bg-white/5 p-3 rounded-2xl">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-[#4EDEA3]" />
-                        <span className="text-xs text-gray-400 font-bold">{t("income")}</span>
-                      </div>
-                      <span className="text-sm text-white font-black">{formatEntryMoney(totalIncome)}</span>
-                    </div>
-                    <div className="flex justify-between items-center bg-white/5 p-3 rounded-2xl">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-[#FFB4AB]" />
-                        <span className="text-xs text-gray-400 font-bold">{t("expense")}</span>
-                      </div>
-                      <span className="text-sm text-white font-black">{formatEntryMoney(totalExpenses)}</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
           </div>
 
           {/* Recent Activities */}
-          {(cashActivities.length > 0 || bucketActivities.length > 0) && (
-            <div className="mt-4 pt-4 border-t border-white/5 flex-1 flex flex-col min-h-0">
-              <div className="flex justify-between items-center mb-3">
-                <h4 className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide">Recent History</h4>
-                <div className="relative w-32 sm:w-48">
-                  <input
-                    type="text"
-                    placeholder="Search..."
-                    value={historySearchQuery}
-                    onChange={(e) => setHistorySearchQuery(e.target.value)}
-                    className="w-full bg-black/40 border border-white/10 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white outline-none focus:border-[#ADC6FF] transition-colors"
-                  />
-                  <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-2 overflow-y-auto scrollbar-thin flex-1 pr-1">
-                {[...cashActivities, ...bucketActivities.map(ba => ({
-                  id: ba.id,
-                  type: ba.type === "deposit" || ba.type === "income_split" || ba.type === "profit_split" ? "INCOME" : "EXPENSE",
-                  amountUSD: ba.amount,
-                  originalAmount: ba.originalAmount,
-                  category: ba.bucketName || ba.type,
-                  date: ba.date,
-                  note: ba.note
-                }))]
-                .filter(act => {
-                  if (!historySearchQuery) return true;
-                  const q = historySearchQuery.toLowerCase();
-                  return act.category.toLowerCase().includes(q) || (act.note && act.note.toLowerCase().includes(q));
-                })
-                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                .slice(0, historySearchQuery ? 20 : 5)
-                .map((act, idx) => {
-                  const isIncome = act.type === "INCOME";
-                  return (
-                    <div key={`${act.id}-${idx}`} className="flex items-center justify-between text-xs p-2 rounded-xl hover:bg-white/5 transition-colors">
-                      <div className="min-w-0">
-                        <p className="text-white font-bold truncate">{act.category} {act.note && <span className="text-gray-500 font-normal ml-1">({act.note})</span>}</p>
-                        <p className="text-[10px] text-gray-500">
-                          {new Date(act.date).toLocaleDateString(language === "th" ? "th-TH" : "en-US", {
-                            month: "short",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit"
-                          })}
-                        </p>
-                      </div>
-                      <span className={cn("text-xs font-black flex-shrink-0", isIncome ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
-                        {isIncome ? "+" : "-"}{formatEntryMoney(getEntryAmount(act))}
-                      </span>
+          <div className="flex-1 space-y-1.5 overflow-y-auto">
+            {recentActivities.map((act, idx) => {
+              const isIncome = act.type === 'INCOME';
+              return (
+                <div key={`${act.id}-${idx}`} className="flex items-center justify-between text-xs px-2 py-1.5 rounded-lg hover:bg-white/5 transition-colors">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className={cn("w-5 h-5 rounded-lg flex items-center justify-center flex-shrink-0",
+                      isIncome ? "bg-[#4EDEA3]/10" : "bg-[#FFB4AB]/10"
+                    )}>
+                      {isIncome ? <ArrowDownLeft size={10} className="text-[#4EDEA3]" /> : <ArrowUpRight size={10} className="text-[#FFB4AB]" />}
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* P/L Summary Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 sm:gap-4">
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-gradient-to-br from-[#1C1B1B] to-[#151515] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5 relative overflow-hidden">
-          <div className="absolute -right-6 -top-6 w-20 h-20 bg-[#ADC6FF]/10 blur-3xl rounded-full" />
-          <p className="text-[10px] sm:text-xs font-black text-[#ADC6FF] uppercase tracking-wide mb-1">{t("totalInvested")}</p>
-          <h3 className="text-lg sm:text-2xl font-black text-white tracking-tighter">{formatMoney(totalInvested)}</h3>
-        </motion.div>
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
-          <p className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide mb-1">{t("unrealizedPL")}</p>
-          <h3 className={cn("text-lg sm:text-2xl font-black tracking-tighter", getPnLColor(totalUnrealizedPL))}>
-            {formatPnL(totalUnrealizedPL, formatMoney)}
-          </h3>
-        </motion.div>
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
-          <p className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide mb-1">{t("realizedPL")}</p>
-          <h3 className={cn("text-lg sm:text-2xl font-black tracking-tighter", getPnLColor(totalRealizedPL))}>
-            {formatPnL(totalRealizedPL, formatMoney)}
-          </h3>
-        </motion.div>
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
-          <p className="text-[10px] sm:text-xs font-black text-[#E9C349] uppercase tracking-wide mb-1">{t("dividends")}</p>
-          <h3 className="text-lg sm:text-2xl font-black text-white tracking-tighter">{formatMoney(totalDividends)}</h3>
-        </motion.div>
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
-          <p className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide mb-1">Max Drawdown</p>
-          <h3 className="text-lg sm:text-2xl font-black text-[#FFB4AB] tracking-tighter">
-            -{maxDrawdown.toFixed(2)}%
-          </h3>
-        </motion.div>
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
-          <p className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide mb-1">Profit Factor</p>
-          <h3 className={cn("text-lg sm:text-2xl font-black tracking-tighter", profitFactor >= 1.5 ? "text-[#4EDEA3]" : "text-white")}>
-            {profitFactor === Number.POSITIVE_INFINITY ? "∞" : profitFactor.toFixed(2)}
-          </h3>
-        </motion.div>
-      </div>
-
-      {/* Customizable Widget Grid */}
-      <DashboardGrid />
-
-      {/* Bento Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6">
-        {/* Left Column: Target Allocation */}
-        <section className="md:col-span-4 space-y-4 sm:space-y-6">
-          <div className="bg-[#1C1B1B] p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-white/5 shadow-xl">
-            <div className="flex justify-between items-center mb-4 sm:mb-6">
-              <h3 className="text-sm sm:text-base font-bold text-white">{t("targetAllocation")}</h3>
-              <Edit3 size={14} className="text-gray-500 cursor-pointer hover:text-white transition-colors" onClick={() => {
-                const vals: Record<string, number> = {};
-                allocations.forEach(a => { vals[a.label] = a.value; });
-                setEditAllocValues(vals);
-                setIsAllocEditOpen(true);
-              }} />
-            </div>
-
-            <div className="space-y-2 sm:space-y-4">
-              {allocations.map(item => (
-                <AllocationItem key={item.label} label={translateLabel(item.label)} value={item.value} color={item.color} />
-              ))}
-            </div>
-
-            <div className="mt-4 sm:mt-8 p-3 sm:p-4 bg-white/5 rounded-xl sm:rounded-2xl border border-white/5">
-              <p className="text-xs sm:text-sm text-gray-400 leading-relaxed font-medium">
-                {t("optimalRebalancingMsg")}
-              </p>
-            </div>
-          </div>
-
-          {/* Insight Card */}
-          <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl h-40 sm:h-48 bg-[#1C1B1B] p-4 sm:p-8 flex flex-col justify-end group border border-white/5">
-            <div 
-              className="absolute inset-0 opacity-20 group-hover:opacity-30 transition-opacity duration-500 bg-cover bg-center" 
-              style={{ backgroundImage: "url('https://picsum.photos/seed/market/600/400')" }}
-            />
-            <div className="relative z-10">
-              <div className="flex items-center gap-2 mb-2">
-                <Info size={12} className="text-[#E9C349]" />
-                <span className="text-xs font-black uppercase text-[#E9C349] tracking-wide">{t("insights")}</span>
-              </div>
-              <h4 className="text-white font-bold leading-tight">
-                {t("marketVolatilityMsg")}
-              </h4>
-            </div>
-          </div>
-        </section>
-
-        {/* Right Column: Drift Table & Suggested Trades */}
-        <section className="md:col-span-8 space-y-4 sm:space-y-6">
-          <div className="bg-[#1C1B1B] rounded-2xl sm:rounded-3xl border border-white/5 overflow-hidden shadow-xl">
-            <div className="p-4 sm:p-6 pb-2">
-              <h3 className="text-sm sm:text-base font-bold text-white">{t("currentVsTarget")}</h3>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="text-[10px] sm:text-xs font-black uppercase tracking-wide text-gray-500 border-b border-white/5">
-                    <th className="px-3 sm:px-6 py-2 sm:py-3">{t("assetClass")}</th>
-                    <th className="px-3 sm:px-6 py-2 sm:py-3">{t("current")}</th>
-                    <th className="px-3 sm:px-6 py-2 sm:py-3">{t("target")}</th>
-                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-right">{t("delta")}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {driftData.map(item => (
-                      <DriftRow 
-                        key={item.label}
-                        label={translateLabel(item.label)} 
-                        current={`${item.currentPct.toFixed(1)}%`} 
-                        target={`${Number(item.targetPct).toFixed(1)}%`} 
-                        delta={`${item.delta >= 0 ? '+' : ''}${item.delta.toFixed(1)}%`} 
-                        type={Math.abs(item.delta) > 2 ? "negative" : "positive"} 
-                        color={item.color} 
-                      />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Suggested Trades */}
-          <div>
-            <h3 className="text-[10px] sm:text-xs font-black uppercase tracking-wide text-gray-500 mb-4 sm:mb-6">{t("suggestedTrades")}</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-              {suggestedTrades.length > 0 ? (
-                <>
-                  {suggestedTrades.map(trade => (
-                    <TradeCard
-                      key={trade.id}
-                      type={trade.type}
-                      asset={trade.asset}
-                      desc={`${trade.desc} ${formatMoney(trade.diffUSD)}`}
-                      icon={trade.icon}
-                      color={trade.color}
-                    />
-                  ))}
-
-                  <div className="bg-[#ADC6FF]/5 p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-[#ADC6FF]/20 flex flex-col justify-center">
-                    <div className="flex justify-between items-center mb-3 sm:mb-4">
-                      <span className="text-[10px] sm:text-xs font-black text-[#ADC6FF] uppercase tracking-wide">{t("totalImpact")}</span>
-                      <span className="text-lg sm:text-xl font-black text-white">{formatMoney(totalImpact)}</span>
-                    </div>
-                    <button
-                      onClick={executeAllSuggestedTrades}
-                      className="w-full py-2.5 sm:py-3 bg-[#ADC6FF] text-[#00285d] rounded-full font-black text-xs uppercase tracking-wide hover:brightness-110 transition-all active:scale-95"
-                    >
-                      {t("executeAll")}
-                    </button>
+                    <span className="text-white font-bold truncate">{act.category}</span>
                   </div>
-                </>
-              ) : (
-                <div className="col-span-1 sm:col-span-2 py-8 sm:py-10 bg-[#1C1B1B] rounded-2xl sm:rounded-3xl border border-white/5 flex flex-col items-center justify-center text-center">
-                  <CheckCircle2 size={24} className="text-[#4EDEA3] mb-2 sm:mb-3 opacity-60" />
-                  <span className="text-xs sm:text-sm font-bold text-gray-400">
-                    {t("portfolioBalanced")}
+                  <span className={cn("font-bold flex-shrink-0 ml-2", isIncome ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
+                    {isIncome ? "+" : "-"}{formatEntryMoney(act.amount)}
                   </span>
                 </div>
-              )}
-            </div>
-          </div>
-        </section>
-      </div>
-
-      {/* Money Buckets Quick Link */}
-      <section>
-        <Link href="/budget" className="block">
-          <motion.div
-            whileHover={{ x: 5 }}
-            className="bg-[#1C1B1B] rounded-2xl sm:rounded-3xl border border-white/5 p-4 sm:p-6 flex items-center justify-between group hover:bg-white/[0.03] transition-all cursor-pointer"
-          >
-            <div className="flex items-center gap-3 sm:gap-4">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-[#E9C349]/10 flex items-center justify-center text-[#E9C349] flex-shrink-0">
-                <PiggyBank size={20} className="sm:size-24" />
-              </div>
-              <div className="min-w-0">
-                <h3 className="text-sm sm:text-base font-bold text-white">{t("budgetPage")}</h3>
-                <p className="text-[10px] sm:text-xs text-gray-500 font-medium mt-0.5 hidden sm:block">{t("moneyBucketsDesc")}</p>
-                <div className="flex items-center gap-2 sm:gap-3 mt-2 overflow-x-auto scrollbar-none">
-                  {moneyBuckets.slice(0, 4).map(b => (
-                    <div key={b.id} className="flex items-center gap-1 flex-shrink-0">
-                      <span className="text-xs sm:text-sm">{b.icon}</span>
-                      <span className="text-[10px] font-bold text-gray-400">{formatMoney(b.currentAmount / (exchangeRates[b.currency || 'USD'] || 1), b.currency as any, undefined, b.currentAmount)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <ArrowRight size={14} className="text-gray-600 group-hover:text-[#E9C349] transition-colors flex-shrink-0" />
-          </motion.div>
-        </Link>
-      </section>
-
-      {/* Transaction History Section */}
-      <section className="space-y-4">
-        <div className="flex items-center gap-3">
-          <History size={18} className="text-[#ADC6FF]" />
-          <h3 className="text-base font-bold text-white">{t("history")}</h3>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {trades.map((trade) => {
-            // Find matching asset for live price data
-            const matchedAsset = assets.find(a => a.symbol.toUpperCase() === trade.asset.toUpperCase());
-            const totalShares = matchedAsset?.shares || 0;
-            const totalAvgCost = matchedAsset?.avgCost || 0;
-            const livePrice = (matchedAsset && totalShares > 0) ? matchedAsset.valueUSD / totalShares : 0;
-            
-            // Calculate per-trade performance
-            const tradePrice = trade.pricePerUnit || (totalAvgCost > 0 ? totalAvgCost : 0);
-            const tradeShares = trade.shares || (tradePrice > 0 ? trade.amountUSD / tradePrice : 0);
-            const holdingValueUSD = tradeShares * livePrice;
-            const profitUSD = holdingValueUSD - trade.amountUSD;
-            const profitPercent = trade.amountUSD > 0 && holdingValueUSD > 0 ? (profitUSD / trade.amountUSD) * 100 : 0;
-            const isProfit = profitUSD >= 0;
-            const hasData = livePrice > 0 && (tradePrice > 0 || totalAvgCost > 0);
-
-            return (
-              <motion.div 
-                layout
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                key={trade.id} 
-                className="bg-[#1C1B1B] p-6 rounded-3xl border border-white/5 shadow-lg flex flex-col justify-between"
-              >
-                <div>
-                  {/* Header */}
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <span className="text-xs font-black text-gray-500 uppercase tracking-wide">{trade.date}</span>
-                      <h4 className="text-lg font-black text-white mt-1">{trade.asset}</h4>
-                    </div>
-                    <div className={cn(
-                      "px-3 py-1 rounded-full text-xs font-black uppercase tracking-wide",
-                      trade.type === "BUY" ? "bg-[#4EDEA3]/10 text-[#4EDEA3]" : "bg-[#FFB4AB]/10 text-[#FFB4AB]"
-                    )}>
-                      {trade.type === "BUY" ? t("buy") : t("sell")}
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t border-white/5 space-y-2.5">
-                    {/* เงินลงทุน */}
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold text-gray-500">{t("investedAmount")}</span>
-                      <span className="text-sm font-black text-white">{formatMoney(trade.amountUSD)}</span>
-                    </div>
-                    
-                    {/* ราคาเทรด */}
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold text-gray-500">
-                        {t("tradePrice")}
-                      </span>
-                      <span className="text-sm font-bold text-gray-300">
-                        {hasData ? `${formatMoney(tradePrice, "USD", 1)}/${trade.asset}` : "—"}
-                      </span>
-                    </div>
-                    
-                    {/* จำนวนที่ได้จากเทรดนี้ */}
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold text-gray-500">
-                        {t("sharesFromTrade")}
-                      </span>
-                      <span className="text-sm font-bold text-gray-300">
-                        {hasData ? `${tradeShares.toFixed(6)} ${trade.asset}` : "—"}
-                      </span>
-                    </div>
-
-                    {/* จำนวนทั้งหมดและต้นทุนเฉลี่ยในพอร์ต */}
-                    {(totalShares > 0 || totalAvgCost > 0) && (
-                      <div className="mt-2 p-3 bg-white/5 rounded-xl border border-white/10 space-y-1">
-                        <div className="flex justify-between items-center">
-                          <span className="text-[10px] font-bold text-gray-400 uppercase">
-                            {t("currentPortfolioShares")}
-                          </span>
-                          <span className="text-[10px] font-black text-[#ADC6FF]">{totalShares.toFixed(6)}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-[10px] font-bold text-gray-400 uppercase">
-                            {t("overallAvgCost")}
-                          </span>
-                          <span className="text-[10px] font-black text-[#ADC6FF]">{formatMoney(totalAvgCost, "USD", 1)} /{trade.asset}</span>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* เส้นแบ่ง */}
-                    <div className="border-t border-white/5 pt-2.5 space-y-2.5 mt-2">
-                      {/* ราคาตอนนี้ */}
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold text-gray-500">{t("currentPrice")}</span>
-                        <span className="text-sm font-bold text-gray-300">
-                          {livePrice > 0 ? `${formatMoney(livePrice, "USD", 1)}/${trade.asset}` : "—"}
-                        </span>
-                      </div>
-                    
-                      {/* มูลค่าของเทรดนี้ */}
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold text-gray-500">
-                          {t("currentValueThisTrade")}
-                        </span>
-                        <span className="text-sm font-black text-white">
-                          {hasData ? formatMoney(holdingValueUSD) : "—"}
-                        </span>
-                      </div>
-                      
-                      {/* กำไร/ขาดทุน ของเทรดนี้ */}
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold text-gray-500">{t("profitLoss")}</span>
-                        {hasData ? (
-                          <div className="text-right">
-                            <span className={cn(
-                              "text-sm font-black",
-                              isProfit ? "text-[#4EDEA3]" : "text-[#FFB4AB]"
-                            )}>
-                              {isProfit ? "+" : ""}{formatMoney(profitUSD)}
-                            </span>
-                            <span className={cn(
-                              "text-[10px] font-bold ml-1.5",
-                              isProfit ? "text-[#4EDEA3]/60" : "text-[#FFB4AB]/60"
-                            )}>
-                              ({isProfit ? "+" : ""}{profitPercent.toFixed(1)}%)
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-sm text-gray-500">—</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* ข้อความเตือนถ้ายังไม่มีข้อมูล live */}
-                {!hasData && (
-                  <div className="text-[10px] text-[#ADC6FF]/60 font-medium pt-3 text-center mt-auto">
-                    {t("noLiveData")}
-                  </div>
-                )}
-              </motion.div>
-            );
-          })}
-        </div>
-
-        {/* Bucket Activities */}
-        {bucketActivities.length > 0 && (
-          <div className="mt-6">
-            <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-              <PiggyBank size={18} className="text-[#E9C349]" />
-              {t("bucketTransactions")}
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {bucketActivities.slice(0, 20).map((act) => {
-                const isPositive = act.type === "deposit" || act.type === "income_split" || act.type === "profit_split";
-                return (
-                  <motion.div
-                    key={act.id}
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="bg-[#1C1B1B] p-6 rounded-3xl border border-white/5 shadow-lg"
-                  >
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <span className="text-xs font-black text-gray-500 uppercase tracking-wide">
-                          {new Date(act.date).toLocaleDateString(language === "th" ? "th-TH" : "en-US", {
-                            day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
-                          })}
-                        </span>
-                        <h4 className="text-lg font-black text-white mt-1">{act.bucketName}</h4>
-                      </div>
-                      <div className={cn(
-                        "px-3 py-1 rounded-full text-xs font-black uppercase tracking-wide",
-                        isPositive ? "bg-[#4EDEA3]/10 text-[#4EDEA3]" : "bg-[#FFB4AB]/10 text-[#FFB4AB]"
-                      )}>
-                        {t(act.type)}
-                      </div>
-                    </div>
-                    <div className="pt-4 border-t border-white/5 space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold text-gray-500">{t("amount")}</span>
-                        <span className={cn("text-lg font-black", isPositive ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
-                          {isPositive ? "+" : "-"}{formatEntryMoney(getEntryAmount(act))}
-                        </span>
-                      </div>
-                      {act.note && (
-                        <div className="text-xs text-gray-400 bg-white/5 p-3 rounded-xl">
-                          {act.note}
-                        </div>
-                      )}
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </section>
-
-      {/* Add Trade Modal */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={t("addTrade")}>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-2">
-            <label className="text-xs font-black text-gray-500 uppercase tracking-wide">{t("assetName")}</label>
-            <input 
-              autoFocus
-              type="text" 
-              placeholder="e.g. AAPL, BTC"
-              value={newTrade.asset}
-              onChange={(e) => setNewTrade({ ...newTrade, asset: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white outline-none focus:border-[#ADC6FF]/50 transition-all"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-black text-gray-500 uppercase tracking-wide">{t("amountUsd")}</label>
-            <div className="relative">
-              <input 
-                type="number" 
-                placeholder="0.00"
-                value={newTrade.amountUSD}
-                onChange={(e) => setNewTrade({ ...newTrade, amountUSD: e.target.value })}
-                className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 pr-12 text-white outline-none focus:border-[#ADC6FF]/50 transition-all"
-              />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[#ADC6FF] font-bold text-xs uppercase opacity-80">USD</span>
-            </div>
-          </div>
-          <div className="flex gap-4">
-            <button 
-              type="button"
-              onClick={() => setNewTrade({ ...newTrade, type: "BUY" })}
-              className={cn(
-                "flex-1 py-4 rounded-2xl font-black text-xs uppercase tracking-wide transition-all",
-                newTrade.type === "BUY" ? "bg-[#4EDEA3] text-[#00285d]" : "bg-white/5 text-gray-500"
-              )}
-            >
-              {t("buy")}
-            </button>
-            <button 
-              type="button"
-              onClick={() => setNewTrade({ ...newTrade, type: "SELL" })}
-              className={cn(
-                "flex-1 py-4 rounded-2xl font-black text-xs uppercase tracking-wide transition-all",
-                newTrade.type === "SELL" ? "bg-[#FFB4AB] text-[#00285d]" : "bg-white/5 text-gray-500"
-              )}
-            >
-              {t("sell")}
-            </button>
-          </div>
-          <div className="flex gap-4 pt-4">
-            <button 
-              type="button"
-              onClick={() => setIsModalOpen(false)}
-              className="flex-1 py-4 text-gray-500 font-bold text-sm hover:text-white transition-colors"
-            >
-              {t("cancel")}
-            </button>
-            <button 
-              type="submit"
-              className="flex-1 py-4 bg-[#ADC6FF] text-[#00285d] rounded-full font-black text-sm uppercase tracking-tight hover:brightness-110 transition-all"
-            >
-              {t("confirm")}
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* CSV Import Modal */}
-      <Modal isOpen={isCSVModalOpen} onClose={() => setIsCSVModalOpen(false)} title={t("importCsv")}>
-        <div className="space-y-8 py-4">
-          <div className="text-center space-y-4">
-            <div className="w-20 h-20 bg-[#ADC6FF]/10 rounded-3xl flex items-center justify-center mx-auto text-[#ADC6FF]">
-              <FileText size={40} />
-            </div>
-            <div className="space-y-2">
-              <h3 className="text-xl font-black text-white">{t("importCsv")}</h3>
-              <p className="text-sm text-gray-500 max-w-xs mx-auto">
-                {t("uploadCsvDesc")}
-              </p>
-            </div>
+              );
+            })}
           </div>
 
-          <div className="bg-white/5 border border-dashed border-white/10 rounded-3xl p-12 text-center relative group hover:border-[#ADC6FF]/50 transition-all">
-            <input 
-              type="file" 
-              accept=".csv" 
-              onChange={handleCSVUpload}
-              className="absolute inset-0 opacity-0 cursor-pointer z-10"
-            />
-            <div className="space-y-4">
-              <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center mx-auto text-gray-400 group-hover:text-[#ADC6FF] transition-colors">
-                <Download size={24} />
-              </div>
-              <p className="text-xs font-black uppercase tracking-wide text-gray-500 group-hover:text-white transition-colors">
-                {t("selectFile")}
-              </p>
-            </div>
-          </div>
-
-          <div className="bg-[#1C1B1B] p-6 rounded-2xl border border-white/5">
-            <h4 className="text-xs font-black text-gray-500 uppercase tracking-wide mb-4">{t("csvFormatExample")}</h4>
-            <code className="text-xs text-[#ADC6FF] block font-mono bg-black/30 p-4 rounded-xl">
-              asset,type,amountUSD,date,rateAtTime,currency<br/>
-              BTC,BUY,5000,2024-01-15,34.5,THB<br/>
-              ETH,BUY,3000,2024-02-10,35.2,THB
-            </code>
-          </div>
-
-          <AnimatePresence>
-            {importStatus.type !== 'idle' && (
-              <motion.div 
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 10 }}
-                className={cn(
-                  "p-4 rounded-2xl flex items-center gap-3",
-                  importStatus.type === 'success' ? "bg-[#4EDEA3]/10 text-[#4EDEA3]" : "bg-[#FFB4AB]/10 text-[#FFB4AB]"
-                )}
-              >
-                {importStatus.type === 'success' ? <CheckCircle2 size={18} /> : <Info size={18} />}
-                <span className="text-xs font-bold">{importStatus.message}</span>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <button 
-            onClick={() => setIsCSVModalOpen(false)}
-            className="w-full py-4 text-gray-500 font-bold text-sm hover:text-white transition-colors"
-          >
-            {t("cancel")}
+          <button onClick={() => router.push('/ledger')}
+            className="w-full mt-3 py-2 rounded-xl border border-border text-[10px] font-bold uppercase tracking-wide text-gray-400 hover:bg-white/5 transition-all text-center">
+            {language === 'th' ? 'ดูทั้งหมด' : 'View All'} →
           </button>
         </div>
-      </Modal>
 
-      {/* Add Asset Modal (shared component) */}
-      <AddAssetModal isOpen={isAddAssetOpen} onClose={() => setIsAddAssetOpen(false)} />
-
-      {/* Add Cashflow Modal */}
-      <AddCashflowModal isOpen={isAddCashflowOpen} onClose={() => setIsAddCashflowOpen(false)} />
-
-
-
-      {/* Allocation Editor Modal */}
-      <Modal isOpen={isAllocEditOpen} onClose={() => setIsAllocEditOpen(false)} title={t("editAllocation")}>
-        <div className="space-y-5">
-          <p className="text-xs text-gray-400 font-medium">{t("editAllocationDesc")}</p>
-          
-          {allocations.map(item => {
-            const val = editAllocValues[item.label] ?? item.value;
-            return (
-              <div key={item.label} className="space-y-2">
-                <div className="flex justify-between items-center text-xs font-black uppercase tracking-wide text-gray-400">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                    <span>{translateLabel(item.label)}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={val}
-                      onChange={(e) => {
-                        const v = Math.max(0, Math.min(100, Number(e.target.value) || 0));
-                        setEditAllocValues(prev => ({ ...prev, [item.label]: v }));
-                      }}
-                      className="w-14 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-right text-white text-sm font-black outline-none focus:border-[#ADC6FF]/50 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    />
-                    <span className="text-white text-sm font-black">%</span>
-                  </div>
+        {/* Top Movers */}
+        <div className="lg:col-span-3 bg-surface/50 rounded-2xl border border-border p-4 flex flex-col">
+          <span className="text-[10px] text-gray-500 uppercase tracking-wide font-bold mb-3">Top Movers</span>
+          <div className="space-y-2 flex-1">
+            {topMovers.length === 0 && (
+              <div className="flex-1 flex items-center justify-center py-8 text-gray-600 text-xs">No active assets</div>
+            )}
+            {topMovers.map(a => (
+              <button key={a.symbol} onClick={() => router.push(`/portfolio`)}
+                className="w-full flex items-center justify-between p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.06] transition-all border border-transparent hover:border-border">
+                <div>
+                  <span className="text-xs font-bold text-white block">{a.symbol}</span>
+                  <span className="text-[9px] text-gray-500 truncate block">{a.name}</span>
                 </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={val}
-                  onChange={(e) => setEditAllocValues(prev => ({ ...prev, [item.label]: Number(e.target.value) }))}
-                  className="w-full h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer"
-                  style={{
-                    accentColor: item.color,
-                    background: `linear-gradient(to right, ${item.color} 0%, ${item.color} ${val}%, rgba(255,255,255,0.1) ${val}%, rgba(255,255,255,0.1) 100%)`
-                  }}
-                />
-              </div>
-            );
-          })}
-
-          {(() => {
-            const total = Object.values(editAllocValues).reduce((s, v) => s + v, 0);
-            const isValid = total === 100;
-            return (
-              <>
-                <div className={cn(
-                  "flex justify-between items-center p-4 rounded-2xl border",
-                  isValid ? "bg-[#4EDEA3]/5 border-[#4EDEA3]/20" : "bg-[#FFB4AB]/5 border-[#FFB4AB]/20"
-                )}>
-                  <span className="text-xs font-black uppercase tracking-wide text-gray-400">{t("total")}</span>
-                  <span className={cn("text-lg font-black", isValid ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
-                    {total}%
+                <div className="text-right">
+                  <span className="text-xs font-bold text-white block">{formatMoney(a.valueUSD)}</span>
+                  <span className={cn("text-[10px] font-bold", a.change >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
+                    {a.change >= 0 ? '+' : ''}{a.change.toFixed(2)}%
                   </span>
                 </div>
-                {!isValid && (
-                  <p className="text-xs text-[#FFB4AB] font-bold text-center">
-                    {t("totalMustBe100")} ({t("remaining")}: {100 - total > 0 ? "+" : ""}{100 - total}%)
-                  </p>
-                )}
-                <div className="flex gap-4 pt-2">
-                  <button
-                    onClick={() => setIsAllocEditOpen(false)}
-                    className="flex-1 py-4 text-gray-500 font-bold text-sm hover:text-white transition-colors"
-                  >
-                    {t("cancel")}
-                  </button>
-                  <button
-                    disabled={!isValid}
-                    onClick={() => {
-                      Object.entries(editAllocValues).forEach(([label, value]) => {
-                        updateAllocation(label, value);
-                      });
-                      setIsAllocEditOpen(false);
-                      addToast(t("allocationSaved"), 'success');
-                      addNotification(
-                        t("targetAllocation"),
-                        allocations.map(a => `${translateLabel(a.label)}: ${editAllocValues[a.label]}%`).join(', '),
-                        'rebalance'
-                      );
-                    }}
-                    className={cn(
-                      "flex-1 py-4 rounded-full font-black text-sm uppercase tracking-tight transition-all",
-                      isValid
-                        ? "bg-[#ADC6FF] text-[#00285d] hover:brightness-110 active:scale-95"
-                        : "bg-white/5 text-gray-600 cursor-not-allowed"
-                    )}
-                  >
-                    {t("confirm")}
-                  </button>
-                </div>
-              </>
-            );
-          })()}
+              </button>
+            ))}
+          </div>
+          <button onClick={() => router.push('/portfolio')}
+            className="w-full mt-3 py-2 rounded-xl border border-border text-[10px] font-bold uppercase tracking-wide text-gray-400 hover:bg-white/5 transition-all text-center">
+            {t("portfolio")} →
+          </button>
         </div>
-      </Modal>
+      </div>
 
-      {/* ─── Floating Action Button (FAB) ─── */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2">
+      {/* ─── FAB ──────────────────────────────────────────────────── */}
+      <div className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-50 flex flex-col items-end gap-2">
         <AnimatePresence>
           {fabOpen && (
             <motion.div
               initial={{ opacity: 0, scale: 0.8, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.8, y: 10 }}
-              transition={{ duration: 0.18, ease: 'easeOut' }}
+              transition={{ duration: 0.18 }}
               className="flex flex-col gap-2 items-end"
             >
               {[
@@ -1681,7 +548,7 @@ export default function DashboardPage() {
                   exit={{ opacity: 0, x: 20 }}
                   transition={{ delay: i * 0.04 }}
                   onClick={action.onClick}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-full shadow-xl text-[#0E0E0E] text-xs font-black tracking-wide hover:brightness-110 active:scale-95 transition-all"
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-full shadow-xl text-[#0E0E0E] text-xs font-bold tracking-wide hover:brightness-110 active:scale-95 transition-all"
                   style={{ backgroundColor: action.bg }}
                 >
                   <span>{action.icon}</span>
@@ -1697,75 +564,60 @@ export default function DashboardPage() {
           whileTap={{ scale: 0.93 }}
           className="w-14 h-14 rounded-full bg-[#ADC6FF] text-[#00285d] shadow-2xl shadow-[#ADC6FF]/30 flex items-center justify-center transition-all"
         >
-          <motion.span
-            animate={{ rotate: fabOpen ? 45 : 0 }}
-            transition={{ duration: 0.2 }}
-            className="text-2xl font-black leading-none"
-          >
+          <motion.span animate={{ rotate: fabOpen ? 45 : 0 }} transition={{ duration: 0.2 }} className="text-2xl font-bold leading-none">
             +
           </motion.span>
         </motion.button>
       </div>
-    </div>
-  );
-}
 
+      {/* ─── Modals ──────────────────────────────────────────────── */}
+      <AddAssetModal isOpen={isAddAssetOpen} onClose={() => setIsAddAssetOpen(false)} />
+            <AddCashflowModal isOpen={isAddCashflowOpen} onClose={() => setIsAddCashflowOpen(false)} />
 
-function AllocationItem({ label, value, color }: { label: string, value: number, color: string }) {
-  return (
-    <div className="group">
-      <div className="flex justify-between text-xs font-black uppercase tracking-wide text-gray-400 mb-2">
-        <span>{label}</span>
-        <span>{value}%</span>
-      </div>
-      <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-        <motion.div 
-          initial={{ width: 0 }}
-          animate={{ width: `${value}%` }}
-          transition={{ duration: 1, ease: "easeOut" }}
-          className="h-full rounded-full" 
-          style={{ backgroundColor: color }}
-        />
-      </div>
-    </div>
-  );
-}
+      {/* CSV Import Modal */}
+      <Modal isOpen={isImportCSVOpen} onClose={() => { setIsImportCSVOpen(false); setCsvImportStatus({ type: 'idle', message: '' }); }} title={t("importCsvPortfolio") || "Import CSV"}>
+        <div className="space-y-6">
+          <div className="p-4 bg-white/5 rounded-2xl border border-border">
+            <p className="text-xs text-gray-400 font-medium mb-3">{t("csvImportInstructions") || "Format: symbol,shares,avgCost"}</p>
+            <div className="bg-background p-3 rounded-xl font-mono text-[11px] text-gray-500 leading-relaxed">
+              symbol,shares,avgCost<br/>
+              AAPL,10,150.00<br/>
+              BTC,0.5,42000.00<br/>
+              PTT.BK,100,35.50
+            </div>
+          </div>
 
-function DriftRow({ label, current, target, delta, type, color }: any) {
-  return (
-    <tr className="hover:bg-white/5 transition-colors group">
-      <td className="px-8 py-6">
-        <div className="flex items-center gap-3">
-          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
-          <span className="font-bold text-sm text-white">{label}</span>
+          <label className="flex flex-col items-center justify-center gap-3 py-8 border-2 border-dashed border-border rounded-2xl cursor-pointer hover:border-[#ADC6FF]/30 hover:bg-white/5 transition-all group">
+            <Upload size={28} className="text-gray-600 group-hover:text-[#ADC6FF] transition-colors" />
+            <span className="text-sm font-bold text-gray-500 group-hover:text-white transition-colors">
+              {t("selectFile") || "Select File"}
+            </span>
+            <span className="text-[10px] text-gray-600">.csv</span>
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleImportCSV}
+              className="hidden"
+            />
+          </label>
+
+          {csvImportStatus.type !== 'idle' && (
+            <div className={cn(
+              "px-4 py-3 rounded-xl text-xs font-bold",
+              csvImportStatus.type === 'success' ? 'bg-[#4EDEA3]/10 text-[#4EDEA3] border border-[#4EDEA3]/20' : 'bg-[#FFB4AB]/10 text-[#FFB4AB] border border-[#FFB4AB]/20'
+            )}>
+              {csvImportStatus.message}
+            </div>
+          )}
+
+          <button
+            onClick={() => { setIsImportCSVOpen(false); setCsvImportStatus({ type: 'idle', message: '' }); }}
+            className="w-full py-4 bg-white/5 border border-border text-white rounded-full font-black text-sm uppercase tracking-tight hover:bg-white/10 transition-all"
+          >
+            {t("close") || "Close"}
+          </button>
         </div>
-      </td>
-      <td className="px-8 py-6 text-sm text-gray-400">{current}</td>
-      <td className="px-8 py-6 text-sm text-gray-400">{target}</td>
-      <td className={cn(
-        "px-8 py-6 text-right text-sm font-black",
-        type === "negative" ? "text-[#FFB4AB]" : "text-[#4EDEA3]"
-      )}>
-        {delta}
-      </td>
-    </tr>
-  );
-}
-
-function TradeCard({ type, asset, desc, icon: Icon, color }: any) {
-  return (
-    <div className="bg-[#1C1B1B] p-6 rounded-3xl flex items-center justify-between group hover:bg-[#262626] transition-all border border-white/5 cursor-pointer">
-      <div className="flex items-center gap-4">
-        <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ backgroundColor: `${color}10`, color }}>
-          <Icon size={24} />
-        </div>
-        <div>
-          <div className="text-xs font-black uppercase tracking-wide" style={{ color }}>{type}</div>
-          <div className="text-white font-bold text-sm">{asset}</div>
-          <div className="text-xs text-gray-400 font-medium">{desc}</div>
-        </div>
-      </div>
-      <ArrowRight size={18} className="text-gray-600 group-hover:text-[#ADC6FF] transition-colors" />
+      </Modal>
     </div>
   );
 }

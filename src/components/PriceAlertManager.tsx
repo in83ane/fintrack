@@ -188,7 +188,7 @@ export function PriceAlertManager() {
           </div>
 
           {/* Add New Alert */}
-          <div className="bg-[#0E0E0E] rounded-2xl p-4 border border-white/5 space-y-3">
+          <div className="bg-background rounded-2xl p-4 border border-border space-y-3">
             <span className="text-[10px] font-bold text-[#ADC6FF] uppercase tracking-wide">
               {language === "th" ? "เพิ่มการแจ้งเตือนใหม่" : "New Alert"}
             </span>
@@ -198,14 +198,14 @@ export function PriceAlertManager() {
                 placeholder={language === "th" ? "สัญลักษณ์ (เช่น BTC)" : "Symbol (e.g. BTC)"}
                 value={newAlert.symbol}
                 onChange={(e) => setNewAlert({ ...newAlert, symbol: e.target.value })}
-                className="bg-white/5 rounded-xl px-3 py-2.5 text-sm text-white border border-white/5 focus:border-[#ADC6FF]/30 outline-none"
+                className="bg-white/5 rounded-xl px-3 py-2.5 text-sm text-white border border-border focus:border-[#ADC6FF]/30 outline-none"
               />
               <input
                 type="number"
                 placeholder={language === "th" ? "ราคาเป้าหมาย" : "Target Price"}
                 value={newAlert.targetPrice}
                 onChange={(e) => setNewAlert({ ...newAlert, targetPrice: e.target.value })}
-                className="bg-white/5 rounded-xl px-3 py-2.5 text-sm text-white border border-white/5 focus:border-[#ADC6FF]/30 outline-none"
+                className="bg-white/5 rounded-xl px-3 py-2.5 text-sm text-white border border-border focus:border-[#ADC6FF]/30 outline-none"
               />
             </div>
             <div className="flex gap-2">
@@ -215,7 +215,7 @@ export function PriceAlertManager() {
                   "flex-1 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all border",
                   newAlert.direction === "below"
                     ? "bg-[#4EDEA3]/10 text-[#4EDEA3] border-[#4EDEA3]/20"
-                    : "bg-white/5 text-gray-500 border-white/5"
+                    : "bg-white/5 text-gray-500 border-border"
                 )}
               >
                 <TrendingDown size={14} /> {language === "th" ? "แนวรับ (ต่ำกว่า)" : "Below (Support)"}
@@ -226,7 +226,7 @@ export function PriceAlertManager() {
                   "flex-1 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all border",
                   newAlert.direction === "above"
                     ? "bg-[#FFB4AB]/10 text-[#FFB4AB] border-[#FFB4AB]/20"
-                    : "bg-white/5 text-gray-500 border-white/5"
+                    : "bg-white/5 text-gray-500 border-border"
                 )}
               >
                 <TrendingUp size={14} /> {language === "th" ? "แนวต้าน (สูงกว่า)" : "Above (Resistance)"}
@@ -237,7 +237,7 @@ export function PriceAlertManager() {
               placeholder={language === "th" ? "หมายเหตุ (ไม่บังคับ)" : "Note (optional)"}
               value={newAlert.note}
               onChange={(e) => setNewAlert({ ...newAlert, note: e.target.value })}
-              className="w-full bg-white/5 rounded-xl px-3 py-2.5 text-sm text-white border border-white/5 focus:border-[#ADC6FF]/30 outline-none"
+              className="w-full bg-white/5 rounded-xl px-3 py-2.5 text-sm text-white border border-border focus:border-[#ADC6FF]/30 outline-none"
             />
             <button
               onClick={handleAddAlert}
@@ -259,7 +259,7 @@ export function PriceAlertManager() {
                   key={alert.id}
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
-                  className="flex items-center justify-between p-3 bg-[#0E0E0E] rounded-xl border border-white/5 group hover:border-white/10 transition-all"
+                  className="flex items-center justify-between p-3 bg-background rounded-xl border border-border group hover:border-border transition-all"
                 >
                   <div className="flex items-center gap-3">
                     <div className={cn(
@@ -301,7 +301,7 @@ export function PriceAlertManager() {
               {triggeredAlerts.slice(0, 5).map((alert) => (
                 <div
                   key={alert.id}
-                  className="flex items-center justify-between p-3 bg-[#0E0E0E]/50 rounded-xl border border-white/5 opacity-60"
+                  className="flex items-center justify-between p-3 bg-background/50 rounded-xl border border-border opacity-60"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-[#4EDEA3]/10 flex items-center justify-center text-[#4EDEA3]">

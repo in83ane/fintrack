@@ -114,7 +114,7 @@ function ResetPasswordContent() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md bg-[#111111]/80 backdrop-blur-xl rounded-3xl border border-white/10 p-8 shadow-2xl relative z-10"
+        className="w-full max-w-md bg-[#111111]/80 backdrop-blur-xl rounded-3xl border border-border p-8 shadow-2xl relative z-10"
       >
         <div className="text-center mb-8">
           <div className="mx-auto w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mb-6 ring-1 ring-white/10 shadow-inner">
@@ -158,7 +158,7 @@ function ResetPasswordContent() {
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3.5 bg-black/50 border border-white/10 rounded-2xl text-white placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all duration-300"
+                    className="w-full pl-11 pr-4 py-3.5 bg-black/50 border border-border rounded-2xl text-white placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all duration-300"
                     required
                   />
                 </div>
@@ -176,7 +176,7 @@ function ResetPasswordContent() {
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3.5 bg-black/50 border border-white/10 rounded-2xl text-white placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all duration-300"
+                    className="w-full pl-11 pr-4 py-3.5 bg-black/50 border border-border rounded-2xl text-white placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all duration-300"
                     required
                   />
                 </div>

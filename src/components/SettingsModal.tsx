@@ -30,7 +30,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
           <div className="space-y-3">
             {/* Toggle: Investment Assets */}
-            <div className="flex items-center justify-between p-4 bg-white/5 border border-white/5 rounded-2xl">
+            <div className="flex items-center justify-between p-4 bg-white/5 border border-border rounded-2xl">
               <div className="flex gap-3 items-center">
                 <div className="w-8 h-8 rounded-full bg-[#ADC6FF]/10 text-[#ADC6FF] flex items-center justify-center">
                   <Briefcase size={14} />
@@ -56,7 +56,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             </div>
 
             {/* Toggle: Money Buckets */}
-            <div className="flex items-center justify-between p-4 bg-white/5 border border-white/5 rounded-2xl">
+            <div className="flex items-center justify-between p-4 bg-white/5 border border-border rounded-2xl">
               <div className="flex gap-3 items-center">
                 <div className="w-8 h-8 rounded-full bg-[#4EDEA3]/10 text-[#4EDEA3] flex items-center justify-center">
                   <Wallet size={14} />
@@ -82,7 +82,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             </div>
 
             {/* Toggle: Liquid Cash */}
-            <div className="flex items-center justify-between p-4 bg-white/5 border border-white/5 rounded-2xl">
+            <div className="flex items-center justify-between p-4 bg-white/5 border border-border rounded-2xl">
               <div className="flex gap-3 items-center">
                 <div className="w-8 h-8 rounded-full bg-[#E9C349]/10 text-[#E9C349] flex items-center justify-center">
                   <DollarSign size={14} />
@@ -115,7 +115,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
           <div className="space-y-3">
             {/* Toggle: Cash */}
-            <div className="flex items-center justify-between p-4 bg-white/5 border border-white/5 rounded-2xl">
+            <div className="flex items-center justify-between p-4 bg-white/5 border border-border rounded-2xl">
               <div className="flex gap-3 items-center">
                 <div className="w-8 h-8 rounded-full bg-[#E9C349]/10 text-[#E9C349] flex items-center justify-center">
                   <DollarSign size={14} />
@@ -141,7 +141,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             </div>
 
             {/* Toggle: Buckets */}
-            <div className="flex items-center justify-between p-4 bg-white/5 border border-white/5 rounded-2xl">
+            <div className="flex items-center justify-between p-4 bg-white/5 border border-border rounded-2xl">
               <div className="flex gap-3 items-center">
                 <div className="w-8 h-8 rounded-full bg-[#4EDEA3]/10 text-[#4EDEA3] flex items-center justify-center">
                   <Wallet size={14} />
@@ -167,7 +167,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             </div>
 
             {/* Toggle: Assets */}
-            <div className="flex items-center justify-between p-4 bg-white/5 border border-white/5 rounded-2xl">
+            <div className="flex items-center justify-between p-4 bg-white/5 border border-border rounded-2xl">
               <div className="flex gap-3 items-center">
                 <div className="w-8 h-8 rounded-full bg-[#ADC6FF]/10 text-[#ADC6FF] flex items-center justify-center">
                   <Briefcase size={14} />

@@ -17,6 +17,18 @@
   /* Fix: Prevent "tracking-tighter" and "tracking-tight" from squishing Thai letters together */
   --tracking-tighter: 0em;
   --tracking-tight: 0em;
+
+  /* PortHub Theme Colors */
+  --color-background: #0f1115; /* Darker than #181c22 for deeper look */
+  --color-foreground: #ffffff;
+  --color-primary: #10b981; /* Emerald 500 */
+  --color-primary-foreground: #022c22;
+  --color-surface: rgba(255, 255, 255, 0.03);
+  --color-surface-2: rgba(255, 255, 255, 0.06);
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-muted: #9ca3af;
+  --color-muted-foreground: #6b7280;
+  --color-emerald-300: #6ee7b7;
 }
 
 
@@ -27,6 +39,10 @@ body {
   line-height: 1.6;
   /* Prevent layout shift when scrollbar appears/disappears (e.g. modals, expanding panels) */
   scrollbar-gutter: stable;
+  
+  /* Apply Base Theme */
+  background-color: var(--color-background);
+  color: var(--color-foreground);
 }
 
 /* Give more breathing room to text in Thai context */

@@ -396,7 +396,7 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
       
       {/* TopBar Portal for Price */}
       {portalTarget ? createPortal(
-        <div className="flex items-center gap-4 bg-white/5 border border-white/10 rounded-full px-4 py-1.5 ml-2 hover:bg-white/10 transition-colors">
+        <div className="flex items-center gap-4 bg-white/5 border border-border rounded-full px-4 py-1.5 ml-2 hover:bg-white/10 transition-colors">
            <div className="flex items-center gap-2">
              <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest hidden sm:inline">Asset</span>
              <span className="text-xs font-black text-white">{symbol || "NO SYMBOL"}</span>
@@ -409,7 +409,7 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
         </div>,
         portalTarget
       ) : (
-        <div className="bg-gradient-to-r from-[#1C1B1B] to-black rounded-3xl p-6 border border-white/5 flex justify-between items-center sticky top-4 z-50 shadow-2xl shadow-black/50 backdrop-blur-xl">
+        <div className="bg-gradient-to-r from-[#1C1B1B] to-black rounded-3xl p-6 border border-border flex justify-between items-center sticky top-4 z-50 shadow-2xl shadow-black/50 backdrop-blur-xl">
            <div>
              <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Trading Asset</p>
              <h2 className="text-3xl font-black text-white tracking-tighter leading-none">{symbol || "NO SYMBOL"}</h2>
@@ -435,7 +435,7 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
             {entries.map((entry, idx) => (
               <div key={entry.id} className={cn(
                 "rounded-2xl p-4 border transition-all",
-                entry.active ? "bg-[#1C1B1B] border-white/10" : "bg-black/20 border-dashed border-white/5 opacity-50"
+                entry.active ? "bg-surface border-border" : "bg-black/20 border-dashed border-border opacity-50"
               )}>
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
@@ -463,7 +463,7 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
                       <input 
                         type="number" step="any"
                         value={entry.price || ''} onChange={e => handleEntryChange(entry.id, 'price', +e.target.value)}
-                        className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-white font-bold text-sm outline-none focus:border-[#ADC6FF]"
+                        className="w-full bg-black/40 border border-border rounded-lg px-3 py-2 text-white font-bold text-sm outline-none focus:border-[#ADC6FF]"
                       />
                     </div>
                     <div>
@@ -471,7 +471,7 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
                       <input 
                         type="number" step="any"
                         value={entry.quantity || ''} onChange={e => handleEntryChange(entry.id, 'quantity', +e.target.value)}
-                        className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-white font-bold text-sm outline-none focus:border-[#ADC6FF]"
+                        className="w-full bg-black/40 border border-border rounded-lg px-3 py-2 text-white font-bold text-sm outline-none focus:border-[#ADC6FF]"
                       />
                     </div>
                     <div>
@@ -479,7 +479,7 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
                       <input 
                         type="number" step="any"
                         value={entry.amount || ''} onChange={e => handleEntryChange(entry.id, 'amount', +e.target.value)}
-                        className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-white font-bold text-sm outline-none focus:border-[#ADC6FF]"
+                        className="w-full bg-black/40 border border-border rounded-lg px-3 py-2 text-white font-bold text-sm outline-none focus:border-[#ADC6FF]"
                       />
                     </div>
                   </div>
@@ -490,7 +490,7 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
 
           {/* Donut Chart */}
           {activeEntries.length > 0 && (
-            <div className="bg-[#1C1B1B] rounded-2xl p-5 border border-white/5 mt-6 shadow-xl relative overflow-hidden">
+            <div className="bg-surface rounded-2xl p-5 border border-border mt-6 shadow-xl relative overflow-hidden">
               <div className="absolute top-0 right-0 p-24 bg-[#4EDEA3]/5 rounded-full blur-[80px] pointer-events-none" />
               <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-4 flex items-center gap-2 relative z-10">
                 <Target size={12} className="text-[#ADC6FF]" /> สัดส่วนการลงทุน
@@ -532,7 +532,7 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
 
           {/* Visual Price Ladder (#11) */}
           {activeEntries.length > 0 && currentMarketPrice > 0 && (
-            <div className="bg-[#1C1B1B] rounded-2xl p-4 sm:p-5 border border-white/5 relative overflow-hidden">
+            <div className="bg-surface rounded-2xl p-4 sm:p-5 border border-border relative overflow-hidden">
               <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2 relative z-10">
                 <Target size={12} className="text-[#ADC6FF]" /> Price Ladder
               </h4>
@@ -576,7 +576,7 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
 
                       {/* Grid lines */}
                       {[0, 25, 50, 75, 100].map(pct => (
-                        <div key={pct} className="absolute left-12 right-0 border-t border-white/5 z-10" style={{ top: `${pct}%` }}>
+                        <div key={pct} className="absolute left-12 right-0 border-t border-border z-10" style={{ top: `${pct}%` }}>
                           <span className="absolute -left-12 -top-2 text-[8px] font-medium text-gray-500 w-10 text-right">
                             {formatVal(maxP - (pct / 100) * range)}
                           </span>
@@ -618,7 +618,7 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
                           <div key={entry.id} className="absolute left-12 right-0 z-30" style={{ top: `${yPos}%` }}>
                             <div className="absolute -left-1.5 -top-2.5 flex items-center gap-2">
                               {/* Centered Circle */}
-                              <div className="w-5 h-5 rounded-full border-[1.5px] flex items-center justify-center text-[9px] font-black shadow-lg" style={{ borderColor: `${color}80`, color, backgroundColor: '#1C1B1B' }}>
+                              <div className="w-5 h-5 rounded-full border-[1.5px] flex items-center justify-center text-[9px] font-black shadow-lg" style={{ borderColor: `${color}80`, color, backgroundColor: 'rgba(255,255,255,0.03)' }}>
                                 <span className="leading-none pt-[1px]">{entry.id}</span>
                               </div>
                               <div className="h-px flex-1 opacity-20" style={{ backgroundColor: color }} />
@@ -637,7 +637,7 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
           )}
           
           {/* Average Info Card */}
-          <div className="bg-gradient-to-br from-[#1C1B1B] to-black rounded-3xl p-6 border border-white/5 relative overflow-hidden">
+          <div className="bg-gradient-to-br from-[#1C1B1B] to-black rounded-3xl p-6 border border-border relative overflow-hidden">
             <div className="absolute top-0 right-0 p-32 bg-[#ADC6FF]/5 rounded-full blur-[100px] pointer-events-none" />
             
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6 relative z-10">
@@ -660,7 +660,7 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
             </div>
 
             {/* Advisory */}
-            <div className="bg-black/40 rounded-xl p-4 border border-white/5 mb-6 flex items-start gap-3 relative z-10">
+            <div className="bg-black/40 rounded-xl p-4 border border-border mb-6 flex items-start gap-3 relative z-10">
               <Info className={cn("shrink-0 mt-0.5", advisory.color)} size={18} />
               <div>
                 <p className="text-xs font-black text-gray-400 mb-1">Day Trader Assistant:</p>
@@ -722,13 +722,13 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
           </div>
 
           {/* Target Table */}
-          <div className="bg-[#1C1B1B] rounded-3xl p-6 border border-white/5">
+          <div className="bg-surface rounded-3xl p-6 border border-border">
             <h3 className="font-black text-white flex items-center gap-2 mb-4"><Calculator size={18} className="text-[#ADC6FF]" /> แผนทำกำไร (Targets by Avg Price)</h3>
             
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-white/5">
+                  <tr className="border-b border-border">
                     <th className="p-3 text-[10px] font-black text-gray-500 uppercase">ระดับ (Level)</th>
                     <th className="p-3 text-[10px] font-black text-gray-500 uppercase">% จากทุนเฉลี่ย</th>
                     <th className="p-3 text-[10px] font-black text-gray-500 uppercase">ราคาเป้าหมาย</th>
@@ -747,7 +747,7 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
                     const gross = targetPrice * totalQuantity;
                     const net = gross - totalInvestment;
                     return (
-                      <tr key={i} className="border-b border-white/5 last:border-0 hover:bg-white/5">
+                      <tr key={i} className="border-b border-border last:border-0 hover:bg-white/5">
                         <td className="p-3 text-xs font-bold text-white">{t.label}</td>
                         <td className={cn("p-3 text-xs font-black", t.color)}>+{t.pct}%</td>
                         <td className="p-3 text-sm font-black text-white">{formatVal(targetPrice)}</td>
@@ -763,7 +763,7 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
           </div>
 
           {/* Recovery Simulator */}
-          <div className="bg-[#1C1B1B] rounded-3xl p-6 border border-white/5">
+          <div className="bg-surface rounded-3xl p-6 border border-border">
              <h3 className="font-black text-white flex items-center gap-2 mb-4"><TrendingUp size={18} className="text-[#E9C349]" /> Recovery Simulator (จำลองกำไรหากราคากลับมา)</h3>
              
              <div className="flex flex-col sm:flex-row gap-4 items-center">
@@ -773,14 +773,14 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
                     <input 
                       type="number" step="any"
                       value={simulatedPrice || ''} onChange={e => setSimulatedPrice(+e.target.value)}
-                      className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-[#E9C349] font-black text-xl outline-none focus:border-[#E9C349]"
+                      className="w-full bg-black/40 border border-border rounded-xl px-4 py-3 text-[#E9C349] font-black text-xl outline-none focus:border-[#E9C349]"
                    />
                  </div>
                </div>
                
                <ArrowRight className="hidden sm:block text-gray-600 rotate-90 sm:rotate-0" size={24} />
 
-               <div className="flex-1 w-full bg-black/20 rounded-xl p-4 border border-white/5">
+               <div className="flex-1 w-full bg-black/20 rounded-xl p-4 border border-border">
                   <div className="text-[10px] font-black text-gray-500 uppercase mb-1">ผลลัพธ์ (Net Profit)</div>
                   <div className={cn("text-2xl font-black", simNetPnL >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
                     {simNetPnL >= 0 ? '+' : ''}{formatVal(simNetPnL)}
@@ -814,18 +814,18 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
               const totalJournalPnL = journal.reduce((sum, t) => sum + t.netProfit, 0);
               return (
                 <>
-                  <div className="bg-gradient-to-br from-[#1C1B1B] to-black p-6 rounded-3xl border border-white/5 relative overflow-hidden">
+                  <div className="bg-gradient-to-br from-[#1C1B1B] to-black p-6 rounded-3xl border border-border relative overflow-hidden">
                      <p className="text-[10px] font-black text-gray-500 uppercase mb-2 relative z-10">Win Rate</p>
                      <p className="text-4xl font-black text-white relative z-10">{winRate.toFixed(0)}%</p>
                      <p className="text-xs text-gray-500 font-bold mt-2 relative z-10">ชนะ {winningTrades} จาก {totalTrades} เทรด</p>
                   </div>
-                  <div className="bg-gradient-to-br from-[#1C1B1B] to-black p-6 rounded-3xl border border-white/5 relative overflow-hidden">
+                  <div className="bg-gradient-to-br from-[#1C1B1B] to-black p-6 rounded-3xl border border-border relative overflow-hidden">
                      <p className="text-[10px] font-black text-gray-500 uppercase mb-2 relative z-10">Total Net P&L</p>
                      <p className={cn("text-4xl font-black relative z-10", totalJournalPnL >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
                        {totalJournalPnL >= 0 ? '+' : ''}{formatVal(totalJournalPnL)}
                      </p>
                   </div>
-                  <div className="bg-gradient-to-br from-[#1C1B1B] to-black p-6 rounded-3xl border border-white/5 relative overflow-hidden">
+                  <div className="bg-gradient-to-br from-[#1C1B1B] to-black p-6 rounded-3xl border border-border relative overflow-hidden">
                      <p className="text-[10px] font-black text-gray-500 uppercase mb-2 relative z-10">Total Trades</p>
                      <p className="text-4xl font-black text-white relative z-10">{totalTrades}</p>
                      <p className="text-xs text-gray-500 font-bold mt-2 relative z-10">ออเดอร์ทั้งหมด</p>
@@ -835,12 +835,12 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
             })()}
           </div>
 
-          <div className="bg-[#1C1B1B] rounded-3xl p-6 border border-white/5">
+          <div className="bg-surface rounded-3xl p-6 border border-border">
             <h3 className="font-black text-white flex items-center gap-2 mb-4"><History size={18} className="text-[#ADC6FF]" /> ประวัติการเทรด (Trade Journal)</h3>
             <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-white/5 text-[10px] font-black text-gray-500 uppercase">
+                <tr className="border-b border-border text-[10px] font-black text-gray-500 uppercase">
                   <th className="p-3">วันที่ (Date)</th>
                   <th className="p-3">Symbol</th>
                   <th className="p-3">จำนวนไม้</th>
@@ -852,7 +852,7 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
               </thead>
               <tbody>
                 {journal.map(trade => (
-                  <tr key={trade.id} className="border-b border-white/5 hover:bg-white/5">
+                  <tr key={trade.id} className="border-b border-border hover:bg-white/5">
                     <td className="p-3 text-xs text-gray-400">{new Date(trade.date).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}</td>
                     <td className="p-3 font-black text-white">{trade.symbol}</td>
                     <td className="p-3 text-xs font-bold text-gray-400">{trade.entriesCount}/4 ไม้</td>

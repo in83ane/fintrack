@@ -26,7 +26,7 @@ function TradingViewWidgetComponent({ symbol }: { symbol: string }) {
           style: "1", // 1 means candlestick
           locale: "en",
           enable_publishing: false,
-          backgroundColor: "#1C1B1B",
+          backgroundColor: "rgba(255,255,255,0.03)",
           gridColor: "rgba(255, 255, 255, 0.05)",
           hide_top_toolbar: false,
           hide_legend: false,
@@ -39,7 +39,7 @@ function TradingViewWidgetComponent({ symbol }: { symbol: string }) {
             "MACD@tv-basicstudies",
             "StochasticRSI@tv-basicstudies"
           ],
-          toolbar_bg: "#1C1B1B",
+          toolbar_bg: "rgba(255,255,255,0.03)",
           studies_overrides: {
             // Optional default settings
           }

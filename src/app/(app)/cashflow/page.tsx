@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useMemo } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   Plus, 
@@ -394,7 +395,7 @@ export default function CashflowPage() {
         <div className="flex flex-wrap gap-2 items-center">
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-[#1C1B1B] text-white rounded-xl font-bold text-xs uppercase tracking-wide border border-white/5 hover:bg-white/5 transition-all"
+            className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-surface text-white rounded-xl font-bold text-xs uppercase tracking-wide border border-border hover:bg-white/5 transition-all"
           >
             <Download size={14} className="text-[#4EDEA3]" />
             <span className="hidden sm:inline">{t("importCsv")}</span>
@@ -410,7 +411,7 @@ export default function CashflowPage() {
 
           <button
             onClick={handleExportCSV}
-            className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-[#1C1B1B] text-white rounded-xl font-bold text-xs uppercase tracking-wide border border-white/5 hover:bg-white/5 transition-all"
+            className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-surface text-white rounded-xl font-bold text-xs uppercase tracking-wide border border-border hover:bg-white/5 transition-all"
           >
             <Upload size={14} className="text-[#ADC6FF]" />
             <span className="hidden sm:inline">{t("exportCsv")}</span>
@@ -433,7 +434,7 @@ export default function CashflowPage() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="relative bg-gradient-to-r from-[#1a1f35] via-[#1C1B1B] to-[#1a2520] rounded-3xl border border-white/5 p-5 sm:p-6 overflow-hidden"
+        className="relative bg-gradient-to-r from-[#1a1f35] via-[#1C1B1B] to-[#1a2520] rounded-3xl border border-border p-5 sm:p-6 overflow-hidden"
       >
         {/* Decorative background elements */}
         <div className="absolute -right-16 -top-16 w-48 h-48 bg-[#4EDEA3]/5 blur-[80px] rounded-full" />
@@ -549,7 +550,7 @@ export default function CashflowPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 sm:gap-4">
-        <div className="bg-gradient-to-br from-[#1C1B1B] to-[#0E0E0E] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5 relative overflow-hidden">
+        <div className="bg-gradient-to-br from-[#1C1B1B] to-[#0E0E0E] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-border relative overflow-hidden">
           <div className="absolute -right-4 -top-4 w-20 h-20 bg-[#ADC6FF]/10 blur-3xl rounded-full" />
           <div className="flex items-center justify-between mb-1">
             <p className="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wide">{t("netCashflow")}</p>
@@ -570,7 +571,7 @@ export default function CashflowPage() {
             className={cn("text-xl sm:text-2xl font-bold tracking-tighter", netCashflow >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}
           />
         </div>
-        <div className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
+        <div className="bg-surface p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-border">
           <div className="flex items-center justify-between mb-1">
             <p className="text-[10px] sm:text-xs font-bold text-[#4EDEA3] uppercase tracking-wide">{t("totalIncome")}</p>
             {(() => {
@@ -586,7 +587,7 @@ export default function CashflowPage() {
           </div>
           <AnimatedNumber value={totalIncome} formatter={(v) => formatEntryMoney(v)} className="text-xl sm:text-2xl font-bold text-white tracking-tighter" />
         </div>
-        <div className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
+        <div className="bg-surface p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-border">
           <div className="flex items-center justify-between mb-1">
             <p className="text-[10px] sm:text-xs font-bold text-[#FFB4AB] uppercase tracking-wide">{t("totalExpenses")}</p>
             {(() => {
@@ -602,16 +603,16 @@ export default function CashflowPage() {
           </div>
           <AnimatedNumber value={totalExpenses} formatter={(v) => formatEntryMoney(v)} className="text-xl sm:text-2xl font-bold text-white tracking-tighter" />
         </div>
-        <div className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
+        <div className="bg-surface p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-border">
           <p className="text-[10px] sm:text-xs font-bold text-[#ADC6FF] uppercase tracking-wide mb-1">Savings Rate</p>
           <AnimatedNumber value={savingsRate} decimals={1} suffix="%" className="text-xl sm:text-2xl font-bold text-white tracking-tighter" />
         </div>
-        <div className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
+        <div className="bg-surface p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-border">
           <p className="text-[10px] sm:text-xs font-bold text-[#E9C349] uppercase tracking-wide mb-1">Investment Ratio</p>
           <AnimatedNumber value={investmentRatio} decimals={1} suffix="%" className="text-xl sm:text-2xl font-bold text-white tracking-tighter" />
         </div>
         {/* Monthly Bar Chart Mini (#19) - Enhanced */}
-        <div className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5">
+        <div className="bg-surface p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-border">
           <p className="text-[10px] sm:text-xs font-bold text-[#E9C349] uppercase tracking-wide mb-2">{t("monthlyOverview") || "Monthly"}</p>
           {monthlyChartData.length > 0 ? (
             <div className="flex items-end gap-1 h-12">
@@ -636,7 +637,7 @@ export default function CashflowPage() {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-[#1C1B1B] p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-white/5"
+          className="bg-surface p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-border"
         >
           <div className="flex items-center gap-2 mb-3">
             <Gauge size={14} className="text-[#E9C349]" />
@@ -714,7 +715,7 @@ export default function CashflowPage() {
       {allCashflowActivities.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           {/* Income by Category */}
-          <div className="bg-[#1C1B1B] p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-white/5">
+          <div className="bg-surface p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-border">
             <div className="flex items-center gap-2 mb-4">
               <PieChart size={14} className="text-[#4EDEA3]" />
               <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide">{t("incomeByCategory") || "Income by Category"}</h3>
@@ -752,7 +753,7 @@ export default function CashflowPage() {
           </div>
 
           {/* Expense by Category */}
-          <div className="bg-[#1C1B1B] p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-white/5">
+          <div className="bg-surface p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-border">
             <div className="flex items-center gap-2 mb-4">
               <Wallet size={14} className="text-[#FFB4AB]" />
               <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide">{t("expenseByCategory") || "Expense by Category"}</h3>
@@ -791,301 +792,19 @@ export default function CashflowPage() {
         </div>
       )}
 
-      {/* Filters & Search */}
-      <div className="flex flex-col gap-3 sm:gap-4 items-stretch sm:items-center bg-[#1C1B1B] p-3 sm:p-4 rounded-2xl sm:rounded-3xl border border-white/5">
-        <div className="flex gap-2 w-full">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
-            <input
-              type="text"
-              placeholder={t("searchTransactions") || "Search..."}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-[#0E0E0E] border-none rounded-xl sm:rounded-2xl py-2.5 sm:py-3 pl-10 sm:pl-12 pr-4 text-sm text-white focus:ring-2 focus:ring-[#4EDEA3]/20 transition-all"
-            />
+      {/* Link to Ledger */}
+      <div className="flex justify-center pt-8 pb-12">
+        <Link href="/ledger" className="group flex flex-col items-center gap-2 px-8 py-6 bg-surface hover:bg-white/5 border border-border rounded-3xl transition-all text-center">
+          <div className="w-12 h-12 bg-[#ADC6FF]/10 text-[#ADC6FF] rounded-full flex items-center justify-center mb-2">
+            <LayoutList size={24} />
           </div>
-          {/* View mode toggle */}
-          <div className="flex bg-[#0E0E0E] rounded-xl border border-white/5 overflow-hidden">
-            <button
-              onClick={() => setViewMode('table')}
-              className={cn(
-                "px-3 py-2 transition-all",
-                viewMode === 'table' ? "bg-[#ADC6FF]/20 text-[#ADC6FF]" : "text-gray-500 hover:text-white"
-              )}
-              title="Table view"
-            >
-              <LayoutList size={16} />
-            </button>
-            <button
-              onClick={() => setViewMode('timeline')}
-              className={cn(
-                "px-3 py-2 transition-all",
-                viewMode === 'timeline' ? "bg-[#ADC6FF]/20 text-[#ADC6FF]" : "text-gray-500 hover:text-white"
-              )}
-              title="Timeline view"
-            >
-              <Clock size={16} />
-            </button>
+          <div className="text-base sm:text-lg text-white font-black tracking-tight flex items-center gap-2">
+            {t("viewAllTransactions") || "View All Transactions"}
+            <ArrowUpRight size={18} className="text-gray-500 group-hover:text-white transition-colors" />
           </div>
-        </div>
-        <div className="flex gap-2 w-full">
-          {(['all', 'income', 'expense', 'deposit', 'withdraw'] as const).map((type) => (
-            <button
-              key={type}
-              onClick={() => setFilterType(type)}
-              className={`flex-1 sm:flex-none px-3 sm:px-6 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl text-xs font-bold uppercase tracking-wide transition-all ${
-                filterType === type
-                  ? type === 'income' || type === 'deposit'
-                    ? "bg-[#4EDEA3] text-[#0E0E0E]"
-                    : type === 'expense' || type === 'withdraw'
-                      ? "bg-[#FFB4AB] text-[#0E0E0E]"
-                      : "bg-[#ADC6FF] text-[#0E0E0E]"
-                  : "bg-[#0E0E0E] text-gray-500 hover:text-white"
-              }`}
-            >
-              {type === 'all' ? t('all') : getFlowLabel(type)}
-            </button>
-          ))}
-        </div>
+          <p className="text-xs sm:text-sm text-gray-500 font-medium">Go to Ledger for detailed transaction history and editing</p>
+        </Link>
       </div>
-
-      {/* ─── Timeline View ────────────────────────────────────────────────── */}
-      {viewMode === 'timeline' && (
-        <div className="space-y-4">
-          {groupedByDate.length === 0 ? (
-            <div className="bg-[#1C1B1B] rounded-2xl border border-white/5 p-12 text-center">
-              <FileText size={32} className="text-white opacity-20 mx-auto mb-3" />
-              <p className="text-xs text-white font-bold uppercase tracking-wide opacity-20">{t("noTransactionsFound") || "No records found"}</p>
-            </div>
-          ) : (
-            groupedByDate.map(([dateKey, txns]) => {
-              const dayIncome = txns.filter(t => (t.type === 'INCOME' || t.type === 'DEPOSIT') && !t.isTransfer).reduce((s, t) => s + getEntryAmount(t), 0);
-              const dayExpense = txns.filter(t => (t.type === 'EXPENSE' || t.type === 'WITHDRAW') && !t.isTransfer).reduce((s, t) => s + getEntryAmount(t), 0);
-              const dayNet = dayIncome - dayExpense;
-              const balance = runningBalances[dateKey] || 0;
-
-              return (
-                <motion.div
-                  key={dateKey}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-[#1C1B1B] rounded-2xl sm:rounded-3xl border border-white/5 overflow-hidden"
-                >
-                  {/* Date Header */}
-                  <div className="px-4 sm:px-6 py-3 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-[#ADC6FF]/10 rounded-xl flex items-center justify-center">
-                        <span className="text-lg font-black text-[#ADC6FF]">{format(new Date(dateKey), 'dd')}</span>
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-white">{format(new Date(dateKey), 'EEEE')}</p>
-                        <p className="text-[10px] text-gray-500">{format(new Date(dateKey), 'MMMM yyyy')} · {txns.length} transaction{txns.length > 1 ? 's' : ''}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className={cn("text-sm font-black tracking-tighter", dayNet >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
-                        {dayNet >= 0 ? "+" : "-"}{formatEntryMoney(dayNet)}
-                      </p>
-                      <p className="text-[9px] text-gray-600 font-bold">Balance: {formatEntryMoney(balance)}</p>
-                    </div>
-                  </div>
-                  {/* Transactions */}
-                  <div className="divide-y divide-white/5">
-                    {txns.map(txn => {
-                      const sourceBucket = txn.bucketId ? moneyBuckets.find(b => b.id === txn.bucketId) : null;
-                      return (
-                        <div
-                          key={txn.id}
-                          className="px-4 sm:px-6 py-3 flex items-center gap-3 hover:bg-white/[0.02] transition-colors cursor-pointer group"
-                          onClick={() => handleViewDetails(txn)}
-                        >
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                            txn.isTransfer
-                              ? 'bg-[#ADC6FF]/10 text-[#ADC6FF]'
-                              : txn.type === 'EXPENSE' || txn.type === 'WITHDRAW'
-                                ? 'bg-[#FFB4AB]/10 text-[#FFB4AB]'
-                                : 'bg-[#4EDEA3]/10 text-[#4EDEA3]'
-                          }`}>
-                            {txn.isTransfer
-                              ? <Wallet size={14} />
-                              : txn.type === 'EXPENSE' || txn.type === 'WITHDRAW'
-                                ? <ArrowDownLeft size={14} />
-                                : <ArrowUpRight size={14} />
-                            }
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-bold text-white">
-                                <span style={{ fontFamily: "'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif" }}>{getCategoryIcon(txn.category)}</span> {t(txn.category)}
-                              </span>
-                              {sourceBucket && (
-                                <span className="text-[9px] bg-white/5 px-1.5 py-0.5 rounded-full text-gray-500">
-                                  <span style={{ fontFamily: "'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif" }}>{sourceBucket.icon}</span> {t(sourceBucket.name) || sourceBucket.name}
-                                </span>
-                              )}
-                            </div>
-                            {txn.note && <p className="text-[10px] text-gray-500 truncate">{txn.note}</p>}
-                          </div>
-                          <div className="text-right flex-shrink-0">
-                            <span className={cn(
-                              "text-sm font-black tracking-tighter",
-                              txn.isTransfer ? "text-[#ADC6FF]"
-                                : txn.type === 'INCOME' || txn.type === 'DEPOSIT' ? "text-[#4EDEA3]"
-                                : "text-[#FFB4AB]"
-                            )}>
-                              {txn.type === 'INCOME' || txn.type === 'DEPOSIT' ? "+" : "-"}
-                              {formatEntryMoney(getEntryAmount(txn))}
-                            </span>
-                            <p className="text-[9px] text-gray-600">
-                              {txn.time || format(new Date(txn.date), 'HH:mm')}
-                            </p>
-                          </div>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleDeleteCashflow(txn.id); }}
-                            className="p-1.5 text-gray-500 hover:text-[#FFB4AB] hover:bg-[#FFB4AB]/10 rounded-lg transition-all opacity-0 group-hover:opacity-100 flex-shrink-0"
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </motion.div>
-              );
-            })
-          )}
-        </div>
-      )}
-
-      {/* ─── Table View ───────────────────────────────────────────────────── */}
-      {viewMode === 'table' && (
-        <div className="bg-[#1C1B1B] rounded-2xl sm:rounded-[2rem] border border-white/5 overflow-hidden shadow-xl">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-white/5">
-                  <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide">{t("date")}</th>
-                  <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide">{t("category")}</th>
-                  <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide">{t("type")}</th>
-                  <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide hidden sm:table-cell">{t("sourceBucket")}</th>
-                  <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide">{t("amount")}</th>
-                  <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide text-right">{t("actions")}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {filteredCashflow.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-3 sm:px-6 py-12 sm:py-16 text-center">
-                      <div className="flex flex-col items-center gap-3 sm:gap-4 opacity-20">
-                        <FileText size={32} className="text-white" />
-                        <p className="text-xs text-white font-bold uppercase tracking-wide">{t("noTransactionsFound") || "No records found"}</p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  filteredCashflow.map((txn) => {
-                    const sourceBucket = txn.bucketId ? moneyBuckets.find(b => b.id === txn.bucketId) : null;
-                    return (
-                    <motion.tr
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      key={txn.id}
-                      className="hover:bg-white/[0.02] transition-colors group cursor-pointer"
-                      onClick={() => handleViewDetails(txn)}
-                    >
-                      <td className="px-3 sm:px-6 py-3 sm:py-4">
-                        <div className="flex flex-col">
-                          <span className="text-[10px] sm:text-xs text-gray-400 font-medium">
-                            {format(new Date(txn.date), 'MMM dd, yyyy')}
-                          </span>
-                          <span className="text-[9px] text-gray-600">
-                            {txn.time ? txn.time : format(new Date(txn.date), 'HH:mm')}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-3 sm:px-6 py-3 sm:py-4">
-                        <div className="flex items-center gap-2 sm:gap-3">
-                          <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center ${
-                            txn.isTransfer
-                              ? 'bg-[#ADC6FF]/10 text-[#ADC6FF]'
-                              : txn.type === 'EXPENSE' || txn.type === 'WITHDRAW'
-                                ? 'bg-[#FFB4AB]/10 text-[#FFB4AB]'
-                                : 'bg-[#4EDEA3]/10 text-[#4EDEA3]'
-                          }`}>
-                            {txn.isTransfer
-                              ? <Wallet size={12} />
-                              : txn.type === 'EXPENSE' || txn.type === 'WITHDRAW'
-                                ? <ArrowDownLeft size={12} />
-                                : <ArrowUpRight size={12} />
-                            }
-                          </div>
-                          <div>
-                            <span className="text-xs font-bold text-white block">{t(txn.category)}</span>
-                            {txn.note && <span className="text-[10px] text-gray-500">{txn.note}</span>}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-3 sm:px-6 py-3 sm:py-4">
-                        <span className={cn(
-                          "px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wide",
-                          txn.isTransfer
-                            ? "bg-[#ADC6FF]/10 text-[#ADC6FF]"
-                            : txn.type === 'INCOME' || txn.type === 'DEPOSIT'
-                              ? "bg-[#4EDEA3]/10 text-[#4EDEA3]"
-                              : "bg-[#FFB4AB]/10 text-[#FFB4AB]"
-                        )}>
-                          {txn.isTransfer ? 'Transfer' : getFlowLabel(txn.type)}
-                        </span>
-                      </td>
-                      <td className="px-3 sm:px-6 py-3 sm:py-4 hidden sm:table-cell">
-                        {sourceBucket ? (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-sm">{sourceBucket.icon}</span>
-                            <span className="text-xs font-bold text-gray-300">{t(sourceBucket.name) || sourceBucket.name}</span>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-gray-600">—</span>
-                        )}
-                      </td>
-                      <td className="px-3 sm:px-6 py-3 sm:py-4">
-                        <span className={`text-sm sm:text-base font-black tracking-tighter ${
-                          txn.isTransfer
-                            ? 'text-[#ADC6FF]'
-                            : txn.type === 'INCOME' || txn.type === 'DEPOSIT'
-                              ? 'text-[#4EDEA3]'
-                              : 'text-[#FFB4AB]'
-                        }`}>
-                          {txn.type === 'INCOME' || txn.type === 'DEPOSIT'
-                            ? `+${formatEntryMoney(getEntryAmount(txn))}`
-                            : `-${formatEntryMoney(getEntryAmount(txn))}`
-                          }
-                        </span>
-                      </td>
-                      <td className="px-3 sm:px-6 py-3 sm:py-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleViewDetails(txn); }}
-                            className="p-1.5 sm:p-2 text-gray-500 hover:text-[#ADC6FF] hover:bg-[#ADC6FF]/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                            title={t("transactionDetails") || "View Details"}
-                          >
-                            <FileText size={14} />
-                          </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleDeleteCashflow(txn.id); }}
-                            className="p-1.5 sm:p-2 text-gray-500 hover:text-[#FFB4AB] hover:bg-[#FFB4AB]/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </td>
-                    </motion.tr>
-                  );})
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
       {/* Add Cashflow Modal */}
       <AddCashflowModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} />
@@ -1106,8 +825,8 @@ export default function CashflowPage() {
             exit={{ y: 50, opacity: 0 }}
             className={`fixed bottom-8 right-8 z-[100] flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl border ${
               notification.type === 'success' 
-                ? "bg-[#0E0E0E] border-[#4EDEA3]/20 text-[#4EDEA3]" 
-                : "bg-[#0E0E0E] border-[#FFB4AB]/20 text-[#FFB4AB]"
+                ? "bg-background border-[#4EDEA3]/20 text-[#4EDEA3]" 
+                : "bg-background border-[#FFB4AB]/20 text-[#FFB4AB]"
             }`}
           >
             {notification.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}

@@ -68,7 +68,7 @@ export function TopBar() {
 
   return (
     <>
-      <header className="w-full top-0 sticky z-50 bg-[#1C1B1B]/80 backdrop-blur-md border-b border-white/5 flex justify-between items-center px-6 lg:px-12 py-4">
+      <header className="w-full top-0 sticky z-50 bg-surface/80 backdrop-blur-md border-b border-border flex justify-between items-center px-6 lg:px-12 py-4">
         <div className="flex items-center gap-4 lg:gap-8">
           <button 
             onClick={() => setShowMobileMenu(true)}
@@ -104,18 +104,18 @@ export function TopBar() {
           {/* ⌘K Search Trigger */}
           <button
             onClick={() => { const e = new KeyboardEvent('keydown', { key: 'k', metaKey: true, ctrlKey: true, bubbles: true }); window.dispatchEvent(e); }}
-            className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:border-[#ADC6FF]/30 transition-all cursor-pointer"
+            className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-border hover:border-[#ADC6FF]/30 transition-all cursor-pointer"
           >
             <Search size={12} className="text-gray-500" />
             <span className="text-xs text-gray-500">{t('searchPlaceholder')}</span>
-            <kbd className="text-[9px] font-bold text-gray-600 bg-white/5 px-1.5 py-0.5 rounded border border-white/5">⌘K</kbd>
+            <kbd className="text-[9px] font-bold text-gray-600 bg-white/5 px-1.5 py-0.5 rounded border border-border">⌘K</kbd>
           </button>
 
           {/* Language Selector - Compact */}
           <div className="relative" ref={langMenuRef}>
             <button
               onClick={() => setShowLangMenu(!showLangMenu)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-all"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/5 border border-border hover:bg-white/10 transition-all"
             >
               <Globe size={12} className="text-gray-400" />
               <span className="text-[10px] font-black uppercase tracking-wide text-white hidden sm:inline">
@@ -130,7 +130,7 @@ export function TopBar() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 10 }}
-                  className="absolute top-full right-0 mt-2 w-28 bg-[#1C1B1B] border border-white/10 rounded-xl shadow-2xl overflow-hidden py-1 z-[60]"
+                  className="absolute top-full right-0 mt-2 w-28 bg-surface border border-border rounded-xl shadow-2xl overflow-hidden py-1 z-[60]"
                 >
                   {languages.map((lang) => (
                     <button
@@ -154,7 +154,7 @@ export function TopBar() {
           </div>
 
           {/* Currency Selector - Compact */}
-          <div className="flex bg-white/5 rounded-full p-0.5 border border-white/10">
+          <div className="flex bg-white/5 rounded-full p-0.5 border border-border">
             {currencies.map((curr) => (
               <button
                 key={curr}
@@ -191,9 +191,9 @@ export function TopBar() {
                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    className="absolute top-full right-12 mt-4 w-80 bg-[#1C1B1B] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-[60]"
+                    className="absolute top-full right-12 mt-4 w-80 bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden z-[60]"
                   >
-                    <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
+                    <div className="px-4 py-3 border-b border-border flex items-center justify-between">
                       <span className="text-sm font-bold text-white uppercase tracking-wide">{t("notifications")}</span>
                       {notifications.length > 0 && (
                         <div className="flex gap-2">
@@ -226,7 +226,7 @@ export function TopBar() {
                               key={notif.id}
                               onClick={() => markNotificationRead(notif.id)}
                               className={cn(
-                                "px-4 py-3 border-b border-white/5 cursor-pointer transition-all hover:bg-white/5",
+                                "px-4 py-3 border-b border-border cursor-pointer transition-all hover:bg-white/5",
                                 !notif.read && "bg-white/[0.02]"
                               )}
                             >
@@ -279,9 +279,9 @@ export function TopBar() {
                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    className="absolute top-full right-0 mt-4 w-56 bg-[#1C1B1B] border border-white/10 rounded-2xl shadow-2xl overflow-hidden py-1 z-[60]"
+                    className="absolute top-full right-0 mt-4 w-56 bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden py-1 z-[60]"
                   >
-                    <div className="px-4 py-3 border-b border-white/5 mb-1">
+                    <div className="px-4 py-3 border-b border-border mb-1">
                       <p className="text-sm font-bold text-white truncate">{userProfile?.email || "User"}</p>
                       <p className="text-xs text-[#4EDEA3] mt-0.5 font-medium">{t("premiumTier") || "Premium Plan"}</p>
                     </div>
@@ -293,7 +293,7 @@ export function TopBar() {
                       <Settings size={14} /> {t("settings")}
                     </Link>
                     
-                    <div className="border-t border-white/5 mt-1 pt-1">
+                    <div className="border-t border-border mt-1 pt-1">
                       <button 
                         onClick={async () => {
                           const keysToRemove = [
@@ -336,7 +336,7 @@ export function TopBar() {
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="absolute left-0 top-0 bottom-0 w-72 bg-[#0E0E0E] shadow-2xl"
+              className="absolute left-0 top-0 bottom-0 w-72 bg-background shadow-2xl"
             >
               <div className="flex justify-end p-4">
                 <button onClick={() => setShowMobileMenu(false)} className="p-2 text-gray-400 hover:text-white">

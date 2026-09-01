@@ -240,10 +240,10 @@ export function CommandPalette() {
             exit={{ opacity: 0, y: -16, scale: 0.97 }}
             transition={{ duration: 0.14, ease: "easeOut" }}
             onClick={e => e.stopPropagation()}
-            className="w-full max-w-xl bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl shadow-black/60 overflow-hidden"
+            className="w-full max-w-xl bg-[#1a1a1a] border border-border rounded-2xl shadow-2xl shadow-black/60 overflow-hidden"
           >
             {/* ─── Input ─── */}
-            <div className="flex items-center gap-3 px-4 py-3.5 border-b border-white/5">
+            <div className="flex items-center gap-3 px-4 py-3.5 border-b border-border">
               <Search size={17} className="text-gray-500 shrink-0" />
               <input
                 ref={inputRef}
@@ -255,7 +255,7 @@ export function CommandPalette() {
                   : "Search · or type 'income 50000' / 'lunch 150' to quick-log"}
                 className="flex-1 bg-transparent text-white text-sm outline-none placeholder:text-gray-600"
               />
-              <kbd className="hidden sm:inline-flex px-1.5 py-0.5 rounded bg-white/5 text-[10px] font-bold text-gray-500 border border-white/10">ESC</kbd>
+              <kbd className="hidden sm:inline-flex px-1.5 py-0.5 rounded bg-white/5 text-[10px] font-bold text-gray-500 border border-border">ESC</kbd>
             </div>
 
             {/* ─── Quick-log preview ─── */}
@@ -387,7 +387,7 @@ export function CommandPalette() {
             </div>
 
             {/* ─── Footer ─── */}
-            <div className="px-4 py-2 border-t border-white/5 flex items-center gap-4 text-[10px] text-gray-600">
+            <div className="px-4 py-2 border-t border-border flex items-center gap-4 text-[10px] text-gray-600">
               <span>↑↓ {isTh ? "เลือก" : "Navigate"}</span>
               <span>↵ {isTh ? "เปิด" : "Open"}</span>
               <span>ESC {isTh ? "ปิด" : "Close"}</span>

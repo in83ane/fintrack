@@ -68,7 +68,7 @@ export default function DashboardGrid() {
               <Plus size={12} /> {t("addWidget")}
             </button>
           )}
-          <button onClick={() => setEditing(!editing)} className={cn("px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all", editing ? "bg-[#4EDEA3] text-[#00285d]" : "bg-white/5 text-gray-400 hover:text-white border border-white/10")}>
+          <button onClick={() => setEditing(!editing)} className={cn("px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all", editing ? "bg-[#4EDEA3] text-[#00285d]" : "bg-white/5 text-gray-400 hover:text-white border border-border")}>
             {editing ? <><Check size={12} /> {t("doneDashboard")}</> : <><LayoutGrid size={12} /> {t("editDashboard")}</>}
           </button>
         </div>
@@ -87,7 +87,7 @@ export default function DashboardGrid() {
         onLayoutChange={onLayoutChange}
       >
         {dashboardWidgets.map(widget => (
-          <div key={widget.i} className={cn("bg-[#1C1B1B] rounded-2xl border shadow-lg overflow-hidden", editing ? "border-[#ADC6FF]/30 ring-1 ring-[#ADC6FF]/10" : "border-white/5")}>
+          <div key={widget.i} className={cn("bg-surface rounded-2xl border shadow-lg overflow-hidden", editing ? "border-[#ADC6FF]/30 ring-1 ring-[#ADC6FF]/10" : "border-border")}>
             <div className="h-full p-4 flex flex-col">
               {editing && (
                 <div className="flex justify-between items-center mb-1 -mt-1">
@@ -111,14 +111,14 @@ export default function DashboardGrid() {
       <AnimatePresence>
         {showLib && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowLib(false)}>
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} onClick={e => e.stopPropagation()} className="bg-[#1C1B1B] rounded-3xl border border-white/10 p-6 w-full max-w-md shadow-2xl">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} onClick={e => e.stopPropagation()} className="bg-surface rounded-3xl border border-border p-6 w-full max-w-md shadow-2xl">
               <h3 className="text-base font-bold text-white mb-4">{t("widgetLibrary")}</h3>
               <div className="grid grid-cols-2 gap-3">
                 {ALL_TYPES.map(type => {
                   const meta = WIDGET_META[type];
                   const exists = dashboardWidgets.some(w => w.type === type);
                   return (
-                    <button key={type} onClick={() => !exists && addWidget(type)} disabled={exists} className={cn("p-4 rounded-2xl border text-left transition-all flex items-center gap-3", exists ? "bg-white/5 border-white/5 opacity-40 cursor-not-allowed" : "bg-white/[0.02] border-white/10 hover:bg-[#ADC6FF]/5 hover:border-[#ADC6FF]/30")}>
+                    <button key={type} onClick={() => !exists && addWidget(type)} disabled={exists} className={cn("p-4 rounded-2xl border text-left transition-all flex items-center gap-3", exists ? "bg-white/5 border-border opacity-40 cursor-not-allowed" : "bg-white/[0.02] border-border hover:bg-[#ADC6FF]/5 hover:border-[#ADC6FF]/30")}>
                       <div className="w-8 h-8 rounded-xl bg-[#ADC6FF]/10 text-[#ADC6FF] flex items-center justify-center">{meta.icon}</div>
                       <span className="text-xs font-bold text-white">{t(meta.labelKey)}</span>
                     </button>

@@ -624,7 +624,7 @@ export default function BudgetPage() {
       </div>
 
       {/* Total Net Worth Card with Ring Chart */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-gradient-to-br from-[#1C1B1B] to-[#141414] rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-white/5 relative overflow-hidden">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-gradient-to-br from-[#1C1B1B] to-[#141414] rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-border relative overflow-hidden">
         <div className="absolute -right-8 -top-8 w-32 h-32 bg-[#E9C349]/5 blur-3xl rounded-full" />
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between relative z-10 gap-4">
           <div className="flex-1">
@@ -662,14 +662,14 @@ export default function BudgetPage() {
                         key={i}
                         d={`M ${C} ${C} L ${x1.toFixed(1)} ${y1.toFixed(1)} A ${R} ${R} 0 ${largeArc} 1 ${x2.toFixed(1)} ${y2.toFixed(1)} Z`}
                         fill={b.color}
-                        stroke="#141414"
+                        stroke="#0f1115"
                         strokeWidth={1}
                         opacity={0.85}
                       />
                     );
                   });
                 })()}
-                <circle cx={50} cy={50} r={22} fill="#141414" />
+                <circle cx={50} cy={50} r={22} fill="#0f1115" />
                 <text x={50} y={48} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize="11" fontWeight="bold">
                   {moneyBuckets.length}
                 </text>
@@ -815,13 +815,55 @@ export default function BudgetPage() {
                     <span className="text-[#8c909f]">{t("progress")}</span>
                     <span className="text-[#4EDEA3]">{actualPct.toFixed(1)}%</span>
                   </div>
-                  <div className="h-1.5 sm:h-2 w-full bg-[#0e0e0e] rounded-full overflow-hidden">
+                  <div className="h-1.5 sm:h-2 w-full bg-background rounded-full overflow-hidden">
                     <div className="h-full bg-gradient-to-r from-[#4EDEA3] to-[#ADC6FF] rounded-full transition-all duration-500" style={{ width: `${Math.min(actualPct, 100)}%` }} />
                   </div>
                 </div>
 
                 {/* Actions */}
-                <div className="mt-4 space-y-2">
+                <div className="mt-4">
+                  {actionModal?.id === bucket.id ? (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-2 bg-background/50 p-2 sm:p-3 rounded-xl border border-white/5">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className={cn("text-xs font-black uppercase tracking-wide", actionModal.type === 'deposit' ? 'text-[#4EDEA3]' : 'text-[#FFB4AB]')}>
+                          {actionModal.type === 'deposit' ? t("deposit") : t("withdraw")}
+                        </span>
+                        <button onClick={() => setActionModal(null)} className="text-gray-500 hover:text-white transition-colors">
+                          <X size={14} />
+                        </button>
+                      </div>
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          placeholder="Amount"
+                          value={actionAmount}
+                          onChange={(e) => setActionAmount(e.target.value)}
+                          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-[#ADC6FF]"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleActionSubmit();
+                            }
+                          }}
+                        />
+                        <button
+                          onClick={handleActionSubmit}
+                          disabled={!actionAmount || parseFloat(actionAmount) <= 0}
+                          className={cn(
+                            "px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all",
+                            actionAmount && parseFloat(actionAmount) > 0
+                              ? "bg-white text-black"
+                              : "bg-white/10 text-gray-500 cursor-not-allowed"
+                          )}
+                        >
+                          <Check size={14} />
+                        </button>
+                      </div>
+                    </motion.div>
+                  ) : (
                     <div className="flex gap-2">
                       <button
                         onClick={(e) => {
@@ -830,9 +872,9 @@ export default function BudgetPage() {
                           setActionAmount("");
                           setActionNote("");
                         }}
-                        className="flex-1 py-2.5 rounded-xl font-black text-xs uppercase bg-[#4EDEA3]/10 text-[#4EDEA3] border border-[#4EDEA3]/20 hover:bg-[#4EDEA3]/20 transition-all flex items-center justify-center gap-1.5"
+                        className="flex-1 py-2 sm:py-2.5 rounded-xl font-black text-[10px] sm:text-xs uppercase bg-[#4EDEA3]/10 text-[#4EDEA3] border border-[#4EDEA3]/20 hover:bg-[#4EDEA3]/20 transition-all flex items-center justify-center gap-1.5"
                       >
-                        <ArrowDownToLine size={14} />
+                        <ArrowDownToLine size={12} className="sm:w-3.5 sm:h-3.5" />
                         {t("deposit")}
                       </button>
                       <button
@@ -842,9 +884,9 @@ export default function BudgetPage() {
                           setActionAmount("");
                           setActionNote("");
                         }}
-                        className="flex-1 py-2.5 rounded-xl font-black text-xs uppercase bg-[#FFB4AB]/10 text-[#FFB4AB] border border-[#FFB4AB]/20 hover:bg-[#FFB4AB]/20 transition-all flex items-center justify-center gap-1.5"
+                        className="flex-1 py-2 sm:py-2.5 rounded-xl font-black text-[10px] sm:text-xs uppercase bg-[#FFB4AB]/10 text-[#FFB4AB] border border-[#FFB4AB]/20 hover:bg-[#FFB4AB]/20 transition-all flex items-center justify-center gap-1.5"
                       >
-                        <ArrowUpFromLine size={14} />
+                        <ArrowUpFromLine size={12} className="sm:w-3.5 sm:h-3.5" />
                         {t("withdraw")}
                       </button>
                       <button
@@ -852,12 +894,13 @@ export default function BudgetPage() {
                           e.stopPropagation();
                           setTransferModal({ sourceBucketId: bucket.id, destinationBucketId: "", amount: "", currency: currency as "USD" | "THB", note: "" });
                         }}
-                        className="flex-[0.5] py-2.5 rounded-xl font-black text-xs uppercase bg-[#ADC6FF]/10 text-[#ADC6FF] border border-[#ADC6FF]/20 hover:bg-[#ADC6FF]/20 transition-all flex items-center justify-center gap-1.5"
+                        className="flex-[0.5] py-2 sm:py-2.5 rounded-xl font-black text-[10px] sm:text-xs uppercase bg-[#ADC6FF]/10 text-[#ADC6FF] border border-[#ADC6FF]/20 hover:bg-[#ADC6FF]/20 transition-all flex items-center justify-center gap-1.5"
                         title={t("transfer") || "Transfer"}
                       >
-                        <ArrowRightLeft size={14} />
+                        <ArrowRightLeft size={12} className="sm:w-3.5 sm:h-3.5" />
                       </button>
                     </div>
+                  )}
                 </div>
 
                 </div>{/* end card surface */}
@@ -878,7 +921,7 @@ export default function BudgetPage() {
               setIsBucketModalOpen(true);
             }}
             className={cn(
-              "bg-[#0e0e0e]/50 p-4 sm:p-6 rounded-xl sm:rounded-2xl border border-dashed flex flex-col items-center justify-center min-h-[16rem] h-auto min-w-[240px] sm:min-w-[280px] flex-shrink-0 snap-start transition-all",
+              "bg-background/50 p-4 sm:p-6 rounded-xl sm:rounded-2xl border border-dashed flex flex-col items-center justify-center min-h-[16rem] h-auto min-w-[240px] sm:min-w-[280px] flex-shrink-0 snap-start transition-all",
               canAddMoreBuckets
                 ? "border-[#424754]/20 cursor-pointer group hover:border-[#ADC6FF]/40"
                 : "border-gray-700 cursor-not-allowed opacity-50"
@@ -926,7 +969,7 @@ export default function BudgetPage() {
       {/* Input Panels Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         {/* Income Distribution Panel */}
-        <div className="bg-[#1C1B1B] rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-white/5">
+        <div className="bg-surface rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-border">
           <div className="flex items-center gap-2 mb-3 sm:mb-4">
             <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-[#ADC6FF]/10 flex items-center justify-center text-[#ADC6FF]">
               <DollarSign size={16} />
@@ -947,9 +990,9 @@ export default function BudgetPage() {
                   setIncomeAmount(val);
                   setShowIncomePreview(!!val && parseFloat(val) > 0);
                 }}
-                className="w-full bg-white/5 border border-white/10 rounded-xl sm:rounded-2xl px-3 sm:px-4 py-3 pr-20 text-white text-sm outline-none focus:border-[#ADC6FF]/50 transition-all placeholder:text-gray-600"
+                className="w-full bg-white/5 border border-border rounded-xl sm:rounded-2xl px-3 sm:px-4 py-3 pr-20 text-white text-sm outline-none focus:border-[#ADC6FF]/50 transition-all placeholder:text-gray-600"
               />
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 p-0.5 bg-white/5 rounded-lg border border-white/10">
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 p-0.5 bg-white/5 rounded-lg border border-border">
                 {(['USD', 'THB'] as const).map(cur => (
                   <button
                     key={cur}
@@ -1006,7 +1049,7 @@ export default function BudgetPage() {
         </div>
 
         {/* Add Profit Panel */}
-        <div className="bg-[#1C1B1B] rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-white/5">
+        <div className="bg-surface rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-border">
           <div className="flex items-center gap-2 mb-3 sm:mb-4">
             <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-[#4EDEA3]/10 flex items-center justify-center text-[#4EDEA3]">
               <TrendingUp size={16} />
@@ -1027,9 +1070,9 @@ export default function BudgetPage() {
                   setProfitAmount(val);
                   setShowProfitSuggestion(!!val && parseFloat(val) > 0);
                 }}
-                className="w-full bg-white/5 border border-white/10 rounded-xl sm:rounded-2xl px-3 sm:px-4 py-3 pr-20 text-white text-sm outline-none focus:border-[#4EDEA3]/50 transition-all placeholder:text-gray-600"
+                className="w-full bg-white/5 border border-border rounded-xl sm:rounded-2xl px-3 sm:px-4 py-3 pr-20 text-white text-sm outline-none focus:border-[#4EDEA3]/50 transition-all placeholder:text-gray-600"
               />
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 p-0.5 bg-white/5 rounded-lg border border-white/10">
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 p-0.5 bg-white/5 rounded-lg border border-border">
                 {(['USD', 'THB'] as const).map(cur => (
                   <button
                     key={cur}
@@ -1099,7 +1142,7 @@ export default function BudgetPage() {
       {/* Bottom Row: Action Log + Financial Advice */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
         {/* Action Log */}
-        <div className="lg:col-span-8 bg-[#1C1B1B] rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-white/5">
+        <div className="lg:col-span-8 bg-surface rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-border">
           <div className="flex items-center gap-2 mb-4 sm:mb-5">
             <History size={14} className="text-[#ADC6FF]" />
             <h3 className="text-sm font-bold text-white">{t("actionLog")}</h3>
@@ -1146,7 +1189,7 @@ export default function BudgetPage() {
         </div>
 
         {/* Financial Advice Panel */}
-        <div className="lg:col-span-4 bg-[#1C1B1B] rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-white/5 flex flex-col">
+        <div className="lg:col-span-4 bg-surface rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-border flex flex-col">
           <div className="flex items-center gap-2 mb-3 sm:mb-5">
             <Lightbulb size={14} className="text-[#E9C349]" />
             <h3 className="text-sm font-bold text-white">{t("adviceTitle")}</h3>
@@ -1180,7 +1223,7 @@ export default function BudgetPage() {
               value={bucketForm.name}
               onChange={(e) => setBucketForm((prev) => ({ ...prev, name: e.target.value }))}
               placeholder={t("bucketName")}
-              className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white text-sm outline-none focus:border-[#E9C349]/50 transition-all"
+              className="w-full bg-white/5 border border-border rounded-2xl px-4 py-3 text-white text-sm outline-none focus:border-[#E9C349]/50 transition-all"
             />
           </div>
           <div className="space-y-2">
@@ -1193,7 +1236,7 @@ export default function BudgetPage() {
                   onClick={() => setBucketForm((prev) => ({ ...prev, icon }))}
                   className={cn(
                     "w-10 h-10 rounded-xl flex items-center justify-center text-lg border transition-all",
-                    bucketForm.icon === icon ? "bg-white/10 border-[#E9C349]/50 scale-110" : "bg-white/5 border-white/5 hover:border-white/10"
+                    bucketForm.icon === icon ? "bg-white/10 border-[#E9C349]/50 scale-110" : "bg-white/5 border-border hover:border-border"
                   )}
                 >
                   {icon}
@@ -1222,7 +1265,7 @@ export default function BudgetPage() {
                 );
               })}
             </div>
-            <div className="flex items-center gap-3 p-3 bg-white/[0.03] border border-white/10 rounded-2xl">
+            <div className="flex items-center gap-3 p-3 bg-white/[0.03] border border-border rounded-2xl">
               <div className="w-10 h-10 rounded-xl border-2 border-white/20 shrink-0 shadow-inner" style={{ backgroundColor: bucketForm.color }} />
               <div className="flex-1 flex items-center gap-2">
                 <span className="text-gray-500 text-sm">#</span>
@@ -1290,7 +1333,7 @@ export default function BudgetPage() {
                         setBucketForm((prev) => ({ ...prev, targetPercent: val.toString() }));
                       }}
                       placeholder="25"
-                      className="w-20 px-2 py-1.5 bg-white/5 border border-white/10 rounded-lg text-white text-sm font-bold text-center focus:outline-none focus:border-[#ADC6FF]/50 placeholder:text-gray-600"
+                      className="w-20 px-2 py-1.5 bg-white/5 border border-border rounded-lg text-white text-sm font-bold text-center focus:outline-none focus:border-[#ADC6FF]/50 placeholder:text-gray-600"
                     />
                     <span className="text-sm font-bold text-gray-500">%</span>
                   </div>
@@ -1304,7 +1347,7 @@ export default function BudgetPage() {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">{t("targetAmount")}</label>
-              <div className="flex gap-1 p-0.5 bg-white/5 rounded-lg border border-white/10">
+              <div className="flex gap-1 p-0.5 bg-white/5 rounded-lg border border-border">
                 {(['USD', 'THB'] as const).map(cur => (
                   <button
                     key={cur}
@@ -1335,7 +1378,7 @@ export default function BudgetPage() {
                 }}
                 onChange={(e) => setBucketForm((prev) => ({ ...prev, targetAmount: e.target.value }))}
                 placeholder="0.00"
-                className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white text-sm outline-none focus:border-[#E9C349]/50 transition-all pr-12"
+                className="w-full bg-white/5 border border-border rounded-2xl px-4 py-3 text-white text-sm outline-none focus:border-[#E9C349]/50 transition-all pr-12"
               />
               <span className={cn(
                 "absolute right-4 top-1/2 -translate-y-1/2 font-black text-xs uppercase opacity-90",
@@ -1349,7 +1392,7 @@ export default function BudgetPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">{t("currentAmount")}</label>
-                <div className="flex gap-1 p-0.5 bg-white/5 rounded-lg border border-white/10 opacity-50 pointer-events-none">
+                <div className="flex gap-1 p-0.5 bg-white/5 rounded-lg border border-border opacity-50 pointer-events-none">
                   {(['USD', 'THB'] as const).map(cur => (
                     <button
                       key={cur}
@@ -1375,7 +1418,7 @@ export default function BudgetPage() {
                   value={bucketForm.currentAmount}
                   onChange={(e) => setBucketForm((prev) => ({ ...prev, currentAmount: e.target.value }))}
                   placeholder="0.00"
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white text-sm outline-none focus:border-[#E9C349]/50 transition-all pr-12"
+                  className="w-full bg-white/5 border border-border rounded-2xl px-4 py-3 text-white text-sm outline-none focus:border-[#E9C349]/50 transition-all pr-12"
                 />
                 <span className={cn(
                   "absolute right-4 top-1/2 -translate-y-1/2 font-black text-xs uppercase opacity-90",
@@ -1431,9 +1474,9 @@ export default function BudgetPage() {
                 }}
                 placeholder="0.00"
                 autoFocus
-                className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-4 pr-24 text-white text-lg font-black outline-none focus:border-[#FF8B9A]/50 transition-all text-center"
+                className="w-full bg-white/5 border border-border rounded-2xl px-4 py-4 pr-24 text-white text-lg font-black outline-none focus:border-[#FF8B9A]/50 transition-all text-center"
               />
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 p-0.5 bg-white/5 rounded-lg border border-white/10">
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 p-0.5 bg-white/5 rounded-lg border border-border">
                 {(['USD', 'THB'] as const).map(cur => (
                   <button
                     key={cur}
@@ -1619,107 +1662,6 @@ export default function BudgetPage() {
         </div>
       </Modal>
 
-      {/* Action Modal (Deposit/Withdraw) */}
-      <Modal isOpen={!!actionModal} onClose={() => setActionModal(null)} title={actionModal?.type === "deposit" ? (t("deposit") || "Deposit") : (t("withdraw") || "Withdraw")}>
-        <div className="space-y-5">
-          {actionModal && (() => {
-            const bucket = moneyBuckets.find(b => b.id === actionModal.id);
-            if (!bucket) return null;
-            return (
-              <>
-                <div className="bg-white/5 rounded-2xl p-4 flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-gray-400 font-bold mb-1 uppercase tracking-wider">{t("bucket") || "Bucket"}</p>
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs" style={{ backgroundColor: `${bucket.color}20` }}>
-                        {bucket.icon}
-                      </div>
-                      <span className="font-bold text-sm text-white">{t(bucket.name) || bucket.name}</span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-gray-400 font-bold mb-1 uppercase tracking-wider">{t("balance") || "Balance"}</p>
-                    <span className="font-bold text-[#E9C349] text-sm">
-                      {formatBucketAmount(bucket, bucket.currentAmount)}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest pl-1">{t("amount") || "Amount"}</label>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setActionCurrency(actionCurrency === "USD" ? "THB" : "USD")}
-                      className="shrink-0 bg-[#1a1a1a] border border-[#333] hover:border-[#4EDEA3] hover:text-[#4EDEA3] text-gray-400 font-bold px-4 py-3.5 rounded-xl transition-colors flex items-center justify-center min-w-[70px]"
-                    >
-                      {actionCurrency === "THB" ? "฿ THB" : "$ USD"}
-                    </button>
-                    <input
-                      type="number"
-                      step="any"
-                      min="0"
-                      value={actionAmount}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val.includes('-')) return;
-                        setActionAmount(val);
-                      }}
-                      placeholder="0.00"
-                      className="flex-1 bg-[#1a1a1a] border border-[#333] text-xl font-black text-white px-4 py-3.5 rounded-xl outline-none focus:border-[#4EDEA3] transition-colors"
-                      autoFocus
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest pl-1">{t("note") || "Note (Optional)"}</label>
-                  <input
-                    type="text"
-                    value={actionNote}
-                    onChange={(e) => setActionNote(e.target.value)}
-                    placeholder={t("notePlaceholder") || "e.g. Salary, Food"}
-                    className="w-full bg-[#1a1a1a] border border-[#333] text-sm font-medium text-white px-4 py-3.5 rounded-xl outline-none focus:border-[#4EDEA3] transition-colors"
-                  />
-                </div>
-
-                <div className="flex gap-3 pt-2">
-                  <button onClick={() => setActionModal(null)} className="flex-1 py-4 text-gray-500 font-bold text-sm hover:text-white transition-colors">
-                    {t("cancel")}
-                  </button>
-                  <button 
-                    onClick={handleActionSubmit}
-                    disabled={!actionAmount || parseFloat(actionAmount) <= 0 || (actionModal.type === "withdraw" && convertCurrency(parseFloat(actionAmount), actionCurrency, bucketCurrency(bucket) as "USD" | "THB") > bucket.currentAmount)}
-                    className={cn(
-                      "flex-[2] text-[#00285d] font-black text-sm uppercase tracking-wider py-4 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none",
-                      actionModal.type === "deposit" ? "bg-[#4EDEA3]" : "bg-[#FFB4AB]"
-                    )}
-                  >
-                    {actionModal.type === "deposit" ? (t("deposit") || "Deposit") : (t("withdraw") || "Withdraw")}
-                  </button>
-                </div>
-              </>
-            );
-          })()}
-        </div>
-      </Modal>
-
-      {/* Bucket Delete Confirmation */}
-      <ConfirmModal
-        isOpen={bucketToDelete !== null}
-        onClose={() => setBucketToDelete(null)}
-        onConfirm={() => {
-          if (!bucketToDelete) return;
-          removeMoneyBucket(bucketToDelete);
-          addToast(t("bucketDeleted"), "success");
-          setBucketToDelete(null);
-        }}
-        title={t("deleteBucket")}
-        message={t("confirmDelete") || "Are you sure you want to delete this entry?"}
-        confirmText={t("confirm")}
-        cancelText={t("cancel")}
-        isDanger={true}
-      />
-      
       {/* Transaction Detail Modal */}
       <TransactionDetailModal
         isOpen={showDetailModal}

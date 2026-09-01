@@ -89,7 +89,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
             {/* Dev-only error details */}
             {isDev && this.state.errorInfo && (
-              <div className="bg-black/40 rounded-xl p-4 border border-white/5 max-h-40 overflow-auto">
+              <div className="bg-black/40 rounded-xl p-4 border border-border max-h-40 overflow-auto">
                 <p className="text-[10px] font-mono text-[#FFB4AB] mb-2 font-bold">STACK TRACE:</p>
                 <p className="text-[10px] font-mono text-gray-400 leading-relaxed whitespace-pre-wrap">
                   {this.state.errorInfo?.componentStack?.substring(0, 500)}...

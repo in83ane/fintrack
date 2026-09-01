@@ -423,7 +423,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="e.g. Lunch at Starbucks, Salary..."
-              className="w-full px-4 py-4 bg-white/5 border border-white/10 rounded-2xl text-white text-sm font-medium placeholder-gray-600 focus:outline-none focus:border-[#ADC6FF]/50 transition-colors pr-10"
+              className="w-full px-4 py-4 bg-white/5 border border-border rounded-2xl text-white text-sm font-medium placeholder-gray-600 focus:outline-none focus:border-[#ADC6FF]/50 transition-colors pr-10"
               autoFocus
             />
             <AnimatePresence>
@@ -443,7 +443,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
         </div>
 
         {/* Type Toggle */}
-        <div className="grid grid-cols-4 gap-1 bg-white/5 p-1 rounded-2xl border border-white/10">
+        <div className="grid grid-cols-4 gap-1 bg-white/5 p-1 rounded-2xl border border-border">
           <button
             type="button"
             onClick={() => handleTypeChange("INCOME")}
@@ -515,7 +515,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
           
           <div className="flex items-center justify-between mt-2 mb-2">
             <label className="text-[10px] text-gray-500 uppercase tracking-wide"></label>
-            <div className="flex gap-1 p-0.5 bg-white/5 rounded-lg border border-white/10">
+            <div className="flex gap-1 p-0.5 bg-white/5 rounded-lg border border-border">
               {(['USD', 'THB'] as const).map(cur => (
                 <button
                   key={cur}
@@ -543,7 +543,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0.00"
-              className="w-full px-4 py-4 bg-white/5 border border-white/10 rounded-2xl text-white text-sm font-medium placeholder-gray-600 focus:outline-none focus:border-[#ADC6FF]/50 transition-colors pr-12"
+              className="w-full px-4 py-4 bg-white/5 border border-border rounded-2xl text-white text-sm font-medium placeholder-gray-600 focus:outline-none focus:border-[#ADC6FF]/50 transition-colors pr-12"
               required
             />
             <span className={cn(
@@ -677,15 +677,15 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
               <select
                 value={selectedBucketId}
                 onChange={(e) => setSelectedBucketId(e.target.value)}
-                className="w-full px-4 py-4 bg-white/5 border border-white/10 rounded-2xl text-white text-sm font-medium appearance-none focus:outline-none focus:border-[#ADC6FF]/50 transition-colors"
+                className="w-full px-4 py-4 bg-white/5 border border-border rounded-2xl text-white text-sm font-medium appearance-none focus:outline-none focus:border-[#ADC6FF]/50 transition-colors"
               >
                 {type === "INCOME" || type === "DEPOSIT" ? (
                   <>
-                    <option value="<auto-distribute>" className="bg-[#1C1B1B]">
+                    <option value="<auto-distribute>" className="bg-surface">
                       ⚡ Auto-distribute (Target Plan)
                     </option>
                     {moneyBuckets.map(bucket => (
-                      <option key={bucket.id} value={bucket.id} className="bg-[#1C1B1B]">
+                      <option key={bucket.id} value={bucket.id} className="bg-surface">
                         {bucket.icon} {t(bucket.name) || bucket.name} ({formatMoney(bucket.currentAmount / (exchangeRates[bucket.currency || 'USD'] || 1), bucket.currency as any, undefined, bucket.currentAmount)})
                       </option>
                     ))}
@@ -693,11 +693,11 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
                 ) : (
                   <>
                     {moneyBuckets.map(bucket => (
-                      <option key={bucket.id} value={bucket.id} className="bg-[#1C1B1B]">
+                      <option key={bucket.id} value={bucket.id} className="bg-surface">
                         {bucket.icon} {t(bucket.name) || bucket.name} ({formatMoney(bucket.currentAmount / (exchangeRates[bucket.currency || 'USD'] || 1), bucket.currency as any, undefined, bucket.currentAmount)})
                       </option>
                     ))}
-                    <option value="<no-bucket>" className="bg-[#1C1B1B]">
+                    <option value="<no-bucket>" className="bg-surface">
                       {t("none") || "None (General Cashflow)"}
                     </option>
                   </>
@@ -719,7 +719,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="w-full px-4 py-4 bg-white/5 border border-white/10 rounded-2xl text-white text-sm font-medium placeholder-gray-600 focus:outline-none focus:border-[#ADC6FF]/50 transition-colors"
+            className="w-full px-4 py-4 bg-white/5 border border-border rounded-2xl text-white text-sm font-medium placeholder-gray-600 focus:outline-none focus:border-[#ADC6FF]/50 transition-colors"
             required
           />
         </div>

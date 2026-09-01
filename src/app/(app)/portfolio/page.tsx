@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { Wallet, ArrowUpRight, ArrowDownRight, Filter, Upload, Download, Plus, X, ZoomIn, Trash2, TrendingUp, PieChart, ChevronDown, AlertCircle, EyeOff } from "lucide-react";
+import { Wallet, ArrowUpRight, ArrowDownRight, Filter, Upload, Download, Plus, X, ZoomIn, Trash2, TrendingUp, PieChart, ChevronDown, AlertCircle, EyeOff, Edit3, MinusCircle, PlusCircle, CheckCircle2, Info } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence, Reorder } from "motion/react";
 import { useApp, Asset } from "@/src/context/AppContext";
@@ -40,7 +40,7 @@ const AssetLogo = ({ symbol, name, className }: { symbol: string; name: string; 
 
   if (imgError) {
     return (
-      <div className={cn("w-full h-full flex items-center justify-center bg-[#1C1B1B] text-[#ADC6FF] font-black rounded-lg overflow-hidden text-xs", className)}>
+      <div className={cn("w-full h-full flex items-center justify-center bg-surface text-[#ADC6FF] font-black rounded-lg overflow-hidden text-xs", className)}>
         {symbol.slice(0, 3).toUpperCase()}
       </div>
     );
@@ -91,7 +91,7 @@ function AssetTradePanel({ asset, onClose }: { asset: Asset, onClose: () => void
   };
 
   return (
-    <div className="bg-[#1C1B1B] p-5 rounded-2xl border border-white/5 space-y-4">
+    <div className="bg-surface p-5 rounded-2xl border border-border space-y-4">
        <div className="flex bg-white/5 rounded-xl p-1 gap-1">
          <button onClick={() => setTradeType("BUY")} className={cn("flex-1 py-2 text-xs font-bold rounded-lg transition-all", tradeType === "BUY" ? "bg-[#4EDEA3] text-[#00285d]" : "text-gray-400 hover:text-white")}>{t("buy") || "BUY"}</button>
          <button onClick={() => setTradeType("SELL")} className={cn("flex-1 py-2 text-xs font-bold rounded-lg transition-all", tradeType === "SELL" ? "bg-[#FFB4AB] text-[#5d0000]" : "text-gray-400 hover:text-white")}>{t("sell") || "SELL"}</button>
@@ -100,19 +100,19 @@ function AssetTradePanel({ asset, onClose }: { asset: Asset, onClose: () => void
           <div className="grid grid-cols-2 gap-3">
              <div>
                <label className="text-[10px] font-bold text-gray-500 uppercase">{t("shares") || "SHARES"}</label>
-               <input type="number" step="any" required value={shares} onChange={e => setShares(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-[#ADC6FF] focus:outline-none mt-1" />
+               <input type="number" step="any" required value={shares} onChange={e => setShares(e.target.value)} className="w-full bg-white/5 border border-border rounded-xl px-3 py-2 text-sm text-white focus:border-[#ADC6FF] focus:outline-none mt-1" />
              </div>
              <div>
                <label className="text-[10px] font-bold text-gray-500 uppercase">{t("pricePerUnit") || "PRICE"}</label>
                <div className="relative mt-1">
-                 <input type="number" step="any" required value={price} onChange={e => setPrice(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-[#ADC6FF] focus:outline-none pr-10" />
+                 <input type="number" step="any" required value={price} onChange={e => setPrice(e.target.value)} className="w-full bg-white/5 border border-border rounded-xl px-3 py-2 text-sm text-white focus:border-[#ADC6FF] focus:outline-none pr-10" />
                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#ADC6FF] font-bold text-[10px] uppercase opacity-80">USD</span>
                </div>
              </div>
           </div>
           <div>
             <label className="text-[10px] font-bold text-gray-500 uppercase">{t("date") || "DATE"}</label>
-            <input type="date" required value={date} onChange={e => setDate(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-[#ADC6FF] focus:outline-none mt-1" />
+            <input type="date" required value={date} onChange={e => setDate(e.target.value)} className="w-full bg-white/5 border border-border rounded-xl px-3 py-2 text-sm text-white focus:border-[#ADC6FF] focus:outline-none mt-1" />
           </div>
           <button type="submit" className={cn("w-full py-3 rounded-xl font-black text-sm uppercase tracking-tight transition-all", tradeType === "BUY" ? "bg-[#4EDEA3] text-[#00285d] hover:brightness-110" : "bg-[#FFB4AB] text-[#5d0000] hover:brightness-110")}>
             {tradeType === "BUY" ? (t("buy") || "Buy") : (t("sell") || "Sell")} {asset.symbol}
@@ -191,7 +191,7 @@ function AssetDetailModal({ asset, isOpen, onClose, initialPeriod = "1m" }: Asse
         <div className="space-y-4">
           {/* Live Price and Avg Cost */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="bg-[#1C1B1B] p-4 rounded-2xl border border-white/5 flex flex-col justify-between">
+            <div className="bg-surface p-4 rounded-2xl border border-border flex flex-col justify-between">
               <p className="text-xs text-gray-500 font-bold uppercase tracking-wide mb-1">{t("livePrice")}</p>
               <div>
                 <div className="flex items-baseline gap-2">
@@ -214,7 +214,7 @@ function AssetDetailModal({ asset, isOpen, onClose, initialPeriod = "1m" }: Asse
                 )}
               </div>
             </div>
-            <div className="bg-[#1C1B1B] p-4 rounded-2xl border border-white/5 flex flex-col justify-between">
+            <div className="bg-surface p-4 rounded-2xl border border-border flex flex-col justify-between">
               <p className="text-xs text-gray-500 font-bold uppercase tracking-wide mb-1">{t("avgCost")}</p>
               <div>
                 <p className="text-2xl font-bold text-white">
@@ -241,7 +241,7 @@ function AssetDetailModal({ asset, isOpen, onClose, initialPeriod = "1m" }: Asse
                 <p className="text-sm font-bold text-white">{t("performanceTitle")}</p>
                 <Link
                   href={`/portfolio/${asset.symbol}?period=${selectedPeriod}`}
-                  className="p-1.5 bg-white/5 border border-white/10 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all"
+                  className="p-1.5 bg-white/5 border border-border rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all"
                   title={t("zoomChart") || "Zoom chart"}
                 >
                   <ZoomIn size={14} />
@@ -297,7 +297,7 @@ function AssetDetailModal({ asset, isOpen, onClose, initialPeriod = "1m" }: Asse
           </div>
 
           {/* Enhanced P/L Details */}
-          <div className="bg-[#1C1B1B] p-5 rounded-2xl border border-white/5 space-y-4">
+          <div className="bg-surface p-5 rounded-2xl border border-border space-y-4">
              <div className="flex justify-between items-center">
                <div className="flex items-center gap-2">
                  <div className="w-2 h-2 rounded-full bg-[#4EDEA3]" />
@@ -316,7 +316,7 @@ function AssetDetailModal({ asset, isOpen, onClose, initialPeriod = "1m" }: Asse
                  {formatPnL(asset.realizedPL || 0, formatMoney)}
                </span>
              </div>
-             <div className="flex justify-between items-center pt-2 border-t border-white/5">
+             <div className="flex justify-between items-center pt-2 border-t border-border">
                <span className="text-xs font-medium text-gray-400">{t("totalReturn")}</span>
                <span className="text-sm font-black text-white">
                  {formatMoney((asset.valueUSD - (asset.avgCost || 0) * (asset.shares || 0)) + (asset.realizedPL || 0) + (asset.dividendTotal || 0))}
@@ -605,7 +605,7 @@ export default function PortfolioPage() {
               "px-4 py-2.5 sm:py-3 rounded-full font-black text-xs tracking-tight flex items-center gap-2 transition-all border",
               isReorderMode
                 ? "bg-[#E9C349] text-[#00285d] border-[#E9C349]"
-                : "bg-white/5 border-white/10 text-gray-400 hover:text-white"
+                : "bg-white/5 border-border text-gray-400 hover:text-white"
             )}
           >
             <GripVertical size={14} />
@@ -620,7 +620,7 @@ export default function PortfolioPage() {
                 "p-2.5 sm:p-3 border rounded-xl transition-all flex-shrink-0 flex items-center gap-1.5",
                 activeFilter !== 'all'
                   ? "bg-[#ADC6FF]/10 border-[#ADC6FF]/30 text-[#ADC6FF]"
-                  : "bg-white/5 border-white/10 text-gray-400 hover:text-white"
+                  : "bg-white/5 border-border text-gray-400 hover:text-white"
               )}
             >
               <Filter size={16} />
@@ -641,7 +641,7 @@ export default function PortfolioPage() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 8, scale: 0.95 }}
                   transition={{ duration: 0.15 }}
-                  className="absolute right-0 top-full mt-2 w-52 bg-[#1C1B1B] border border-white/10 rounded-2xl overflow-hidden shadow-2xl z-30"
+                  className="absolute right-0 top-full mt-2 w-52 bg-surface border border-border rounded-2xl overflow-hidden shadow-2xl z-30"
                 >
                   <div className="p-1">
                     <button
@@ -688,7 +688,7 @@ export default function PortfolioPage() {
                       >{t(f.label)}</button>
                     ))}
                   </div>
-                  <div className="px-3 py-1.5 border-t border-white/5 mt-1">
+                  <div className="px-3 py-1.5 border-t border-border mt-1">
                     <button
                       onClick={() => { setShowSoldAssets(!showSoldAssets); setShowFilterDropdown(false); }}
                       className={cn("w-full px-3 py-2.5 text-left text-xs font-bold rounded-xl transition-colors flex items-center justify-between",
@@ -707,7 +707,7 @@ export default function PortfolioPage() {
           {/* Import CSV */}
           <button
             onClick={() => setIsImportCSVOpen(true)}
-            className="p-2.5 sm:p-3 bg-white/5 border border-white/10 rounded-xl text-gray-400 hover:text-white transition-all flex-shrink-0 flex items-center gap-1.5"
+            className="p-2.5 sm:p-3 bg-white/5 border border-border rounded-xl text-gray-400 hover:text-white transition-all flex-shrink-0 flex items-center gap-1.5"
             title={t("importCsvPortfolio")}
           >
             <Upload size={16} />
@@ -717,7 +717,7 @@ export default function PortfolioPage() {
           {/* Export CSV */}
           <button
             onClick={handleExportCSV}
-            className="p-2.5 sm:p-3 bg-white/5 border border-white/10 rounded-xl text-gray-400 hover:text-white transition-all flex-shrink-0 flex items-center gap-1.5"
+            className="p-2.5 sm:p-3 bg-white/5 border border-border rounded-xl text-gray-400 hover:text-white transition-all flex-shrink-0 flex items-center gap-1.5"
             title={t("exportCsvPortfolio")}
           >
             <Download size={16} />
@@ -730,7 +730,7 @@ export default function PortfolioPage() {
         {/* Enhanced Summary Stats */}
         <div className="lg:col-span-1 space-y-4">
           {/* Portfolio Value Hero */}
-          <div className="bg-gradient-to-br from-[#1C1B1B] to-[#0E0E0E] p-4 sm:p-6 rounded-2xl sm:rounded-[1.5rem] border border-white/5 shadow-xl relative overflow-hidden">
+          <div className="bg-gradient-to-br from-[#1C1B1B] to-[#0E0E0E] p-4 sm:p-6 rounded-2xl sm:rounded-[1.5rem] border border-border shadow-xl relative overflow-hidden">
             <div className="absolute -right-4 -top-4 w-24 h-24 bg-[#ADC6FF]/10 blur-3xl rounded-full" />
             <span className="text-xs font-bold text-[#ADC6FF] uppercase tracking-wide block mb-3">{t("portfolioValue")}</span>
             <div className="text-2xl sm:text-3xl font-black text-white mb-2">{formatMoney(totalValue)}</div>
@@ -753,32 +753,32 @@ export default function PortfolioPage() {
 
           {/* P/L Summary Cards */}
           <div className="grid grid-cols-2 gap-3">
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-[#1C1B1B] p-3 sm:p-4 rounded-2xl border border-white/5">
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-surface p-3 sm:p-4 rounded-2xl border border-border">
               <p className="text-[9px] sm:text-[10px] font-black text-[#ADC6FF] uppercase tracking-wide mb-1">{t("totalInvested")}</p>
               <h3 className="text-sm sm:text-lg font-black text-white tracking-tighter">{formatMoney(totalInvested)}</h3>
             </motion.div>
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="bg-[#1C1B1B] p-3 sm:p-4 rounded-2xl border border-white/5">
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="bg-surface p-3 sm:p-4 rounded-2xl border border-border">
               <p className="text-[9px] sm:text-[10px] font-black text-gray-500 uppercase tracking-wide mb-1">{t("unrealizedPL")}</p>
               <h3 className={cn("text-sm sm:text-lg font-black tracking-tighter", getPnLColor(totalUnrealizedPL))}>
                 {formatPnL(totalUnrealizedPL, formatMoney)}
               </h3>
               <p className="text-[8px] text-gray-600 mt-1">กำไร/ขาดทุนที่ยังไม่ขาย (ถืออยู่)</p>
             </motion.div>
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-[#1C1B1B] p-3 sm:p-4 rounded-2xl border border-white/5">
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-surface p-3 sm:p-4 rounded-2xl border border-border">
               <p className="text-[9px] sm:text-[10px] font-black text-gray-500 uppercase tracking-wide mb-1">{t("realizedPL")}</p>
               <h3 className={cn("text-sm sm:text-lg font-black tracking-tighter", getPnLColor(totalRealizedPL))}>
                 {formatPnL(totalRealizedPL, formatMoney)}
               </h3>
               <p className="text-[8px] text-gray-600 mt-1">กำไร/ขาดทุนที่ขายไปแล้ว (จาก SELL trades)</p>
             </motion.div>
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="bg-[#1C1B1B] p-3 sm:p-4 rounded-2xl border border-white/5">
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="bg-surface p-3 sm:p-4 rounded-2xl border border-border">
               <p className="text-[9px] sm:text-[10px] font-black text-[#E9C349] uppercase tracking-wide mb-1">{t("dividends")}</p>
               <h3 className="text-sm sm:text-lg font-black text-white tracking-tighter">{formatMoney(totalDividends)}</h3>
             </motion.div>
           </div>
 
           {/* Allocation Donut Chart */}
-          <div className="bg-[#1C1B1B] p-4 sm:p-6 rounded-2xl sm:rounded-[1.5rem] border border-white/5">
+          <div className="bg-surface p-4 sm:p-6 rounded-2xl sm:rounded-[1.5rem] border border-border">
             <h3 className="text-xs font-bold text-white mb-4 flex items-center gap-2">
               <PieChart size={12} className="text-[#ADC6FF]" />
               {t("assetAllocation")}
@@ -790,7 +790,7 @@ export default function PortfolioPage() {
                   const visibleSegs = allocationSegments.filter(s => s.pct > 0);
                   if (visibleSegs.length === 0) return <circle cx={C} cy={C} r={R} fill="#2A2A2A" />;
                   if (visibleSegs.length === 1) {
-                    return <circle cx={C} cy={C} r={R} fill={visibleSegs[0].color} stroke="#0E0E0E" strokeWidth={1} />;
+                    return <circle cx={C} cy={C} r={R} fill={visibleSegs[0].color} stroke="#0f1115" strokeWidth={1} />;
                   }
                   // Normalize visual pcts: give each non-zero seg at least 5% visually
                   const MIN_V = 5;
@@ -816,13 +816,13 @@ export default function PortfolioPage() {
                         key={i}
                         d={`M ${C.toFixed(1)} ${C.toFixed(1)} L ${x1.toFixed(1)} ${y1.toFixed(1)} A ${R.toFixed(1)} ${R.toFixed(1)} 0 ${largeArc} 1 ${x2.toFixed(1)} ${y2.toFixed(1)} Z`}
                         fill={seg.color}
-                        stroke="#0E0E0E"
+                        stroke="#0f1115"
                         strokeWidth={1}
                       />
                     );
                   });
                 })()}
-                <circle cx={50} cy={50} r={22} fill="#1C1B1B" />
+                <circle cx={50} cy={50} r={22} fill="rgba(255,255,255,0.03)" />
                 <text x={50} y={50} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize="12" fontWeight="bold">
                   {assets.length}
                 </text>
@@ -843,11 +843,11 @@ export default function PortfolioPage() {
             </div>
           </div>
 
-          {/* ─── Dynamic Trading Asset Allocation ──────────────────────── */}
-          <TerminalAllocation />
+          {/* ─── Target Allocation & Rebalance ──────────────────────── */}
+          <RebalanceTools />
 
           {/* Risk Allocation */}
-          <div className="bg-[#1C1B1B] p-4 sm:p-6 rounded-2xl sm:rounded-[1.5rem] border border-white/5">
+          <div className="bg-surface p-4 sm:p-6 rounded-2xl sm:rounded-[1.5rem] border border-border">
             <h3 className="text-xs font-bold text-white mb-4">{t("allocationByRisk")}</h3>
             <div className="space-y-3">
               <RiskItem label={t("highRisk")} value={riskDist.high} color="#FFB4AB" />
@@ -857,7 +857,7 @@ export default function PortfolioPage() {
           </div>
 
           {/* Portfolio Warnings + Position Sizing */}
-          <div className="bg-[#1C1B1B] p-4 sm:p-6 rounded-2xl sm:rounded-[1.5rem] border border-white/5">
+          <div className="bg-surface p-4 sm:p-6 rounded-2xl sm:rounded-[1.5rem] border border-border">
             <h3 className="text-xs font-bold text-white mb-4 flex items-center gap-2">
               <AlertCircle size={12} className="text-[#FFB4AB]" />
               {t("portfolioWarnings") || "Risk Alerts"}
@@ -916,7 +916,7 @@ export default function PortfolioPage() {
             const avgCost = a.avgCost || livePrice;
             return shares > 0 && avgCost > 0 && livePrice < avgCost;
           }) && (
-            <div className="bg-[#1C1B1B] p-4 sm:p-6 rounded-2xl sm:rounded-[1.5rem] border border-white/5">
+            <div className="bg-surface p-4 sm:p-6 rounded-2xl sm:rounded-[1.5rem] border border-border">
               <h3 className="text-xs font-bold text-white mb-1 flex items-center gap-2">
                 <TrendingUp size={12} className="text-[#ADC6FF]" />
                 DCA Opportunities
@@ -938,7 +938,7 @@ export default function PortfolioPage() {
                   const dcaShares = shares;
                   const newAvg = ((avgCost * shares) + (livePrice * dcaShares)) / (shares + dcaShares);
                   return (
-                    <div key={a.symbol} className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
+                    <div key={a.symbol} className="p-3 rounded-xl bg-white/[0.02] border border-border">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-black text-white">{a.symbol}</span>
@@ -978,10 +978,10 @@ export default function PortfolioPage() {
 
         {/* Assets Table */}
         <div className="lg:col-span-2">
-          <div className="bg-[#1C1B1B] rounded-2xl sm:rounded-[1.5rem] border border-white/5 shadow-xl overflow-x-auto">
+          <div className="bg-surface rounded-2xl sm:rounded-[1.5rem] border border-border shadow-xl overflow-x-auto">
             <table className="w-full text-left table-fixed min-w-[500px] sm:min-w-[800px]">
               <thead>
-                <tr className="text-[10px] sm:text-xs font-black uppercase tracking-wide text-gray-500 border-b border-white/5 whitespace-nowrap">
+                <tr className="text-[10px] sm:text-xs font-black uppercase tracking-wide text-gray-500 border-b border-border whitespace-nowrap">
                   <th className="pl-4 sm:pl-8 pr-2 sm:pr-3 py-3 sm:py-4 w-[35%] sm:w-[25%]">{t("asset")}</th>
                   <th className="px-2 sm:px-3 py-3 sm:py-4 w-[30%] sm:w-[20%] text-left">{t("marketPriceAndCost")}</th>
                   <th className="px-2 sm:px-3 py-3 sm:py-4 w-[14%] hidden sm:table-cell">{t("holdings")}</th>
@@ -1030,7 +1030,7 @@ export default function PortfolioPage() {
                               <GripVertical size={14} />
                             </div>
                           )}
-                          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white/5 flex items-center justify-center text-xs font-black text-[#ADC6FF] relative overflow-hidden group border border-white/5 shadow-xl flex-shrink-0">
+                          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white/5 flex items-center justify-center text-xs font-black text-[#ADC6FF] relative overflow-hidden group border border-border shadow-xl flex-shrink-0">
                             <AssetLogo symbol={asset.symbol} name={asset.name} />
                           </div>
                           <div className="min-w-0">
@@ -1147,7 +1147,7 @@ export default function PortfolioPage() {
                                 <Trash2 size={14} />
                               </button>
                               <div className="absolute right-0 top-full mt-1 opacity-0 pointer-events-none transition-opacity duration-150 z-50">
-                                <div className="bg-[#1C1B1B] border border-[#FFB4AB]/30 rounded-xl shadow-xl overflow-hidden">
+                                <div className="bg-surface border border-[#FFB4AB]/30 rounded-xl shadow-xl overflow-hidden">
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -1219,9 +1219,9 @@ export default function PortfolioPage() {
       {/* CSV Import Modal */}
       <Modal isOpen={isImportCSVOpen} onClose={() => { setIsImportCSVOpen(false); setCsvImportStatus({ type: 'idle', message: '' }); }} title={t("importCsvPortfolio")}>
         <div className="space-y-6">
-          <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
+          <div className="p-4 bg-white/5 rounded-2xl border border-border">
             <p className="text-xs text-gray-400 font-medium mb-3">{t("csvImportInstructions")}</p>
-            <div className="bg-[#0E0E0E] p-3 rounded-xl font-mono text-[11px] text-gray-500 leading-relaxed">
+            <div className="bg-background p-3 rounded-xl font-mono text-[11px] text-gray-500 leading-relaxed">
               symbol,shares,avgCost<br/>
               AAPL,10,150.00<br/>
               BTC,0.5,42000.00<br/>
@@ -1229,7 +1229,7 @@ export default function PortfolioPage() {
             </div>
           </div>
 
-          <label className="flex flex-col items-center justify-center gap-3 py-8 border-2 border-dashed border-white/10 rounded-2xl cursor-pointer hover:border-[#ADC6FF]/30 hover:bg-white/5 transition-all group">
+          <label className="flex flex-col items-center justify-center gap-3 py-8 border-2 border-dashed border-border rounded-2xl cursor-pointer hover:border-[#ADC6FF]/30 hover:bg-white/5 transition-all group">
             <Upload size={28} className="text-gray-600 group-hover:text-[#ADC6FF] transition-colors" />
             <span className="text-sm font-bold text-gray-500 group-hover:text-white transition-colors">
               {t("selectFile")}
@@ -1254,7 +1254,7 @@ export default function PortfolioPage() {
 
           <button
             onClick={() => { setIsImportCSVOpen(false); setCsvImportStatus({ type: 'idle', message: '' }); }}
-            className="w-full py-4 bg-white/5 border border-white/10 text-white rounded-full font-black text-sm uppercase tracking-tight hover:bg-white/10 transition-all"
+            className="w-full py-4 bg-white/5 border border-border text-white rounded-full font-black text-sm uppercase tracking-tight hover:bg-white/10 transition-all"
           >
             {t("close")}
           </button>
@@ -1280,183 +1280,344 @@ function RiskItem({ label, value, color }: { label: string, value: number, color
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// TERMINAL ALLOCATION — Dynamic Pie Chart (Auto-calculated)
+// TARGET ALLOCATION & REBALANCE TOOLS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const TERMINAL_CATEGORIES = [
-  { key: 'Gold', label: 'Gold', labelTh: 'ทองคำ', color: '#E9C349', icon: '🥇' },
-  { key: 'USA Stock', label: 'USA Stock', labelTh: 'หุ้นอเมริกา', color: '#4D8EFF', icon: '🇺🇸' },
-  { key: 'Thai Stock', label: 'Thai Stock', labelTh: 'หุ้นไทย', color: '#FF6B6B', icon: '🇹🇭' },
-  { key: 'Crypto', label: 'Crypto', labelTh: 'คริปโต', color: '#4EDEA3', icon: '₿' },
-  { key: 'Cash', label: 'Cash', labelTh: 'เงินสด', color: '#A78BFA', icon: '💵' },
-] as const;
+function AllocationItem({ label, value, color }: { label: string, value: number, color: string }) {
+  return (
+    <div>
+      <div className="flex justify-between text-[10px] sm:text-xs font-black uppercase tracking-wide text-gray-500 mb-1.5">
+        <span>{label}</span>
+        <span>{value}%</span>
+      </div>
+      <div className="h-1.5 sm:h-2 bg-white/5 rounded-full overflow-hidden">
+        <div className="h-full rounded-full" style={{ width: `${value}%`, backgroundColor: color }} />
+      </div>
+    </div>
+  );
+}
 
-type CategoryKey = typeof TERMINAL_CATEGORIES[number]['key'];
+function DriftRow({ label, current, target, delta, type, color }: any) {
+  return (
+    <tr className="border-b border-white/5 group hover:bg-white/5 transition-colors">
+      <td className="px-3 sm:px-6 py-2.5 sm:py-4">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="w-2 sm:w-2.5 h-2 sm:h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+          <span className="text-xs sm:text-sm font-bold text-white whitespace-nowrap">{label}</span>
+        </div>
+      </td>
+      <td className="px-3 sm:px-6 py-2.5 sm:py-4 text-xs sm:text-sm font-bold text-gray-300 whitespace-nowrap">{current}</td>
+      <td className="px-3 sm:px-6 py-2.5 sm:py-4 text-xs sm:text-sm font-bold text-gray-400 whitespace-nowrap">{target}</td>
+      <td className="px-3 sm:px-6 py-2.5 sm:py-4 text-right whitespace-nowrap">
+        <span className={cn(
+          "inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-black tracking-wide",
+          type === "positive" 
+            ? "bg-[#4EDEA3]/10 text-[#4EDEA3]" 
+            : "bg-[#FFB4AB]/10 text-[#FFB4AB]"
+        )}>
+          {delta}
+        </span>
+      </td>
+    </tr>
+  );
+}
 
-function TerminalAllocation() {
-  const { language, assets, formatMoney } = useApp();
-  const isTh = language === 'th';
+function TradeCard({ type, asset, desc, icon: Icon, color }: any) {
+  return (
+    <div className="bg-surface p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-white/5 flex items-start gap-3 sm:gap-4 hover:border-white/20 transition-all cursor-default">
+      <div className="p-2 sm:p-2.5 rounded-xl bg-background border border-white/5 flex-shrink-0">
+        <Icon size={16} color={color} className="sm:w-5 sm:h-5" />
+      </div>
+      <div>
+        <div className="flex items-center gap-2 mb-0.5 sm:mb-1">
+          <span className="text-[10px] sm:text-xs font-black px-2 py-0.5 rounded-md uppercase tracking-wider" 
+                style={{ backgroundColor: `${color}15`, color }}>
+            {type}
+          </span>
+          <span className="text-sm sm:text-base font-bold text-white">{asset}</span>
+        </div>
+        <p className="text-[10px] sm:text-xs text-gray-500 font-medium leading-relaxed">{desc}</p>
+      </div>
+    </div>
+  );
+}
 
-  const categoryValues = useMemo(() => {
-    const values: Record<CategoryKey, number> = { Gold: 0, 'USA Stock': 0, 'Thai Stock': 0, Crypto: 0, Cash: 0 };
+function RebalanceTools() {
+  const { t, formatMoney, currency, exchangeRates, bulkAddTrades, allocations, updateAllocation, assets, addToast, addNotification } = useApp();
+  const [isAllocEditOpen, setIsAllocEditOpen] = useState(false);
+  const [editAllocValues, setEditAllocValues] = useState<Record<string, number>>({});
 
-    // Crypto: match exact OR prefix+dash/slash (e.g. BTC-USD, ETH/USDT)
-    const CRYPTO_PREFIXES = ['BTC', 'ETH', 'SOL', 'USDT', 'DOGE', 'XRP', 'ADA', 'MATIC', 'AVAX', 'LINK', 'DOT', 'LTC', 'BCH', 'UNI', 'ATOM', 'FIL', 'NEAR', 'ALGO', 'XLM', 'ICP', 'VET', 'SAND', 'MANA', 'AXS', 'THETA', 'BNB', 'TRX', 'TON', 'SHIB', 'APT', 'ARB', 'OP', 'SUI', 'SEI'];
-    const isCryptoSymbol = (sym: string) => CRYPTO_PREFIXES.some(p => sym === p || sym.startsWith(p + '-') || sym.startsWith(p + '/'));
+  const assetClassKeyMap: Record<string, string> = {
+    Equities: "equities",
+    "Fixed Income": "fixedIncome",
+    Alternatives: "alternatives",
+    Cash: "cash",
+  };
+  const translateLabel = (label: string) => {
+    const key = assetClassKeyMap[label];
+    return key ? t(key) : label;
+  };
 
-    // Gold: exact tickers + keyword patterns + XAU pairs
-    // US: GLD, IAU, SGOL, GC=F, GOLD (Barrick classified as USA Stock, keyword 'GOLD' ETFs = gold)
-    // Thai gold ETFs on SET (BK): TGOLDETF, TGOLD, KTAM-GOLD
-    // London ECTs (.L): SGLN, PHGP, IGLN, RMAU, BULG, GLTR
-    const GOLD_EXACT = new Set(['GC=F', 'GLD', 'IAU', 'SGOL', 'XAUUSD', 'XAU/USD', 'XAUUSDT',
-      // Thai gold price symbol (MTS Gold / TradingView)
-      'GLD965', 'GLD9999', 'XAUTHB',
-      // Physical gold bars (manual assets)
-      'GOLDBAR', 'GOLDBAR.TH', 'GOLDBAR.UK', 'GOLDBAR.US', 'THGOLD', 'PHYSGOLD',
-      // Thai SET gold ETFs
-      'TGOLDETF', 'TGOLDETF.BK', 'TGOLD', 'TGOLD.BK', 'KTAM-GOLD', 'KTAM-GOLD.BK',
-      'SCBGOLD', 'SCBGOLD.BK', 'GOLDMUL', 'GOLDMUL.BK', '1AMJPNK-T', 'T-GOLDPVD', 'T-GOLDPVD.BK',
-      // London gold ETCs
-      'SGLN.L', 'PHGP.L', 'IGLN.L', 'RMAU.L', 'BULG.L', 'GLTR.L', 'VZLD.L', '3GOL.L',
-      // Generic
-      'XAU', 'PAXG', 'XAUT',
-    ]);
-    const isGoldSymbol = (sym: string) =>
-      GOLD_EXACT.has(sym) ||
-      sym.startsWith('XAU') ||          // XAU/USD, XAUUSD, XAUUSDT …
-      sym.includes('GOLD') ||           // TGOLDETF, KTAM-GOLD, SCBGOLD …
-      sym.includes('BULLION') ||
-      (sym.endsWith('.L') && ['SGLN', 'PHGP', 'IGLN', 'RMAU', 'BULG', 'GLTR'].some(g => sym.startsWith(g)));
+  const totalPortfolioUSD = useMemo(() => assets.reduce((acc, curr) => acc + curr.valueUSD, 0), [assets]);
 
-    assets.forEach(asset => {
-      const sym = asset.symbol.toUpperCase();
-      const alloc = asset.allocation || '';
-      const val = asset.valueUSD;
+  const driftData = useMemo(() => {
+    return allocations.map(item => {
+      const categoryAssets = assets.filter(a => (a.allocation || "Other") === item.label);
+      const categoryUSD = categoryAssets.reduce((acc, a) => acc + a.valueUSD, 0);
+      const currentPct = totalPortfolioUSD > 0 ? (categoryUSD / totalPortfolioUSD) * 100 : 0;
+      const targetPct = item.value;
+      const delta = currentPct - targetPct;
+      
+      return {
+        ...item,
+        currentPct,
+        targetPct,
+        delta,
+        categoryUSD,
+        targetUSD: totalPortfolioUSD * (targetPct / 100),
+        assets: categoryAssets
+      };
+    });
+  }, [allocations, assets, totalPortfolioUSD]);
 
-      if (alloc === 'Cash' || sym === 'USD' || sym === 'THB' || sym === 'EUR') {
-        values['Cash'] += val;
-      } else if (isGoldSymbol(sym) || alloc === 'Gold') {
-        // Gold check before Thai Stock so TGOLDETF.BK → Gold, not Thai Stock
-        values['Gold'] += val;
-      } else if (sym.endsWith('.BK') || sym.endsWith('.TH') || alloc === 'Thai Stock') {
-        values['Thai Stock'] += val;
-      } else if (sym.endsWith('.L') || alloc === 'UK Stock') {
-        // London-listed non-gold ETFs/stocks → USA Stock bucket (or extend categories later)
-        values['USA Stock'] += val;
-      } else if (isCryptoSymbol(sym) || alloc === 'Crypto' || alloc === 'Alternatives') {
-        values['Crypto'] += val;
-      } else {
-        values['USA Stock'] += val;
+  const { suggestedTrades, totalImpact } = useMemo(() => {
+    const trades: any[] = [];
+    let impact = 0;
+
+    driftData.forEach(d => {
+      // Suggest trades if drift is > 2% absolute
+      if (Math.abs(d.delta) > 2) {
+        const diffUSD = Math.abs(d.categoryUSD - d.targetUSD);
+        impact += diffUSD;
+        
+        let assetName = d.label;
+        if (d.assets.length > 0) {
+          const largestAsset = [...d.assets].sort((a,b) => b.valueUSD - a.valueUSD)[0];
+          assetName = largestAsset.symbol;
+        }
+
+        trades.push({
+           id: d.label,
+           rawType: d.delta > 0 ? "SELL" : "BUY",
+           type: d.delta > 0 ? t("sell") : t("buy"),
+           asset: assetName,
+           diffUSD: diffUSD,
+           desc: d.delta > 0 ? t("reduceOverExposure") : t("increaseAllocation"),
+           icon: d.delta > 0 ? MinusCircle : PlusCircle,
+           color: d.delta > 0 ? "#FFB4AB" : "#4EDEA3"
+        });
       }
     });
-    return values;
-  }, [assets]);
+    
+    return { suggestedTrades: trades, totalImpact: impact };
+  }, [driftData, t]);
 
-  const totalValue = useMemo(() =>
-    Object.values(categoryValues).reduce((s, v) => s + v, 0),
-    [categoryValues]
-  );
+  const executeAllSuggestedTrades = () => {
+    if (suggestedTrades.length === 0) return;
+    
+    const newTrades = suggestedTrades.map(trade => ({
+      asset: trade.asset.toUpperCase(),
+      type: trade.rawType as "BUY" | "SELL",
+      amountUSD: trade.diffUSD,
+      date: new Date().toISOString(),
+      rateAtTime: exchangeRates[currency] || 1,
+      currency: currency as any,
+    }));
 
-  const segments = useMemo(() =>
-    TERMINAL_CATEGORIES.map(cat => ({
-      ...cat,
-      value: categoryValues[cat.key],
-      pct: totalValue > 0 ? (categoryValues[cat.key] / totalValue) * 100 : 0,
-    })),
-    [categoryValues, totalValue]
-  );
+    bulkAddTrades(newTrades);
+    addToast(t("importSuccess") || "Trades executed successfully", 'success');
+    addNotification(
+      t("executeAll"),
+      `${suggestedTrades.length} ${t("tradesExecuted")} — ${formatMoney(totalImpact)}`,
+      'trade'
+    );
+  };
+
+  const currentTotalAlloc = Object.values(editAllocValues).reduce((a, b) => a + (b || 0), 0);
+  const isValid = Math.abs(currentTotalAlloc - 100) < 0.1;
 
   return (
-    <div className="bg-[#1C1B1B] p-4 sm:p-6 rounded-2xl sm:rounded-[1.5rem] border border-white/5">
-      <h3 className="text-xs font-bold text-white mb-4 flex items-center gap-2">
-        <PieChart size={12} className="text-[#A78BFA]" />
-        {isTh ? 'สัดส่วนพอร์ตการเทรด' : 'Trading Asset Allocation'}
-      </h3>
-
-      <div className="flex flex-col sm:flex-row items-center gap-6">
-        {/* Pie Chart */}
-        <div className="flex items-center justify-center relative w-32 h-32 flex-shrink-0">
-          <svg viewBox="0 0 100 100" className="w-full h-full">
-            {(() => {
-              const R = 40, C = 50;
-              if (totalValue === 0) {
-                return <circle cx={C} cy={C} r={R} fill="#2A2A2A" stroke="#333" strokeWidth={0.5} />;
-              }
-              const nonZeroSegs = segments.filter(s => s.pct > 0);
-              if (nonZeroSegs.length === 0) {
-                return <circle cx={C} cy={C} r={R} fill="#2A2A2A" stroke="#333" strokeWidth={0.5} />;
-              }
-              // Single segment — full circle
-              if (nonZeroSegs.length === 1) {
-                return <circle cx={C} cy={C} r={R} fill={nonZeroSegs[0].color} stroke="#0E0E0E" strokeWidth={1} />;
-              }
-              // Normalize visual pcts: give each non-zero seg at least 5% visually
-              const MIN_V = 5;
-              const remainder = 99.99 - nonZeroSegs.length * MIN_V;
-              const actualTotal = nonZeroSegs.reduce((s, seg) => s + seg.pct, 0) || 1;
-              let cumPct = 0;
-              return segments.map((seg, i) => {
-                if (seg.pct <= 0) return null;
-                const visualPct = MIN_V + (seg.pct / actualTotal) * remainder;
-                const startAngle = cumPct * 3.6;
-                cumPct += visualPct;
-                const endAngle = cumPct * 3.6;
-                const largeArc = visualPct > 50 ? 1 : 0;
-                const startRad = ((startAngle - 90) * Math.PI) / 180;
-                const endRad = ((endAngle - 90) * Math.PI) / 180;
-                const x1 = C + R * Math.cos(startRad);
-                const y1 = C + R * Math.sin(startRad);
-                const x2 = C + R * Math.cos(endRad);
-                const y2 = C + R * Math.sin(endRad);
-                return (
-                  <path
-                    key={i}
-                    d={`M ${C.toFixed(1)} ${C.toFixed(1)} L ${x1.toFixed(1)} ${y1.toFixed(1)} A ${R} ${R} 0 ${largeArc} 1 ${x2.toFixed(1)} ${y2.toFixed(1)} Z`}
-                    fill={seg.color}
-                    stroke="#0E0E0E"
-                    strokeWidth={1}
-                    className="transition-all duration-300 hover:opacity-80"
-                  />
-                );
-              });
-            })()}
-            <circle cx={50} cy={50} r={22} fill="#1C1B1B" />
-            <text x={50} y={48} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize="6.5" fontWeight="bold">
-              {totalValue > 0 ? formatMoney(totalValue) : '—'}
-            </text>
-            <text x={50} y={57} textAnchor="middle" fill="#6B7280" fontSize="4.5">
-              {isTh ? 'รวม' : 'TOTAL'}
-            </text>
-          </svg>
-        </div>
-
-        {/* Legend / Values */}
-        <div className="flex-1 w-full space-y-2">
-          {segments.map((seg) => (
-            <div key={seg.key} className="flex items-center justify-between p-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 rounded-full flex-shrink-0 shadow-sm" style={{ backgroundColor: seg.color }} />
-                <span className="text-xs text-gray-300 font-bold">
-                  {seg.icon} {isTh ? seg.labelTh : seg.label}
-                </span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-white font-mono font-bold">
-                  {formatMoney(seg.value)}
-                </span>
-                <span className="text-xs font-bold w-14 text-right" style={{ color: seg.pct > 0 ? seg.color : '#6B7280' }}>
-                  {seg.pct === 0 ? '—' : seg.pct < 0.1 ? '< 0.1%' : `${seg.pct.toFixed(1)}%`}
-                </span>
-              </div>
+    <>
+      {/* This component lives in the portfolio sidebar. Keeping its panels stacked
+          prevents the allocation table from collapsing into unreadable columns. */}
+      <div className="grid grid-cols-1 gap-4 sm:gap-6">
+        <section className="space-y-4 sm:space-y-6 min-w-0">
+          <div className="bg-surface p-4 sm:p-6 rounded-2xl sm:rounded-[1.5rem] border border-border">
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
+              <h3 className="text-xs sm:text-sm font-bold text-white">{t("targetAllocation")}</h3>
+              <Edit3 size={14} className="text-gray-500 cursor-pointer hover:text-white transition-colors" onClick={() => {
+                const vals: Record<string, number> = {};
+                allocations.forEach(a => { vals[a.label] = a.value; });
+                setEditAllocValues(vals);
+                setIsAllocEditOpen(true);
+              }} />
             </div>
-          ))}
-        </div>
+
+            <div className="space-y-2 sm:space-y-4">
+              {allocations.map(item => (
+                <AllocationItem key={item.label} label={translateLabel(item.label)} value={item.value} color={item.color} />
+              ))}
+            </div>
+
+            <div className="mt-4 sm:mt-8 p-3 sm:p-4 bg-white/5 rounded-xl sm:rounded-2xl border border-white/5">
+              <p className="text-xs sm:text-sm text-gray-400 leading-relaxed font-medium">
+                {t("optimalRebalancingMsg")}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section className="space-y-4 sm:space-y-6 min-w-0">
+          <div className="bg-surface rounded-2xl sm:rounded-[1.5rem] border border-border overflow-hidden">
+            <div className="p-4 sm:p-6 pb-2">
+              <h3 className="text-xs sm:text-sm font-bold text-white">{t("currentVsTarget")}</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[360px] text-left">
+                <thead>
+                  <tr className="text-[10px] sm:text-xs font-black uppercase tracking-wide text-gray-500 border-b border-border">
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 whitespace-nowrap">{t("assetClass")}</th>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 whitespace-nowrap">{t("current")}</th>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 whitespace-nowrap">{t("target")}</th>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-right whitespace-nowrap">{t("delta")}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {driftData.map(item => (
+                      <DriftRow 
+                        key={item.label}
+                        label={translateLabel(item.label)} 
+                        current={`${item.currentPct.toFixed(1)}%`} 
+                        target={`${Number(item.targetPct).toFixed(1)}%`} 
+                        delta={`${item.delta >= 0 ? '+' : ''}${item.delta.toFixed(1)}%`} 
+                        type={Math.abs(item.delta) > 2 ? "negative" : "positive"} 
+                        color={item.color} 
+                      />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-[10px] sm:text-xs font-black uppercase tracking-wide text-gray-500 mb-4 sm:mb-6">{t("suggestedTrades")}</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+              {suggestedTrades.length > 0 ? (
+                <>
+                  {suggestedTrades.map(trade => (
+                    <TradeCard
+                      key={trade.id}
+                      type={trade.type}
+                      asset={trade.asset}
+                      desc={`${trade.desc} ${formatMoney(trade.diffUSD)}`}
+                      icon={trade.icon}
+                      color={trade.color}
+                    />
+                  ))}
+
+                  <div className="bg-[#ADC6FF]/5 p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-[#ADC6FF]/20 flex flex-col justify-center">
+                    <div className="flex justify-between items-center mb-3 sm:mb-4">
+                      <span className="text-[10px] sm:text-xs font-black text-[#ADC6FF] uppercase tracking-wide">{t("totalImpact")}</span>
+                      <span className="text-lg sm:text-xl font-black text-white">{formatMoney(totalImpact)}</span>
+                    </div>
+                    <button
+                      onClick={executeAllSuggestedTrades}
+                      className="w-full py-2.5 sm:py-3 bg-[#ADC6FF] text-[#00285d] rounded-full font-black text-xs uppercase tracking-wide hover:brightness-110 transition-all active:scale-95"
+                    >
+                      {t("executeAll")}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="col-span-1 sm:col-span-2 py-8 sm:py-10 bg-surface rounded-2xl sm:rounded-[1.5rem] border border-border flex flex-col items-center justify-center text-center">
+                  <CheckCircle2 size={24} className="text-[#4EDEA3] mb-2 sm:mb-3 opacity-60" />
+                  <span className="text-xs sm:text-sm font-bold text-gray-400">
+                    {t("portfolioBalanced") || "Your portfolio is balanced."}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
       </div>
-      {totalValue === 0 && (
-        <p className="text-[10px] text-gray-600 text-center mt-4">
-          {isTh ? 'ไม่พบข้อมูลสินทรัพย์' : 'No asset data available'}
-        </p>
-      )}
-    </div>
+
+      <Modal isOpen={isAllocEditOpen} onClose={() => setIsAllocEditOpen(false)} title={t("editAllocation")}>
+        <div className="p-5 sm:p-6 space-y-5 sm:space-y-6">
+          <p className="text-xs sm:text-sm text-gray-400 font-medium">{t("editAllocationDesc")}</p>
+          
+          <div className="space-y-3 sm:space-y-4">
+            {allocations.map(item => {
+              const val = editAllocValues[item.label] ?? item.value;
+              return (
+                <div key={item.label} className="flex items-center gap-3 sm:gap-4">
+                  <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
+                  <span className="text-xs sm:text-sm font-bold text-white flex-1">{translateLabel(item.label)}</span>
+                  <div className="relative w-24 sm:w-32">
+                    <input 
+                      type="number" 
+                      min="0" 
+                      max="100" 
+                      value={val}
+                      onChange={(e) => {
+                        let v = parseInt(e.target.value) || 0;
+                        if (v > 100) v = 100;
+                        if (v < 0) v = 0;
+                        setEditAllocValues(prev => ({ ...prev, [item.label]: v }));
+                      }}
+                      className="w-full bg-background border border-white/10 rounded-xl px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-bold text-white focus:outline-none focus:border-[#ADC6FF] pr-8 transition-colors"
+                    />
+                    <span className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">%</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="pt-4 border-t border-white/5">
+            <div className="flex justify-between items-center mb-4 sm:mb-6">
+              <span className="text-[10px] sm:text-xs font-black uppercase tracking-wide text-gray-500">Total</span>
+              <span className={cn(
+                "text-sm sm:text-base font-black",
+                isValid ? "text-[#4EDEA3]" : "text-[#FFB4AB]"
+              )}>
+                {currentTotalAlloc}%
+              </span>
+            </div>
+
+            <div className="flex gap-2 sm:gap-3">
+              <button 
+                onClick={() => setIsAllocEditOpen(false)}
+                className="flex-1 py-3 sm:py-4 bg-white/5 border border-white/10 text-white rounded-full font-black text-xs sm:text-sm uppercase tracking-tight hover:bg-white/10 transition-all"
+              >
+                {t("cancel")}
+              </button>
+              <button 
+                disabled={!isValid}
+                onClick={() => {
+                  Object.entries(editAllocValues).forEach(([label, value]) => {
+                    updateAllocation(label, value);
+                  });
+                  setIsAllocEditOpen(false);
+                  addToast(t("allocationSaved"), 'success');
+                  addNotification(
+                    t("targetAllocation"),
+                    allocations.map(a => `${translateLabel(a.label)}: ${editAllocValues[a.label]}%`).join(', '),
+                    'rebalance'
+                  );
+                }}
+                className={cn(
+                  "flex-1 py-3 sm:py-4 rounded-full font-black text-xs sm:text-sm uppercase tracking-tight transition-all",
+                  isValid 
+                    ? "bg-[#ADC6FF] text-[#00285d] hover:brightness-110 shadow-[0_0_20px_rgba(173,198,255,0.2)]" 
+                    : "bg-white/5 text-gray-500 cursor-not-allowed"
+                )}
+              >
+                {t("save")}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Modal>
+    </>
   );
 }

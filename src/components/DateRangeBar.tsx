@@ -39,9 +39,16 @@ export function getDateBounds(
   }
 
   if (state.mode === "custom" && state.from && state.to) {
+    const toLocalDate = (date: string, endOfDay = false) => {
+      const [year, month, day] = date.split("-").map(Number);
+      return endOfDay
+        ? new Date(year, month - 1, day, 23, 59, 59, 999)
+        : new Date(year, month - 1, day);
+    };
+
     return {
-      from: new Date(state.from),
-      to: new Date(state.to + "T23:59:59"),
+      from: toLocalDate(state.from),
+      to: toLocalDate(state.to, true),
     };
   }
 
@@ -58,6 +65,7 @@ export function isInRange(
 }
 
 const PRESETS = [
+  { id: "all", label: "All" },
   { id: "1d", label: "1D" },
   { id: "1w", label: "1W" },
   { id: "1m", label: "1M" },
@@ -65,8 +73,21 @@ const PRESETS = [
   { id: "3m", label: "3M" },
   { id: "6m", label: "6M" },
   { id: "1y", label: "1Y" },
-  { id: "all", label: "All" },
 ] as const;
+
+function normalizeDateInput(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 4) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+  return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`;
+}
+
+function isValidDateInput(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+}
 
 interface DateRangeBarProps {
   value: DateRangeState;
@@ -81,11 +102,14 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
   const [customTo, setCustomTo] = useState("");
   const monthPickerRef = useRef<HTMLDivElement>(null);
   const customRef = useRef<HTMLDivElement>(null);
+  const customFromPickerRef = useRef<HTMLInputElement>(null);
+  const customToPickerRef = useRef<HTMLInputElement>(null);
 
   const months = Array.from({ length: 24 }, (_, i) => {
     const d = subMonths(new Date(), i);
     return { year: d.getFullYear(), month: d.getMonth(), label: format(d, "MMM yyyy") };
   });
+  const recentMonths = months.slice(0, 2);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -105,10 +129,19 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
       return `${value.from} to ${value.to}`;
     return null;
   })();
+  const selectedCustomFrom = customFrom;
+  const selectedCustomTo = customTo;
+  const hasInvalidCustomRange = Boolean(
+    selectedCustomFrom && selectedCustomTo && selectedCustomFrom > selectedCustomTo
+  );
+  const hasInvalidCustomDate = Boolean(
+    (selectedCustomFrom && !isValidDateInput(selectedCustomFrom)) ||
+    (selectedCustomTo && !isValidDateInput(selectedCustomTo))
+  );
 
   return (
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
-      <div className="flex items-center gap-0.5 bg-white/5 rounded-xl p-1 border border-white/10 overflow-x-auto">
+      <div className="flex items-center gap-0.5 bg-white/5 rounded-xl p-1 border border-border overflow-x-auto">
         {PRESETS.map((preset) => (
           <button
             key={preset.id}
@@ -129,6 +162,27 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
         ))}
       </div>
 
+      <div className="flex items-center gap-1 rounded-xl border border-border bg-white/[0.03] p-1">
+        {recentMonths.map((m) => (
+          <button
+            key={`${m.year}-${m.month}`}
+            onClick={() => {
+              onChange({ mode: "month", year: m.year, month: m.month });
+              setShowMonthPicker(false);
+              setShowCustom(false);
+            }}
+            className={cn(
+              "rounded-lg px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wide transition-all whitespace-nowrap",
+              value.mode === "month" && value.year === m.year && value.month === m.month
+                ? "bg-[#ADC6FF]/20 text-[#ADC6FF]"
+                : "text-gray-500 hover:bg-white/5 hover:text-gray-300"
+            )}
+          >
+            {format(new Date(m.year, m.month, 1), "MMM yy")}
+          </button>
+        ))}
+      </div>
+
       <div className="relative" ref={monthPickerRef}>
         <button
           onClick={() => { setShowMonthPicker(!showMonthPicker); setShowCustom(false); }}
@@ -136,11 +190,11 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
             "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all",
             value.mode === "month"
               ? "bg-[#ADC6FF]/20 text-[#ADC6FF] border-[#ADC6FF]/30"
-              : "bg-white/5 text-gray-500 border-white/10 hover:text-gray-300"
+              : "bg-white/5 text-gray-500 border-border hover:text-gray-300"
           )}
         >
           <Calendar size={12} />
-          <span>{value.mode === "month" ? format(new Date(value.year, value.month, 1), "MMM yyyy") : "Month"}</span>
+          <span>{value.mode === "month" ? format(new Date(value.year, value.month, 1), "MMM yyyy") : "More months"}</span>
           <ChevronDown size={10} className={cn("transition-transform", showMonthPicker && "rotate-180")} />
         </button>
 
@@ -150,10 +204,11 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 8 }}
-              className="absolute top-full left-0 mt-2 w-48 bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden"
+              className="absolute top-full left-0 mt-2 w-48 bg-[#1a1a1a] border border-border rounded-2xl shadow-2xl z-50 overflow-hidden"
             >
               <div className="p-2 max-h-64 overflow-y-auto space-y-0.5">
-                {months.map((m) => (
+                <p className="px-3 pb-1 pt-1 text-[10px] font-black uppercase tracking-wide text-gray-600">All months</p>
+                {months.slice(2).map((m) => (
                   <button
                     key={`${m.year}-${m.month}`}
                     onClick={() => { onChange({ mode: "month", year: m.year, month: m.month }); setShowMonthPicker(false); }}
@@ -175,12 +230,19 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
 
       <div className="relative" ref={customRef}>
         <button
-          onClick={() => { setShowCustom(!showCustom); setShowMonthPicker(false); }}
+          onClick={() => {
+            if (!showCustom && value.mode === "custom") {
+              setCustomFrom(value.from);
+              setCustomTo(value.to);
+            }
+            setShowCustom(!showCustom);
+            setShowMonthPicker(false);
+          }}
           className={cn(
             "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all",
             value.mode === "custom"
               ? "bg-[#4EDEA3]/20 text-[#4EDEA3] border-[#4EDEA3]/30"
-              : "bg-white/5 text-gray-500 border-white/10 hover:text-gray-300"
+              : "bg-white/5 text-gray-500 border-border hover:text-gray-300"
           )}
         >
           <Calendar size={12} />
@@ -194,41 +256,90 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 8 }}
-              className="absolute top-full left-0 mt-2 w-72 bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl z-50 p-4 space-y-3"
+              className="absolute top-full left-0 mt-2 w-72 bg-[#1a1a1a] border border-border rounded-2xl shadow-2xl z-50 p-4 space-y-3"
             >
               <p className="text-[10px] font-black text-gray-500 uppercase tracking-wide">Custom Range</p>
               <div className="space-y-2">
                 <div>
                   <label className="text-[10px] text-gray-500 font-bold uppercase mb-1 block">From</label>
-                  <input
-                    type="date"
-                    value={customFrom || (value.mode === "custom" ? value.from : "")}
-                    onChange={(e) => setCustomFrom(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-xs font-bold focus:outline-none focus:border-[#4EDEA3]/50 transition-all [color-scheme:dark]"
+                  <div className="relative">
+                    <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={10}
+                    placeholder="YYYY-MM-DD"
+                    value={selectedCustomFrom}
+                    onChange={(e) => setCustomFrom(normalizeDateInput(e.target.value))}
+                    className="w-full bg-white/5 border border-border rounded-xl px-3 py-2 pr-9 text-white text-xs font-bold focus:outline-none focus:border-[#4EDEA3]/50 transition-all"
                   />
+                    <button
+                      type="button"
+                      aria-label="Choose start date from calendar"
+                      onClick={() => customFromPickerRef.current?.showPicker?.()}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-gray-500 hover:bg-white/5 hover:text-white"
+                    >
+                      <Calendar size={14} />
+                    </button>
+                    <input
+                      ref={customFromPickerRef}
+                      type="date"
+                      tabIndex={-1}
+                      value={isValidDateInput(selectedCustomFrom) ? selectedCustomFrom : ""}
+                      onChange={(e) => setCustomFrom(e.target.value)}
+                      className="sr-only"
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className="text-[10px] text-gray-500 font-bold uppercase mb-1 block">To</label>
-                  <input
-                    type="date"
-                    value={customTo || (value.mode === "custom" ? value.to : "")}
-                    onChange={(e) => setCustomTo(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-xs font-bold focus:outline-none focus:border-[#4EDEA3]/50 transition-all [color-scheme:dark]"
+                  <div className="relative">
+                    <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={10}
+                    placeholder="YYYY-MM-DD"
+                    value={selectedCustomTo}
+                    onChange={(e) => setCustomTo(normalizeDateInput(e.target.value))}
+                    className="w-full bg-white/5 border border-border rounded-xl px-3 py-2 pr-9 text-white text-xs font-bold focus:outline-none focus:border-[#4EDEA3]/50 transition-all"
                   />
+                    <button
+                      type="button"
+                      aria-label="Choose end date from calendar"
+                      onClick={() => customToPickerRef.current?.showPicker?.()}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-gray-500 hover:bg-white/5 hover:text-white"
+                    >
+                      <Calendar size={14} />
+                    </button>
+                    <input
+                      ref={customToPickerRef}
+                      type="date"
+                      tabIndex={-1}
+                      min={isValidDateInput(selectedCustomFrom) ? selectedCustomFrom : undefined}
+                      value={isValidDateInput(selectedCustomTo) ? selectedCustomTo : ""}
+                      onChange={(e) => setCustomTo(e.target.value)}
+                      className="sr-only"
+                    />
+                  </div>
                 </div>
               </div>
+              {hasInvalidCustomDate ? (
+                <p className="text-[10px] font-bold text-[#FFB4AB]">Use a valid date in YYYY-MM-DD format.</p>
+              ) : hasInvalidCustomRange && (
+                <p className="text-[10px] font-bold text-[#FFB4AB]">End date must be on or after the start date.</p>
+              )}
               <button
                 onClick={() => {
-                  const from = customFrom || (value.mode === "custom" ? value.from : "");
-                  const to = customTo || (value.mode === "custom" ? value.to : "");
-                  if (from && to) {
+                  const from = selectedCustomFrom;
+                  const to = selectedCustomTo;
+                  if (isValidDateInput(from) && isValidDateInput(to) && from <= to) {
                     onChange({ mode: "custom", from, to });
                     setShowCustom(false);
                     setCustomFrom("");
                     setCustomTo("");
                   }
                 }}
-                className="w-full py-2 bg-[#4EDEA3] text-[#0E0E0E] rounded-xl font-black text-xs uppercase tracking-wide hover:brightness-110 transition-all active:scale-95"
+                disabled={!selectedCustomFrom || !selectedCustomTo || hasInvalidCustomDate || hasInvalidCustomRange}
+                className="w-full py-2 bg-[#4EDEA3] text-[#0E0E0E] rounded-xl font-black text-xs uppercase tracking-wide hover:brightness-110 transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Apply
               </button>
@@ -240,7 +351,7 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
       {activeBadge && (
         <button
           onClick={() => onChange({ mode: "all" })}
-          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[10px] font-bold text-gray-400 hover:text-white hover:border-white/20 transition-all"
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/5 border border-border text-[10px] font-bold text-gray-400 hover:text-white hover:border-white/20 transition-all"
         >
           <span>{activeBadge}</span>
           <X size={10} />

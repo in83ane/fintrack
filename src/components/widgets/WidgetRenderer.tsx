@@ -111,13 +111,13 @@ function AllocationPieWidget() {
                 key={i}
                 d={`M ${C} ${C} L ${x1} ${y1} A ${R} ${R} 0 ${largeArc} 1 ${x2} ${y2} Z`}
                 fill={seg.color}
-                stroke="#0E0E0E"
+                stroke="#0f1115"
                 strokeWidth={1}
                 suppressHydrationWarning
               />
             );
           })}
-          <circle cx={C} cy={C} r={22} fill="#0E0E0E" />
+          <circle cx={C} cy={C} r={22} fill="#0f1115" />
           <text x={C} y={C + 1} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize="10" fontWeight="bold">
             {assets.length}
           </text>
