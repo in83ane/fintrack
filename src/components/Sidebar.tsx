@@ -23,7 +23,19 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
   const [isAddingPortfolio, setIsAddingPortfolio] = React.useState(false);
   const [editingPortfolioId, setEditingPortfolioId] = React.useState<string | null>(null);
   const [editingPortfolioName, setEditingPortfolioName] = React.useState("");
-  const [isPortfolioSectionOpen, setIsPortfolioSectionOpen] = React.useState(true);
+  const [isPortfolioSectionOpen, setIsPortfolioSectionOpen] = React.useState(false);
+  const portfolioSectionRef = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    if (!isPortfolioSectionOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (portfolioSectionRef.current && !portfolioSectionRef.current.contains(event.target as Node)) {
+        setIsPortfolioSectionOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isPortfolioSectionOpen]);
 
   const navItems = [
     { icon: LayoutDashboard, label: t("dashboard"), href: "/dashboard" },
@@ -99,95 +111,114 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
         </Link>
       </div>
 
-      <div className={cn("mx-4 mb-5 rounded-2xl border border-border bg-white/[0.03] p-3", !isMobile && "mx-3") }>
+      <div ref={portfolioSectionRef} className={cn("relative mx-4 mb-5", !isMobile && "mx-3")}>
           <button
             type="button"
             onClick={() => setIsPortfolioSectionOpen(open => !open)}
-            className="flex w-full items-center justify-between gap-2 text-left"
+            className={cn(
+              "flex w-full items-center gap-2.5 rounded-2xl border border-border bg-white/[0.03] px-3 py-2.5 text-left transition-colors hover:bg-white/[0.06]",
+              isPortfolioSectionOpen && "border-[#ADC6FF]/40 bg-white/[0.06]"
+            )}
             aria-expanded={isPortfolioSectionOpen}
             aria-controls="portfolio-list"
           >
-            <span className="text-[10px] font-black uppercase tracking-wide text-gray-500">Investment portfolio</span>
-            <ChevronDown size={15} className={cn("text-gray-500 transition-transform", !isPortfolioSectionOpen && "-rotate-90")} />
-          </button>
-          {!isPortfolioSectionOpen && (
-            <p className="mt-2 truncate text-xs font-bold text-[#ADC6FF]">
-              {isAllPortfolios ? "All portfolios" : (activePortfolio?.name || "Portfolio")}
-            </p>
-          )}
-          {isPortfolioSectionOpen && (
-          <>
-          <div id="portfolio-list" className="mt-2 space-y-1.5">
-            <button
-              onClick={() => { selectPortfolio(null); onClose?.(); }}
+            <span
               className={cn(
-                "flex min-h-10 w-full items-center justify-between rounded-xl px-3 text-left text-xs font-bold transition-colors",
-                isAllPortfolios
-                  ? "bg-[#4EDEA3]/15 text-[#4EDEA3]"
-                  : "text-gray-400 hover:bg-white/5 hover:text-white"
+                "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl",
+                isAllPortfolios ? "bg-[#4EDEA3]/15 text-[#4EDEA3]" : "bg-[#ADC6FF]/15 text-[#ADC6FF]"
               )}
             >
-              <span className="flex min-w-0 items-center gap-2 truncate"><Layers size={14} /> <span className="truncate">All portfolios</span></span>
-              {isAllPortfolios && <Check size={14} />}
-            </button>
-            {portfolios.map((portfolio) => (
-              <div key={portfolio.id} className={cn("flex items-center gap-1 rounded-xl", activePortfolio?.id === portfolio.id && "bg-[#ADC6FF]/15")}>
-                {editingPortfolioId === portfolio.id ? (
-                  <form onSubmit={handleRenamePortfolio} className="flex min-w-0 flex-1 gap-1 p-1">
-                    <input
-                      autoFocus
-                      value={editingPortfolioName}
-                      onChange={(event) => setEditingPortfolioName(event.target.value)}
-                      maxLength={80}
-                      className="min-w-0 flex-1 rounded-lg border border-[#ADC6FF]/40 bg-background px-2 py-1.5 text-xs text-white outline-none"
-                    />
-                    <button type="submit" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#ADC6FF] text-[#00285d]" aria-label="Save portfolio name"><Check size={14} /></button>
-                  </form>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => { selectPortfolio(portfolio.id); onClose?.(); }}
-                      className={cn(
-                        "flex min-h-10 min-w-0 flex-1 items-center justify-between rounded-xl px-3 text-left text-xs font-bold transition-colors",
-                        activePortfolio?.id === portfolio.id
-                          ? "text-[#ADC6FF]"
-                          : "text-gray-400 hover:bg-white/5 hover:text-white"
-                      )}
-                    >
-                      <span className="flex min-w-0 items-center gap-2 truncate">
-                        <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: portfolio.color }} />
-                        <span className="truncate">{portfolio.name}</span>
-                      </span>
-                      {activePortfolio?.id === portfolio.id && <Check size={14} />}
-                    </button>
-                    <button
-                      onClick={() => { setEditingPortfolioId(portfolio.id); setEditingPortfolioName(portfolio.name); }}
-                      className="mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-white/10 hover:text-white"
-                      aria-label={`Rename ${portfolio.name}`}
-                    ><Pencil size={13} /></button>
-                  </>
-                )}
-              </div>
-            ))}
-          </div>
-          <form onSubmit={handleCreatePortfolio} className="mt-2 flex gap-2">
-            <input
-              value={portfolioName}
-              onChange={(event) => setPortfolioName(event.target.value)}
-              maxLength={80}
-              placeholder="New portfolio"
-              className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 py-2 text-xs text-white outline-none placeholder:text-gray-600 focus:border-[#ADC6FF]/60"
-            />
-            <button
-              type="submit"
-              disabled={isAddingPortfolio || !portfolioName.trim()}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#ADC6FF] text-[#00285d] disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="Create portfolio"
+              {isAllPortfolios ? (
+                <Layers size={15} />
+              ) : (
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: activePortfolio?.color || "#ADC6FF" }} />
+              )}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500">Investment portfolio</span>
+              <span className="block truncate text-xs font-bold text-white">
+                {isAllPortfolios ? "All portfolios" : (activePortfolio?.name || "Portfolio")}
+              </span>
+            </span>
+            <ChevronDown size={15} className={cn("shrink-0 text-gray-500 transition-transform", isPortfolioSectionOpen && "rotate-180")} />
+          </button>
+
+          {isPortfolioSectionOpen && (
+            <div
+              id="portfolio-list"
+              className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 rounded-2xl border border-border bg-background p-2 shadow-2xl shadow-black/40"
             >
-              <Plus size={16} />
-            </button>
-          </form>
-          </>
+              <div className="max-h-64 space-y-1 overflow-y-auto custom-scrollbar">
+                <button
+                  onClick={() => { selectPortfolio(null); setIsPortfolioSectionOpen(false); onClose?.(); }}
+                  className={cn(
+                    "flex min-h-10 w-full items-center justify-between rounded-xl px-3 text-left text-xs font-bold transition-colors",
+                    isAllPortfolios
+                      ? "bg-[#4EDEA3]/15 text-[#4EDEA3]"
+                      : "text-gray-400 hover:bg-white/5 hover:text-white"
+                  )}
+                >
+                  <span className="flex min-w-0 items-center gap-2 truncate"><Layers size={14} /> <span className="truncate">All portfolios</span></span>
+                  {isAllPortfolios && <Check size={14} />}
+                </button>
+                {portfolios.map((portfolio) => (
+                  <div key={portfolio.id} className={cn("flex items-center gap-1 rounded-xl", activePortfolio?.id === portfolio.id && "bg-[#ADC6FF]/15")}>
+                    {editingPortfolioId === portfolio.id ? (
+                      <form onSubmit={handleRenamePortfolio} className="flex min-w-0 flex-1 gap-1 p-1">
+                        <input
+                          autoFocus
+                          value={editingPortfolioName}
+                          onChange={(event) => setEditingPortfolioName(event.target.value)}
+                          maxLength={80}
+                          className="min-w-0 flex-1 rounded-lg border border-[#ADC6FF]/40 bg-background px-2 py-1.5 text-xs text-white outline-none"
+                        />
+                        <button type="submit" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#ADC6FF] text-[#00285d]" aria-label="Save portfolio name"><Check size={14} /></button>
+                      </form>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => { selectPortfolio(portfolio.id); setIsPortfolioSectionOpen(false); onClose?.(); }}
+                          className={cn(
+                            "flex min-h-10 min-w-0 flex-1 items-center justify-between rounded-xl px-3 text-left text-xs font-bold transition-colors",
+                            activePortfolio?.id === portfolio.id
+                              ? "text-[#ADC6FF]"
+                              : "text-gray-400 hover:bg-white/5 hover:text-white"
+                          )}
+                        >
+                          <span className="flex min-w-0 items-center gap-2 truncate">
+                            <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: portfolio.color }} />
+                            <span className="truncate">{portfolio.name}</span>
+                          </span>
+                          {activePortfolio?.id === portfolio.id && <Check size={14} />}
+                        </button>
+                        <button
+                          onClick={() => { setEditingPortfolioId(portfolio.id); setEditingPortfolioName(portfolio.name); }}
+                          className="mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-white/10 hover:text-white"
+                          aria-label={`Rename ${portfolio.name}`}
+                        ><Pencil size={13} /></button>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <form onSubmit={handleCreatePortfolio} className="mt-2 flex gap-2 border-t border-border pt-2">
+                <input
+                  value={portfolioName}
+                  onChange={(event) => setPortfolioName(event.target.value)}
+                  maxLength={80}
+                  placeholder="New portfolio"
+                  className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 py-2 text-xs text-white outline-none placeholder:text-gray-600 focus:border-[#ADC6FF]/60"
+                />
+                <button
+                  type="submit"
+                  disabled={isAddingPortfolio || !portfolioName.trim()}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#ADC6FF] text-[#00285d] disabled:cursor-not-allowed disabled:opacity-40"
+                  aria-label="Create portfolio"
+                >
+                  <Plus size={16} />
+                </button>
+              </form>
+            </div>
           )}
       </div>
 

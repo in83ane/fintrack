@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Bell, Globe, ChevronDown, Search, Menu, X, Briefcase, Plus, Check, Layers, Pencil } from "lucide-react";
+import { Bell, Globe, ChevronDown, Search, Menu, X, Plus, Check, Layers, Pencil } from "lucide-react";
 import { useApp, Language, Currency, AppNotification } from "@/src/context/AppContext";
 import { cn } from "@/src/lib/utils";
 import { Sidebar } from "./Sidebar";
@@ -145,10 +145,17 @@ export function TopBar() {
           <div className="relative hidden xl:block" ref={portfolioMenuRef}>
             <button
               onClick={() => setShowPortfolioMenu(open => !open)}
-              className="flex max-w-44 items-center gap-2 rounded-full border border-border bg-white/5 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-white/10"
+              className={cn(
+                "flex max-w-44 items-center gap-2 rounded-full border border-border bg-white/5 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-white/10",
+                showPortfolioMenu && "border-[#ADC6FF]/40 bg-white/10"
+              )}
               aria-label="Choose investment portfolio"
             >
-              <Briefcase size={13} className="shrink-0 text-[#ADC6FF]" />
+              {isAllPortfolios ? (
+                <Layers size={14} className="shrink-0 text-[#4EDEA3]" />
+              ) : (
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: activePortfolio?.color || "#ADC6FF" }} />
+              )}
               <span className="truncate">{isAllPortfolios ? "All portfolios" : (activePortfolio?.name || "Portfolio")}</span>
               <ChevronDown size={11} className={cn("shrink-0 text-gray-500 transition-transform", showPortfolioMenu && "rotate-180")} />
             </button>
@@ -158,7 +165,7 @@ export function TopBar() {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 8 }}
-                  className="absolute right-0 top-full z-[60] mt-2 w-64 overflow-hidden rounded-2xl border border-border bg-[#1a1a1a] p-2 shadow-2xl"
+                  className="absolute right-0 top-full z-[60] mt-2 w-64 overflow-hidden rounded-2xl border border-border bg-background p-2 shadow-2xl shadow-black/40"
                 >
                   <p className="px-2 py-1 text-[10px] font-black uppercase tracking-wide text-gray-500">Investment portfolios</p>
                   <div className="max-h-48 space-y-0.5 overflow-y-auto py-1">
@@ -233,9 +240,12 @@ export function TopBar() {
           <div className="relative" ref={langMenuRef}>
             <button
               onClick={() => setShowLangMenu(!showLangMenu)}
-              className="flex h-9 items-center gap-1.5 rounded-full border border-border bg-white/5 px-2.5 py-1.5 hover:bg-white/10 transition-all"
+              className={cn(
+                "flex h-9 items-center gap-1.5 rounded-full border border-border bg-white/5 px-2.5 py-1.5 hover:bg-white/10 transition-all",
+                showLangMenu && "border-[#ADC6FF]/40 bg-white/10"
+              )}
             >
-              <Globe size={12} className="text-gray-400" />
+              <Globe size={13} className="shrink-0 text-[#4EDEA3]" />
               <span className="text-[10px] font-black uppercase tracking-wide text-white hidden sm:inline">
                 {languages.find(l => l.code === language)?.label}
               </span>
@@ -248,7 +258,7 @@ export function TopBar() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 10 }}
-                  className="absolute top-full right-0 mt-2 w-28 bg-surface border border-border rounded-xl shadow-2xl overflow-hidden py-1 z-[60]"
+                  className="absolute top-full right-0 mt-2 w-28 bg-background border border-border rounded-xl shadow-2xl shadow-black/40 overflow-hidden py-1 z-[60]"
                 >
                   {languages.map((lang) => (
                     <button
@@ -280,7 +290,7 @@ export function TopBar() {
                 className={cn(
                   "px-2 sm:px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide transition-all",
                   currency === curr
-                    ? "bg-[#ADC6FF] text-[#00285d]"
+                    ? "bg-[#4EDEA3] text-[#00332b]"
                     : "text-gray-500 hover:text-white"
                 )}
               >
@@ -309,7 +319,7 @@ export function TopBar() {
                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    className="absolute top-full right-12 mt-4 w-80 bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden z-[60]"
+                    className="absolute top-full right-12 mt-4 w-80 bg-background border border-border rounded-2xl shadow-2xl shadow-black/40 overflow-hidden z-[60]"
                   >
                     <div className="px-4 py-3 border-b border-border flex items-center justify-between">
                       <span className="text-sm font-bold text-white uppercase tracking-wide">{t("notifications")}</span>
@@ -397,7 +407,7 @@ export function TopBar() {
                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    className="absolute top-full right-0 mt-4 w-56 bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden py-1 z-[60]"
+                    className="absolute top-full right-0 mt-4 w-56 bg-background border border-border rounded-2xl shadow-2xl shadow-black/40 overflow-hidden py-1 z-[60]"
                   >
                     <div className="px-4 py-3 border-b border-border mb-1">
                       <p className="text-sm font-bold text-white truncate">{userProfile?.email || "User"}</p>
