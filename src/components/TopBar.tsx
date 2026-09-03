@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Bell, Globe, ChevronDown, Search, Menu, X } from "lucide-react";
+import { Bell, Globe, ChevronDown, Search, Menu, X, Briefcase, Plus, Check, Layers, Pencil } from "lucide-react";
 import { useApp, Language, Currency, AppNotification } from "@/src/context/AppContext";
 import { cn } from "@/src/lib/utils";
 import { Sidebar } from "./Sidebar";
@@ -22,16 +22,22 @@ function formatTimeAgo(time: Date, t: (key: string) => string): string {
 }
 
 export function TopBar() {
-  const { language, setLanguage, currency, setCurrency, t, userProfile, notifications, markNotificationRead, clearNotifications } = useApp();
+  const { language, setLanguage, currency, setCurrency, t, userProfile, notifications, markNotificationRead, clearNotifications, portfolios, activePortfolio, isAllPortfolios, selectPortfolio, createPortfolio, renamePortfolio } = useApp();
   const pathname = usePathname();
   const [showLangMenu, setShowLangMenu] = React.useState(false);
   const [showMobileMenu, setShowMobileMenu] = React.useState(false);
   const [showProfileMenu, setShowProfileMenu] = React.useState(false);
   const [showNotifMenu, setShowNotifMenu] = React.useState(false);
+  const [showPortfolioMenu, setShowPortfolioMenu] = React.useState(false);
+  const [portfolioName, setPortfolioName] = React.useState("");
+  const [isCreatingPortfolio, setIsCreatingPortfolio] = React.useState(false);
+  const [editingPortfolioId, setEditingPortfolioId] = React.useState<string | null>(null);
+  const [editingPortfolioName, setEditingPortfolioName] = React.useState("");
 
   const langMenuRef = React.useRef<HTMLDivElement>(null);
   const notifMenuRef = React.useRef<HTMLDivElement>(null);
   const profileMenuRef = React.useRef<HTMLDivElement>(null);
+  const portfolioMenuRef = React.useRef<HTMLDivElement>(null);
 
   // Close all popups when clicking outside
   React.useEffect(() => {
@@ -46,11 +52,36 @@ export function TopBar() {
       if (showProfileMenu && profileMenuRef.current && !profileMenuRef.current.contains(target)) {
         setShowProfileMenu(false);
       }
+      if (showPortfolioMenu && portfolioMenuRef.current && !portfolioMenuRef.current.contains(target)) {
+        setShowPortfolioMenu(false);
+      }
     }
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showLangMenu, showNotifMenu, showProfileMenu]);
+  }, [showLangMenu, showNotifMenu, showProfileMenu, showPortfolioMenu]);
+
+  const handleCreatePortfolio = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!portfolioName.trim()) return;
+    setIsCreatingPortfolio(true);
+    const created = await createPortfolio(portfolioName);
+    if (created) {
+      setPortfolioName("");
+      setShowPortfolioMenu(false);
+    }
+    setIsCreatingPortfolio(false);
+  };
+
+  const handleRenamePortfolio = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!editingPortfolioId || !editingPortfolioName.trim()) return;
+    const renamed = await renamePortfolio(editingPortfolioId, editingPortfolioName);
+    if (renamed) {
+      setEditingPortfolioId(null);
+      setEditingPortfolioName("");
+    }
+  };
 
   const isDashboard = pathname === "/dashboard" || pathname === "/";
 
@@ -68,11 +99,11 @@ export function TopBar() {
 
   return (
     <>
-      <header className="w-full top-0 sticky z-50 bg-surface/80 backdrop-blur-md border-b border-border flex justify-between items-center px-6 lg:px-12 py-4">
-        <div className="flex items-center gap-4 lg:gap-8">
+      <header className="sticky top-0 z-50 flex w-full min-w-0 items-center justify-between gap-2 border-b border-border bg-surface/80 px-3 py-3 backdrop-blur-md sm:px-4 lg:px-12 lg:py-4">
+        <div className="flex min-w-0 shrink items-center gap-2 lg:gap-8">
           <button 
             onClick={() => setShowMobileMenu(true)}
-            className="lg:hidden p-2 text-gray-400 hover:text-white transition-colors"
+            className="lg:hidden shrink-0 rounded-xl p-2 text-gray-400 hover:bg-white/5 hover:text-white transition-colors"
           >
             <Menu size={24} />
           </button>
@@ -97,10 +128,10 @@ export function TopBar() {
               ))}
             </div>
           )}
-          <div id="topbar-price-portal" className="flex items-center gap-3"></div>
+          <div id="topbar-price-portal" className="hidden items-center gap-3 xl:flex"></div>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
           {/* ⌘K Search Trigger */}
           <button
             onClick={() => { const e = new KeyboardEvent('keydown', { key: 'k', metaKey: true, ctrlKey: true, bubbles: true }); window.dispatchEvent(e); }}
@@ -111,11 +142,98 @@ export function TopBar() {
             <kbd className="text-[9px] font-bold text-gray-600 bg-white/5 px-1.5 py-0.5 rounded border border-border">⌘K</kbd>
           </button>
 
+          <div className="relative hidden xl:block" ref={portfolioMenuRef}>
+            <button
+              onClick={() => setShowPortfolioMenu(open => !open)}
+              className="flex max-w-44 items-center gap-2 rounded-full border border-border bg-white/5 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-white/10"
+              aria-label="Choose investment portfolio"
+            >
+              <Briefcase size={13} className="shrink-0 text-[#ADC6FF]" />
+              <span className="truncate">{isAllPortfolios ? "All portfolios" : (activePortfolio?.name || "Portfolio")}</span>
+              <ChevronDown size={11} className={cn("shrink-0 text-gray-500 transition-transform", showPortfolioMenu && "rotate-180")} />
+            </button>
+            <AnimatePresence>
+              {showPortfolioMenu && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 8 }}
+                  className="absolute right-0 top-full z-[60] mt-2 w-64 overflow-hidden rounded-2xl border border-border bg-[#1a1a1a] p-2 shadow-2xl"
+                >
+                  <p className="px-2 py-1 text-[10px] font-black uppercase tracking-wide text-gray-500">Investment portfolios</p>
+                  <div className="max-h-48 space-y-0.5 overflow-y-auto py-1">
+                    <button
+                      onClick={() => { selectPortfolio(null); setShowPortfolioMenu(false); }}
+                      className={cn(
+                        "flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-xs font-bold transition-colors",
+                        isAllPortfolios ? "bg-[#4EDEA3]/15 text-[#4EDEA3]" : "text-gray-400 hover:bg-white/5 hover:text-white"
+                      )}
+                    >
+                      <span className="flex items-center gap-2"><Layers size={14} /> All portfolios</span>
+                      {isAllPortfolios && <Check size={14} />}
+                    </button>
+                    {portfolios.map((portfolio) => (
+                      <div key={portfolio.id} className={cn("flex items-center gap-1 rounded-xl", activePortfolio?.id === portfolio.id && "bg-[#ADC6FF]/15")}>
+                        {editingPortfolioId === portfolio.id ? (
+                          <form onSubmit={handleRenamePortfolio} className="flex min-w-0 flex-1 gap-1 p-1">
+                            <input
+                              autoFocus
+                              value={editingPortfolioName}
+                              onChange={(event) => setEditingPortfolioName(event.target.value)}
+                              maxLength={80}
+                              className="min-w-0 flex-1 rounded-lg border border-[#ADC6FF]/40 bg-background px-2 py-1.5 text-xs text-white outline-none"
+                            />
+                            <button type="submit" className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#ADC6FF] text-[#00285d]" aria-label="Save portfolio name"><Check size={14} /></button>
+                          </form>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => { selectPortfolio(portfolio.id); setShowPortfolioMenu(false); }}
+                              className={cn(
+                                "flex min-w-0 flex-1 items-center justify-between rounded-xl px-3 py-2.5 text-left text-xs font-bold transition-colors",
+                                activePortfolio?.id === portfolio.id ? "text-[#ADC6FF]" : "text-gray-400 hover:bg-white/5 hover:text-white"
+                              )}
+                            >
+                              <span className="flex min-w-0 items-center gap-2"><span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: portfolio.color }} /><span className="truncate">{portfolio.name}</span></span>
+                              {activePortfolio?.id === portfolio.id && <Check size={14} />}
+                            </button>
+                            <button
+                              onClick={() => { setEditingPortfolioId(portfolio.id); setEditingPortfolioName(portfolio.name); }}
+                              className="mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-white/10 hover:text-white"
+                              aria-label={`Rename ${portfolio.name}`}
+                            ><Pencil size={13} /></button>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <form onSubmit={handleCreatePortfolio} className="mt-1 flex gap-2 border-t border-border pt-2">
+                    <input
+                      value={portfolioName}
+                      onChange={(event) => setPortfolioName(event.target.value)}
+                      maxLength={80}
+                      placeholder="New portfolio"
+                      className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 py-2 text-xs text-white outline-none placeholder:text-gray-600 focus:border-[#ADC6FF]/60"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!portfolioName.trim() || isCreatingPortfolio}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#ADC6FF] text-[#00285d] disabled:cursor-not-allowed disabled:opacity-40"
+                      aria-label="Create portfolio"
+                    >
+                      <Plus size={16} />
+                    </button>
+                  </form>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
           {/* Language Selector - Compact */}
           <div className="relative" ref={langMenuRef}>
             <button
               onClick={() => setShowLangMenu(!showLangMenu)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/5 border border-border hover:bg-white/10 transition-all"
+              className="flex h-9 items-center gap-1.5 rounded-full border border-border bg-white/5 px-2.5 py-1.5 hover:bg-white/10 transition-all"
             >
               <Globe size={12} className="text-gray-400" />
               <span className="text-[10px] font-black uppercase tracking-wide text-white hidden sm:inline">
@@ -154,13 +272,13 @@ export function TopBar() {
           </div>
 
           {/* Currency Selector - Compact */}
-          <div className="flex bg-white/5 rounded-full p-0.5 border border-border">
+          <div className="flex h-9 shrink-0 bg-white/5 rounded-full p-0.5 border border-border">
             {currencies.map((curr) => (
               <button
                 key={curr}
                 onClick={() => setCurrency(curr)}
                 className={cn(
-                  "px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide transition-all",
+                  "px-2 sm:px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide transition-all",
                   currency === curr
                     ? "bg-[#ADC6FF] text-[#00285d]"
                     : "text-gray-500 hover:text-white"
@@ -171,7 +289,7 @@ export function TopBar() {
             ))}
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3 relative">
+          <div className="relative flex shrink-0 items-center gap-1.5 sm:gap-3">
             <div ref={notifMenuRef} className="flex items-center">
               <button
                 onClick={() => { setShowNotifMenu(!showNotifMenu); setShowProfileMenu(false); setShowLangMenu(false); }}
@@ -301,6 +419,9 @@ export function TopBar() {
                             "fintrack-buckets", "fintrack-bucket-activities", "fintrack-cash-activities"
                           ];
                           keysToRemove.forEach(key => localStorage.removeItem(key));
+                          Object.keys(localStorage)
+                            .filter(key => key.startsWith("dca_draft_"))
+                            .forEach(key => localStorage.removeItem(key));
                           
                           const { supabase } = await import('@/src/lib/supabase');
                           await supabase.auth.signOut();

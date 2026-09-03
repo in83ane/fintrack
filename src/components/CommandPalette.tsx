@@ -140,7 +140,7 @@ export function CommandPalette() {
     const navItems: CommandItem[] = [
       { id: "nav-dashboard", label: isTh ? "แดชบอร์ด" : "Dashboard", icon: <LayoutDashboard size={16} />, action: () => handleNavigate("Dashboard", "/dashboard"), category: "navigation" },
       { id: "nav-portfolio", label: isTh ? "พอร์ตโฟลิโอ" : "Portfolio", icon: <Briefcase size={16} />, action: () => handleNavigate("Portfolio", "/portfolio"), category: "navigation" },
-      { id: "nav-trade", label: isTh ? "ผู้ช่วยเทรด" : "Trade Assistant", icon: <TrendingUp size={16} />, action: () => handleNavigate("Trade", "/trade"), category: "navigation" },
+      { id: "nav-trade", label: isTh ? "ผู้ช่วยเทรด" : "Trade Assistant", icon: <TrendingUp size={16} />, action: () => handleNavigate("Trade Assistant", "/terminal"), category: "navigation" },
       { id: "nav-budget", label: isTh ? "งบประมาณ" : "Budget", icon: <Wallet size={16} />, action: () => handleNavigate("Budget", "/budget"), category: "navigation" },
       { id: "nav-cashflow", label: isTh ? "กระแสเงินสด" : "Cashflow", icon: <ArrowRightLeft size={16} />, action: () => handleNavigate("Cashflow", "/cashflow"), category: "navigation" },
       { id: "nav-transactions", label: isTh ? "ธุรกรรม" : "Transactions", icon: <Receipt size={16} />, action: () => handleNavigate("Transactions", "/transactions"), category: "navigation" },

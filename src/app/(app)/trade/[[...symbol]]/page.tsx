@@ -6,7 +6,6 @@ import { useParams, useRouter } from "next/navigation";
 import { cn } from "@/src/lib/utils";
 import { useApp } from "@/src/context/AppContext";
 import { analyzeTradeSignal, scanMarketSignals, computePyramidLevels, PyramidPlan, searchSymbols } from "../actions";
-import { DcaOrderSystem } from "@/src/components/DcaOrderSystem";
 
 type SearchResult = Awaited<ReturnType<typeof searchSymbols>>[number];
 
@@ -629,11 +628,6 @@ export default function TradePage() {
                 </div>
               </motion.div>
             )}
-
-            {/* DCA Order System */}
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }} className="mt-8">
-              <DcaOrderSystem initialSymbol={result?.symbol.replace(".BK", "")} initialPrice={result?.price} marketCurrency={result?.currency} signalData={result} />
-            </motion.div>
 
             <div className="text-center py-6">
               <p className="text-[10px] text-gray-600 font-medium">⚠️ {language === "th" ? "การวิเคราะห์นี้เพื่อการศึกษาเท่านั้น ไม่ใช่คำแนะนำทางการเงิน" : "This analysis is for educational purposes only."}</p>

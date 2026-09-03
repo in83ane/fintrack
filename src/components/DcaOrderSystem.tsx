@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Calculator, Target, Plus, Check, TrendingUp, AlertTriangle, Info, ShieldAlert, History, Trash2, ArrowRight } from 'lucide-react';
+import { Calculator, Target, Plus, Check, TrendingUp, AlertTriangle, Info, ShieldAlert, History, Trash2, ArrowRight, X, CircleDollarSign } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { cn } from '@/src/lib/utils';
 import { useApp } from '@/src/context/AppContext';
@@ -15,6 +15,40 @@ export interface DcaEntry {
   amount: number;
   quantity: number;
   active: boolean;
+  /** The input the trader supplied directly; the other value is calculated. */
+  calculationBasis?: 'amount' | 'quantity';
+}
+
+const createDefaultEntries = (): DcaEntry[] => [
+  { id: 1, price: 0, amount: 0, quantity: 0, active: true },
+];
+
+const normalizeDcaEntries = (rawEntries: unknown): DcaEntry[] => {
+  if (!Array.isArray(rawEntries) || rawEntries.length === 0) return createDefaultEntries();
+
+  const entries = rawEntries.map((entry: any, index) => ({
+    id: Number.isFinite(Number(entry?.id)) ? Number(entry.id) : index + 1,
+    price: Number(entry?.price) || 0,
+    amount: Number(entry?.amount) || 0,
+    quantity: Number(entry?.quantity) || 0,
+    active: entry?.active !== false,
+    calculationBasis: entry?.calculationBasis === 'amount' || entry?.calculationBasis === 'quantity'
+      ? entry.calculationBasis
+      : undefined,
+  }));
+
+  // Older drafts could retain only closed lots after a completed order.  Such a
+  // draft must not leave the first DCA card without Price / Qty / Amount inputs.
+  return entries.some(entry => entry.active) ? entries : createDefaultEntries();
+};
+
+interface PartialExit {
+  id: string;
+  entryId: number;
+  quantity: number;
+  price: number;
+  pnl: number;
+  closedAt: string;
 }
 
 export interface TradeSummary {
@@ -36,38 +70,48 @@ interface Props {
   initialPrice?: number;
   marketCurrency?: string;
   signalData?: any;
+  compact?: boolean;
+  onClose?: () => void;
 }
 
-export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCurrency = 'USD', signalData = null }: Props) {
-  const { formatMoney, addAsset, addTrade, currency, exchangeRates, addToast } = useApp();
+export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCurrency = 'USD', signalData = null, compact = false, onClose }: Props) {
+  const { formatMoney, addTrade, currency, exchangeRates, addToast, assets, trades, updateAsset, syncDcaPosition, activePortfolioId } = useApp();
   const formatVal = (val: number) => formatMoney(val, marketCurrency as any, 1);
   const [symbol, setSymbol] = useState(initialSymbol);
   const [currentMarketPrice, setCurrentMarketPrice] = useState<number>(initialPrice);
   const [manualSellPrice, setManualSellPrice] = useState<string>('');
   
-  const defaultEntries: DcaEntry[] = [
-    { id: 1, price: 0, amount: 0, quantity: 0, active: true },
-    { id: 2, price: 0, amount: 0, quantity: 0, active: false },
-    { id: 3, price: 0, amount: 0, quantity: 0, active: false },
-    { id: 4, price: 0, amount: 0, quantity: 0, active: false },
-  ];
-
-  const [entries, setEntries] = useState<DcaEntry[]>(defaultEntries);
+  const [entries, setEntries] = useState<DcaEntry[]>(createDefaultEntries);
 
   const [simulatedPrice, setSimulatedPrice] = useState<number>(initialPrice);
   const [journal, setJournal] = useState<TradeSummary[]>([]);
   const [portalTarget, setPortalTarget] = useState<Element | null>(null);
+  const [portfolioBudget, setPortfolioBudget] = useState(0);
+  const [partialExits, setPartialExits] = useState<PartialExit[]>([]);
+  const [exitQuantities, setExitQuantities] = useState<Record<number, string>>({});
 
   useEffect(() => {
-    setPortalTarget(document.getElementById('topbar-price-portal'));
+    const media = window.matchMedia('(min-width: 1280px)');
+    const updateTarget = () => {
+      setPortalTarget(media.matches ? document.getElementById('topbar-price-portal') : null);
+    };
+    updateTarget();
+    media.addEventListener('change', updateTarget);
+    return () => media.removeEventListener('change', updateTarget);
   }, []);
 
   // User isolation
-  const currentSymbolRef = useRef("");
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLoadingRef = useRef(true); // Start true to block auto-save until first load
   const [userId, setUserId] = useState<string | null>(null);
   const [userReady, setUserReady] = useState(false);
+
+  // Publish the open lots immediately.  This avoids Portfolio having to wait
+  // for the debounced Supabase draft write before it can recalculate Avg Cost.
+  useEffect(() => {
+    if (!activePortfolioId || !symbol || isLoadingRef.current) return;
+    syncDcaPosition(symbol, { entries });
+  }, [activePortfolioId, entries, symbol, syncDcaPosition]);
 
   useEffect(() => {
     if (initialSymbol) setSymbol(initialSymbol);
@@ -76,6 +120,36 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
       setSimulatedPrice(initialPrice);
     }
   }, [initialSymbol, initialPrice]);
+
+  // Keep Live P&L tied to the Terminal's selected symbol.
+  useEffect(() => {
+    if (!symbol) return;
+    const controller = new AbortController();
+    const loadPrice = async () => {
+      try {
+        const response = await fetch(`/api/market/analysis?symbol=${encodeURIComponent(symbol)}&interval=60`, {
+          signal: controller.signal,
+          cache: 'no-store',
+        });
+        const result = response.ok ? await response.json() : null;
+        if (!controller.signal.aborted && result?.data?.symbol === symbol.toUpperCase()) {
+          const price = Number(result.data.currentPrice);
+          if (price > 0) {
+            setCurrentMarketPrice(price);
+            setSimulatedPrice(current => current > 0 ? current : price);
+          }
+        }
+      } catch (error: any) {
+        if (error?.name !== 'AbortError') console.error('Failed to load DCA market price', error);
+      }
+    };
+    loadPrice();
+    const refreshTimer = window.setInterval(loadPrice, 30_000);
+    return () => {
+      controller.abort();
+      window.clearInterval(refreshTimer);
+    };
+  }, [symbol]);
 
   // Get current user on mount
   useEffect(() => {
@@ -89,93 +163,108 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
 
   // Load drafts from Supabase (per user + symbol) — waits for userReady
   useEffect(() => {
-    if (!userReady || !symbol) return;
+    if (!activePortfolioId || !userReady || !symbol || (userId && !activePortfolioId)) return;
+    let cancelled = false;
+    let resetTimer: number | undefined;
 
     const loadDraft = async () => {
       isLoadingRef.current = true;
-      currentSymbolRef.current = symbol;
-
+      let loadedEntries = createDefaultEntries();
       if (userId) {
-        const { data } = await supabase
+        let query = supabase
           .from('dca_drafts')
           .select('entries')
           .eq('user_id', userId)
-          .eq('symbol', symbol)
-          .maybeSingle();
+          .eq('symbol', symbol);
+        if (activePortfolioId) query = query.eq('portfolio_id', activePortfolioId);
+        const { data } = await query.maybeSingle();
 
-        if (data?.entries && Array.isArray(data.entries) && data.entries.length > 0) {
-          setEntries(data.entries as DcaEntry[]);
+        if (cancelled) return;
+        const draft = data?.entries;
+        if (Array.isArray(draft) && draft.length > 0) {
+          loadedEntries = normalizeDcaEntries(draft);
+          setEntries(loadedEntries);
+          setPortfolioBudget(0);
+          setPartialExits([]);
+        } else if (draft?.entries && Array.isArray(draft.entries)) {
+          loadedEntries = normalizeDcaEntries(draft.entries);
+          setEntries(loadedEntries);
+          setPortfolioBudget(Number(draft.portfolioBudget) || 0);
+          setPartialExits(Array.isArray(draft.partialExits) ? draft.partialExits : []);
         } else {
-          setEntries([...defaultEntries]);
+          setEntries(loadedEntries);
+          setPortfolioBudget(0);
+          setPartialExits([]);
         }
       } else {
-        const saved = localStorage.getItem(`dca_draft_${symbol}`);
+        if (cancelled) return;
+        const saved = localStorage.getItem(`dca_draft_${activePortfolioId || 'local-main'}_${symbol}`);
         if (saved) {
-          try { setEntries(JSON.parse(saved)); } catch { setEntries([...defaultEntries]); }
+          try {
+            const draft = JSON.parse(saved);
+            if (Array.isArray(draft)) {
+              loadedEntries = normalizeDcaEntries(draft);
+              setEntries(loadedEntries);
+            }
+            else {
+              loadedEntries = normalizeDcaEntries(draft.entries);
+              setEntries(loadedEntries);
+              setPortfolioBudget(Number(draft.portfolioBudget) || 0);
+              setPartialExits(Array.isArray(draft.partialExits) ? draft.partialExits : []);
+            }
+          } catch { setEntries(loadedEntries); }
         } else {
-          setEntries([...defaultEntries]);
+          setEntries(loadedEntries);
+          setPortfolioBudget(0);
+          setPartialExits([]);
         }
       }
 
       // Allow auto-save after a short delay to let React settle
-      setTimeout(() => { isLoadingRef.current = false; }, 200);
+      resetTimer = window.setTimeout(() => {
+        if (cancelled) return;
+        isLoadingRef.current = false;
+        syncDcaPosition(symbol, { entries: loadedEntries });
+      }, 200);
     };
 
-    loadDraft();
-  }, [symbol, userReady]); // re-run when symbol changes OR user becomes ready
+    void loadDraft();
+    return () => {
+      cancelled = true;
+      if (resetTimer) window.clearTimeout(resetTimer);
+    };
+  }, [activePortfolioId, symbol, userReady, userId, syncDcaPosition]);
 
-  // Debounced auto-save to Supabase whenever entries change + sync to Portfolio
+  // Debounced persistence, scoped by user and terminal symbol.
   useEffect(() => {
-    if (!symbol || !userReady || isLoadingRef.current) return;
-
-    // Don't save if all entries are empty defaults
-    const hasData = entries.some(e => e.price > 0 || e.amount > 0 || e.quantity > 0);
-    if (!hasData) return;
+    if (!activePortfolioId || !symbol || !userReady || isLoadingRef.current || (userId && !activePortfolioId)) return;
 
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
 
     saveTimerRef.current = setTimeout(async () => {
+      const draftPayload = { entries, portfolioBudget, partialExits };
       // 1. Save DCA draft
       if (userId) {
         await supabase
           .from('dca_drafts')
           .upsert(
-            { user_id: userId, symbol, entries, updated_at: new Date().toISOString() },
-            { onConflict: 'user_id,symbol' }
+            { user_id: userId, portfolio_id: activePortfolioId, symbol, entries: draftPayload, updated_at: new Date().toISOString() },
+            { onConflict: activePortfolioId ? 'user_id,portfolio_id,symbol' : 'user_id,symbol' }
           );
-      } else {
-        localStorage.setItem(`dca_draft_${symbol}`, JSON.stringify(entries));
       }
+      // Keep a local, current-session snapshot even for signed-in users. It
+      // prevents a Portfolio refresh from ever waiting on a remote draft read.
+      localStorage.setItem(`dca_draft_${activePortfolioId || 'local-main'}_${symbol}`, JSON.stringify(draftPayload));
 
-      // 2. Auto-sync active entries to Portfolio as a holding
-      const filledEntries = entries.filter(e => e.active && e.price > 0 && e.quantity > 0);
-      if (filledEntries.length > 0 && symbol) {
-        const totalQty = filledEntries.reduce((s, e) => s + e.quantity, 0);
-        const totalAmt = filledEntries.reduce((s, e) => s + e.amount, 0);
-        const avgCost = totalQty > 0 ? totalAmt / totalQty : 0;
-        const mktPrice = currentMarketPrice || avgCost;
-        const isThaiAsset = symbol.toUpperCase().endsWith('.BK') || symbol.toUpperCase().endsWith('.TH');
-        const CRYPTO = ['BTC', 'ETH', 'SOL', 'USDT', 'DOGE', 'XRP'];
-        const autoAllocation = CRYPTO.includes(symbol.toUpperCase()) ? 'Alternatives'
-          : isThaiAsset ? 'Equities' : 'Equities';
+      // Portfolio derives open DCA holdings from this persisted draft.
+      window.dispatchEvent(new CustomEvent('dca-drafts-changed', { detail: { symbol, entries: draftPayload, portfolioId: activePortfolioId } }));
 
-        addAsset({
-          name: symbol,
-          symbol: symbol,
-          valueUSD: mktPrice * totalQty,
-          change: mktPrice > 0 && avgCost > 0 ? ((mktPrice - avgCost) / avgCost) * 100 : 0,
-          allocation: autoAllocation,
-          shares: totalQty,
-          avgCost: avgCost,
-          currentPrice: mktPrice,
-        });
-      }
     }, 800);
 
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
-  }, [entries, symbol]);
+  }, [activePortfolioId, entries, portfolioBudget, partialExits, symbol, userReady, userId]);
 
   useEffect(() => {
     const fetchJournal = async () => {
@@ -188,12 +277,13 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
         return;
       }
       
-      const { data, error } = await supabase
+      let query = supabase
         .from('trade_journal')
         .select('*')
         .eq('user_id', user.id)
-        .eq('status', 'CLOSED')
-        .order('closed_at', { ascending: false });
+        .eq('status', 'CLOSED');
+      if (activePortfolioId) query = query.eq('portfolio_id', activePortfolioId);
+      const { data, error } = await query.order('closed_at', { ascending: false });
         
       if (data && data.length > 0) {
         setJournal(data.map(d => {
@@ -216,20 +306,26 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
       }
     };
     fetchJournal();
-  }, []);
+  }, [activePortfolioId]);
 
   const handleEntryChange = (id: number, field: 'price' | 'amount' | 'quantity', value: number) => {
     setEntries(prev => prev.map(e => {
       if (e.id !== id) return e;
       const newEntry = { ...e, [field]: value };
-      
-      if (field === 'price') {
-        if (newEntry.amount > 0) newEntry.quantity = value > 0 ? newEntry.amount / value : 0;
-        else if (newEntry.quantity > 0) newEntry.amount = newEntry.quantity * value;
-      } else if (field === 'amount') {
+
+      // Price, quantity and amount may be entered in any order.  Only derive
+      // the third value after the user has explicitly chosen quantity or amount
+      // as their basis, so typing a price never fills an unexpected quantity.
+      if (field === 'amount') {
+        newEntry.calculationBasis = 'amount';
         newEntry.quantity = newEntry.price > 0 ? value / newEntry.price : 0;
       } else if (field === 'quantity') {
+        newEntry.calculationBasis = 'quantity';
         newEntry.amount = value * newEntry.price;
+      } else if (newEntry.calculationBasis === 'amount' && newEntry.amount > 0) {
+        newEntry.quantity = value > 0 ? newEntry.amount / value : 0;
+      } else if (newEntry.calculationBasis === 'quantity' && newEntry.quantity > 0) {
+        newEntry.amount = value * newEntry.quantity;
       }
       return newEntry;
     }));
@@ -259,12 +355,68 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
     });
   };
 
+  const addEntry = () => {
+    setEntries(prev => {
+      return [...prev, {
+        id: Math.max(0, ...prev.map(entry => entry.id)) + 1,
+        price: 0,
+        amount: 0,
+        quantity: 0,
+        active: true,
+      }];
+    });
+  };
+
+  const removeEntry = (id: number) => {
+    setEntries(prev => prev.length === 1 ? prev : prev.filter(entry => entry.id !== id));
+    setExitQuantities(prev => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  };
+
   const activeEntries = entries.filter(e => e.active && e.price > 0 && (e.amount > 0 || e.quantity > 0));
-  const totalQuantity = activeEntries.reduce((sum, e) => sum + e.quantity, 0);
-  const totalInvestment = activeEntries.reduce((sum, e) => sum + e.amount, 0);
+  const portfolioBase = useMemo(() => {
+    const position = { quantity: 0, cost: 0 };
+    if (!symbol) return position;
+
+    // DCA lots are represented by the draft, not by completed trade rows.
+    // This is the same moving-average calculation used by Portfolio for the
+    // trader's normal BUY / SELL history.
+    [...trades]
+      .filter(trade => trade.asset.toUpperCase() === symbol.toUpperCase() && !trade.tag?.startsWith('DCA '))
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .forEach(trade => {
+        const quantity = trade.shares || (trade.pricePerUnit ? trade.amountUSD / trade.pricePerUnit : 0);
+        if (trade.type === 'BUY' || trade.type === 'IMPORT') {
+          position.quantity += quantity;
+          position.cost += trade.amountUSD + (trade.fees || 0);
+        } else if (trade.type === 'SELL' && position.quantity > 0) {
+          const costOfSoldShares = (Math.min(quantity, position.quantity) / position.quantity) * position.cost;
+          position.quantity = Math.max(0, position.quantity - quantity);
+          position.cost = Math.max(0, position.cost - costOfSoldShares);
+        } else if (trade.type === 'SHORT') {
+          position.quantity -= quantity;
+          position.cost += trade.amountUSD - (trade.fees || 0);
+        } else if (trade.type === 'COVER' && position.quantity < 0) {
+          const costOfCoveredShares = (quantity / Math.abs(position.quantity)) * position.cost;
+          position.quantity += quantity;
+          position.cost -= costOfCoveredShares;
+        }
+      });
+    return position;
+  }, [symbol, trades]);
+  const dcaTotalQuantity = activeEntries.reduce((sum, e) => sum + e.quantity, 0);
+  const dcaTotalInvestment = activeEntries.reduce((sum, e) => sum + e.amount, 0);
+  const dcaAvgEntryPrice = dcaTotalQuantity > 0 ? dcaTotalInvestment / dcaTotalQuantity : 0;
+  const totalQuantity = portfolioBase.quantity + dcaTotalQuantity;
+  const totalInvestment = portfolioBase.cost + dcaTotalInvestment;
   const totalBuyFee = 0; // Fee removed as requested
   const avgEntryPrice = totalQuantity > 0 ? totalInvestment / totalQuantity : 0;
   const breakEvenPrice = avgEntryPrice; // Fee removed
+  const realizedPartialPnl = partialExits.reduce((sum, exit) => sum + exit.pnl, 0);
+  const realizedPartialCost = partialExits.reduce((sum, exit) => sum + (exit.price * exit.quantity - exit.pnl), 0);
 
   // Live P&L based on current market price
   const effectiveSellPrice = manualSellPrice !== '' ? Number(manualSellPrice) : currentMarketPrice;
@@ -273,6 +425,7 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
   const currentSellFee = 0; // Fee removed
   const netPnL = grossValue - totalInvestment;
   const pnlPercent = totalInvestment > 0 ? (netPnL / totalInvestment) * 100 : 0;
+  const dcaNetPnL = effectiveSellPrice * dcaTotalQuantity - dcaTotalInvestment;
 
   // Simulator P&L
   const simGrossValue = simulatedPrice * totalQuantity;
@@ -287,26 +440,123 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
     if (pnlPercent > -1) return { text: "💡 ราคาอ่อนตัว ถ้ามีแผน DCA พิจารณาเปิดไม้ 2", color: "text-[#ADC6FF]" };
     if (pnlPercent > -2) return { text: "💡 ราคาลงมาถึงโซนไม้ 2 เพิ่มไม้เพื่อลดต้นทุนเฉลี่ย", color: "text-[#ADC6FF]" };
     if (pnlPercent > -4) return { text: "💡 โซนไม้ 3 การเพิ่มไม้จะดึงราคาเฉลี่ยลงมาได้มาก", color: "text-[#FFB4AB]" };
-    if (activeEntries.length === 4) return { text: "⏳ โซนไม้สุดท้ายแล้ว (ใช้เต็ม 4 ไม้) ถือไว้อย่างใจเย็น ราคาเฉลี่ยของคุณต่ำกว่าตลาดมาก", color: "text-purple-400" };
-    return { text: "⏳ โซนไม้ 4 (ไม้สุดท้าย) เพิ่มน้ำหนักเพื่อลดเฉลี่ย รอราคากลับ", color: "text-[#FFB4AB]" };
+    return { text: "⏳ ราคาอยู่ต่ำกว่าทุนเฉลี่ย — พิจารณาเพิ่มไม้ตามแผนและความเสี่ยงที่ตั้งไว้", color: "text-[#FFB4AB]" };
   };
 
   const advisory = getAdvisoryMessage();
 
+  const closeEntry = async (entryId: number, requestedQuantity: number, silent = false) => {
+    if (!activePortfolioId) {
+      if (!silent) addToast('เลือกพอร์ตเดี่ยวก่อนปิดไม้', 'warning');
+      return;
+    }
+    const entry = entries.find(item => item.id === entryId && item.active);
+    const sellPrice = effectiveSellPrice;
+    const quantity = Number(requestedQuantity);
+    if (!entry || !Number.isFinite(quantity) || quantity <= 0 || quantity > entry.quantity || sellPrice <= 0) {
+      if (!silent) addToast('ระบุจำนวนที่จะปิดให้มากกว่า 0 และไม่เกินจำนวนที่ถืออยู่', 'error');
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const pnl = (sellPrice - entry.price) * quantity;
+    const exit: PartialExit = {
+      id: crypto.randomUUID(),
+      entryId,
+      quantity,
+      price: sellPrice,
+      pnl,
+      closedAt: now,
+    };
+
+    // A closed lot is recorded as a matched BUY/SELL pair, retaining an
+    // accurate realised P&L while the remaining lots stay open in the draft.
+    await addTrade({
+      asset: symbol,
+      type: 'BUY',
+      amountUSD: entry.price * quantity,
+      date: now,
+      rateAtTime: exchangeRates[currency] || 1,
+      currency,
+      shares: quantity,
+      pricePerUnit: entry.price,
+      tag: `DCA entry ${entry.id}`,
+    });
+    await addTrade({
+      asset: symbol,
+      type: 'SELL',
+      amountUSD: sellPrice * quantity,
+      date: now,
+      rateAtTime: exchangeRates[currency] || 1,
+      currency,
+      shares: quantity,
+      pricePerUnit: sellPrice,
+      tag: `DCA partial exit from entry ${entry.id}`,
+    });
+
+    setEntries(prev => prev.map(item => {
+      if (item.id !== entryId) return item;
+      const remainingQuantity = Math.max(0, item.quantity - quantity);
+      return {
+        ...item,
+        quantity: remainingQuantity,
+        amount: remainingQuantity * item.price,
+        active: remainingQuantity > 0,
+      };
+    }));
+    setPartialExits(prev => [exit, ...prev]);
+    setExitQuantities(prev => ({ ...prev, [entryId]: '' }));
+    if (!silent) {
+      addToast(`ปิดไม้ ${entryId} จำนวน ${quantity.toLocaleString()} แล้ว · ${pnl >= 0 ? 'กำไร' : 'ขาดทุน'} ${formatVal(Math.abs(pnl))}`, pnl >= 0 ? 'success' : 'warning');
+    }
+  };
+
+  const archiveLegacyDcaAsset = async (expectedQuantity: number, expectedAveragePrice: number) => {
+    const sym = symbol.toUpperCase();
+    const asset = assets.find(item => item.symbol.toUpperCase() === sym);
+    const hasManualTrades = trades.some(trade =>
+      trade.asset.toUpperCase() === sym && !trade.tag?.startsWith('DCA ')
+    );
+    const quantityTolerance = Math.max(0.000001, expectedQuantity * 0.000001);
+    const priceTolerance = Math.max(0.0001, expectedAveragePrice * 0.000001);
+    const matchesLegacyDcaPosition = asset
+      && Math.abs((asset.shares || 0) - expectedQuantity) <= quantityTolerance
+      && Math.abs((asset.avgCost || 0) - expectedAveragePrice) <= priceTolerance;
+
+    // Previous versions mirrored a DCA draft into Portfolio without creating
+    // source trades.  Archive only that exact, unlinked position after it has
+    // been closed; real portfolio holdings and their trade history stay intact.
+    if (matchesLegacyDcaPosition && !hasManualTrades) {
+      await updateAsset(sym, { is_active: false });
+    }
+  };
+
   const closeTrade = async () => {
+    if (!activePortfolioId) {
+      addToast('เลือกพอร์ตเดี่ยวก่อนปิดออเดอร์', 'warning');
+      return;
+    }
     if (activeEntries.length === 0) return;
-    
+
     let newTradeId = Math.random().toString(36).substr(2, 9);
     const sym = symbol || 'UNKNOWN';
     const now = new Date().toISOString();
-    
-    // 1. Save to trade_journal (Supabase)
+    const finalNetPnl = dcaNetPnL + realizedPartialPnl;
+    const allCost = dcaTotalInvestment + realizedPartialCost;
+    const finalPnlPercent = allCost > 0 ? (finalNetPnl / allCost) * 100 : 0;
+    const allExits = [
+      ...partialExits.map(exit => ({ entry_id: exit.entryId, quantity: exit.quantity, price: exit.price, pnl: exit.pnl, hit_at: exit.closedAt })),
+      ...activeEntries.map(entry => ({ entry_id: entry.id, quantity: entry.quantity, price: effectiveSellPrice, pnl: (effectiveSellPrice - entry.price) * entry.quantity, hit_at: now })),
+    ];
+
+    // Persist a journal snapshot before clearing the remaining position.
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const user = sessionData?.session?.user;
       if (user) {
         const { data } = await supabase.from('trade_journal').insert({
           user_id: user.id,
+          portfolio_id: activePortfolioId,
           symbol: sym,
           market: sym.endsWith('.BK') || sym.endsWith('.TH') ? 'SET' : 'US',
           timeframe: 'DAY',
@@ -314,11 +564,11 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
           entries: activeEntries.map(e => ({
             level: e.id, price: e.price, amount: e.amount, quantity: e.quantity, filled_at: now
           })),
-          take_profits: [{ price: effectiveSellPrice, hit_at: now }],
-          avg_entry: avgEntryPrice,
-          total_pnl: netPnL,
+          take_profits: allExits,
+          avg_entry: dcaAvgEntryPrice,
+          total_pnl: finalNetPnl,
           signal_data: signalData,
-          notes: `Closed from DcaOrderSystem`,
+          notes: `Closed from DCA assistant — ${partialExits.length} prior partial exit(s)`,
           opened_at: now,
           closed_at: now,
         }).select().single();
@@ -328,63 +578,53 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
       console.error('Failed to save to Supabase', e);
     }
 
-    // 2. Record BUY trades per entry → Portfolio P/L tracking
+    // Close each entry as its own lot, preserving entry-level realised P&L.
     for (const entry of activeEntries) {
-      addTrade({
-        asset: sym,
-        type: 'BUY',
-        amountUSD: entry.amount,
-        date: now,
-        rateAtTime: exchangeRates[currency] || 1,
-        currency: currency,
-        shares: entry.quantity,
-        pricePerUnit: entry.price,
-      });
+      await closeEntry(entry.id, entry.quantity, true);
     }
-
-    // 3. Record single SELL trade at market price
-    addTrade({
-      asset: sym,
-      type: 'SELL',
-      amountUSD: effectiveSellPrice * totalQuantity,
-      date: now,
-      rateAtTime: exchangeRates[currency] || 1,
-      currency: currency,
-      shares: totalQuantity,
-      pricePerUnit: effectiveSellPrice,
-    });
+    await archiveLegacyDcaAsset(dcaTotalQuantity, dcaAvgEntryPrice);
     
     const trade: TradeSummary = {
       id: newTradeId,
       symbol: sym,
       entriesCount: activeEntries.length,
-      avgPrice: avgEntryPrice,
-      totalQuantity,
+      avgPrice: dcaAvgEntryPrice,
+      totalQuantity: dcaTotalQuantity,
       sellPrice: effectiveSellPrice,
       totalBuyFee,
       sellFee: currentSellFee,
-      netProfit: netPnL,
-      profitPercent: pnlPercent,
+      netProfit: finalNetPnl,
+      profitPercent: finalPnlPercent,
       date: now,
     };
     
     setJournal(prev => [trade, ...prev]);
     
-    addToast(`บันทึกการขายเรียบร้อย! กำไรสุทธิ: ${netPnL >= 0 ? '+' : ''}${formatVal(netPnL)}`, netPnL >= 0 ? 'success' : 'warning');
+    addToast(`บันทึกการปิดออเดอร์แล้ว · กำไรสุทธิ: ${finalNetPnl >= 0 ? '+' : ''}${formatVal(finalNetPnl)}`, finalNetPnl >= 0 ? 'success' : 'warning');
 
-    // 4. Clear saved draft from Supabase and reset
+    // Clear the persisted draft after a complete close.
     if (userId && symbol) {
-      supabase.from('dca_drafts').delete().eq('user_id', userId).eq('symbol', symbol).then(() => {});
+      let query = supabase.from('dca_drafts').delete().eq('user_id', userId).eq('symbol', symbol);
+      if (activePortfolioId) query = query.eq('portfolio_id', activePortfolioId);
+      await query;
     }
-    localStorage.removeItem(`dca_draft_${symbol}`);
+    localStorage.removeItem(`dca_draft_${activePortfolioId || 'local-main'}_${symbol}`);
+    syncDcaPosition(symbol, { entries: [] });
+    window.dispatchEvent(new CustomEvent('dca-drafts-changed', { detail: { symbol, entries: { entries: [] }, portfolioId: activePortfolioId } }));
     
     // Reset entries — block auto-save during reset
     isLoadingRef.current = true;
-    setEntries([...defaultEntries]);
+    setEntries(createDefaultEntries());
+    setPortfolioBudget(0);
+    setPartialExits([]);
     setTimeout(() => { isLoadingRef.current = false; }, 100);
   };
 
   const deleteJournal = async (id: string) => {
+    if (!activePortfolioId) {
+      addToast('เลือกพอร์ตเดี่ยวก่อนลบประวัติ', 'warning');
+      return;
+    }
     setJournal(prev => prev.filter(j => j.id !== id));
     try {
       await supabase.from('trade_journal').delete().eq('id', id);
@@ -394,8 +634,8 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
   return (
     <div className="space-y-6">
       
-      {/* TopBar Portal for Price */}
-      {portalTarget ? createPortal(
+      {/* Standalone page header; the Terminal modal supplies its own header. */}
+      {!compact && (portalTarget ? createPortal(
         <div className="flex items-center gap-4 bg-white/5 border border-border rounded-full px-4 py-1.5 ml-2 hover:bg-white/10 transition-colors">
            <div className="flex items-center gap-2">
              <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest hidden sm:inline">Asset</span>
@@ -419,6 +659,22 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
              <h2 className="text-3xl font-black text-[#4EDEA3] leading-none">{formatVal(currentMarketPrice)}</h2>
            </div>
         </div>
+      ))}
+
+      {compact && (
+        <div className="flex items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-wider text-gray-500">DCA Trade Assistant</p>
+            <h2 className="text-lg font-black text-white">{symbol || 'NO SYMBOL'}</h2>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <p className="text-[10px] font-bold uppercase text-gray-500">MKT Price</p>
+              <p className="text-sm font-black text-[#4EDEA3]">{formatVal(currentMarketPrice)}</p>
+            </div>
+            {onClose && <button onClick={onClose} className="rounded-xl p-2 text-gray-400 hover:bg-white/5 hover:text-white"><X size={18} /></button>}
+          </div>
+        </div>
       )}
 
       {/* Grid Layout */}
@@ -428,7 +684,12 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
         <div className="xl:col-span-1 space-y-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="font-black text-white flex items-center gap-2"><Target size={18} className="text-[#ADC6FF]" /> ไม้เข้าซื้อ (DCA Entries)</h3>
-            <span className="text-xs font-bold text-gray-500 bg-white/5 px-2 py-1 rounded">ใช้ไม้ไปแล้ว {activeEntries.length}/4</span>
+            <span className="text-xs font-bold text-gray-500 bg-white/5 px-2 py-1 rounded">ใช้ไม้ไปแล้ว {activeEntries.length} ไม้</span>
+          </div>
+
+          <div className="flex items-center justify-between rounded-xl border border-[#ADC6FF]/20 bg-[#ADC6FF]/5 px-3 py-2">
+            <span className="text-[10px] font-black uppercase tracking-wide text-gray-500">สินทรัพย์ที่กำลังซื้อ (Symbol)</span>
+            <span className="text-xs font-black text-[#ADC6FF]">{symbol || 'เลือก Symbol ใน Terminal'}</span>
           </div>
           
           <div className="space-y-3">
@@ -446,46 +707,73 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
                     </div>
                     <span className="font-bold text-sm text-white">ไม้ {entry.id} {idx === 0 ? '(แรก)' : '(ถัว)'}</span>
                   </div>
-                  {idx > 0 && (
+                  {entries.length > 1 && (
                     <button 
-                      onClick={() => toggleEntry(entry.id)}
-                      className="text-xs font-bold px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                      onClick={() => removeEntry(entry.id)}
+                      className="text-xs font-bold px-2 py-1 rounded-lg text-[#FFB4AB] bg-[#FFB4AB]/5 hover:bg-[#FFB4AB]/10 transition-colors"
                     >
-                      {entry.active ? 'ยกเลิกไม้' : '+ เพิ่มไม้'}
+                      ลบไม้
                     </button>
                   )}
                 </div>
 
                 {entry.active && (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div>
-                      <label className="text-[10px] font-black text-gray-500 uppercase mb-1 block">ราคา (Price)</label>
+                  <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                    <div className="min-w-0">
+                      <label className="mb-1 flex min-h-7 flex-col justify-end text-[9px] font-black uppercase leading-3 text-gray-500">
+                        <span>ราคา</span><span>(Price)</span>
+                      </label>
                       <input 
                         type="number" step="any"
                         value={entry.price || ''} onChange={e => handleEntryChange(entry.id, 'price', +e.target.value)}
-                        className="w-full bg-black/40 border border-border rounded-lg px-3 py-2 text-white font-bold text-sm outline-none focus:border-[#ADC6FF]"
+                        className="h-10 min-w-0 w-full rounded-lg border border-border bg-black/40 px-2 text-sm font-bold text-white outline-none focus:border-[#ADC6FF] sm:px-3"
                       />
                     </div>
-                    <div>
-                      <label className="text-[10px] font-black text-gray-500 uppercase mb-1 block">จำนวนหุ้น (Qty)</label>
+                    <div className="min-w-0">
+                      <label className="mb-1 flex min-h-7 flex-col justify-end text-[9px] font-black uppercase leading-3 text-gray-500">
+                        <span>จำนวนหุ้น</span><span>(Qty)</span>
+                      </label>
                       <input 
                         type="number" step="any"
                         value={entry.quantity || ''} onChange={e => handleEntryChange(entry.id, 'quantity', +e.target.value)}
-                        className="w-full bg-black/40 border border-border rounded-lg px-3 py-2 text-white font-bold text-sm outline-none focus:border-[#ADC6FF]"
+                        className="h-10 min-w-0 w-full rounded-lg border border-border bg-black/40 px-2 text-sm font-bold text-white outline-none focus:border-[#ADC6FF] sm:px-3"
                       />
                     </div>
-                    <div>
-                      <label className="text-[10px] font-black text-gray-500 uppercase mb-1 block">จำนวนเงิน (Amount)</label>
+                    <div className="min-w-0">
+                      <label className="mb-1 flex min-h-7 flex-col justify-end text-[9px] font-black uppercase leading-3 text-gray-500">
+                        <span>จำนวนเงิน</span><span>(Amount)</span>
+                      </label>
                       <input 
                         type="number" step="any"
                         value={entry.amount || ''} onChange={e => handleEntryChange(entry.id, 'amount', +e.target.value)}
-                        className="w-full bg-black/40 border border-border rounded-lg px-3 py-2 text-white font-bold text-sm outline-none focus:border-[#ADC6FF]"
+                        className="h-10 min-w-0 w-full rounded-lg border border-border bg-black/40 px-2 text-sm font-bold text-white outline-none focus:border-[#ADC6FF] sm:px-3"
                       />
                     </div>
                   </div>
                 )}
               </div>
             ))}
+          </div>
+
+          <button
+            onClick={addEntry}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[#ADC6FF]/40 py-3 text-xs font-black text-[#ADC6FF] transition-colors hover:bg-[#ADC6FF]/10"
+          >
+            <Plus size={15} /> เพิ่มไม้ DCA
+          </button>
+
+          <div className="mt-4 rounded-2xl border border-border bg-surface p-4">
+            <label className="mb-1 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wide text-gray-500"><CircleDollarSign size={12} /> เงินทุนแผนนี้ (Portfolio Budget)</label>
+            <input
+              type="number"
+              min="0"
+              step="any"
+              value={portfolioBudget || ''}
+              onChange={event => setPortfolioBudget(Number(event.target.value) || 0)}
+              placeholder="0.00"
+              className="w-full rounded-xl border border-border bg-black/40 px-3 py-2 text-sm font-black text-white outline-none focus:border-[#ADC6FF]"
+            />
+            <p className="mt-2 text-[10px] font-bold text-gray-500">ใช้ DCA แล้ว {formatVal(dcaTotalInvestment)}{portfolioBudget > 0 ? ` · คงเหลือ ${formatVal(Math.max(0, portfolioBudget - dcaTotalInvestment))}` : ''}</p>
           </div>
 
           {/* Donut Chart */}
@@ -642,7 +930,7 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
             
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6 relative z-10">
               <div>
-                <p className="text-[10px] font-black text-gray-500 uppercase mb-1">ราคาเฉลี่ย (Avg Cost)</p>
+                <p className="text-[10px] font-black text-gray-500 uppercase mb-1">ราคาเฉลี่ยพอร์ต (Portfolio Avg)</p>
                 <p className="text-2xl font-black text-white">{formatVal(avgEntryPrice)}</p>
               </div>
               <div>
@@ -650,7 +938,7 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
                 <p className="text-2xl font-black text-[#4EDEA3]">{formatVal(breakEvenPrice)}</p>
               </div>
               <div>
-                <p className="text-[10px] font-black text-gray-500 uppercase mb-1">ต้นทุนรวม (Total Cost)</p>
+                <p className="text-[10px] font-black text-gray-500 uppercase mb-1">ต้นทุนรวมพอร์ต (Total Cost)</p>
                 <p className="text-xl font-bold text-white">{formatVal(totalInvestment)}</p>
               </div>
               <div>
@@ -658,6 +946,12 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
                 <p className="text-xl font-bold text-white">{totalQuantity.toLocaleString(undefined, { maximumFractionDigits: 5 })}</p>
               </div>
             </div>
+
+            {portfolioBase.quantity > 0 && (
+              <p className="-mt-3 mb-5 rounded-lg border border-[#ADC6FF]/15 bg-[#ADC6FF]/5 px-3 py-2 text-[10px] font-bold text-[#ADC6FF] relative z-10">
+                รวมหุ้นเดิมใน Portfolio {portfolioBase.quantity.toLocaleString(undefined, { maximumFractionDigits: 5 })} หน่วย · ต้นทุน {formatVal(portfolioBase.cost)} เข้ากับไม้ DCA แล้ว
+              </p>
+            )}
 
             {/* Advisory */}
             <div className="bg-black/40 rounded-xl p-4 border border-border mb-6 flex items-start gap-3 relative z-10">
@@ -710,14 +1004,68 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
                   </div>
                 </div>
               </div>
+
+              <div className="mb-4 rounded-xl border border-white/10 bg-black/20 p-3">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <span className="text-[10px] font-black uppercase tracking-wide text-gray-400">ปิดบางส่วน / ตัดกำไรตามไม้</span>
+                  <span className="text-[10px] text-gray-500">ใช้ราคาขายด้านบน</span>
+                </div>
+                <div className="space-y-2">
+                  {activeEntries.map(entry => {
+                    const exitQuantity = Number(exitQuantities[entry.id]);
+                    const canCloseEntry = Number.isFinite(exitQuantity) && exitQuantity > 0 && exitQuantity <= entry.quantity;
+
+                    return (
+                      <div key={entry.id} className="grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded-lg bg-white/[0.03] p-2">
+                        <span className="text-xs font-black text-[#ADC6FF]">ไม้ {entry.id}</span>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="0"
+                            max={entry.quantity}
+                            step="any"
+                            value={exitQuantities[entry.id] ?? ''}
+                            onChange={event => setExitQuantities(prev => ({ ...prev, [entry.id]: event.target.value }))}
+                            placeholder={`สูงสุด ${entry.quantity.toLocaleString(undefined, { maximumFractionDigits: 5 })}`}
+                            className="min-w-0 flex-1 rounded-lg border border-border bg-black/40 px-2 py-1.5 text-xs font-bold text-white outline-none focus:border-[#E9C349]"
+                          />
+                          <span className="hidden text-[10px] text-gray-500 sm:inline">/{entry.quantity.toLocaleString(undefined, { maximumFractionDigits: 5 })}</span>
+                        </div>
+                        <button
+                          onClick={() => closeEntry(entry.id, exitQuantity)}
+                          disabled={!canCloseEntry}
+                          title={canCloseEntry ? 'ปิดไม้ตามจำนวนที่ระบุ' : 'กรุณาระบุจำนวนที่มากกว่า 0 และไม่เกินจำนวนที่ถืออยู่'}
+                          className="rounded-lg bg-[#E9C349] px-2.5 py-1.5 text-[10px] font-black text-[#2a2200] hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          ปิดไม้
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+                {partialExits.length > 0 && (
+                  <div className="mt-3 border-t border-white/10 pt-3">
+                    <p className="mb-1.5 text-[10px] font-black uppercase tracking-wide text-gray-500">ปิดไปแล้ว</p>
+                    <div className="space-y-1">
+                      {partialExits.slice(0, 4).map(exit => (
+                        <div key={exit.id} className="flex items-center justify-between text-[10px] font-bold text-gray-400">
+                          <span>ไม้ {exit.entryId} · {exit.quantity.toLocaleString(undefined, { maximumFractionDigits: 5 })} @ {formatVal(exit.price)}</span>
+                          <span className={exit.pnl >= 0 ? 'text-[#4EDEA3]' : 'text-[#FFB4AB]'}>{exit.pnl >= 0 ? '+' : ''}{formatVal(exit.pnl)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
               
               <button 
                 onClick={closeTrade}
                 disabled={activeEntries.length === 0}
                 className="w-full py-3 rounded-xl bg-white text-black font-black uppercase text-xs hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2 shadow-lg"
               >
-                <Check size={16} /> ยืนยันปิดออเดอร์ทำกำไร
+                <Check size={16} /> ปิดไม้ DCA ที่เหลือทั้งหมด
               </button>
+              {portfolioBase.quantity > 0 && <p className="mt-2 text-center text-[10px] font-bold text-gray-500">คำสั่งนี้ปิดเฉพาะไม้ DCA — หุ้นเดิมใน Portfolio จะไม่ถูกขาย</p>}
             </div>
           </div>
 

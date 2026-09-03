@@ -406,15 +406,15 @@ export default function LedgerPage() {
   }, [moneyBuckets, currency, exchangeRates]);
 
   return (
-    <div className="min-h-screen pb-24 sm:pb-8 flex flex-col">
+    <div className="flex min-h-screen min-w-0 flex-col pb-24 lg:pb-8">
       <SuccessConfetti active={showConfetti} />
 
       {/* ─── Header & Wallets ────────────────────────────────────────── */}
       <div className="bg-gradient-to-b from-[#1C1B1B] to-background border-b border-border sticky top-16 z-40">
         
         {/* Date Range Selector & Desktop Actions */}
-        <div className="flex items-center justify-between p-3 sm:p-4">
-          <DateRangeBar value={dateRange} onChange={setDateRange} className="min-w-0" />
+        <div className="flex min-w-0 items-center justify-between p-3 sm:p-4">
+          <DateRangeBar value={dateRange} onChange={setDateRange} className="min-w-0 flex-1" />
           
           <div className="hidden sm:flex items-center gap-2 flex-shrink-0 ml-4">
             <button 
@@ -434,7 +434,7 @@ export default function LedgerPage() {
 
         {/* Wallets Selector */}
         <div className="px-3 sm:px-4 pb-4">
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-2">
+          <div className="flex max-w-full items-center gap-2 overflow-x-auto overscroll-x-contain no-scrollbar pb-2">
             <button
               onClick={() => setSelectedWalletId('all')}
               className={cn(

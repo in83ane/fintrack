@@ -704,7 +704,7 @@ export default function BudgetPage() {
 
       {/* Account Cards Carousel - Luxury Glass Design */}
       <div
-        className="mb-6 sm:mb-8 relative"
+        className="relative mb-6 max-w-full sm:mb-8"
         onMouseEnter={() => setIsCarouselHovered(true)}
         onMouseLeave={() => setIsCarouselHovered(false)}
       >
@@ -718,7 +718,7 @@ export default function BudgetPage() {
 
         <div
           ref={carouselRef}
-          className="flex gap-4 sm:gap-6 overflow-x-auto py-3 px-1 pb-5 scrollbar-none snap-x snap-mandatory"
+          className="flex max-w-full gap-4 overflow-x-auto overscroll-x-contain px-1 py-3 pb-5 scrollbar-none snap-x snap-mandatory sm:gap-6"
         >
           {moneyBuckets.map((bucket) => {
             const actualPct = (bucket.targetAmount && bucket.targetAmount > 0) 
@@ -730,7 +730,7 @@ export default function BudgetPage() {
                 layout
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="relative flex-shrink-0 snap-start group min-w-[280px] sm:min-w-[340px] min-h-[16rem] h-auto"
+                className="group relative h-auto min-h-[16rem] w-[calc(100vw-2rem)] max-w-[22rem] flex-shrink-0 snap-start sm:min-w-[340px] sm:w-auto sm:max-w-none"
                 style={{ willChange: "transform" }}
               >
                 {/* Wrapper that scales — keeps glow clipped inside radius */}

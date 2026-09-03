@@ -140,8 +140,8 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
   );
 
   return (
-    <div className={cn("flex flex-wrap items-center gap-2", className)}>
-      <div className="flex items-center gap-0.5 bg-white/5 rounded-xl p-1 border border-border overflow-x-auto">
+    <div className={cn("flex max-w-full items-center gap-2 overflow-x-auto overscroll-x-contain scrollbar-none", className)}>
+      <div className="flex shrink-0 items-center gap-0.5 rounded-xl border border-border bg-white/5 p-1">
         {PRESETS.map((preset) => (
           <button
             key={preset.id}
@@ -162,7 +162,7 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
         ))}
       </div>
 
-      <div className="flex items-center gap-1 rounded-xl border border-border bg-white/[0.03] p-1">
+      <div className="flex shrink-0 items-center gap-1 rounded-xl border border-border bg-white/[0.03] p-1">
         {recentMonths.map((m) => (
           <button
             key={`${m.year}-${m.month}`}
@@ -183,7 +183,7 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
         ))}
       </div>
 
-      <div className="relative" ref={monthPickerRef}>
+      <div className="relative shrink-0" ref={monthPickerRef}>
         <button
           onClick={() => { setShowMonthPicker(!showMonthPicker); setShowCustom(false); }}
           className={cn(
@@ -228,7 +228,7 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
         </AnimatePresence>
       </div>
 
-      <div className="relative" ref={customRef}>
+      <div className="relative shrink-0" ref={customRef}>
         <button
           onClick={() => {
             if (!showCustom && value.mode === "custom") {

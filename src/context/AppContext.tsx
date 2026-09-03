@@ -22,6 +22,7 @@ export interface Trade {
   sourceBucketId?: string;
   tag?: string;
   dbId?: string;
+  portfolioId?: string;
 }
 
 export interface CashActivity {
@@ -51,6 +52,59 @@ export interface AppToast {
   message: string;
   type?: 'success' | 'info' | 'warning' | 'error';
 }
+
+interface DcaPosition {
+  symbol: string;
+  quantity: number;
+  cost: number;
+}
+
+// DCA entries are open positions, even before the trader closes them.  Keep
+// their portfolio contribution derived from the saved draft instead of writing
+// a duplicate BUY trade every time an input changes.
+const getDcaPositions = (drafts: Array<{ symbol?: string; entries?: unknown }>): DcaPosition[] => {
+  const positions = new Map<string, DcaPosition>();
+
+  drafts.forEach(draft => {
+    const symbol = draft.symbol?.trim().toUpperCase();
+    const payload = Array.isArray(draft.entries) ? draft.entries : (draft.entries as any)?.entries;
+    if (!symbol || !Array.isArray(payload)) return;
+
+    payload.forEach((entry: any) => {
+      if (entry?.active === false) return;
+      const quantity = Number(entry?.quantity);
+      const price = Number(entry?.price);
+      const amount = Number(entry?.amount);
+      if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(price) || price <= 0) return;
+
+      const current = positions.get(symbol) || { symbol, quantity: 0, cost: 0 };
+      current.quantity += quantity;
+      current.cost += Number.isFinite(amount) && amount > 0 ? amount : price * quantity;
+      positions.set(symbol, current);
+    });
+  });
+
+  return Array.from(positions.values());
+};
+
+const getTradePosition = (trades: Trade[], symbol: string) => {
+  const position = { quantity: 0, cost: 0 };
+  [...trades]
+    .filter(trade => trade.asset.toUpperCase() === symbol && !trade.tag?.startsWith('DCA '))
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .forEach(trade => {
+      const quantity = trade.shares || (trade.pricePerUnit ? trade.amountUSD / trade.pricePerUnit : 0);
+      if (trade.type === 'BUY' || trade.type === 'IMPORT') {
+        position.quantity += quantity;
+        position.cost += trade.amountUSD + (trade.fees || 0);
+      } else if (trade.type === 'SELL' && position.quantity > 0) {
+        const soldQuantity = Math.min(quantity, position.quantity);
+        position.cost -= (soldQuantity / position.quantity) * position.cost;
+        position.quantity -= soldQuantity;
+      }
+    });
+  return position;
+};
 
 export interface AppNotification {
   id: string;
@@ -131,7 +185,17 @@ export interface Asset {
   currentPrice?: number;
   currency?: string;
   excludeFromTotal?: boolean;
+  portfolioId?: string;
 }
+
+export interface Portfolio {
+  id: string;
+  name: string;
+  color: string;
+  isDefault: boolean;
+}
+
+export const ALL_PORTFOLIOS_ID = "__all_portfolios__";
 
 export interface NetWorthSettings {
   includeAssets: boolean;
@@ -178,7 +242,15 @@ interface AppState {
   allocations: Allocation[];
   updateAllocation: (label: string, value: number) => void;
   assets: Asset[];
+  portfolios: Portfolio[];
+  activePortfolioId: string | null;
+  activePortfolio: Portfolio | null;
+  isAllPortfolios: boolean;
+  selectPortfolio: (id: string | null) => void;
+  createPortfolio: (name: string) => Promise<Portfolio | null>;
+  renamePortfolio: (id: string, name: string) => Promise<boolean>;
   addAsset: (asset: Asset) => void;
+  syncDcaPosition: (symbol: string, entries: unknown) => void;
   bulkAddTrades: (trades: Omit<Trade, "id">[]) => void;
   netWorthHistory: { date: string; value: number }[];
   userProfile?: { email: string; avatarUrl: string; initials: string };
@@ -1533,10 +1605,151 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [dcaPositions, setDcaPositions] = useState<DcaPosition[]>([]);
+  const dcaAssetSaveTimers = React.useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const deletedAssetSymbols = React.useRef<Set<string>>(new Set());
   const [toasts, setToasts] = useState<AppToast[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [customCategories, setCustomCategories] = useState<CustomCategory[]>([]);
+  const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
+  const [activePortfolioId, setActivePortfolioId] = useState<string | null>(null);
+  const [portfoliosReady, setPortfoliosReady] = useState(false);
+
+  const selectPortfolio = React.useCallback((id: string | null) => {
+    setActivePortfolioId(id);
+    try { localStorage.setItem('fintrack-active-portfolio', id || ALL_PORTFOLIOS_ID); } catch {}
+  }, []);
+
+  const createPortfolio = React.useCallback(async (name: string): Promise<Portfolio | null> => {
+    const trimmedName = name.trim().slice(0, 80);
+    if (!trimmedName) return null;
+
+    if (!user) {
+      const portfolio: Portfolio = {
+        id: `local-${Date.now()}`,
+        name: trimmedName,
+        color: '#ADC6FF',
+        isDefault: portfolios.length === 0,
+      };
+      setPortfolios(prev => [...prev, portfolio]);
+      selectPortfolio(portfolio.id);
+      return portfolio;
+    }
+
+    const { data, error } = await db.portfolios.insert({
+      user_id: user.id,
+      name: trimmedName,
+      color: '#ADC6FF',
+      is_default: portfolios.length === 0,
+    });
+    if (error || !data) {
+      console.error('Failed to create portfolio', error);
+      return null;
+    }
+    const portfolio: Portfolio = {
+      id: data.id,
+      name: data.name,
+      color: data.color,
+      isDefault: data.is_default,
+    };
+    setPortfolios(prev => [...prev, portfolio]);
+    selectPortfolio(portfolio.id);
+    return portfolio;
+  }, [portfolios.length, selectPortfolio, user]);
+
+  const renamePortfolio = React.useCallback(async (id: string, name: string): Promise<boolean> => {
+    const trimmedName = name.trim().slice(0, 80);
+    if (!trimmedName) return false;
+    if (!user) {
+      setPortfolios(prev => prev.map(portfolio => portfolio.id === id ? { ...portfolio, name: trimmedName } : portfolio));
+      return true;
+    }
+    const { data, error } = await db.portfolios.update(id, { name: trimmedName });
+    if (error || !data) {
+      console.error('Failed to rename portfolio', error);
+      return false;
+    }
+    setPortfolios(prev => prev.map(portfolio => portfolio.id === id ? { ...portfolio, name: data.name, color: data.color } : portfolio));
+    return true;
+  }, [user]);
+
+  // Makes the Terminal and Portfolio agree immediately, then persists the
+  // calculated holding so a refresh has the exact same source of truth.
+  const syncDcaPosition = React.useCallback((symbol: string, entries: unknown) => {
+    // “All portfolios” is an aggregate/read-only view. Never assign a DCA
+    // draft or its mirrored asset to an unscoped portfolio from this view.
+    if (!activePortfolioId) return;
+    const normalizedSymbol = symbol.trim().toUpperCase();
+    if (!normalizedSymbol) return;
+    const nextPosition = getDcaPositions([{ symbol: normalizedSymbol, entries }])[0];
+    const manualPosition = getTradePosition(trades, normalizedSymbol);
+    const totalQuantity = manualPosition.quantity + (nextPosition?.quantity || 0);
+    const totalCost = manualPosition.cost + (nextPosition?.cost || 0);
+
+    setDcaPositions(prev => {
+      const remaining = prev.filter(position => position.symbol.toUpperCase() !== normalizedSymbol);
+      return nextPosition ? [...remaining, nextPosition] : remaining;
+    });
+
+    if (totalQuantity <= 0) return;
+
+    const existingAsset = assetsRef.current.find(asset => asset.symbol.toUpperCase() === normalizedSymbol);
+    const currentPrice = existingAsset?.currentPrice || (totalCost / totalQuantity);
+    const nextAsset: Asset = {
+      id: existingAsset?.id,
+      name: existingAsset?.name || normalizedSymbol,
+      symbol: normalizedSymbol,
+      valueUSD: currentPrice * totalQuantity,
+      currentPrice,
+      avgCost: totalCost / totalQuantity,
+      shares: totalQuantity,
+      change: currentPrice > 0 && totalCost > 0 ? ((currentPrice - (totalCost / totalQuantity)) / (totalCost / totalQuantity)) * 100 : 0,
+      allocation: existingAsset?.allocation || 'Equities',
+      realizedPL: existingAsset?.realizedPL || 0,
+      dividendTotal: existingAsset?.dividendTotal || 0,
+      isFavorite: existingAsset?.isFavorite,
+      sortOrder: existingAsset?.sortOrder,
+      is_active: true,
+    };
+
+    setAssets(prev => {
+      const index = prev.findIndex(asset => asset.symbol.toUpperCase() === normalizedSymbol);
+      const next = index >= 0
+        ? prev.map((asset, assetIndex) => assetIndex === index ? { ...asset, ...nextAsset } : asset)
+        : [nextAsset, ...prev];
+      localStorage.setItem('fintrack-assets', JSON.stringify(next));
+      return next;
+    });
+
+    const previousTimer = dcaAssetSaveTimers.current[normalizedSymbol];
+    if (previousTimer) clearTimeout(previousTimer);
+    dcaAssetSaveTimers.current[normalizedSymbol] = setTimeout(async () => {
+      if (!user) return;
+      await db.assets.upsert({
+        user_id: user.id,
+        portfolio_id: activePortfolioId,
+        name: nextAsset.name,
+        symbol: nextAsset.symbol,
+        asset_type: nextAsset.allocation,
+        allocation: nextAsset.allocation,
+        value_usd: nextAsset.valueUSD,
+        quantity: nextAsset.shares || 0,
+        avg_purchase_price: nextAsset.avgCost || 0,
+        current_price: nextAsset.currentPrice || 0,
+        is_active: true,
+        is_favorite: nextAsset.isFavorite || false,
+        sort_order: nextAsset.sortOrder || 0,
+        notes: null,
+        sector: null,
+        country: null,
+        allocation_target: 0,
+        allocation_current: 0,
+        change_24h: 0,
+        change_percentage: nextAsset.change,
+        exclude_from_total: nextAsset.excludeFromTotal || false,
+      });
+    }, 350);
+  }, [activePortfolioId, trades, user]);
 
   const loadFromLocalStorage = React.useCallback(() => {
     let hasLocalData = false;
@@ -1646,9 +1859,69 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Fetch data when user changes
+  // All financial records are loaded for the selected portfolio.  Passing a
+  // null selection is reserved for the explicit aggregate/read-only view.
   useEffect(() => {
     if (!authReady) return;
+    setPortfoliosReady(false);
+
+    if (!user) {
+      const localPortfolio: Portfolio = { id: 'local-main', name: 'Main Portfolio', color: '#ADC6FF', isDefault: true };
+      setPortfolios([localPortfolio]);
+      setActivePortfolioId(localPortfolio.id);
+      setPortfoliosReady(true);
+      return;
+    }
+
+    let cancelled = false;
+    const loadPortfolios = async () => {
+      const { data, error } = await db.portfolios.getAll(user.id);
+      if (cancelled) return;
+      if (error) {
+        // Do not fall back to an unfiltered account query: that would expose
+        // Main Portfolio data while the user thinks another portfolio is open.
+        console.warn('Unable to load portfolios', error.message);
+        setPortfolios([{ id: 'portfolio-migration-required', name: 'Portfolio setup required', color: '#FFB4AB', isDefault: true }]);
+        setActivePortfolioId('portfolio-migration-required');
+        setPortfoliosReady(true);
+        return;
+      }
+
+      let records = data || [];
+      if (records.length === 0) {
+        const created = await db.portfolios.insert({
+          user_id: user.id,
+          name: 'Main Portfolio',
+          color: '#ADC6FF',
+          is_default: true,
+        });
+        if (cancelled) return;
+        records = created.data ? [created.data] : [];
+        if (created.error) console.error('Unable to create default portfolio', created.error);
+      }
+
+      const nextPortfolios = records.map(record => ({
+        id: record.id,
+        name: record.name,
+        color: record.color,
+        isDefault: record.is_default,
+      }));
+      setPortfolios(nextPortfolios);
+      const savedId = typeof window !== 'undefined' ? localStorage.getItem('fintrack-active-portfolio') : null;
+      const nextActive = nextPortfolios.find(portfolio => portfolio.id === savedId)
+        || nextPortfolios.find(portfolio => portfolio.isDefault)
+        || nextPortfolios[0];
+      setActivePortfolioId(savedId === ALL_PORTFOLIOS_ID ? null : (nextActive?.id || null));
+      setPortfoliosReady(true);
+    };
+
+    void loadPortfolios();
+    return () => { cancelled = true; };
+  }, [authReady, user]);
+
+  // Fetch data when user or selected portfolio changes
+  useEffect(() => {
+    if (!authReady || (user && !portfoliosReady)) return;
 
     setIsDataLoaded(false);
 
@@ -1674,13 +1947,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           { data: cashActivitiesData, error: cashActivitiesError },
           { data: userCategoriesData, error: userCategoriesError },
         ] = await Promise.all([
-          db.assets.getAll(user.id),
-          db.trades.getAll(user.id),
-          db.allocations.getAll(user.id),
-          db.buckets.getAll(user.id),
-          db.bucketActivities.getAll(user.id),
-          db.cashActivities.getAll(user.id),
-          db.userCategories.getAll(user.id),
+          db.assets.getAll(user.id, activePortfolioId),
+          db.trades.getAll(user.id, activePortfolioId),
+          db.allocations.getAll(user.id, activePortfolioId),
+          db.buckets.getAll(user.id, activePortfolioId),
+          db.bucketActivities.getAll(user.id, activePortfolioId),
+          db.cashActivities.getAll(user.id, activePortfolioId),
+          db.userCategories.getAll(user.id, activePortfolioId),
         ]);
 
         const loadErrors = [
@@ -1697,19 +1970,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           console.error("Supabase data load errors:", loadErrors);
         }
 
-        const remoteHasData = [
-          assetsData,
-          tradesData,
-          allocationsData,
-          bucketsData,
-          bucketActivitiesData,
-          cashActivitiesData,
-          userCategoriesData,
-        ].some((data) => Array.isArray(data) && data.length > 0);
-
-        if (!remoteHasData && loadFromLocalStorage()) {
-          return;
-        }
+        // Signed-in data never falls back to the browser cache.  A cache may
+        // belong to a different selected portfolio and was the source of
+        // records from Main appearing in a newly-created portfolio.
 
         if (assetsData) {
           // Populate deleted symbols so trades don't recreate them
@@ -1721,25 +1984,46 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const activeAssets = assetsData.filter(a => a.is_active !== false);
           const uniqueAssetsMap = new Map();
           activeAssets.forEach(a => {
-            if (!uniqueAssetsMap.has(a.symbol.toUpperCase())) {
-              uniqueAssetsMap.set(a.symbol.toUpperCase(), {
+            const symbolKey = a.symbol.toUpperCase();
+            const quantity = a.quantity || 0;
+            const currentPrice = a.current_price || a.avg_purchase_price || (quantity > 0 ? (a.value_usd || 0) / quantity : 0);
+            const nextAsset = {
                 id: a.id,
                 name: a.name,
                 symbol: a.symbol,
                 valueUSD: (() => {
-                  if (a.current_price && a.quantity) return a.current_price * a.quantity;
-                  if (a.avg_purchase_price && a.quantity) return a.avg_purchase_price * a.quantity;
+                  if (a.current_price && quantity) return a.current_price * quantity;
+                  if (a.avg_purchase_price && quantity) return a.avg_purchase_price * quantity;
                   return a.value_usd || 0;
                 })(),
                 change: a.change_percentage || 0,
                 allocation: a.asset_type || 'Equities',
-                shares: a.quantity,
+                shares: quantity,
                 avgCost: a.avg_purchase_price || 0,
-                currentPrice: a.current_price || a.avg_purchase_price || (a.quantity && a.quantity > 0 ? (a.value_usd || 0) / a.quantity : 0),
+                currentPrice,
                 isFavorite: a.is_favorite,
                 sortOrder: a.sort_order,
-                is_active: a.is_active
+                is_active: a.is_active,
+                portfolioId: a.portfolio_id || undefined,
+              };
+            const existing = uniqueAssetsMap.get(symbolKey);
+            // The all-portfolios view is an aggregate. Keep one row per symbol
+            // and combine its quantity/cost/value instead of silently keeping
+            // the first portfolio's copy.
+            if (existing && !activePortfolioId) {
+              const combinedShares = (existing.shares || 0) + quantity;
+              const existingCost = (existing.avgCost || 0) * (existing.shares || 0);
+              const nextCost = (a.avg_purchase_price || 0) * quantity;
+              uniqueAssetsMap.set(symbolKey, {
+                ...existing,
+                shares: combinedShares,
+                avgCost: combinedShares > 0 ? (existingCost + nextCost) / combinedShares : 0,
+                valueUSD: (existing.valueUSD || 0) + nextAsset.valueUSD,
+                currentPrice: combinedShares > 0 ? ((existing.valueUSD || 0) + nextAsset.valueUSD) / combinedShares : existing.currentPrice,
+                portfolioId: undefined,
               });
+            } else if (!existing) {
+              uniqueAssetsMap.set(symbolKey, nextAsset);
             }
           });
           const newAssetsArray = Array.from(uniqueAssetsMap.values());
@@ -1771,7 +2055,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               pricePerUnit: t.price_at_execution || 0,
               sourceBucketId: sourceBucketId,
               tag: (t.tags && t.tags.length > 0) ? t.tags[0] : undefined,
-              dbId: t.id
+              dbId: t.id,
+              portfolioId: t.portfolio_id || undefined,
             };
           }));
         } else {
@@ -1858,7 +2143,86 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
 
     loadData();
-  }, [user, authReady, loadFromLocalStorage]);
+  }, [user, authReady, activePortfolioId, portfoliosReady, loadFromLocalStorage]);
+
+  // Never let a previous portfolio's virtual DCA lots appear while the next
+  // selected portfolio is still loading its own draft.
+  useEffect(() => {
+    deletedAssetSymbols.current.clear();
+    setDcaPositions([]);
+  }, [activePortfolioId]);
+
+  // Refresh open DCA lots on startup and whenever the Terminal saves a draft.
+  // The assistant publishes this browser event after its debounced persistence.
+  useEffect(() => {
+    if (!authReady || (user && !portfoliosReady)) return;
+    let cancelled = false;
+
+    const getLocalDcaDrafts = (): Array<{ symbol: string; entries: unknown }> => {
+      const localDrafts: Array<{ symbol: string; entries: unknown }> = [];
+      // Portfolio-specific browser drafts cannot be safely reconstructed from
+      // their key in the aggregate view. Supabase supplies the combined view.
+      if (!activePortfolioId) return localDrafts;
+      const prefix = activePortfolioId ? `dca_draft_${activePortfolioId}_` : 'dca_draft_';
+      for (let index = 0; index < localStorage.length; index += 1) {
+        const key = localStorage.key(index);
+        if (!key?.startsWith(prefix)) continue;
+        try {
+          localDrafts.push({ symbol: key.slice(prefix.length), entries: JSON.parse(localStorage.getItem(key) || '[]') });
+        } catch {
+          // Ignore malformed offline drafts and continue loading the rest.
+        }
+      }
+      return localDrafts;
+    };
+
+    const loadDcaPositions = async () => {
+      const localPositions = getDcaPositions(getLocalDcaDrafts());
+      if (user) {
+        let query = supabase
+          .from('dca_drafts')
+          .select('symbol, entries')
+          .eq('user_id', user.id);
+        if (activePortfolioId) query = query.eq('portfolio_id', activePortfolioId);
+        const { data, error } = await query;
+
+        if (cancelled) return;
+        if (error) {
+          // The table is created by migration 007.  Keep the portfolio usable
+          // for deployments where that migration has not been run yet.
+          console.warn('Unable to load open DCA positions', error.message);
+          setDcaPositions(localPositions);
+          return;
+        }
+        const remotePositions = getDcaPositions(data || []);
+        // A local snapshot is written with the same edit that starts the remote
+        // upsert.  Prefer it for a symbol so a page refresh never flashes an
+        // older server response while that write is propagating.
+        const merged = new Map(remotePositions.map(position => [position.symbol.toUpperCase(), position]));
+        localPositions.forEach(position => merged.set(position.symbol.toUpperCase(), position));
+        setDcaPositions(Array.from(merged.values()));
+        return;
+      }
+
+      if (!cancelled) setDcaPositions(localPositions);
+    };
+
+    const handleDcaDraftChange = (event: Event) => {
+      const detail = (event as CustomEvent<{ symbol?: string; entries?: unknown; portfolioId?: string | null }>).detail;
+      if (detail?.portfolioId && detail.portfolioId !== activePortfolioId) return;
+      if (detail?.symbol && detail.entries !== undefined) {
+        syncDcaPosition(detail.symbol, detail.entries);
+        return;
+      }
+      void loadDcaPositions();
+    };
+    void loadDcaPositions();
+    window.addEventListener('dca-drafts-changed', handleDcaDraftChange);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('dca-drafts-changed', handleDcaDraftChange);
+    };
+  }, [activePortfolioId, authReady, portfoliosReady, user, syncDcaPosition]);
 
   // Sync state to local storage is no longer needed as primary source, 
   // but we can keep it as a backup for transient state if we want.
@@ -2044,6 +2408,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
+    // Open DCA lots are virtual holdings backed by dca_drafts.  They merge
+    // with any regular position in the same symbol, then disappear as soon as
+    // the assistant closes the remaining lots and clears its draft.
+    const dcaSymbols = new Set<string>();
+    dcaPositions.forEach(position => {
+      const sym = position.symbol.toUpperCase();
+      if (position.quantity <= 0 || position.cost <= 0) return;
+      dcaSymbols.add(sym);
+      if (!stats[sym]) stats[sym] = { shares: 0, totalCost: 0, realizedPL: 0, dividendTotal: 0 };
+      stats[sym].shares += position.quantity;
+      stats[sym].totalCost += position.cost;
+    });
+
     setAssets(prev => {
       // Build a set of symbols that exist in Supabase with is_active: false
       const softDeletedSymbols = new Set(
@@ -2074,11 +2451,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
       // Add new ones that aren't in the deleted set and have positive shares
       Object.entries(stats).forEach(([symbol, s]) => {
-        if (deletedAssetSymbols.current.has(symbol)) return;
+        if (deletedAssetSymbols.current.has(symbol) && !dcaSymbols.has(symbol)) return;
         // Don't recreate assets with 0 shares (fully sold)
         if (s.shares <= 0) return;
         // Don't recreate soft-deleted assets
-        if (softDeletedSymbols.has(symbol)) return;
+        if (softDeletedSymbols.has(symbol) && !dcaSymbols.has(symbol)) return;
         const CRYPTO_SYM = ['BTC', 'ETH', 'SOL', 'USDT', 'DOGE', 'XRP'];
         const autoAlloc = CRYPTO_SYM.includes(symbol) ? 'Alternatives'
           : (symbol.endsWith('.BK') || symbol.endsWith('.TH')) ? 'Equities'
@@ -2101,7 +2478,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem("fintrack-assets", JSON.stringify(deduplicatedAssets));
       return deduplicatedAssets;
     });
-  }, [trades, isDataLoaded]);
+  }, [trades, dcaPositions, isDataLoaded]);
 
   // Fetch Live Market Data and persist prices to Supabase
   useEffect(() => {
@@ -2164,7 +2541,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }));
 
         // 2. Write live prices back to Supabase so next refresh is instant
-        if (user && mounted) {
+        // Aggregate rows are a display-only synthesis and their `id` belongs
+        // to just one source portfolio, so never write live quotes from All.
+        if (user && activePortfolioId && mounted) {
           const writes = snapshot
             .filter(a => a.id)
             .map(a => {
@@ -2207,7 +2586,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       mounted = false;
       clearInterval(interval);
     };
-  }, [isDataLoaded, user]);
+  }, [activePortfolioId, isDataLoaded, user]);
 
 
   const fetchAssetMarketData = async (symbol: string) => {
@@ -2280,6 +2659,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data, error } = await db.assets.upsert({
         user_id: user.id,
+        portfolio_id: activePortfolioId,
         name: assetData.name,
         symbol: assetData.symbol,
         asset_type: assetData.allocation,
@@ -2334,6 +2714,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data, error } = await db.trades.insert({
         user_id: user.id,
+        portfolio_id: activePortfolioId,
         asset_id: null,
         asset_name: tradeData.asset,
         symbol: tradeData.asset,
@@ -2359,7 +2740,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }]);
 
         // Refetch cash activities to sync with backend triggers
-        const { data: newCashActivities } = await db.cashActivities.getAll(user.id);
+        const { data: newCashActivities } = await db.cashActivities.getAll(user.id, activePortfolioId);
         if (newCashActivities) {
           setCashActivities(newCashActivities.map(ca => ({
             id: ca.id,
@@ -2421,10 +2802,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
     try {
       // Option B: Soft delete all rows matching symbol
-      await db.assets.softDeleteBySymbol(user.id, sym);
+      await db.assets.softDeleteBySymbol(user.id, sym, activePortfolioId);
       
       // Delete all trades for this asset
-      await db.trades.deleteBySymbol(user.id, sym);
+      await db.trades.deleteBySymbol(user.id, sym, activePortfolioId);
       
       deletedAssetSymbols.current.add(sym);
       setAssets(prev => prev.filter(a => a.symbol.toUpperCase() !== sym));
@@ -2592,6 +2973,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       let { data, error } = await db.buckets.insert({
         user_id: user.id,
+        portfolio_id: activePortfolioId,
         name: bucket.name,
         target_percent: bucket.targetPercent,
         target_amount: bucket.targetAmount || 0,
@@ -2678,6 +3060,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data, error } = await db.bucketActivities.insert({
         user_id: user.id,
+        portfolio_id: activePortfolioId,
         bucket_id: activity.bucketId,
         type: activity.type,
         amount: activity.amount,
@@ -2740,6 +3123,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data, error } = await db.cashActivities.insert({
         user_id: user.id,
+        portfolio_id: activePortfolioId,
         type: activityData.type,
         amount: activityData.amountUSD,
         category: activityData.category,
@@ -2837,6 +3221,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const allocation = allocations.find(a => a.label === label);
       await db.allocations.upsert({
         user_id: user.id,
+        portfolio_id: activePortfolioId,
         label,
         value,
         color: allocation?.color || "#6B7280"
@@ -2855,6 +3240,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const supabaseTrades = newTrades.map(t => ({
         user_id: user.id,
+        portfolio_id: activePortfolioId,
         asset_id: null,
         asset_name: t.asset,
         symbol: t.asset,
@@ -2880,7 +3266,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setTrades(prev => [...tradesWithIds, ...prev]);
 
         // Refetch cash activities to sync with backend triggers
-        const { data: newCashActivities } = await db.cashActivities.getAll(user.id);
+        const { data: newCashActivities } = await db.cashActivities.getAll(user.id, activePortfolioId);
         if (newCashActivities) {
           setCashActivities(newCashActivities.map(ca => ({
             id: ca.id,
@@ -2930,6 +3316,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
 
+  const activePortfolio = React.useMemo(
+    () => portfolios.find(portfolio => portfolio.id === activePortfolioId) || null,
+    [activePortfolioId, portfolios]
+  );
+  const isAllPortfolios = activePortfolioId === null;
+
   // Computed P/L metrics respecting excludeFromTotal
   const includedAssets = React.useMemo(() => assets.filter(a => !a.excludeFromTotal), [assets]);
 
@@ -2970,7 +3362,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const { data, error } = await db.userCategories.insert(user.id, type, trimmed, icon);
+      const { data, error } = await db.userCategories.insert(user.id, type, trimmed, icon, activePortfolioId);
       if (error) throw error;
       if (data) {
         // Replace temp with real DB id
@@ -2999,6 +3391,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // The combined view is deliberately read-only.  Without this guard a write
+  // from "All portfolios" could either be unscoped or modify an arbitrary
+  // row that happens to be visible in the aggregate.
+  const blockAllPortfolioMutation = () => {
+    addToast(
+      language === 'th'
+        ? 'เลือกพอร์ตเดี่ยวก่อนเพิ่มหรือแก้ไขข้อมูล'
+        : 'Select one portfolio before adding or editing data.',
+      'warning'
+    );
+  };
+  const readOnlyCashActivity = async (): Promise<CashActivity | null> => {
+    blockAllPortfolioMutation();
+    return null;
+  };
+  const blockAllPortfolioMutationAsync = async (): Promise<void> => {
+    blockAllPortfolioMutation();
+  };
+
   return (
     <AppContext.Provider value={{ 
       language, 
@@ -3009,25 +3420,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       formatMoney,
       exchangeRates,
       trades,
-      addTrade,
+      addTrade: isAllPortfolios ? blockAllPortfolioMutation : addTrade,
       cashActivities,
-      addCashActivity,
-      removeCashActivity,
+      addCashActivity: isAllPortfolios ? readOnlyCashActivity : addCashActivity,
+      removeCashActivity: isAllPortfolios ? blockAllPortfolioMutation : removeCashActivity,
       allocations,
-      updateAllocation,
+      updateAllocation: isAllPortfolios ? blockAllPortfolioMutation : updateAllocation,
       assets,
-      addAsset,
-      bulkAddTrades,
+      portfolios,
+      activePortfolioId,
+      activePortfolio,
+      isAllPortfolios,
+      selectPortfolio,
+      createPortfolio,
+      renamePortfolio,
+      addAsset: isAllPortfolios ? blockAllPortfolioMutation : addAsset,
+      syncDcaPosition,
+      bulkAddTrades: isAllPortfolios ? blockAllPortfolioMutation : bulkAddTrades,
       netWorthHistory,
       userProfile,
       setUserProfile,
       fetchAssetMarketData,
-      removeAsset,
-      updateAsset,
-      reorderAssets,
-      removeTrade,
-      updateTrade,
-      updateCashActivity,
+      removeAsset: isAllPortfolios ? blockAllPortfolioMutation : removeAsset,
+      updateAsset: isAllPortfolios ? blockAllPortfolioMutation : updateAsset,
+      reorderAssets: isAllPortfolios ? blockAllPortfolioMutation : reorderAssets,
+      removeTrade: isAllPortfolios ? blockAllPortfolioMutation : removeTrade,
+      updateTrade: isAllPortfolios ? blockAllPortfolioMutation : updateTrade,
+      updateCashActivity: isAllPortfolios ? blockAllPortfolioMutation : updateCashActivity,
       toasts,
       addToast,
       removeToast,
@@ -3043,13 +3462,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       notifPreferences,
       setNotifPreferences,
       moneyBuckets: dynamicMoneyBuckets,
-      addMoneyBucket,
-      updateMoneyBucket,
-      removeMoneyBucket,
+      addMoneyBucket: isAllPortfolios ? blockAllPortfolioMutation : addMoneyBucket,
+      updateMoneyBucket: isAllPortfolios ? blockAllPortfolioMutation : updateMoneyBucket,
+      removeMoneyBucket: isAllPortfolios ? blockAllPortfolioMutation : removeMoneyBucket,
       bucketActivities,
-      addBucketActivity,
-      removeBucketActivity,
-      addTradeFromBucket,
+      addBucketActivity: isAllPortfolios ? blockAllPortfolioMutation : addBucketActivity,
+      removeBucketActivity: isAllPortfolios ? blockAllPortfolioMutation : removeBucketActivity,
+      addTradeFromBucket: isAllPortfolios ? blockAllPortfolioMutation : addTradeFromBucket,
       dashboardWidgets,
       setDashboardWidgets,
       totalInvested,
@@ -3057,13 +3476,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       totalRealizedPL,
       totalDividends,
       customCategories,
-      addCustomCategory,
-      removeCustomCategory,
+      addCustomCategory: isAllPortfolios ? blockAllPortfolioMutationAsync : addCustomCategory,
+      removeCustomCategory: isAllPortfolios ? blockAllPortfolioMutationAsync : removeCustomCategory,
     }}>
       {children}
       
       {/* Global Toast Container — Rich Upgrade (#30) */}
-      <div className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-[9999] flex flex-col gap-3 pointer-events-none max-w-sm w-full">
+      <div className="fixed bottom-20 right-4 z-[9999] flex w-full max-w-sm flex-col gap-3 pointer-events-none sm:right-6 lg:bottom-6">
         {toasts.map(toast => {
           const iconColor = toast.type === 'success' ? '#4EDEA3' : toast.type === 'warning' ? '#E9C349' : toast.type === 'error' ? '#FFB4AB' : '#ADC6FF';
           const iconBg = toast.type === 'success' ? 'rgba(78,222,163,0.1)' : toast.type === 'warning' ? 'rgba(233,195,73,0.1)' : toast.type === 'error' ? 'rgba(255,180,171,0.1)' : 'rgba(173,198,255,0.1)';

@@ -11,8 +11,10 @@ const prompt = Prompt({ subsets: ["latin", "thai"], weight: ["300", "400", "500"
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  // The app is responsive at the device width.  Keep browser zoom available
+  // for accessibility instead of forcing users to compensate for a layout.
+  maximumScale: 5,
+  userScalable: true,
 };
 
 export const metadata: Metadata = {
@@ -36,7 +38,7 @@ export default function RootLayout({
       <head>
         <link rel="icon" href="/fintrack-icon.svg" type="image/svg+xml" />
       </head>
-      <body suppressHydrationWarning className={`${prompt.className} bg-[#131313] text-[#e5e2e1] min-h-screen antialiased`}>
+      <body suppressHydrationWarning className={`${prompt.className} bg-[#131313] text-[#e5e2e1] min-h-screen min-w-0 antialiased`}>
         <AppProvider>
           {children}
         </AppProvider>
@@ -44,4 +46,3 @@ export default function RootLayout({
     </html>
   );
 }
-

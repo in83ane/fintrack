@@ -15,12 +15,12 @@ export default function AppLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen min-w-0">
       <Sidebar />
       
-      <div className="flex-1 lg:ml-64 pb-16 sm:pb-0">
+      <div className="min-w-0 flex-1 lg:ml-64 pb-[calc(4.75rem+env(safe-area-inset-bottom))] lg:pb-0">
         <TopBar />
-        <main>
+        <main className="min-w-0">
           <ErrorBoundary>
             {children}
           </ErrorBoundary>

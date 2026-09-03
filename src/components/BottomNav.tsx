@@ -19,9 +19,9 @@ export function BottomNav() {
   const router = useRouter();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 sm:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 lg:hidden">
       <div className="bg-background/95 backdrop-blur-xl border-t border-border px-2 pb-[env(safe-area-inset-bottom)]">
-        <div className="flex items-center justify-around py-1">
+        <div className="mx-auto flex min-h-16 max-w-lg items-center justify-around py-1">
           {NAV_ITEMS.map(item => {
             const isActive = pathname?.startsWith(item.path);
             const Icon = item.icon;
@@ -55,7 +55,7 @@ export function BottomNav() {
                 key={item.path}
                 onClick={() => router.push(item.path)}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 py-2 px-3 rounded-xl transition-all relative",
+                  "flex min-w-0 flex-col items-center gap-0.5 px-2 py-2 text-center rounded-xl transition-all relative",
                   isActive ? "text-white" : "text-gray-600"
                 )}
               >

@@ -18,6 +18,7 @@ export interface Profile {
 export interface Asset {
   id: string; // uuid
   user_id: string;
+  portfolio_id?: string | null;
   name: string;
   symbol: string;
   asset_type: string | null;
@@ -44,6 +45,7 @@ export interface Asset {
 export interface Trade {
   id: string; // uuid
   user_id: string;
+  portfolio_id?: string | null;
   asset_id: string | null;
   symbol: string;
   type: 'BUY' | 'SELL' | 'DIVIDEND' | 'IMPORT';
@@ -59,9 +61,20 @@ export interface Trade {
   created_at: string;
 }
 
+export interface Portfolio {
+  id: string;
+  user_id: string;
+  name: string;
+  color: string;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Allocation {
   id: string; // uuid
   user_id: string;
+  portfolio_id?: string | null;
   label: string;
   value: number;
   color: string;
@@ -70,6 +83,7 @@ export interface Allocation {
 export interface MoneyBucket {
   id: string; // uuid
   user_id: string;
+  portfolio_id?: string | null;
   name: string;
   target_percent: number;
   target_amount?: number;
@@ -84,6 +98,7 @@ export interface MoneyBucket {
 export interface BucketActivity {
   id: string; // uuid
   user_id: string;
+  portfolio_id?: string | null;
   bucket_id: string;
   type: 'deposit' | 'withdraw' | 'income_split' | 'invest' | 'profit_split';
   amount: number;
@@ -98,6 +113,7 @@ export interface BucketActivity {
 export interface CashActivity {
   id: string; // uuid
   user_id: string;
+  portfolio_id?: string | null;
   type: 'INCOME' | 'EXPENSE' | 'DEPOSIT' | 'WITHDRAW';
   amount: number;
   category: string;
@@ -136,13 +152,15 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 export const db = {
   // Assets
   assets: {
-    getAll: async (userId: string) => {
-      return await supabase
+    getAll: async (userId: string, portfolioId?: string | null) => {
+      let query = supabase
         .from('assets')
         .select('*')
         .eq('user_id', userId)
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: false });
+      if (portfolioId) query = query.eq('portfolio_id', portfolioId);
+      return await query;
     },
     insert: async (asset: Omit<Asset, 'id' | 'created_at' | 'updated_at'>) => {
       return await supabase
@@ -162,22 +180,25 @@ export const db = {
     delete: async (id: string) => {
       return await supabase.from('assets').delete().eq('id', id);
     },
-    softDeleteBySymbol: async (userId: string, symbol: string) => {
-      return await supabase
+    softDeleteBySymbol: async (userId: string, symbol: string, portfolioId?: string | null) => {
+      let query = supabase
         .from('assets')
         .update({ is_active: false })
         .eq('user_id', userId)
         .ilike('symbol', symbol);
+      if (portfolioId) query = query.eq('portfolio_id', portfolioId);
+      return await query;
     },
     upsert: async (asset: Omit<Asset, 'id' | 'created_at' | 'updated_at'>) => {
       // Manual upsert since there is no unique constraint on user_id,symbol
-      const existing = await supabase
+      let existingQuery = supabase
         .from('assets')
         .select('id')
         .eq('user_id', asset.user_id)
         .ilike('symbol', asset.symbol)
-        .limit(1)
-        .single();
+        .limit(1);
+      if (asset.portfolio_id) existingQuery = existingQuery.eq('portfolio_id', asset.portfolio_id);
+      const existing = await existingQuery.maybeSingle();
         
       if (existing.data?.id) {
         return await supabase
@@ -204,12 +225,14 @@ export const db = {
 
   // Trades
   trades: {
-    getAll: async (userId: string) => {
-      return await supabase
+    getAll: async (userId: string, portfolioId?: string | null) => {
+      let query = supabase
         .from('trades')
         .select('*')
         .eq('user_id', userId)
         .order('execution_date', { ascending: false });
+      if (portfolioId) query = query.eq('portfolio_id', portfolioId);
+      return await query;
     },
     insert: async (trade: Omit<Trade, 'id' | 'created_at'>) => {
       return await supabase.from('trades').insert(trade).select().single();
@@ -220,36 +243,66 @@ export const db = {
     delete: async (id: string) => {
       return await supabase.from('trades').delete().eq('id', id);
     },
-    deleteBySymbol: async (userId: string, symbol: string) => {
-      return await supabase
+    deleteBySymbol: async (userId: string, symbol: string, portfolioId?: string | null) => {
+      let query = supabase
         .from('trades')
         .delete()
         .eq('user_id', userId)
         .ilike('symbol', symbol);
+      if (portfolioId) query = query.eq('portfolio_id', portfolioId);
+      return await query;
     },
     bulkInsert: async (trades: Omit<Trade, 'id' | 'created_at'>[]) => {
       return await supabase.from('trades').insert(trades).select();
     },
   },
 
-  // Allocations
-  allocations: {
+  portfolios: {
     getAll: async (userId: string) => {
       return await supabase
+        .from('portfolios')
+        .select('*')
+        .eq('user_id', userId)
+        .order('is_default', { ascending: false })
+        .order('created_at', { ascending: true });
+    },
+    insert: async (portfolio: Omit<Portfolio, 'id' | 'created_at' | 'updated_at'>) => {
+      return await supabase.from('portfolios').insert(portfolio).select().single();
+    },
+    update: async (id: string, updates: Partial<Portfolio>) => {
+      return await supabase
+        .from('portfolios')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single();
+    },
+    delete: async (id: string) => {
+      return await supabase.from('portfolios').delete().eq('id', id);
+    },
+  },
+
+  // Allocations
+  allocations: {
+    getAll: async (userId: string, portfolioId?: string | null) => {
+      let query = supabase
         .from('allocations')
         .select('*')
         .eq('user_id', userId)
         .order('label');
+      if (portfolioId) query = query.eq('portfolio_id', portfolioId);
+      return await query;
     },
     upsert: async (allocation: Omit<Allocation, 'id'>) => {
       return await supabase
         .from('allocations')
-        .upsert(allocation, { onConflict: 'user_id,label' })
+        .upsert(allocation, { onConflict: allocation.portfolio_id ? 'user_id,portfolio_id,label' : 'user_id,label' })
         .select()
         .single();
     },
     bulkUpsert: async (allocations: Omit<Allocation, 'id'>[]) => {
-      return await supabase.from('allocations').upsert(allocations, { onConflict: 'user_id,label' }).select();
+      const portfolioId = allocations[0]?.portfolio_id;
+      return await supabase.from('allocations').upsert(allocations, { onConflict: portfolioId ? 'user_id,portfolio_id,label' : 'user_id,label' }).select();
     },
     delete: async (userId: string, label: string) => {
       return await supabase.from('allocations').delete().eq('user_id', userId).eq('label', label);
@@ -258,12 +311,14 @@ export const db = {
 
   // Money Buckets
   buckets: {
-    getAll: async (userId: string) => {
-      return await supabase
+    getAll: async (userId: string, portfolioId?: string | null) => {
+      let query = supabase
         .from('money_buckets')
         .select('*')
         .eq('user_id', userId)
         .order('created_at');
+      if (portfolioId) query = query.eq('portfolio_id', portfolioId);
+      return await query;
     },
     insert: async (bucket: Omit<MoneyBucket, 'id' | 'created_at'>) => {
       return await supabase.from('money_buckets').insert(bucket).select().single();
@@ -278,12 +333,14 @@ export const db = {
 
   // Bucket Activities
   bucketActivities: {
-    getAll: async (userId: string) => {
-      return await supabase
+    getAll: async (userId: string, portfolioId?: string | null) => {
+      let query = supabase
         .from('bucket_activities')
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
+      if (portfolioId) query = query.eq('portfolio_id', portfolioId);
+      return await query;
     },
     insert: async (activity: Omit<BucketActivity, 'id' | 'created_at'>) => {
       return await supabase.from('bucket_activities').insert(activity).select().single();
@@ -295,12 +352,14 @@ export const db = {
 
   // Cash Activities
   cashActivities: {
-    getAll: async (userId: string) => {
-      return await supabase
+    getAll: async (userId: string, portfolioId?: string | null) => {
+      let query = supabase
         .from('cash_activities')
         .select('*')
         .eq('user_id', userId)
         .order('date', { ascending: false });
+      if (portfolioId) query = query.eq('portfolio_id', portfolioId);
+      return await query;
     },
     insert: async (activity: Omit<CashActivity, 'id' | 'created_at'>) => {
       return await supabase.from('cash_activities').insert(activity).select().single();
@@ -315,28 +374,31 @@ export const db = {
 
   // DCA Drafts (per user per symbol)
   dcaDrafts: {
-    get: async (userId: string, symbol: string) => {
-      return await supabase
+    get: async (userId: string, symbol: string, portfolioId?: string | null) => {
+      let query = supabase
         .from('dca_drafts')
         .select('entries')
         .eq('user_id', userId)
-        .eq('symbol', symbol)
-        .maybeSingle();
+        .eq('symbol', symbol);
+      if (portfolioId) query = query.eq('portfolio_id', portfolioId);
+      return await query.maybeSingle();
     },
-    upsert: async (userId: string, symbol: string, entries: any[]) => {
+    upsert: async (userId: string, symbol: string, entries: any[], portfolioId?: string | null) => {
       return await supabase
         .from('dca_drafts')
         .upsert(
-          { user_id: userId, symbol, entries, updated_at: new Date().toISOString() },
-          { onConflict: 'user_id,symbol' }
+          { user_id: userId, symbol, entries, portfolio_id: portfolioId || null, updated_at: new Date().toISOString() },
+          { onConflict: portfolioId ? 'user_id,portfolio_id,symbol' : 'user_id,symbol' }
         );
     },
-    delete: async (userId: string, symbol: string) => {
-      return await supabase
+    delete: async (userId: string, symbol: string, portfolioId?: string | null) => {
+      let query = supabase
         .from('dca_drafts')
         .delete()
         .eq('user_id', userId)
         .eq('symbol', symbol);
+      if (portfolioId) query = query.eq('portfolio_id', portfolioId);
+      return await query;
     },
   },
 
@@ -360,17 +422,19 @@ export const db = {
 
   // User Custom Categories (for Ledger)
   userCategories: {
-    getAll: async (userId: string) => {
-      return await supabase
+    getAll: async (userId: string, portfolioId?: string | null) => {
+      let query = supabase
         .from('user_categories')
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: true });
+      if (portfolioId) query = query.eq('portfolio_id', portfolioId);
+      return await query;
     },
-    insert: async (userId: string, type: 'INCOME' | 'EXPENSE', label: string, icon: string) => {
+    insert: async (userId: string, type: 'INCOME' | 'EXPENSE', label: string, icon: string, portfolioId?: string | null) => {
       return await supabase
         .from('user_categories')
-        .insert({ user_id: userId, type, label, icon })
+        .insert({ user_id: userId, portfolio_id: portfolioId || null, type, label, icon })
         .select()
         .single();
     },

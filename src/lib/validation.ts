@@ -163,7 +163,7 @@ export const DCAOrderSchema = z.object({
       quantity: positiveNumber,
       invested: positiveNumber,
     })
-  ).min(1, 'At least one entry required').max(4, 'Maximum 4 entries'),
+  ).min(1, 'At least one entry required'),
   totalInvested: positiveNumber,
   avgEntryPrice: positiveNumber,
   breakEvenPrice: positiveNumber,

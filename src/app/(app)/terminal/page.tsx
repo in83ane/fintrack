@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Briefcase, Calendar } from "lucide-react";
+import { Briefcase, Calendar, Target, X } from "lucide-react";
 import { useApp } from "@/src/context/AppContext";
 import { supabase } from "@/src/lib/supabase";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   SupportResistancePanel,
   FibonacciPanel,
@@ -18,6 +19,7 @@ import {
   ScreenerWidget,
   TimelineWidget,
 } from "@/src/components/TradingViewWidgets";
+import { DcaOrderSystem } from "@/src/components/DcaOrderSystem";
 
 function useMounted() {
   const [mounted, setMounted] = useState(false);
@@ -26,15 +28,33 @@ function useMounted() {
 }
 
 export default function TerminalPage() {
+  return (
+    <React.Suspense fallback={<div className="min-h-screen bg-background" />}>
+      <TerminalContent />
+    </React.Suspense>
+  );
+}
+
+function TerminalContent() {
   const { language } = useApp();
+  const searchParams = useSearchParams();
   const mounted = useMounted();
-  const [symbol, setSymbol] = useState("XAUUSD");
-  const [searchInput, setSearchInput] = useState("XAUUSD");
+  const requestedSymbol = searchParams.get("symbol")?.trim().toUpperCase();
+  const [symbol, setSymbol] = useState(requestedSymbol || "XAUUSD");
+  const [searchInput, setSearchInput] = useState(requestedSymbol || "XAUUSD");
   const [interval, setInterval] = useState("60");
   const [stateLoaded, setStateLoaded] = useState(false);
+  const [isTradeAssistantOpen, setIsTradeAssistantOpen] = useState(false);
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // ─── Load saved terminal state from Supabase on mount ───────────────
+  useEffect(() => {
+    if (requestedSymbol) {
+      setSymbol(requestedSymbol);
+      setSearchInput(requestedSymbol);
+    }
+  }, [requestedSymbol]);
+
   useEffect(() => {
     async function loadTerminalState() {
       try {
@@ -47,7 +67,7 @@ export default function TerminalPage() {
           .eq("id", session.user.id)
           .single();
 
-        if (profile) {
+        if (profile && !requestedSymbol) {
           if (profile.terminal_symbol) {
             setSymbol(profile.terminal_symbol);
             setSearchInput(profile.terminal_symbol);
@@ -63,7 +83,7 @@ export default function TerminalPage() {
       }
     }
     loadTerminalState();
-  }, []);
+  }, [requestedSymbol]);
 
   // ─── Debounced auto-save to Supabase when symbol or interval changes ─
   const saveTerminalState = useCallback(async (sym: string, tf: string) => {
@@ -199,6 +219,12 @@ export default function TerminalPage() {
                       placeholder="Search Symbol"
                     />
                   </form>
+                  <button
+                    onClick={() => setIsTradeAssistantOpen(true)}
+                    className="hidden sm:flex items-center gap-1.5 rounded-lg border border-[#ADC6FF]/30 bg-[#ADC6FF]/10 px-3 py-1.5 text-xs font-black text-[#ADC6FF] transition-all hover:bg-[#ADC6FF]/20"
+                  >
+                    <Target size={14} /> DCA Assistant
+                  </button>
                 </div>
               </div>
               <div className="flex-1 w-full relative">
@@ -286,6 +312,38 @@ export default function TerminalPage() {
           </div>
         )}
       </div>
+
+      <button
+        onClick={() => setIsTradeAssistantOpen(true)}
+        className="fixed bottom-20 right-4 z-40 flex items-center gap-2 rounded-full bg-[#ADC6FF] px-4 py-3 text-xs font-black text-[#00285d] shadow-xl shadow-[#ADC6FF]/20 lg:hidden"
+      >
+        <Target size={16} /> DCA
+      </button>
+
+      {isTradeAssistantOpen && (
+        <div className="fixed inset-0 z-[100] flex items-end bg-black/70 p-0 backdrop-blur-sm sm:items-center sm:justify-center sm:p-6">
+          <div className="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-t-3xl border border-border bg-background shadow-2xl sm:rounded-3xl">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-6">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-wider text-gray-500">Terminal Trade Assistant</p>
+                <h2 className="text-base font-black text-white">DCA plan for {symbol}</h2>
+              </div>
+              <button onClick={() => setIsTradeAssistantOpen(false)} className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-white/5 hover:text-white" aria-label="Close trade assistant">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="overflow-y-auto p-4 sm:p-6">
+              <DcaOrderSystem
+                key={`terminal-dca-${symbol}`}
+                initialSymbol={symbol}
+                marketCurrency={symbol.endsWith('.BK') ? 'THB' : 'USD'}
+                compact
+                onClose={() => setIsTradeAssistantOpen(false)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

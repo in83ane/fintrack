@@ -391,7 +391,7 @@ export default function DashboardPage() {
               <Plus size={14} /> {t("addAsset") || "Add Asset"}
             </button>
             <button
-              onClick={() => router.push('/trade')}
+              onClick={() => router.push('/terminal')}
               className="px-4 py-2 bg-[#4EDEA3]/10 text-[#4EDEA3] border border-[#4EDEA3]/30 rounded-xl font-black text-xs flex items-center gap-1.5 hover:bg-[#4EDEA3]/20 transition-all"
             >
               <TrendingUp size={14} /> {t("trade") || "Trade"}
@@ -539,7 +539,7 @@ export default function DashboardPage() {
                 { label: language === 'th' ? 'บันทึกรายได้' : 'Log Income', bg: '#4EDEA3', icon: '💰', onClick: () => { setIsAddCashflowOpen(true); setFabOpen(false); } },
                 { label: language === 'th' ? 'บันทึกรายจ่าย' : 'Log Expense', bg: '#FFB4AB', icon: '💸', onClick: () => { setIsAddCashflowOpen(true); setFabOpen(false); } },
                 { label: language === 'th' ? 'เพิ่มสินทรัพย์' : 'Add Asset', bg: '#ADC6FF', icon: '📈', onClick: () => { setIsAddAssetOpen(true); setFabOpen(false); } },
-                { label: language === 'th' ? 'เทรด' : 'Trade', bg: '#E9C349', icon: '⚡', onClick: () => { router.push('/trade'); setFabOpen(false); } },
+                { label: language === 'th' ? 'เทรด' : 'Trade', bg: '#E9C349', icon: '⚡', onClick: () => { router.push('/terminal'); setFabOpen(false); } },
               ].map((action, i) => (
                 <motion.button
                   key={action.label}
