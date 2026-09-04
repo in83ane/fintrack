@@ -259,7 +259,7 @@ export function TopBar() {
             <button
               onClick={() => setShowLangMenu(!showLangMenu)}
               className={cn(
-                "flex h-9 items-center gap-1.5 rounded-full border border-border bg-white/5 px-3 py-1.5 hover:bg-white/10 transition-all",
+                "box-border flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-border bg-white/5 px-3 leading-none hover:bg-white/10 transition-all",
                 showLangMenu && "border-[#ADC6FF]/40 bg-white/10"
               )}
             >
@@ -300,7 +300,7 @@ export function TopBar() {
           </div>
 
           {/* Currency Selector - Capsule Toggle */}
-          <div className="relative flex h-9 shrink-0 items-center rounded-full border border-border bg-white/5 p-1">
+          <div className="relative flex h-9 shrink-0 items-center rounded-full border border-border bg-white/5 p-1 box-border">
             <motion.div
               className="absolute top-1 bottom-1 rounded-full bg-[#4EDEA3]"
               animate={{ left: currencyHighlight.left, width: currencyHighlight.width }}
