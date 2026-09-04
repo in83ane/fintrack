@@ -38,6 +38,24 @@ export function TopBar() {
   const notifMenuRef = React.useRef<HTMLDivElement>(null);
   const profileMenuRef = React.useRef<HTMLDivElement>(null);
   const portfolioMenuRef = React.useRef<HTMLDivElement>(null);
+  const currencyBtnRefs = React.useRef<Record<string, HTMLButtonElement | null>>({});
+  const [currencyHighlight, setCurrencyHighlight] = React.useState({ left: 0, width: 0 });
+
+  const measureCurrencyHighlight = React.useCallback(() => {
+    const btn = currencyBtnRefs.current[currency];
+    if (btn) {
+      setCurrencyHighlight({ left: btn.offsetLeft, width: btn.offsetWidth });
+    }
+  }, [currency]);
+
+  React.useLayoutEffect(() => {
+    measureCurrencyHighlight();
+  }, [measureCurrencyHighlight]);
+
+  React.useEffect(() => {
+    window.addEventListener("resize", measureCurrencyHighlight);
+    return () => window.removeEventListener("resize", measureCurrencyHighlight);
+  }, [measureCurrencyHighlight]);
 
   // Close all popups when clicking outside
   React.useEffect(() => {
@@ -241,7 +259,7 @@ export function TopBar() {
             <button
               onClick={() => setShowLangMenu(!showLangMenu)}
               className={cn(
-                "flex h-9 items-center gap-1.5 rounded-full border border-border bg-white/5 px-2.5 py-1.5 hover:bg-white/10 transition-all",
+                "flex h-9 items-center gap-1.5 rounded-full border border-border bg-white/5 px-3 py-1.5 hover:bg-white/10 transition-all",
                 showLangMenu && "border-[#ADC6FF]/40 bg-white/10"
               )}
             >
@@ -282,18 +300,19 @@ export function TopBar() {
           </div>
 
           {/* Currency Selector - Capsule Toggle */}
-          <div className="relative flex h-9 w-[92px] shrink-0 items-center rounded-full border border-border bg-white/5 p-1">
+          <div className="relative flex h-9 shrink-0 items-center rounded-full border border-border bg-white/5 p-1">
             <motion.div
-              className="absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-full bg-[#4EDEA3]"
-              animate={{ x: currency === "USD" ? 0 : "100%" }}
+              className="absolute top-1 bottom-1 rounded-full bg-[#4EDEA3]"
+              animate={{ left: currencyHighlight.left, width: currencyHighlight.width }}
               transition={{ type: "spring", stiffness: 500, damping: 35 }}
             />
             {currencies.map((curr) => (
               <button
                 key={curr}
+                ref={(el) => { currencyBtnRefs.current[curr] = el; }}
                 onClick={() => setCurrency(curr)}
                 className={cn(
-                  "relative z-10 flex h-full flex-1 items-center justify-center rounded-full text-[10px] font-black uppercase tracking-wide transition-colors",
+                  "relative z-10 flex h-full items-center justify-center rounded-full px-3 text-[10px] font-black uppercase tracking-wide transition-colors",
                   currency === curr ? "text-[#00332b]" : "text-gray-500 hover:text-white"
                 )}
               >
