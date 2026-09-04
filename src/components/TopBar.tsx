@@ -282,13 +282,13 @@ export function TopBar() {
           </div>
 
           {/* Currency Selector - Compact */}
-          <div className="flex h-9 shrink-0 bg-white/5 rounded-full p-0.5 border border-border">
+          <div className="flex h-9 shrink-0 items-center bg-white/5 rounded-full p-0.5 border border-border">
             {currencies.map((curr) => (
               <button
                 key={curr}
                 onClick={() => setCurrency(curr)}
                 className={cn(
-                  "px-2 sm:px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide transition-all",
+                  "flex h-full min-w-[2.5rem] items-center justify-center rounded-full px-2.5 sm:px-3 text-[10px] font-black uppercase tracking-wide transition-all",
                   currency === curr
                     ? "bg-[#4EDEA3] text-[#00332b]"
                     : "text-gray-500 hover:text-white"
