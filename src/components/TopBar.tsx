@@ -281,17 +281,20 @@ export function TopBar() {
             </AnimatePresence>
           </div>
 
-          {/* Currency Selector - Compact */}
-          <div className="flex h-9 shrink-0 items-center bg-white/5 rounded-full p-0.5 border border-border">
+          {/* Currency Selector - Capsule Toggle */}
+          <div className="relative flex h-9 w-[92px] shrink-0 items-center rounded-full border border-border bg-white/5 p-1">
+            <motion.div
+              className="absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-full bg-[#4EDEA3]"
+              animate={{ x: currency === "USD" ? 0 : "100%" }}
+              transition={{ type: "spring", stiffness: 500, damping: 35 }}
+            />
             {currencies.map((curr) => (
               <button
                 key={curr}
                 onClick={() => setCurrency(curr)}
                 className={cn(
-                  "flex h-full min-w-[2.5rem] items-center justify-center rounded-full px-2.5 sm:px-3 text-[10px] font-black uppercase tracking-wide transition-all",
-                  currency === curr
-                    ? "bg-[#4EDEA3] text-[#00332b]"
-                    : "text-gray-500 hover:text-white"
+                  "relative z-10 flex h-full flex-1 items-center justify-center rounded-full text-[10px] font-black uppercase tracking-wide transition-colors",
+                  currency === curr ? "text-[#00332b]" : "text-gray-500 hover:text-white"
                 )}
               >
                 {curr}
