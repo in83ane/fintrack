@@ -645,7 +645,8 @@ export default function BudgetPage() {
                   let cumPct = 0;
                   const R = 38, r = 26, C = 50;
                   return moneyBuckets.map((b, i) => {
-                    let pct = totalAllocated > 0 ? Math.max((b.currentAmount / totalAllocated) * 100, 0.5) : (100 / moneyBuckets.length);
+                    const bAmountUSD = b.currentAmount / (exchangeRates[b.currency || 'USD'] || 1);
+                    let pct = totalAllocated > 0 ? Math.max((bAmountUSD / totalAllocated) * 100, 0.5) : (100 / moneyBuckets.length);
                     if (pct >= 100) pct = 99.99;
                     const startAngle = cumPct * 3.6;
                     cumPct += pct;
@@ -723,7 +724,7 @@ export default function BudgetPage() {
           {moneyBuckets.map((bucket) => {
             const actualPct = (bucket.targetAmount && bucket.targetAmount > 0) 
               ? (bucket.currentAmount / bucket.targetAmount) * 100 
-              : (totalAllocated > 0 ? (bucket.currentAmount / totalAllocated) * 100 : 0);
+              : (totalAllocated > 0 ? ((bucket.currentAmount / (exchangeRates[bucket.currency || 'USD'] || 1)) / totalAllocated) * 100 : 0);
             return (
               <motion.div
                 key={bucket.id}

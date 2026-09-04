@@ -2,14 +2,13 @@
 
 import React from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Briefcase, ReceiptText, Monitor, PiggyBank, CalendarDays } from "lucide-react";
+import { LayoutDashboard, Briefcase, ReceiptText, PiggyBank, CalendarDays } from "lucide-react";
 import { cn } from "@/src/lib/utils";
-import { motion } from "motion/react";
 
 const NAV_ITEMS = [
   { path: "/dashboard", icon: LayoutDashboard, label: "Home" },
   { path: "/portfolio", icon: Briefcase, label: "Portfolio" },
-  { path: "/ledger", icon: ReceiptText, label: "Ledger", isFab: true },
+  { path: "/ledger", icon: ReceiptText, label: "Ledger" },
   { path: "/budget", icon: PiggyBank, label: "Budget" },
   { path: "/calendar", icon: CalendarDays, label: "Calendar" },
 ];
@@ -26,48 +25,33 @@ export function BottomNav() {
             const isActive = pathname?.startsWith(item.path);
             const Icon = item.icon;
 
-            // FAB-style center button for Ledger
-            if (item.isFab) {
-              return (
-                <button
-                  key={item.path}
-                  onClick={() => router.push(item.path)}
-                  className="relative flex flex-col items-center gap-0.5 -mt-5"
-                >
-                  <div className={cn(
-                    "w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transition-all",
-                    isActive
-                      ? "bg-primary text-primary-foreground shadow-primary/30 scale-105"
-                      : "bg-surface-2 text-gray-400 border border-border hover:bg-surface-2"
-                  )}>
-                    <Icon size={22} strokeWidth={isActive ? 2.5 : 1.8} />
-                  </div>
-                  <span className={cn(
-                    "text-[9px] font-bold",
-                    isActive ? "text-primary" : "text-gray-500"
-                  )}>{item.label}</span>
-                </button>
-              );
-            }
-
             return (
               <button
                 key={item.path}
                 onClick={() => router.push(item.path)}
                 className={cn(
-                  "flex min-w-0 flex-col items-center gap-0.5 px-2 py-2 text-center rounded-xl transition-all relative",
-                  isActive ? "text-white" : "text-gray-600"
+                  "relative flex flex-col items-center gap-0.5 transition-[margin] duration-300 ease-out",
+                  isActive && "-mt-5"
                 )}
               >
-                {isActive && (
-                  <motion.div
-                    layoutId="bottomnav-indicator"
-                    className="absolute -top-1 w-8 h-0.5 rounded-full bg-primary"
-                    transition={{ type: "spring", stiffness: 500, damping: 35 }}
-                  />
-                )}
-                <Icon size={20} strokeWidth={isActive ? 2.5 : 1.5} />
-                <span className={cn("text-[9px] font-bold", isActive && "text-primary")}>{item.label}</span>
+                <div
+                  className={cn(
+                    "w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 ease-out",
+                    isActive
+                      ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30 scale-105"
+                      : "bg-transparent text-gray-600"
+                  )}
+                >
+                  <Icon size={20} strokeWidth={isActive ? 2.5 : 1.5} />
+                </div>
+                <span
+                  className={cn(
+                    "text-[9px] font-bold transition-colors",
+                    isActive ? "text-primary" : "text-gray-500"
+                  )}
+                >
+                  {item.label}
+                </span>
               </button>
             );
           })}
