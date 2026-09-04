@@ -256,19 +256,23 @@ export function TopBar() {
 
           {/* Language Selector - Compact */}
           <div className="relative" ref={langMenuRef}>
-            <button
-              onClick={() => setShowLangMenu(!showLangMenu)}
+            <div
               className={cn(
-                "box-border flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-border bg-white/5 px-3 leading-none hover:bg-white/10 transition-all",
+                "box-border flex h-9 shrink-0 items-center rounded-full border border-border bg-white/5 hover:bg-white/10 transition-all",
                 showLangMenu && "border-[#ADC6FF]/40 bg-white/10"
               )}
             >
-              <Globe size={13} className="shrink-0 text-[#4EDEA3]" />
-              <span className="text-[10px] font-black uppercase tracking-wide text-white hidden sm:inline">
-                {languages.find(l => l.code === language)?.label}
-              </span>
-              <ChevronDown size={10} className={cn("text-gray-500 transition-transform", showLangMenu && "rotate-180")} />
-            </button>
+              <button
+                onClick={() => setShowLangMenu(!showLangMenu)}
+                className="flex h-full items-center gap-1.5 rounded-full px-3 leading-none"
+              >
+                <Globe size={13} className="shrink-0 text-[#4EDEA3]" />
+                <span className="text-[10px] font-black uppercase tracking-wide text-white hidden sm:inline">
+                  {languages.find(l => l.code === language)?.label}
+                </span>
+                <ChevronDown size={10} className={cn("text-gray-500 transition-transform", showLangMenu && "rotate-180")} />
+              </button>
+            </div>
 
             <AnimatePresence>
               {showLangMenu && (
