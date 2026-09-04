@@ -151,32 +151,38 @@ export function TopBar() {
 
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
           {/* ⌘K Search Trigger */}
-          <button
-            onClick={() => { const e = new KeyboardEvent('keydown', { key: 'k', metaKey: true, ctrlKey: true, bubbles: true }); window.dispatchEvent(e); }}
-            className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-border hover:border-[#ADC6FF]/30 transition-all cursor-pointer"
-          >
-            <Search size={12} className="text-gray-500" />
-            <span className="text-xs text-gray-500">{t('searchPlaceholder')}</span>
-            <kbd className="text-[9px] font-bold text-gray-600 bg-white/5 px-1.5 py-0.5 rounded border border-border">⌘K</kbd>
-          </button>
+          <div className="hidden md:flex h-9 box-border items-center rounded-full bg-white/5 border border-border hover:border-[#ADC6FF]/30 transition-all">
+            <button
+              onClick={() => { const e = new KeyboardEvent('keydown', { key: 'k', metaKey: true, ctrlKey: true, bubbles: true }); window.dispatchEvent(e); }}
+              className="flex h-full items-center gap-2 px-3 leading-none cursor-pointer"
+            >
+              <Search size={12} className="text-gray-500" />
+              <span className="text-xs text-gray-500">{t('searchPlaceholder')}</span>
+              <kbd className="text-[9px] font-bold text-gray-600 bg-white/5 px-1.5 py-0.5 rounded border border-border">⌘K</kbd>
+            </button>
+          </div>
 
           <div className="relative hidden xl:block" ref={portfolioMenuRef}>
-            <button
-              onClick={() => setShowPortfolioMenu(open => !open)}
+            <div
               className={cn(
-                "flex max-w-44 items-center gap-2 rounded-full border border-border bg-white/5 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-white/10",
+                "box-border flex h-9 max-w-44 shrink-0 items-center rounded-full border border-border bg-white/5 hover:bg-white/10 transition-colors",
                 showPortfolioMenu && "border-[#ADC6FF]/40 bg-white/10"
               )}
-              aria-label="Choose investment portfolio"
             >
-              {isAllPortfolios ? (
-                <Layers size={14} className="shrink-0 text-[#4EDEA3]" />
-              ) : (
-                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: activePortfolio?.color || "#ADC6FF" }} />
-              )}
-              <span className="truncate">{isAllPortfolios ? "All portfolios" : (activePortfolio?.name || "Portfolio")}</span>
-              <ChevronDown size={11} className={cn("shrink-0 text-gray-500 transition-transform", showPortfolioMenu && "rotate-180")} />
-            </button>
+              <button
+                onClick={() => setShowPortfolioMenu(open => !open)}
+                className="flex h-full min-w-0 items-center gap-2 rounded-full px-3 text-xs font-bold leading-none text-white"
+                aria-label="Choose investment portfolio"
+              >
+                {isAllPortfolios ? (
+                  <Layers size={14} className="shrink-0 text-[#4EDEA3]" />
+                ) : (
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: activePortfolio?.color || "#ADC6FF" }} />
+                )}
+                <span className="truncate">{isAllPortfolios ? "All portfolios" : (activePortfolio?.name || "Portfolio")}</span>
+                <ChevronDown size={11} className={cn("shrink-0 text-gray-500 transition-transform", showPortfolioMenu && "rotate-180")} />
+              </button>
+            </div>
             <AnimatePresence>
               {showPortfolioMenu && (
                 <motion.div
