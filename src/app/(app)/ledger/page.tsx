@@ -480,22 +480,22 @@ export default function LedgerPage() {
           </div>
 
           {/* Stats for selected period & wallet */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
-            <div className="min-w-0 bg-surface/50 border border-border rounded-xl px-3 py-3.5 sm:px-4 sm:py-4">
-              <p className="min-h-4 text-[10px] text-gray-500 uppercase font-bold leading-4 tracking-wide">
+          <div className="grid grid-cols-3 gap-2 sm:gap-3 mt-3">
+            <div className="min-w-0 bg-surface/50 border border-border rounded-xl px-2.5 py-3 sm:px-4 sm:py-4">
+              <p className="min-h-4 text-[8px] sm:text-[10px] text-gray-500 uppercase font-bold leading-4 tracking-wide truncate">
                 IN <span className="opacity-50">•</span> {periodLabel}
               </p>
-              <div className="mt-1.5 whitespace-nowrap text-lg sm:text-xl font-black leading-none tabular-nums text-[#4EDEA3]">{formatMoney(periodStats.inc)}</div>
+              <div className="mt-1.5 whitespace-nowrap text-sm sm:text-xl font-black leading-none tabular-nums text-[#4EDEA3]">{formatMoney(periodStats.inc)}</div>
             </div>
-            <div className="min-w-0 bg-surface/50 border border-border rounded-xl px-3 py-3.5 sm:px-4 sm:py-4">
-              <p className="min-h-4 text-[10px] text-gray-500 uppercase font-bold leading-4 tracking-wide">
+            <div className="min-w-0 bg-surface/50 border border-border rounded-xl px-2.5 py-3 sm:px-4 sm:py-4">
+              <p className="min-h-4 text-[8px] sm:text-[10px] text-gray-500 uppercase font-bold leading-4 tracking-wide truncate">
                 OUT <span className="opacity-50">•</span> {periodLabel}
               </p>
-              <div className="mt-1.5 whitespace-nowrap text-lg sm:text-xl font-black leading-none tabular-nums text-[#FFB4AB]">{formatMoney(periodStats.exp)}</div>
+              <div className="mt-1.5 whitespace-nowrap text-sm sm:text-xl font-black leading-none tabular-nums text-[#FFB4AB]">{formatMoney(periodStats.exp)}</div>
             </div>
-            <div className="min-w-0 bg-surface/50 border border-border rounded-xl px-3 py-3.5 sm:px-4 sm:py-4">
-              <p className="min-h-4 text-[10px] text-gray-500 uppercase font-bold leading-4 tracking-wide">NET</p>
-              <div className={cn("mt-1.5 whitespace-nowrap text-lg sm:text-xl font-black leading-none tabular-nums", periodStats.net >= 0 ? "text-white" : "text-[#FFB4AB]")}>
+            <div className="min-w-0 bg-surface/50 border border-border rounded-xl px-2.5 py-3 sm:px-4 sm:py-4">
+              <p className="min-h-4 text-[8px] sm:text-[10px] text-gray-500 uppercase font-bold leading-4 tracking-wide truncate">NET</p>
+              <div className={cn("mt-1.5 whitespace-nowrap text-sm sm:text-xl font-black leading-none tabular-nums", periodStats.net >= 0 ? "text-white" : "text-[#FFB4AB]")}>
                 {periodStats.net >= 0 ? "+" : ""}{formatMoney(periodStats.net)}
               </div>
             </div>
@@ -586,7 +586,7 @@ export default function LedgerPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/60 sm:backdrop-blur-sm pointer-events-auto"
+            className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center sm:p-4 pb-20 sm:pb-4 bg-black/60 sm:backdrop-blur-sm pointer-events-auto"
             onClick={() => setActivePanel(null)}
           >
             <motion.div
@@ -594,10 +594,10 @@ export default function LedgerPage() {
               animate={{ y: 0, opacity: 1, scale: 1 }}
               exit={{ y: 50, opacity: 0, scale: 0.95 }}
               transition={{ type: "spring", bounce: 0.4, duration: 0.6 }}
-              className="bg-surface/95 backdrop-blur-3xl border border-white/10 rounded-t-[2rem] sm:rounded-[2rem] p-5 shadow-2xl w-full max-w-sm sm:max-w-md"
+              className="bg-surface/95 backdrop-blur-3xl border border-white/10 rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl w-full max-w-sm sm:max-w-md max-h-[88vh] sm:max-h-[85vh] flex flex-col overflow-hidden"
               onClick={e => e.stopPropagation()}
             >
-              <div className="flex justify-between items-center mb-4">
+              <div className="flex justify-between items-center p-5 pb-4 shrink-0">
                 <span className={cn(
                   "px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider",
                   activePanel === "INCOME" ? "bg-[#4EDEA3]/20 text-[#4EDEA3]" : "bg-[#FFB4AB]/20 text-[#FFB4AB]"
@@ -609,175 +609,181 @@ export default function LedgerPage() {
                 </button>
               </div>
 
-              <form onSubmit={handleQuickSubmit} className="space-y-4 relative">
-                {/* Deposit To / Pay From Selector */}
-                <div className="relative z-50">
-                  <button
-                    type="button"
-                    onClick={() => setIsDepositToOpen(!isDepositToOpen)}
-                    className="w-full bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl px-4 py-3 flex items-center justify-between transition-colors"
-                  >
-                    <div className="flex flex-col items-start">
-                      <span className="text-[10px] text-gray-500 uppercase font-black tracking-wider">
-                        {activePanel === "INCOME" ? "Deposit To" : "Pay From"}
-                      </span>
-                      <span className="text-sm font-bold text-white mt-0.5">
-                        {depositTo === 'auto_split' ? '✨ Auto-split' : 
-                         depositTo === 'unassigned' ? 'Unassigned' : 
-                         (moneyBuckets.find(b => b.id === depositTo)?.name || 'Select Wallet')}
-                      </span>
-                    </div>
-                    <ChevronDown size={16} className={cn("text-gray-400 transition-transform", isDepositToOpen && "rotate-180")} />
-                  </button>
-                  
-                  <AnimatePresence>
-                    {isDepositToOpen && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        className="absolute top-full left-0 right-0 mt-2 bg-[#1C1C1E] border border-white/10 rounded-xl shadow-2xl overflow-hidden flex flex-col z-50"
-                      >
-                        {activePanel === "INCOME" && (
-                          <button
-                            type="button"
-                            onClick={() => { setDepositTo("auto_split"); setIsDepositToOpen(false); }}
-                            className="text-left px-4 py-3 hover:bg-white/5 transition-colors border-b border-white/5 flex items-center gap-2"
-                          >
-                            <span>✨</span>
-                            <span className="text-sm font-bold text-white">Auto-split</span>
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => { setDepositTo("unassigned"); setIsDepositToOpen(false); }}
-                          className="text-left px-4 py-3 hover:bg-white/5 transition-colors border-b border-white/5 flex items-center gap-2"
+              <form onSubmit={handleQuickSubmit} className="flex flex-col flex-1 min-h-0">
+                <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 pb-2 space-y-4">
+                  {/* Deposit To / Pay From Selector */}
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setIsDepositToOpen(!isDepositToOpen)}
+                      className="w-full bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl px-4 py-3 flex items-center justify-between transition-colors"
+                    >
+                      <div className="flex flex-col items-start">
+                        <span className="text-[10px] text-gray-500 uppercase font-black tracking-wider">
+                          {activePanel === "INCOME" ? "Deposit To" : "Pay From"}
+                        </span>
+                        <span className="text-sm font-bold text-white mt-0.5">
+                          {depositTo === 'auto_split' ? '✨ Auto-split' : 
+                           depositTo === 'unassigned' ? 'Unassigned' : 
+                           (moneyBuckets.find(b => b.id === depositTo)?.name || 'Select Wallet')}
+                        </span>
+                      </div>
+                      <ChevronDown size={16} className={cn("text-gray-400 transition-transform", isDepositToOpen && "rotate-180")} />
+                    </button>
+
+                    <AnimatePresence>
+                      {isDepositToOpen && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="overflow-hidden"
                         >
-                          <ReceiptText size={14} className="text-gray-400" />
-                          <span className="text-sm font-bold text-white">Unassigned</span>
+                          <div className="mt-2 bg-[#1C1C1E] border border-white/10 rounded-xl shadow-2xl flex flex-col">
+                            {activePanel === "INCOME" && (
+                              <button
+                                type="button"
+                                onClick={() => { setDepositTo("auto_split"); setIsDepositToOpen(false); }}
+                                className="text-left px-4 py-3 hover:bg-white/5 transition-colors border-b border-white/5 flex items-center gap-2"
+                              >
+                                <span>✨</span>
+                                <span className="text-sm font-bold text-white">Auto-split</span>
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => { setDepositTo("unassigned"); setIsDepositToOpen(false); }}
+                              className="text-left px-4 py-3 hover:bg-white/5 transition-colors border-b border-white/5 flex items-center gap-2"
+                            >
+                              <ReceiptText size={14} className="text-gray-400" />
+                              <span className="text-sm font-bold text-white">Unassigned</span>
+                            </button>
+                            {moneyBuckets.map(b => (
+                              <button
+                                key={b.id}
+                                type="button"
+                                onClick={() => { setDepositTo(b.id); setIsDepositToOpen(false); }}
+                                className="text-left px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-2"
+                              >
+                                <span>{b.icon}</span>
+                                <span className="text-sm font-bold text-white">{b.name}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  <div>
+                    <div className="relative group flex items-center">
+                      <button
+                        type="button"
+                        onClick={() => setActionCurrency(prev => prev === "USD" ? "THB" : "USD")}
+                        className="absolute left-3 z-10 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-sm font-black text-white transition-colors"
+                      >
+                        {actionCurrency === "THB" ? "฿" : "$"}
+                      </button>
+                      <input
+                        ref={inputRef}
+                        type="number"
+                        step="any"
+                        required
+                        value={amount}
+                        onChange={e => setAmount(e.target.value)}
+                        placeholder="0.00"
+                        className="w-full bg-background border-2 border-white/5 focus:border-white/20 rounded-[1.5rem] py-4 pl-14 pr-4 text-3xl font-black text-white placeholder-gray-600 outline-none transition-colors shadow-inner"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 overflow-x-auto sm:overflow-x-visible sm:flex-wrap no-scrollbar pb-2">
+                    {(activePanel === "INCOME" ? INCOME_PRESET_KEYS : EXPENSE_PRESET_KEYS).map((p) => {
+                      const isSelected = !isCustomCategory && category === (t(p.key) || p.key);
+                      return (
+                        <button
+                          key={p.key}
+                          type="button"
+                          onClick={() => {
+                            setIsCustomCategory(false);
+                            setCategory(t(p.key) || p.key);
+                          }}
+                          className={cn(
+                            "flex items-center gap-1.5 px-3 py-2 rounded-xl border flex-shrink-0 transition-all text-xs font-bold",
+                            isSelected
+                              ? (activePanel === "INCOME" ? "bg-[#4EDEA3]/20 border-[#4EDEA3] text-[#4EDEA3]" : "bg-[#FFB4AB]/20 border-[#FFB4AB] text-[#FFB4AB]")
+                              : "bg-white/5 border-transparent text-gray-400 hover:bg-white/10 hover:text-white"
+                          )}
+                        >
+                          <span>{p.icon}</span>
+                          <span>{t(p.key) || p.key}</span>
                         </button>
-                        {moneyBuckets.map(b => (
-                          <button
-                            key={b.id}
-                            type="button"
-                            onClick={() => { setDepositTo(b.id); setIsDepositToOpen(false); }}
-                            className="text-left px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-2"
-                          >
-                            <span>{b.icon}</span>
-                            <span className="text-sm font-bold text-white">{b.name}</span>
-                          </button>
-                        ))}
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCustomCategory(true);
+                        setCategory("");
+                      }}
+                      className={cn(
+                        "flex items-center gap-1.5 px-3 py-2 rounded-xl border flex-shrink-0 transition-all text-xs font-bold",
+                        isCustomCategory
+                          ? (activePanel === "INCOME" ? "bg-[#4EDEA3]/20 border-[#4EDEA3] text-[#4EDEA3]" : "bg-[#FFB4AB]/20 border-[#FFB4AB] text-[#FFB4AB]")
+                          : "bg-white/5 border-transparent text-gray-400 hover:bg-white/10 hover:text-white"
+                      )}
+                    >
+                      <Tag size={12} />
+                      <span>+ Custom</span>
+                    </button>
+                  </div>
+
+                  <AnimatePresence>
+                    {isCustomCategory && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="overflow-hidden"
+                      >
+                        <input
+                          type="text"
+                          required
+                          value={customCategory}
+                          onChange={e => setCustomCategory(e.target.value)}
+                          placeholder="Type category..."
+                          className="w-full bg-background border border-white/5 focus:border-white/20 rounded-xl px-4 py-3 text-sm font-medium text-white placeholder-gray-500 outline-none transition-colors"
+                        />
                       </motion.div>
                     )}
                   </AnimatePresence>
-                </div>
 
-                <div>
-                  <div className="relative group flex items-center">
-                    <button
-                      type="button"
-                      onClick={() => setActionCurrency(prev => prev === "USD" ? "THB" : "USD")}
-                      className="absolute left-3 z-10 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-sm font-black text-white transition-colors"
-                    >
-                      {actionCurrency === "THB" ? "฿" : "$"}
-                    </button>
+                  <div>
                     <input
-                      ref={inputRef}
-                      type="number"
-                      step="any"
-                      required
-                      value={amount}
-                      onChange={e => setAmount(e.target.value)}
-                      placeholder="0.00"
-                      className="w-full bg-background border-2 border-white/5 focus:border-white/20 rounded-[1.5rem] py-4 pl-14 pr-4 text-3xl font-black text-white placeholder-gray-600 outline-none transition-colors shadow-inner"
+                      type="text"
+                      value={note}
+                      onChange={e => setNote(e.target.value)}
+                      placeholder={t("noteOptional") || "Note (Optional)"}
+                      className="w-full bg-background border border-white/5 focus:border-white/20 rounded-xl px-4 py-3 text-sm font-medium text-white placeholder-gray-500 outline-none transition-colors"
                     />
                   </div>
                 </div>
 
-                <div className="flex gap-2 overflow-x-auto sm:overflow-x-visible sm:flex-wrap no-scrollbar pb-2">
-                  {(activePanel === "INCOME" ? INCOME_PRESET_KEYS : EXPENSE_PRESET_KEYS).map((p) => {
-                    const isSelected = !isCustomCategory && category === (t(p.key) || p.key);
-                    return (
-                      <button
-                        key={p.key}
-                        type="button"
-                        onClick={() => {
-                          setIsCustomCategory(false);
-                          setCategory(t(p.key) || p.key);
-                        }}
-                        className={cn(
-                          "flex items-center gap-1.5 px-3 py-2 rounded-xl border flex-shrink-0 transition-all text-xs font-bold",
-                          isSelected
-                            ? (activePanel === "INCOME" ? "bg-[#4EDEA3]/20 border-[#4EDEA3] text-[#4EDEA3]" : "bg-[#FFB4AB]/20 border-[#FFB4AB] text-[#FFB4AB]")
-                            : "bg-white/5 border-transparent text-gray-400 hover:bg-white/10 hover:text-white"
-                        )}
-                      >
-                        <span>{p.icon}</span>
-                        <span>{t(p.key) || p.key}</span>
-                      </button>
-                    );
-                  })}
+                <div className="shrink-0 px-5 pt-3 pb-5 border-t border-white/5">
                   <button
-                    type="button"
-                    onClick={() => {
-                      setIsCustomCategory(true);
-                      setCategory("");
-                    }}
+                    disabled={isAdding || !amount || (!isCustomCategory && !category) || (isCustomCategory && !customCategory)}
                     className={cn(
-                      "flex items-center gap-1.5 px-3 py-2 rounded-xl border flex-shrink-0 transition-all text-xs font-bold",
-                      isCustomCategory
-                        ? (activePanel === "INCOME" ? "bg-[#4EDEA3]/20 border-[#4EDEA3] text-[#4EDEA3]" : "bg-[#FFB4AB]/20 border-[#FFB4AB] text-[#FFB4AB]")
-                        : "bg-white/5 border-transparent text-gray-400 hover:bg-white/10 hover:text-white"
+                      "w-full py-4 rounded-[1.25rem] font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-xl",
+                      activePanel === "INCOME"
+                        ? "bg-[#4EDEA3] text-[#00285d] shadow-[#4EDEA3]/20 hover:brightness-110 active:scale-95"
+                        : "bg-[#FFB4AB] text-[#5d0000] shadow-[#FFB4AB]/20 hover:brightness-110 active:scale-95",
+                      (isAdding || !amount || (!isCustomCategory && !category) || (isCustomCategory && !customCategory)) && "opacity-50 cursor-not-allowed active:scale-100 shadow-none"
                     )}
                   >
-                    <Tag size={12} />
-                    <span>+ Custom</span>
+                    {isAdding ? <Loader2 size={18} className="animate-spin" /> : <Check size={20} />}
+                    {t("saveRecord") || "Save"}
                   </button>
                 </div>
-                
-                <AnimatePresence>
-                  {isCustomCategory && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      className="overflow-hidden"
-                    >
-                      <input
-                        type="text"
-                        required
-                        value={customCategory}
-                        onChange={e => setCustomCategory(e.target.value)}
-                        placeholder="Type category..."
-                        className="w-full bg-background border border-white/5 focus:border-white/20 rounded-xl px-4 py-3 text-sm font-medium text-white placeholder-gray-500 outline-none transition-colors"
-                      />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                <div>
-                  <input
-                    type="text"
-                    value={note}
-                    onChange={e => setNote(e.target.value)}
-                    placeholder={t("noteOptional") || "Note (Optional)"}
-                    className="w-full bg-background border border-white/5 focus:border-white/20 rounded-xl px-4 py-3 text-sm font-medium text-white placeholder-gray-500 outline-none transition-colors"
-                  />
-                </div>
-
-                <button
-                  disabled={isAdding || !amount || (!isCustomCategory && !category) || (isCustomCategory && !customCategory)}
-                  className={cn(
-                    "w-full py-4 rounded-[1.25rem] font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-xl",
-                    activePanel === "INCOME"
-                      ? "bg-[#4EDEA3] text-[#00285d] shadow-[#4EDEA3]/20 hover:brightness-110 active:scale-95"
-                      : "bg-[#FFB4AB] text-[#5d0000] shadow-[#FFB4AB]/20 hover:brightness-110 active:scale-95",
-                    (isAdding || !amount || (!isCustomCategory && !category) || (isCustomCategory && !customCategory)) && "opacity-50 cursor-not-allowed active:scale-100 shadow-none"
-                  )}
-                >
-                  {isAdding ? <Loader2 size={18} className="animate-spin" /> : <Check size={20} />}
-                  {t("saveRecord") || "Save"}
-                </button>
               </form>
             </motion.div>
           </motion.div>
