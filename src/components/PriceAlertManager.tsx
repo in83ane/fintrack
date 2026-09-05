@@ -163,7 +163,7 @@ export function PriceAlertManager() {
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setIsModalOpen(true)}
-        className="fixed bottom-24 right-6 z-40 w-14 h-14 rounded-2xl bg-gradient-to-br from-[#E9C349] to-[#D4A017] text-[#1C1B1B] shadow-lg shadow-[#E9C349]/20 flex items-center justify-center"
+        className="hidden sm:flex fixed bottom-24 right-6 z-40 w-14 h-14 rounded-2xl bg-gradient-to-br from-[#E9C349] to-[#D4A017] text-[#1C1B1B] shadow-lg shadow-[#E9C349]/20 items-center justify-center"
       >
         <Bell size={22} />
         {activeAlerts.length > 0 && (

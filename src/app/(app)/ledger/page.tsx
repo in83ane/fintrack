@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence, PanInfo } from "motion/react";
 import {
   Search,
   Trash2,
@@ -123,6 +123,7 @@ export default function LedgerPage() {
   const {
     t, formatMoney, cashActivities, bucketActivities, moneyBuckets, removeCashActivity, removeBucketActivity, language, currency, exchangeRates,
     addCashActivity, updateMoneyBucket, addBucketActivity, addToast,
+    customCategories, addCustomCategory, removeCustomCategory,
   } = useApp();
 
   const [activePanel, setActivePanel] = useState<"INCOME" | "EXPENSE" | null>(null);
@@ -132,6 +133,10 @@ export default function LedgerPage() {
   const [isAdding, setIsAdding] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const [toDelete, setToDelete] = useState<{id: string, source: 'cash' | 'bucket'} | null>(null);
+  // Swipe-to-delete (mobile): which row is currently swiped open, plus refs to detect outside taps.
+  const [swipedId, setSwipedId] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [actionCurrency, setActionCurrency] = useState<"USD" | "THB">(currency as "USD" | "THB");
   const [depositTo, setDepositTo] = useState<string>("auto_split");
   const [isCustomCategory, setIsCustomCategory] = useState(false);
@@ -149,6 +154,32 @@ export default function LedgerPage() {
   }));
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Only enable the swipe gesture below the sm breakpoint (matches Tailwind's `sm:` cutoff).
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)");
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  // Close an open swipe row when the user taps elsewhere or scrolls, so the delete
+  // button never stays exposed longer than the deliberate swipe gesture.
+  useEffect(() => {
+    if (!swipedId) return;
+    const closeIfOutside = (e: Event) => {
+      const el = rowRefs.current[swipedId];
+      if (el && !el.contains(e.target as Node)) setSwipedId(null);
+    };
+    const closeOnScroll = () => setSwipedId(null);
+    document.addEventListener("pointerdown", closeIfOutside);
+    window.addEventListener("scroll", closeOnScroll, true);
+    return () => {
+      document.removeEventListener("pointerdown", closeIfOutside);
+      window.removeEventListener("scroll", closeOnScroll, true);
+    };
+  }, [swipedId]);
+
   const formatDisplay = (displayAmount: number, displayCurrency: "USD" | "THB" = currency as "USD" | "THB") => {
     const formatter = new Intl.NumberFormat(language === "th" ? "th-TH" : "en-US", {
       style: "currency",
@@ -163,6 +194,12 @@ export default function LedgerPage() {
   };
   
   const bucketCurrency = (bucket: { currency?: string }) => (bucket.currency === "THB" ? "THB" : "USD");
+
+  const bucketsById = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; icon?: string }>();
+    moneyBuckets.forEach(b => map.set(b.id, b));
+    return map;
+  }, [moneyBuckets]);
 
   // Ledger totals must always be added in one currency. `cash_activities.amount`
   // is stored in USD, while `bucket_activities.amount` is stored in that
@@ -363,6 +400,16 @@ export default function LedgerPage() {
         }
       }
 
+      if (isCustomCategory && customCategory.trim()) {
+        const trimmed = customCategory.trim();
+        const alreadySaved = customCategories.some(
+          c => c.type === activePanel && c.label.toLowerCase() === trimmed.toLowerCase()
+        );
+        if (!alreadySaved) {
+          addCustomCategory(activePanel!, trimmed);
+        }
+      }
+
       if (activePanel === "INCOME") {
         setShowConfetti(true);
         setTimeout(() => setShowConfetti(false), 1700);
@@ -373,6 +420,24 @@ export default function LedgerPage() {
     } finally {
       setIsAdding(false);
     }
+  };
+
+  // Saves a new custom category to the user's list right away (Supabase, via AppContext),
+  // independent of the amount/transaction form. This is how a category gets added without
+  // ever creating a $0 or placeholder record in the ledger.
+  const handleAddCustomCategory = async () => {
+    const trimmed = customCategory.trim();
+    if (!trimmed || !activePanel) return;
+    const alreadySaved = customCategories.some(
+      c => c.type === activePanel && c.label.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (!alreadySaved) {
+      await addCustomCategory(activePanel, trimmed);
+    }
+    // Select it immediately so the user can go straight to entering an amount.
+    setCategory(trimmed);
+    setIsCustomCategory(false);
+    setCustomCategory("");
   };
 
   const handleDelete = (item: {id: string, source: 'cash' | 'bucket'}) => {
@@ -536,40 +601,101 @@ export default function LedgerPage() {
                     minute: "2-digit",
                   });
                   return (
-                    <div key={item.id} className={cn("p-3 sm:p-4 flex items-center justify-between group", idx !== items.length - 1 && "border-b border-border/50")}>
-                      <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
-                        <div className={cn(
-                          "w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center text-lg sm:text-xl flex-shrink-0 transition-transform group-hover:scale-105",
-                          isIncome ? "bg-[#4EDEA3]/10" : "bg-white/5"
-                        )}>
-                          {getCategoryIcon(item.category)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="text-sm sm:text-base font-bold text-white truncate">{t(item.category) || item.category}</h4>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            {item.note && <span className="text-xs text-gray-500 truncate max-w-[120px] sm:max-w-[200px]">{item.note}</span>}
-                            {item.note && <span className="text-gray-700 text-[10px]">•</span>}
-                            <span className="text-[10px] text-gray-500 uppercase font-black">{item.bucketId === 'unassigned' ? 'cash' : 'wallet'}</span>
+                    <div
+                      key={item.id}
+                      ref={(el) => { rowRefs.current[item.id] = el; }}
+                      className={cn("relative overflow-hidden", idx !== items.length - 1 && "border-b border-border/50")}
+                    >
+                      <motion.div
+                        drag={isMobile ? "x" : false}
+                        dragDirectionLock
+                        dragConstraints={{ left: -80, right: 0 }}
+                        dragElastic={{ left: 0.15, right: 0 }}
+                        animate={{ x: isMobile && swipedId === item.id ? -80 : 0 }}
+                        transition={{ type: "spring", stiffness: 500, damping: 40 }}
+                        onDragEnd={(_, info: PanInfo) => {
+                          if (info.offset.x < -40 || info.velocity.x < -400) {
+                            setSwipedId(item.id);
+                          } else {
+                            setSwipedId(null);
+                          }
+                        }}
+                        onTap={() => {
+                          if (swipedId === item.id) setSwipedId(null);
+                        }}
+                        className="flex touch-pan-y"
+                      >
+                        {/* Row content: always the full row width and never shrinks, so the delete
+                            cell after it stays outside the visible area (clipped by the wrapper's
+                            overflow-hidden) until the row is actually dragged left. This doesn't rely
+                            on any background opacity to hide the delete button — it's structurally
+                            off-screen. */}
+                        <div className="w-full flex-shrink-0 bg-surface/50 p-3 sm:p-4 flex items-center justify-between group">
+                          <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                            <div className={cn(
+                              "w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center text-lg sm:text-xl flex-shrink-0 transition-transform group-hover:scale-105",
+                              isIncome ? "bg-[#4EDEA3]/10" : "bg-white/5"
+                            )}>
+                              {getCategoryIcon(item.category)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="text-sm sm:text-base font-bold text-white truncate">{t(item.category) || item.category}</h4>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                {item.note && <span className="text-xs text-gray-500 truncate max-w-[120px] sm:max-w-[200px]">{item.note}</span>}
+                                {item.note && <span className="text-gray-700 text-[10px]">•</span>}
+                                <span className="text-[10px] text-gray-500 uppercase font-black inline-flex items-center gap-1">
+                                  {item.bucketId === 'unassigned' ? (
+                                    <>
+                                      <ReceiptText size={10} />
+                                      {t("unassigned") || "Unassigned"}
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="normal-case">{bucketsById.get(item.bucketId)?.icon || "💳"}</span>
+                                      {bucketsById.get(item.bucketId)?.name || (t("wallet") || "Wallet")}
+                                    </>
+                                  )}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3 sm:gap-4 pl-3">
+                            <div className="text-right">
+                              <span className={cn(
+                                "block text-sm sm:text-base font-black tabular-nums tracking-tight whitespace-nowrap",
+                                isIncome ? "text-[#4EDEA3]" : "text-[#FFB4AB]"
+                              )}>
+                                {isIncome ? "+" : "-"}{formatDisplay(item.originalAmount, item.originalCurrency as "USD" | "THB")}
+                              </span>
+                              <span className="block text-[10px] text-gray-500 whitespace-nowrap">{itemTime}</span>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setToDelete({ id: item.id, source: item.source });
+                              }}
+                              className="hidden sm:flex w-8 h-8 rounded-xl bg-red-500/10 text-red-400 items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/20 flex-shrink-0"
+                            >
+                              <Trash2 size={14} />
+                            </button>
                           </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-3 sm:gap-4 pl-3">
-                        <div className="text-right">
-                          <span className={cn(
-                            "block text-sm sm:text-base font-black tabular-nums tracking-tight whitespace-nowrap",
-                            isIncome ? "text-[#4EDEA3]" : "text-[#FFB4AB]"
-                          )}>
-                            {isIncome ? "+" : "-"}{formatDisplay(item.originalAmount, item.originalCurrency as "USD" | "THB")}
-                          </span>
-                          <span className="block text-[10px] text-gray-500 whitespace-nowrap">{itemTime}</span>
+
+                        {/* Delete cell: sits right after the full-width row above, so it only ever
+                            enters the visible area once the row is swiped left. Mobile only. */}
+                        <div className="w-20 flex-shrink-0 sm:hidden bg-surface/50 flex items-center justify-center">
+                          <button
+                            onClick={() => {
+                              setToDelete({ id: item.id, source: item.source });
+                              setSwipedId(null);
+                            }}
+                            className="w-11 h-11 rounded-xl bg-red-500/10 text-red-400 flex items-center justify-center active:bg-red-500/20 transition-colors"
+                            aria-label={t("delete") || "Delete"}
+                          >
+                            <Trash2 size={18} />
+                          </button>
                         </div>
-                        <button
-                          onClick={() => setToDelete({ id: item.id, source: item.source })}
-                          className="w-8 h-8 rounded-xl bg-red-500/10 text-red-400 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/20"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
+                      </motion.div>
                     </div>
                   );
                 })}
@@ -586,7 +712,7 @@ export default function LedgerPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center sm:p-4 pb-20 sm:pb-4 bg-black/60 sm:backdrop-blur-sm pointer-events-auto"
+            className="fixed inset-0 z-40 flex items-end sm:items-center justify-center sm:p-4 bg-black/60 sm:backdrop-blur-sm pointer-events-auto"
             onClick={() => setActivePanel(null)}
           >
             <motion.div
@@ -720,6 +846,48 @@ export default function LedgerPage() {
                         </button>
                       );
                     })}
+                    {/* Custom categories the user has saved before (from Supabase via AppContext),
+                        so they can be tapped directly next time instead of retyping them. */}
+                    {activePanel && customCategories
+                      .filter(c => c.type === activePanel)
+                      .filter(c => !(activePanel === "INCOME" ? INCOME_PRESET_KEYS : EXPENSE_PRESET_KEYS)
+                        .some(p => (t(p.key) || p.key).toLowerCase() === c.label.toLowerCase()))
+                      .map((c) => {
+                        const isSelected = !isCustomCategory && category === c.label;
+                        return (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => {
+                              setIsCustomCategory(false);
+                              setCategory(c.label);
+                            }}
+                            className={cn(
+                              "group/chip flex items-center gap-1.5 px-3 py-2 rounded-xl border flex-shrink-0 transition-all text-xs font-bold",
+                              isSelected
+                                ? (activePanel === "INCOME" ? "bg-[#4EDEA3]/20 border-[#4EDEA3] text-[#4EDEA3]" : "bg-[#FFB4AB]/20 border-[#FFB4AB] text-[#FFB4AB]")
+                                : "bg-white/5 border-transparent text-gray-400 hover:bg-white/10 hover:text-white"
+                            )}
+                          >
+                            <span>{c.icon || "🏷️"}</span>
+                            <span>{c.label}</span>
+                            <span
+                              role="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeCustomCategory(c.id);
+                                if (category === c.label) {
+                                  setCategory("");
+                                }
+                              }}
+                              className="ml-0.5 opacity-40 hover:opacity-100 transition-opacity"
+                              aria-label={t("delete") || "Remove"}
+                            >
+                              <X size={11} />
+                            </span>
+                          </button>
+                        );
+                      })}
                     <button
                       type="button"
                       onClick={() => {
@@ -746,14 +914,31 @@ export default function LedgerPage() {
                         exit={{ height: 0, opacity: 0 }}
                         className="overflow-hidden"
                       >
-                        <input
-                          type="text"
-                          required
-                          value={customCategory}
-                          onChange={e => setCustomCategory(e.target.value)}
-                          placeholder="Type category..."
-                          className="w-full bg-background border border-white/5 focus:border-white/20 rounded-xl px-4 py-3 text-sm font-medium text-white placeholder-gray-500 outline-none transition-colors"
-                        />
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={customCategory}
+                            onChange={e => setCustomCategory(e.target.value)}
+                            placeholder={t("ledgerTypeCategory") || "Type your category name..."}
+                            className="flex-1 min-w-0 bg-background border border-white/5 focus:border-white/20 rounded-xl px-4 py-3 text-sm font-medium text-white placeholder-gray-500 outline-none transition-colors"
+                          />
+                          {/* Saves the category to the user's list right away (no amount needed), so it
+                              never creates a fake $0 transaction in the ledger. The main Save Record
+                              button below still records the real transaction as usual. */}
+                          <button
+                            type="button"
+                            onClick={handleAddCustomCategory}
+                            disabled={!customCategory.trim()}
+                            className={cn(
+                              "px-4 rounded-xl text-sm font-black flex-shrink-0 transition-all",
+                              customCategory.trim()
+                                ? (activePanel === "INCOME" ? "bg-[#4EDEA3] text-[#00285d] hover:brightness-110" : "bg-[#FFB4AB] text-[#5d0000] hover:brightness-110")
+                                : "bg-white/5 text-gray-600 cursor-not-allowed"
+                            )}
+                          >
+                            {t("ledgerAddCategory") || "Add"}
+                          </button>
+                        </div>
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -769,7 +954,7 @@ export default function LedgerPage() {
                   </div>
                 </div>
 
-                <div className="shrink-0 px-5 pt-3 pb-5 border-t border-white/5">
+                <div className="shrink-0 px-5 pt-3 pb-24 sm:pb-5 border-t border-white/5">
                   <button
                     disabled={isAdding || !amount || (!isCustomCategory && !category) || (isCustomCategory && !customCategory)}
                     className={cn(
