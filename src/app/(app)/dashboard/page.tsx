@@ -251,11 +251,18 @@ export default function DashboardPage() {
   const getEntryAmount = (entry: { amountUSD?: number; amount?: number }) => entry.amountUSD ?? entry.amount ?? 0;
   const formatEntryMoney = (v: number) => formatMoney(Math.abs(v));
 
-  // Monthly cashflow
+  // Monthly cashflow — compare using local date to avoid UTC offset issues (UTC+7)
   const now2 = new Date();
-  const monthKey = `${now2.getFullYear()}-${String(now2.getMonth() + 1).padStart(2, '0')}`;
-  const monthIncome = cashActivities.filter(a => a.date.startsWith(monthKey) && a.type === 'INCOME').reduce((s, a) => s + getEntryAmount(a), 0);
-  const monthExpense = cashActivities.filter(a => a.date.startsWith(monthKey) && (a.type === 'EXPENSE' || a.type === 'WITHDRAW') && !a.isTransfer).reduce((s, a) => s + getEntryAmount(a), 0);
+  const currentYear = now2.getFullYear();
+  const currentMonth = now2.getMonth(); // 0-indexed
+  const monthIncome = cashActivities.filter(a => {
+    const d = new Date(a.date);
+    return d.getFullYear() === currentYear && d.getMonth() === currentMonth && a.type === 'INCOME';
+  }).reduce((s, a) => s + getEntryAmount(a), 0);
+  const monthExpense = cashActivities.filter(a => {
+    const d = new Date(a.date);
+    return d.getFullYear() === currentYear && d.getMonth() === currentMonth && (a.type === 'EXPENSE' || a.type === 'WITHDRAW') && !a.isTransfer;
+  }).reduce((s, a) => s + getEntryAmount(a), 0);
   const monthNet = monthIncome - monthExpense;
 
   // P/L metrics

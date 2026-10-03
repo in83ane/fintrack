@@ -48,13 +48,32 @@ export function getDateBounds(
   return null;
 }
 
+/** Convert any date string to local midnight (start of day in local time) */
+export function toLocalDateStart(dateStr: string): Date {
+  const d = new Date(dateStr);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+}
+
+/** Get local YYYY-MM-DD key from any date string (handles ISO UTC strings correctly) */
+export function toLocalDateKey(dateStr: string): string {
+  const d = new Date(dateStr);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 export function isInRange(
   dateStr: string,
   bounds: { from: Date; to: Date } | null
 ): boolean {
   if (!bounds) return true;
-  const d = new Date(dateStr).getTime();
-  return d >= bounds.from.getTime() && d <= bounds.to.getTime();
+  // Use local date for comparison so UTC-stored ISO strings are compared
+  // against the local-date bounds (fixes timezone offset issues for UTC+7)
+  const localKey = toLocalDateKey(dateStr);
+  const [y, mo, dy] = localKey.split('-').map(Number);
+  const localMidnight = new Date(y, mo - 1, dy, 0, 0, 0, 0).getTime();
+  return localMidnight >= bounds.from.getTime() && localMidnight <= bounds.to.getTime();
 }
 
 const PRESETS = [

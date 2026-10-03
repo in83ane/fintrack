@@ -199,6 +199,8 @@ export default function BudgetPage() {
   useEffect(() => {
     const el = carouselRef.current;
     if (!el) return;
+    // Reset scroll to start so the first (leftmost) card is visible on mount
+    el.scrollLeft = 0;
     updateScrollState();
     el.addEventListener("scroll", updateScrollState, { passive: true });
     const ro = new ResizeObserver(updateScrollState);
@@ -703,7 +705,7 @@ export default function BudgetPage() {
         </div>
       </motion.div>
 
-      {/* Account Cards Carousel - Luxury Glass Design */}
+      {/* Account Cards - Grouped Layout */}
       <div
         className="relative mb-6 max-w-full sm:mb-8"
         onMouseEnter={() => setIsCarouselHovered(true)}
@@ -725,34 +727,215 @@ export default function BudgetPage() {
             const actualPct = (bucket.targetAmount && bucket.targetAmount > 0) 
               ? (bucket.currentAmount / bucket.targetAmount) * 100 
               : (totalAllocated > 0 ? ((bucket.currentAmount / (exchangeRates[bucket.currency || 'USD'] || 1)) / totalAllocated) * 100 : 0);
+            
+            // Generate gradient colors based on bucket color
+            const hsl = hexToHsl(bucket.color);
+            const grad1 = `hsl(${hsl.h}, ${Math.min(hsl.s + 20, 100)}%, ${Math.min(hsl.l + 10, 60)}%)`;
+            const grad2 = `hsl(${(hsl.h + 30) % 360}, ${Math.min(hsl.s + 10, 100)}%, ${Math.max(hsl.l - 20, 15)}%)`;
+            const grad3 = `hsl(${(hsl.h + 60) % 360}, ${hsl.s}%, ${Math.max(hsl.l - 30, 10)}%)`;
+            const textColor = hsl.l > 50 ? '#1a1a1a' : '#ffffff';
+            const textColorMuted = hsl.l > 50 ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.6)';
+
             return (
               <motion.div
                 key={bucket.id}
-                layout
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="group relative h-auto min-h-[16rem] w-[calc(100vw-2rem)] max-w-[22rem] flex-shrink-0 snap-start sm:min-w-[340px] sm:w-auto sm:max-w-none"
-                style={{ willChange: "transform" }}
+                className="group relative flex-shrink-0 snap-start w-[calc(100vw-2rem)] max-w-[20rem] sm:w-[19rem] sm:max-w-none"
+                style={{ willChange: "transform", height: '14rem' }}
               >
-                {/* Wrapper that scales — keeps glow clipped inside radius */}
-                <div className="absolute inset-0 rounded-xl sm:rounded-2xl overflow-hidden pointer-events-none">
-                  <div className="absolute -right-4 -top-4 w-24 h-24 blur-2xl rounded-full opacity-20" style={{ backgroundColor: bucket.color }} />
-                </div>
-                {/* Card surface — scales on hover */}
+                {/* ===== CREDIT CARD FACE ===== */}
                 <div
-                  className="relative h-full bg-[#353534]/40 backdrop-blur-xl p-4 sm:p-6 rounded-xl sm:rounded-2xl border border-[#424754]/5 shadow-xl flex flex-col justify-between group-hover:scale-[1.02] transition-all duration-200"
+                  className="relative w-full h-full rounded-2xl sm:rounded-[1.5rem] overflow-hidden shadow-2xl group-hover:scale-[1.02] transition-all duration-300"
+                  style={{
+                    background: `linear-gradient(135deg, ${grad1} 0%, ${grad2} 55%, ${grad3} 100%)`,
+                  }}
                 >
-                <div className="flex justify-between items-start relative z-10">
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-base sm:text-lg" style={{ backgroundColor: `${bucket.color}15` }}>
-                      {bucket.icon}
+                  {/* Decorative blobs */}
+                  <div className="absolute -top-8 -right-8 w-36 h-36 rounded-full opacity-20 blur-2xl" style={{ backgroundColor: 'white' }} />
+                  <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full opacity-10 blur-xl" style={{ backgroundColor: 'white' }} />
+                  {/* Subtle grid pattern */}
+                  <div
+                    className="absolute inset-0 opacity-[0.04]"
+                    style={{
+                      backgroundImage: `repeating-linear-gradient(45deg, white 0, white 1px, transparent 0, transparent 50%)`,
+                      backgroundSize: '10px 10px',
+                    }}
+                  />
+
+                  {/* Card content */}
+                  <div className="relative z-10 h-full flex flex-col justify-between p-4 sm:p-5">
+                    {/* Top: name + icon badge */}
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-[0.6rem] font-black uppercase tracking-[0.2em] mb-0.5" style={{ color: textColorMuted }}>
+                          {bucket.targetPercent}% {t("incomeSplit") || "Income Split"}
+                        </p>
+                        <h3 className="font-black text-sm sm:text-base tracking-tight leading-tight" style={{ color: textColor }}>
+                          {t(bucket.name) || bucket.name}
+                        </h3>
+                      </div>
+                      <div
+                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-xl shadow-lg flex-shrink-0"
+                        style={{ backgroundColor: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(8px)' }}
+                      >
+                        {bucket.icon}
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-bold text-white tracking-tight text-sm sm:text-base">{t(bucket.name) || bucket.name}</h3>
-                      <p className="text-[0.55rem] sm:text-[0.6rem] text-[#8c909f] uppercase tracking-widest">{bucket.targetPercent}% {t("incomeSplit") || "Income Split"}</p>
+
+
+
+                    {/* Middle: amount + progress */}
+                    <div className="space-y-1.5 mb-auto mt-2 sm:mt-4">
+                      <p className="text-[0.55rem] font-black uppercase tracking-[0.18em]" style={{ color: textColorMuted }}>
+                        {bucket.targetAmount && bucket.targetAmount > 0 ? t("savings") : t("currentAmount")}
+                      </p>
+                      <div className="flex items-end justify-between">
+                        <div className="flex items-baseline gap-1">
+                          <span className="font-light text-sm" style={{ color: textColorMuted }}>
+                            {formatBucketAmount(bucket, 0).replace(/[0-9,.\s-]/g, "")}
+                          </span>
+                          <span className="text-2xl sm:text-3xl font-black tracking-[-0.04em]" style={{ color: textColor }}>
+                            {formatBucketAmount(bucket, bucket.currentAmount).replace(/[^0-9,.]/g, "")}
+                          </span>
+                          {bucket.targetAmount && bucket.targetAmount > 0 ? (
+                            <span className="text-xs font-bold ml-0.5" style={{ color: textColorMuted }}>
+                              / {formatBucketAmount(bucket, bucket.targetAmount).replace(/[^0-9,.]/g, "")}
+                            </span>
+                          ) : null}
+                        </div>
+                        <span className="text-xs font-black" style={{ color: textColor }}>
+                          {actualPct.toFixed(0)}%
+                        </span>
+                      </div>
+                      <div className="h-1 w-full rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}>
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{ width: `${Math.min(actualPct, 100)}%`, backgroundColor: 'rgba(255,255,255,0.75)' }}
+                        />
+                      </div>
                     </div>
+
+                    {/* Action buttons inside card */}
+                    <div className="mt-auto pt-3 border-t border-white/10 space-y-1.5">
+                      {(bucket.targetAmount && bucket.targetAmount > 0 && bucket.currentAmount > bucket.targetAmount) ? (
+                        <div 
+                          className="text-[9px] sm:text-[10px] font-bold px-2 py-1 rounded-lg inline-flex items-center gap-1 cursor-pointer transition-colors"
+                          style={{ backgroundColor: 'rgba(255,255,255,0.12)', color: textColor }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setInvestModal({ sourceBucketId: bucket.id });
+                          }}
+                        >
+                          💡 {t("suggestionInvest")} {formatBucketAmount(bucket, bucket.currentAmount - bucket.targetAmount)}
+                        </div>
+                      ) : null}
+
+                        <div className="flex gap-1.5">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActionModal({ id: bucket.id, type: "deposit" });
+                              setActionAmount("");
+                              setActionNote("");
+                            }}
+                            className="flex-1 py-1.5 sm:py-2 rounded-lg font-black text-[9px] sm:text-[10px] uppercase transition-all flex items-center justify-center gap-1"
+                            style={{ backgroundColor: 'rgba(255,255,255,0.12)', color: textColor }}
+                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.22)')}
+                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.12)')}
+                          >
+                            <ArrowDownToLine size={11} />
+                            {t("deposit")}
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActionModal({ id: bucket.id, type: "withdraw" });
+                              setActionAmount("");
+                              setActionNote("");
+                            }}
+                            className="flex-1 py-1.5 sm:py-2 rounded-lg font-black text-[9px] sm:text-[10px] uppercase transition-all flex items-center justify-center gap-1"
+                            style={{ backgroundColor: 'rgba(255,255,255,0.12)', color: textColor }}
+                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.22)')}
+                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.12)')}
+                          >
+                            <ArrowUpFromLine size={11} />
+                            {t("withdraw")}
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setTransferModal({ sourceBucketId: bucket.id, destinationBucketId: "", amount: "", currency: currency as "USD" | "THB", note: "" });
+                            }}
+                            className="py-1.5 sm:py-2 px-2.5 rounded-lg font-black text-[9px] sm:text-[10px] uppercase transition-all flex items-center justify-center"
+                            style={{ backgroundColor: 'rgba(255,255,255,0.12)', color: textColor }}
+                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.22)')}
+                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.12)')}
+                            title={t("transfer") || "Transfer"}
+                          >
+                            <ArrowRightLeft size={11} />
+                          </button>
+                        </div>
+                    </div>
+
+                    {/* Deposit/Withdraw overlay */}
+                    <AnimatePresence>
+                      {actionModal?.id === bucket.id && (
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.15 }}
+                          className="absolute inset-0 z-30 flex flex-col items-center justify-center rounded-2xl sm:rounded-[1.5rem] p-5"
+                          style={{ backgroundColor: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(12px)' }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="w-full max-w-[16rem] space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className={cn("text-xs font-black uppercase tracking-widest", actionModal.type === 'deposit' ? 'text-[#4EDEA3]' : 'text-[#FFB4AB]')}>
+                                {actionModal.type === 'deposit' ? t("deposit") : t("withdraw")}
+                              </span>
+                              <button onClick={() => setActionModal(null)} className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/70 hover:text-white transition-colors">
+                                <X size={14} />
+                              </button>
+                            </div>
+                            <input
+                              type="number"
+                              step="any"
+                              min="0"
+                              placeholder="Amount"
+                              value={actionAmount}
+                              onChange={(e) => setActionAmount(e.target.value)}
+                              className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-white/50 placeholder:text-white/30 transition-colors"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') { e.preventDefault(); handleActionSubmit(); }
+                                if (e.key === 'Escape') { setActionModal(null); }
+                              }}
+                            />
+                            <button
+                              onClick={handleActionSubmit}
+                              disabled={!actionAmount || parseFloat(actionAmount) <= 0}
+                              className={cn(
+                                "w-full py-2.5 rounded-xl text-xs font-black uppercase tracking-wide transition-all",
+                                actionAmount && parseFloat(actionAmount) > 0
+                                  ? actionModal.type === 'deposit'
+                                    ? "bg-[#4EDEA3] text-[#0E0E0E] hover:brightness-110 shadow-lg shadow-[#4EDEA3]/20"
+                                    : "bg-[#FFB4AB] text-[#0E0E0E] hover:brightness-110 shadow-lg shadow-[#FFB4AB]/20"
+                                  : "bg-white/10 text-white/30 cursor-not-allowed"
+                              )}
+                            >
+                              <Check size={14} className="inline mr-1" />
+                              {actionModal.type === 'deposit' ? t("deposit") : t("withdraw")}
+                            </button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
-                  <div className="flex gap-0.5 sm:gap-1 opacity-0 group-hover:opacity-100 transition-opacity relative z-10">
+
+                  {/* Hover edit/delete overlay */}
+                  <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -772,139 +955,18 @@ export default function BudgetPage() {
                         });
                         setIsBucketModalOpen(true);
                       }}
-                      className="p-1 sm:p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/10 transition-all"
+                      className="w-7 h-7 rounded-lg flex items-center justify-center bg-black/30 backdrop-blur-sm text-white hover:bg-black/50 transition-all"
                     >
-                      <Pencil size={12} />
+                      <Pencil size={11} />
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); setBucketToDelete(bucket.id); }}
-                      className="p-1 sm:p-1.5 rounded-lg text-gray-500 hover:text-[#FFB4AB] hover:bg-[#FFB4AB]/10 transition-all"
+                      className="w-7 h-7 rounded-lg flex items-center justify-center bg-black/30 backdrop-blur-sm text-white hover:bg-[#FFB4AB]/60 transition-all"
                     >
-                      <Trash2 size={12} />
+                      <Trash2 size={11} />
                     </button>
                   </div>
                 </div>
-                <div className="relative z-10 flex-1 flex flex-col justify-center">
-                  <span className="text-[0.6rem] sm:text-[0.6875rem] text-[#8c909f] uppercase font-bold tracking-[0.15em] mb-1">
-                    {bucket.targetAmount && bucket.targetAmount > 0 ? t("savings") : t("currentAmount")}
-                  </span>
-                  <div className="flex items-baseline gap-1 mt-1">
-                    <span className="text-[#8c909f] font-light text-lg sm:text-xl">{formatBucketAmount(bucket, 0).replace(/[0-9,.\s-]/g, "")}</span>
-                    <span className="text-3xl sm:text-4xl font-black tracking-[-0.04em] text-white">
-                      {formatBucketAmount(bucket, bucket.currentAmount).replace(/[^0-9,.]/g, "")}
-                    </span>
-                    {bucket.targetAmount && bucket.targetAmount > 0 ? (
-                      <span className="text-sm sm:text-base font-bold text-[#8c909f]/60 ml-1 tracking-tight">
-                        / {formatBucketAmount(bucket, bucket.targetAmount).replace(/[^0-9,.]/g, "")}
-                      </span>
-                    ) : null}
-                  </div>
-                  {(bucket.targetAmount && bucket.targetAmount > 0 && bucket.currentAmount > bucket.targetAmount) ? (
-                    <div 
-                      className="mt-3 text-[10px] sm:text-xs text-[#E9C349] font-bold bg-[#E9C349]/10 border border-[#E9C349]/20 px-2.5 py-1.5 rounded-lg inline-flex items-center gap-1 cursor-pointer hover:bg-[#E9C349]/20 transition-colors max-w-fit"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setInvestModal({ sourceBucketId: bucket.id });
-                      }}
-                    >
-                      💡 {t("suggestionInvest")} {formatBucketAmount(bucket, bucket.currentAmount - bucket.targetAmount)}
-                    </div>
-                  ) : null}
-                </div>
-                <div className="space-y-1.5 sm:space-y-2 relative z-10">
-                  <div className="flex justify-between items-end text-[0.6rem] sm:text-[0.6875rem] uppercase tracking-widest font-bold">
-                    <span className="text-[#8c909f]">{t("progress")}</span>
-                    <span className="text-[#4EDEA3]">{actualPct.toFixed(1)}%</span>
-                  </div>
-                  <div className="h-1.5 sm:h-2 w-full bg-background rounded-full overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-[#4EDEA3] to-[#ADC6FF] rounded-full transition-all duration-500" style={{ width: `${Math.min(actualPct, 100)}%` }} />
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="mt-4">
-                  {actionModal?.id === bucket.id ? (
-                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-2 bg-background/50 p-2 sm:p-3 rounded-xl border border-white/5">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className={cn("text-xs font-black uppercase tracking-wide", actionModal.type === 'deposit' ? 'text-[#4EDEA3]' : 'text-[#FFB4AB]')}>
-                          {actionModal.type === 'deposit' ? t("deposit") : t("withdraw")}
-                        </span>
-                        <button onClick={() => setActionModal(null)} className="text-gray-500 hover:text-white transition-colors">
-                          <X size={14} />
-                        </button>
-                      </div>
-                      <div className="flex gap-2">
-                        <input
-                          type="number"
-                          step="any"
-                          min="0"
-                          placeholder="Amount"
-                          value={actionAmount}
-                          onChange={(e) => setActionAmount(e.target.value)}
-                          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-[#ADC6FF]"
-                          autoFocus
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              handleActionSubmit();
-                            }
-                          }}
-                        />
-                        <button
-                          onClick={handleActionSubmit}
-                          disabled={!actionAmount || parseFloat(actionAmount) <= 0}
-                          className={cn(
-                            "px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all",
-                            actionAmount && parseFloat(actionAmount) > 0
-                              ? "bg-white text-black"
-                              : "bg-white/10 text-gray-500 cursor-not-allowed"
-                          )}
-                        >
-                          <Check size={14} />
-                        </button>
-                      </div>
-                    </motion.div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActionModal({ id: bucket.id, type: "deposit" });
-                          setActionAmount("");
-                          setActionNote("");
-                        }}
-                        className="flex-1 py-2 sm:py-2.5 rounded-xl font-black text-[10px] sm:text-xs uppercase bg-[#4EDEA3]/10 text-[#4EDEA3] border border-[#4EDEA3]/20 hover:bg-[#4EDEA3]/20 transition-all flex items-center justify-center gap-1.5"
-                      >
-                        <ArrowDownToLine size={12} className="sm:w-3.5 sm:h-3.5" />
-                        {t("deposit")}
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActionModal({ id: bucket.id, type: "withdraw" });
-                          setActionAmount("");
-                          setActionNote("");
-                        }}
-                        className="flex-1 py-2 sm:py-2.5 rounded-xl font-black text-[10px] sm:text-xs uppercase bg-[#FFB4AB]/10 text-[#FFB4AB] border border-[#FFB4AB]/20 hover:bg-[#FFB4AB]/20 transition-all flex items-center justify-center gap-1.5"
-                      >
-                        <ArrowUpFromLine size={12} className="sm:w-3.5 sm:h-3.5" />
-                        {t("withdraw")}
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setTransferModal({ sourceBucketId: bucket.id, destinationBucketId: "", amount: "", currency: currency as "USD" | "THB", note: "" });
-                        }}
-                        className="flex-[0.5] py-2 sm:py-2.5 rounded-xl font-black text-[10px] sm:text-xs uppercase bg-[#ADC6FF]/10 text-[#ADC6FF] border border-[#ADC6FF]/20 hover:bg-[#ADC6FF]/20 transition-all flex items-center justify-center gap-1.5"
-                        title={t("transfer") || "Transfer"}
-                      >
-                        <ArrowRightLeft size={12} className="sm:w-3.5 sm:h-3.5" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                </div>{/* end card surface */}
               </motion.div>
             );
           })}

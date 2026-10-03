@@ -25,7 +25,7 @@ import { useApp } from "@/src/context/AppContext";
 import { ConfirmModal } from "@/src/components/ConfirmModal";
 import { createPortal } from "react-dom";
 import { AnimatedNumber } from "@/src/components/AnimatedNumber";
-import { DateRangeBar, DateRangeState, getDateBounds, isInRange } from "@/src/components/DateRangeBar";
+import { DateRangeBar, DateRangeState, getDateBounds, isInRange, toLocalDateKey } from "@/src/components/DateRangeBar";
 
 const INCOME_PRESET_KEYS = [
   { icon: "💰", key: "salary" },
@@ -101,7 +101,9 @@ function getCategoryIcon(cat: string): string {
 }
 
 function formatDateGroup(dateStr: string, todayLabel: string, yesterdayLabel: string, language: string): string {
-  const d = new Date(dateStr);
+  // Parse as local date (dateStr is a YYYY-MM-DD group key, already local)
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const d = new Date(year, month - 1, day);
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
@@ -264,7 +266,8 @@ export default function LedgerPage() {
   const grouped = useMemo(() => {
     const groups: Record<string, typeof records> = {};
     records.forEach(r => {
-      const key = r.date.split("T")[0];
+      // Use local date key (not UTC) to group correctly for UTC+7 users
+      const key = toLocalDateKey(r.date);
       if (!groups[key]) groups[key] = [];
       groups[key].push(r);
     });

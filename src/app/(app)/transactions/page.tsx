@@ -25,7 +25,7 @@ import { AddAssetModal } from "@/src/components/AddAssetModal";
 import { ConfirmModal } from "@/src/components/ConfirmModal";
 import { TransactionDetailModal } from "@/src/components/TransactionDetailModal";
 import { calcExpectancy, calcStreak } from "@/src/lib/finance";
-import { DateRangeBar, DateRangeState, getDateBounds, isInRange } from "@/src/components/DateRangeBar";
+import { DateRangeBar, DateRangeState, getDateBounds, isInRange, toLocalDateKey } from "@/src/components/DateRangeBar";
 
 interface UnifiedTransaction {
   id: string;
@@ -72,28 +72,29 @@ export default function TransactionsPage() {
   const heatmapDate = new Date(now.getFullYear(), now.getMonth() - selectedHeatmapMonth, 1);
   const daysInMonth = new Date(heatmapDate.getFullYear(), heatmapDate.getMonth() + 1, 0).getDate();
   const firstDay = new Date(heatmapDate.getFullYear(), heatmapDate.getMonth(), 1).getDay();
-  const heatmapMonthKey = `${heatmapDate.getFullYear()}-${String(heatmapDate.getMonth() + 1).padStart(2, '0')}`;
+  const heatmapYear = heatmapDate.getFullYear();
+  const heatmapMonth = heatmapDate.getMonth(); // 0-indexed
 
-  // Daily P/L from cash activities (actual income/expense)
+  // Daily P/L from cash activities — use LOCAL date to avoid UTC shift (UTC+7)
   const dailyPL: Record<number, number> = {};
   const dailyCount: Record<number, number> = {};
   cashActivities.forEach(ca => {
-    if (ca.date.startsWith(heatmapMonthKey)) {
-      const d = new Date(ca.date);
-      const day = d.getDate();
-      if (!dailyPL[day]) dailyPL[day] = 0;
-      if (!dailyCount[day]) dailyCount[day] = 0;
-      if (ca.type === 'INCOME' || ca.type === 'DEPOSIT') dailyPL[day] += ca.amountUSD;
-      else if (!ca.isTransfer) dailyPL[day] -= ca.amountUSD;
-      dailyCount[day]++;
+    const localKey = toLocalDateKey(ca.date); // e.g. "2026-09-18"
+    const [ly, lm, ld] = localKey.split('-').map(Number);
+    if (ly === heatmapYear && lm - 1 === heatmapMonth) {
+      if (!dailyPL[ld]) dailyPL[ld] = 0;
+      if (!dailyCount[ld]) dailyCount[ld] = 0;
+      if (ca.type === 'INCOME' || ca.type === 'DEPOSIT') dailyPL[ld] += ca.amountUSD;
+      else if (!ca.isTransfer) dailyPL[ld] -= ca.amountUSD;
+      dailyCount[ld]++;
     }
   });
   trades.forEach(trade => {
-    if (trade.date.startsWith(heatmapMonthKey)) {
-      const d = new Date(trade.date);
-      const day = d.getDate();
-      if (!dailyCount[day]) dailyCount[day] = 0;
-      dailyCount[day]++;
+    const localKey = toLocalDateKey(trade.date);
+    const [ly, lm, ld] = localKey.split('-').map(Number);
+    if (ly === heatmapYear && lm - 1 === heatmapMonth) {
+      if (!dailyCount[ld]) dailyCount[ld] = 0;
+      dailyCount[ld]++;
     }
   });
 
@@ -602,7 +603,7 @@ export default function TransactionsPage() {
                       </div>
                     </td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4">
-                      <div className="flex items-center gap-2 sm:gap-3">
+                      <div className="relative flex items-center gap-2 sm:gap-3">
                         <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center ${
                           txn.category === 'bucket' ? 'bg-[#ADC6FF]/10 text-[#ADC6FF]' :
                           txn.category === 'cash' ? 'bg-[#E9C349]/10 text-[#E9C349]' :
@@ -612,11 +613,38 @@ export default function TransactionsPage() {
                            txn.category === 'cash' ? <AlertCircle size={12} /> :
                            txn.type === 'SELL' ? <ArrowDownLeft size={12} /> : <ArrowUpRight size={12} />}
                         </div>
-                        <div className="flex flex-col">
-                          <span className="text-xs font-bold text-white">{txn.asset}</span>
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-xs font-bold text-white truncate">{txn.asset}</span>
                           <span className="text-[9px] text-gray-500 uppercase">
                             {txn.category === 'trade' ? 'Trade' : txn.category === 'bucket' ? 'Bucket' : 'Cash'}
                           </span>
+                        </div>
+                        {/* Trade icon at bottom-left — small asset initial badge */}
+                        <div
+                          className="absolute -bottom-1 left-0 flex items-center justify-center rounded-md text-[8px] font-black leading-none select-none pointer-events-none"
+                          style={{
+                            width: '14px',
+                            height: '14px',
+                            backgroundColor:
+                              txn.category === 'bucket' ? 'rgba(173,198,255,0.15)' :
+                              txn.category === 'cash' ? 'rgba(233,195,73,0.15)' :
+                              txn.type === 'SELL' ? 'rgba(255,180,171,0.15)' : 'rgba(78,222,163,0.15)',
+                            color:
+                              txn.category === 'bucket' ? '#ADC6FF' :
+                              txn.category === 'cash' ? '#E9C349' :
+                              txn.type === 'SELL' ? '#FFB4AB' : '#4EDEA3',
+                            border: `1px solid ${
+                              txn.category === 'bucket' ? 'rgba(173,198,255,0.25)' :
+                              txn.category === 'cash' ? 'rgba(233,195,73,0.25)' :
+                              txn.type === 'SELL' ? 'rgba(255,180,171,0.25)' : 'rgba(78,222,163,0.25)'
+                            }`,
+                          }}
+                          title={txn.asset}
+                        >
+                          {txn.category === 'bucket' && txn.bucketIcon
+                            ? <span style={{ fontSize: '8px', lineHeight: 1 }}>{txn.bucketIcon}</span>
+                            : txn.asset.charAt(0).toUpperCase()
+                          }
                         </div>
                       </div>
                     </td>

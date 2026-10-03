@@ -592,9 +592,9 @@ const translations: Record<Language, Record<string, string>> = {
     portfolioBalanced: "Your portfolio is perfectly balanced!",
 
     // Money Buckets
-    moneyManagement: "Money Management",
+    moneyManagement: "Account Management",
     moneyBuckets: "Money Buckets",
-    moneyBucketsDesc: "Divide your money into purpose-based buckets",
+    moneyBucketsDesc: "Manage your cash accounts and savings buckets",
     addBucket: "Add Bucket",
     editBucket: "Edit Bucket",
     bucketName: "Bucket Name",
@@ -619,7 +619,7 @@ const translations: Record<Language, Record<string, string>> = {
     bucketTotal: "Total Allocated",
     bucketRemaining: "Remaining",
     customBucket: "Custom",
-    budgetPage: "Money Buckets",
+    budgetPage: "Bucket",
     incomeDistribution: "Income Distribution",
     enterIncome: "Enter Income Amount",
     distributeNow: "Distribute Now",
@@ -1014,9 +1014,9 @@ const translations: Record<Language, Record<string, string>> = {
     portfolioBalanced: "พอร์ตของคุณสมดุลดีเยี่ยมแล้ว",
 
     // Money Buckets
-    moneyManagement: "การจัดการเงิน",
+    moneyManagement: "จัดการบัญชี",
     moneyBuckets: "กระเป๋าเงิน",
-    moneyBucketsDesc: "แบ่งเงินของคุณตามวัตถุประสงค์",
+    moneyBucketsDesc: "จัดการบัญชีเงินสดและกระเป๋าออม",
     addBucket: "เพิ่มกระเป๋า",
     editBucket: "แก้ไขกระเป๋า",
     bucketName: "ชื่อกระเป๋า",
@@ -1041,7 +1041,7 @@ const translations: Record<Language, Record<string, string>> = {
     bucketTotal: "จัดสรรรวม",
     bucketRemaining: "เหลือ",
     customBucket: "กำหนดเอง",
-    budgetPage: "กระเป๋าเงิน",
+    budgetPage: "Bucket",
     incomeDistribution: "กระจายรายได้",
     enterIncome: "กรอกจำนวนรายได้",
     distributeNow: "กระจายเงินทันที",
@@ -1906,6 +1906,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         color: record.color,
         isDefault: record.is_default,
       }));
+
+      nextPortfolios.sort((a, b) => {
+        if (a.name.toLowerCase() === 'bucket' && b.name.toLowerCase() !== 'bucket') return -1;
+        if (b.name.toLowerCase() === 'bucket' && a.name.toLowerCase() !== 'bucket') return 1;
+        return 0;
+      });
+
       setPortfolios(nextPortfolios);
       const savedId = typeof window !== 'undefined' ? localStorage.getItem('fintrack-active-portfolio') : null;
       const nextActive = nextPortfolios.find(portfolio => portfolio.id === savedId)
@@ -2740,7 +2747,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }]);
 
         // Refetch cash activities to sync with backend triggers
-        const { data: newCashActivities } = await db.cashActivities.getAll(user.id, activePortfolioId);
+        const { data: newCashActivities } = await db.cashActivities.getAll(user.id, bucketPortfolioId);
         if (newCashActivities) {
           setCashActivities(newCashActivities.map(ca => ({
             id: ca.id,
@@ -2957,6 +2964,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Bucket/Cash operations are global — when "All portfolios" is active, fall back to the first portfolio
+  const bucketPortfolioId = activePortfolioId || (portfolios.length > 0 ? portfolios[0].id : null);
+
   const addMoneyBucket = async (bucket: Omit<MoneyBucket, 'id'>) => {
     if (!user) {
       const id = Date.now().toString();
@@ -2973,7 +2983,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       let { data, error } = await db.buckets.insert({
         user_id: user.id,
-        portfolio_id: activePortfolioId,
+        portfolio_id: bucketPortfolioId,
         name: bucket.name,
         target_percent: bucket.targetPercent,
         target_amount: bucket.targetAmount || 0,
@@ -3060,7 +3070,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data, error } = await db.bucketActivities.insert({
         user_id: user.id,
-        portfolio_id: activePortfolioId,
+        portfolio_id: bucketPortfolioId,
         bucket_id: activity.bucketId,
         type: activity.type,
         amount: activity.amount,
@@ -3123,7 +3133,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data, error } = await db.cashActivities.insert({
         user_id: user.id,
-        portfolio_id: activePortfolioId,
+        portfolio_id: bucketPortfolioId,
         type: activityData.type,
         amount: activityData.amountUSD,
         category: activityData.category,
@@ -3266,7 +3276,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setTrades(prev => [...tradesWithIds, ...prev]);
 
         // Refetch cash activities to sync with backend triggers
-        const { data: newCashActivities } = await db.cashActivities.getAll(user.id, activePortfolioId);
+        const { data: newCashActivities } = await db.cashActivities.getAll(user.id, bucketPortfolioId);
         if (newCashActivities) {
           setCashActivities(newCashActivities.map(ca => ({
             id: ca.id,
@@ -3422,8 +3432,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       trades,
       addTrade: isAllPortfolios ? blockAllPortfolioMutation : addTrade,
       cashActivities,
-      addCashActivity: isAllPortfolios ? readOnlyCashActivity : addCashActivity,
-      removeCashActivity: isAllPortfolios ? blockAllPortfolioMutation : removeCashActivity,
+      addCashActivity,
+      removeCashActivity,
       allocations,
       updateAllocation: isAllPortfolios ? blockAllPortfolioMutation : updateAllocation,
       assets,
@@ -3446,7 +3456,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       reorderAssets: isAllPortfolios ? blockAllPortfolioMutation : reorderAssets,
       removeTrade: isAllPortfolios ? blockAllPortfolioMutation : removeTrade,
       updateTrade: isAllPortfolios ? blockAllPortfolioMutation : updateTrade,
-      updateCashActivity: isAllPortfolios ? blockAllPortfolioMutation : updateCashActivity,
+      updateCashActivity,
       toasts,
       addToast,
       removeToast,
@@ -3462,13 +3472,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       notifPreferences,
       setNotifPreferences,
       moneyBuckets: dynamicMoneyBuckets,
-      addMoneyBucket: isAllPortfolios ? blockAllPortfolioMutation : addMoneyBucket,
-      updateMoneyBucket: isAllPortfolios ? blockAllPortfolioMutation : updateMoneyBucket,
-      removeMoneyBucket: isAllPortfolios ? blockAllPortfolioMutation : removeMoneyBucket,
+      addMoneyBucket,
+      updateMoneyBucket,
+      removeMoneyBucket,
       bucketActivities,
-      addBucketActivity: isAllPortfolios ? blockAllPortfolioMutation : addBucketActivity,
-      removeBucketActivity: isAllPortfolios ? blockAllPortfolioMutation : removeBucketActivity,
-      addTradeFromBucket: isAllPortfolios ? blockAllPortfolioMutation : addTradeFromBucket,
+      addBucketActivity,
+      removeBucketActivity,
+      addTradeFromBucket,
       dashboardWidgets,
       setDashboardWidgets,
       totalInvested,

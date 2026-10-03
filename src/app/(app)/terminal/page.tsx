@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Briefcase, Calendar, Target, X } from "lucide-react";
+import { Briefcase, Calendar, Target, X, ChevronDown, TrendingUp, BarChart2, Bell, CalendarDays, Globe, Search, Newspaper, Flame } from "lucide-react";
 import { useApp } from "@/src/context/AppContext";
 import { supabase } from "@/src/lib/supabase";
 import Link from "next/link";
@@ -27,6 +27,60 @@ function useMounted() {
   return mounted;
 }
 
+// ─── TradingView Stock Heatmap Widget ────────────────────────────────────────
+function HeatmapWidget() {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    // Clear previous widget if any
+    container.innerHTML = "";
+
+    const widgetDiv = document.createElement("div");
+    widgetDiv.className = "tradingview-widget-container__widget";
+    widgetDiv.style.height = "100%";
+    widgetDiv.style.width = "100%";
+    container.appendChild(widgetDiv);
+
+    const script = document.createElement("script");
+    script.src = "https://s3.tradingview.com/external-embedding/embed-widget-stock-heatmap.js";
+    script.type = "text/javascript";
+    script.async = true;
+    script.innerHTML = JSON.stringify({
+      exchanges: [],
+      dataSource: "SPX500",
+      grouping: "sector",
+      blockSize: "market_cap_basic",
+      blockColor: "change",
+      locale: "en",
+      symbolUrl: "",
+      colorTheme: "dark",
+      hasTopBar: false,
+      isDataSetEnabled: false,
+      isZoomEnabled: true,
+      hasSymbolTooltip: true,
+      isMonoSize: false,
+      width: "100%",
+      height: "100%",
+    });
+    container.appendChild(script);
+
+    return () => {
+      if (container) container.innerHTML = "";
+    };
+  }, []);
+
+  return (
+    <div
+      className="tradingview-widget-container"
+      ref={containerRef}
+      style={{ height: "100%", width: "100%" }}
+    />
+  );
+}
+
 export default function TerminalPage() {
   return (
     <React.Suspense fallback={<div className="min-h-screen bg-background" />}>
@@ -45,6 +99,14 @@ function TerminalContent() {
   const [interval, setInterval] = useState("60");
   const [stateLoaded, setStateLoaded] = useState(false);
   const [isTradeAssistantOpen, setIsTradeAssistantOpen] = useState(false);
+  const [openPanels, setOpenPanels] = useState<Set<string>>(new Set());
+
+  const togglePanel = (id: string) =>
+    setOpenPanels(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // ─── Load saved terminal state from Supabase on mount ───────────────
@@ -235,69 +297,159 @@ function TerminalContent() {
             </div>
 
             {/* ═══════════════════════════════════════════════════════════════
-                ROW 2 — Analysis Panels (S/R, Fibo, Alerts)
+                PANELS — Collapsible sections (Analysis + Market Data + Heatmap)
                 ═══════════════════════════════════════════════════════════════ */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full">
-              <div className="h-full">
-                <SupportResistancePanel key={`sr-${symbol}-${interval}`} symbol={symbol} interval={interval} />
-              </div>
-              <div className="h-full">
-                <FibonacciPanel key={`fibo-${symbol}-${interval}`} symbol={symbol} interval={interval} />
-              </div>
-              <div className="h-full">
-                <AlertsPanel key={`alerts-${symbol}-${interval}`} symbol={symbol} interval={interval} />
+
+            {/* ── Panel toggle bar ───────────────────────────────────────── */}
+            <div className="bg-surface rounded-2xl border border-border p-2">
+              <div className="flex flex-wrap gap-2">
+                {([
+                  { id: "sr",       label: "Support & Resistance", icon: TrendingUp },
+                  { id: "fibo",     label: "Fibonacci Setup",      icon: BarChart2  },
+                  { id: "alerts",   label: "Multi-Factor Alerts",  icon: Bell       },
+                  { id: "calendar", label: "Economic Calendar",    icon: CalendarDays },
+                  { id: "overview", label: "Market Overview",      icon: Globe      },
+                  { id: "screener", label: "Forex Screener",       icon: Search     },
+                  { id: "timeline", label: "Market Timeline",      icon: Newspaper  },
+                  { id: "heatmap",  label: "S&P 500 Heatmap",      icon: Flame      },
+                ] as const).map(({ id, label, icon: Icon }) => {
+                  const isOpen = openPanels.has(id);
+                  return (
+                    <button
+                      key={id}
+                      onClick={() => togglePanel(id)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                        isOpen
+                          ? "bg-primary/15 border-primary/40 text-primary"
+                          : "bg-surface-2 border-border text-gray-400 hover:text-white hover:border-border/80"
+                      }`}
+                    >
+                      <Icon size={12} />
+                      {label}
+                      <ChevronDown
+                        size={11}
+                        className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+                      />
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            {/* ═══════════════════════════════════════════════════════════════
-                ROW 3 — Economic Calendar + Market Overview
-                ═══════════════════════════════════════════════════════════════ */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-              <div className="lg:col-span-7 bg-surface rounded-2xl border border-border overflow-hidden flex flex-col">
-                <div className="px-4 pt-3 pb-2 border-b border-border">
-                  <h2 className="text-sm font-bold text-white">Economic calendar</h2>
-                  <p className="text-[11px] text-gray-500 mt-0.5">Upcoming high-impact events</p>
-                </div>
-                <div className="flex-1 min-h-[400px]">
-                  <EconomicCalendarWidget />
-                </div>
+            {/* ── Analysis panels (3 col when multiple open) ─────────────── */}
+            {(openPanels.has("sr") || openPanels.has("fibo") || openPanels.has("alerts")) && (
+              <div className={`grid gap-4 ${
+                [openPanels.has("sr"), openPanels.has("fibo"), openPanels.has("alerts")].filter(Boolean).length === 1
+                  ? "grid-cols-1"
+                  : [openPanels.has("sr"), openPanels.has("fibo"), openPanels.has("alerts")].filter(Boolean).length === 2
+                  ? "grid-cols-1 md:grid-cols-2"
+                  : "grid-cols-1 md:grid-cols-3"
+              }`}>
+                {openPanels.has("sr") && (
+                  <SupportResistancePanel key={`sr-${symbol}-${interval}`} symbol={symbol} interval={interval} />
+                )}
+                {openPanels.has("fibo") && (
+                  <FibonacciPanel key={`fibo-${symbol}-${interval}`} symbol={symbol} interval={interval} />
+                )}
+                {openPanels.has("alerts") && (
+                  <AlertsPanel key={`alerts-${symbol}-${interval}`} symbol={symbol} interval={interval} />
+                )}
               </div>
+            )}
 
-              <div className="lg:col-span-5 bg-surface rounded-2xl border border-border overflow-hidden flex flex-col">
-                <div className="px-4 pt-3 pb-2 border-b border-border">
-                  <h2 className="text-sm font-bold text-white">Market overview</h2>
-                  <p className="text-[11px] text-gray-500 mt-0.5">Forex, metals, indices, and crypto tabs</p>
-                </div>
-                <div className="flex-1 min-h-[400px]">
-                  <MarketOverviewWidget />
-                </div>
+            {/* ── Market data panels ─────────────────────────────────────── */}
+            {(openPanels.has("calendar") || openPanels.has("overview")) && (
+              <div className={`grid gap-4 ${
+                openPanels.has("calendar") && openPanels.has("overview")
+                  ? "grid-cols-1 lg:grid-cols-12"
+                  : "grid-cols-1"
+              }`}>
+                {openPanels.has("calendar") && (
+                  <div className={`${openPanels.has("overview") ? "lg:col-span-7" : ""} bg-surface rounded-2xl border border-border overflow-hidden flex flex-col`}>
+                    <div className="px-4 pt-3 pb-2 border-b border-border flex items-center justify-between">
+                      <div>
+                        <h2 className="text-sm font-bold text-white">Economic calendar</h2>
+                        <p className="text-[11px] text-gray-500 mt-0.5">Upcoming high-impact events</p>
+                      </div>
+                      <button onClick={() => togglePanel("calendar")} className="p-1 rounded-lg hover:bg-white/5 text-gray-500 hover:text-white transition-colors">
+                        <X size={13} />
+                      </button>
+                    </div>
+                    <div className="flex-1 min-h-[400px]"><EconomicCalendarWidget /></div>
+                  </div>
+                )}
+                {openPanels.has("overview") && (
+                  <div className={`${openPanels.has("calendar") ? "lg:col-span-5" : ""} bg-surface rounded-2xl border border-border overflow-hidden flex flex-col`}>
+                    <div className="px-4 pt-3 pb-2 border-b border-border flex items-center justify-between">
+                      <div>
+                        <h2 className="text-sm font-bold text-white">Market overview</h2>
+                        <p className="text-[11px] text-gray-500 mt-0.5">Forex, metals, indices, and crypto tabs</p>
+                      </div>
+                      <button onClick={() => togglePanel("overview")} className="p-1 rounded-lg hover:bg-white/5 text-gray-500 hover:text-white transition-colors">
+                        <X size={13} />
+                      </button>
+                    </div>
+                    <div className="flex-1 min-h-[400px]"><MarketOverviewWidget /></div>
+                  </div>
+                )}
               </div>
-            </div>
+            )}
 
-            {/* ═══════════════════════════════════════════════════════════════
-                ROW 3 — Forex Screener + Market Timeline
-                ═══════════════════════════════════════════════════════════════ */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-              <div className="lg:col-span-7 bg-surface rounded-2xl border border-border overflow-hidden flex flex-col">
-                <div className="px-4 pt-3 pb-2 border-b border-border">
-                  <h2 className="text-sm font-bold text-white">Forex screener</h2>
-                  <p className="text-[11px] text-gray-500 mt-0.5">Filter pairs by technicals and overview</p>
-                </div>
-                <div className="flex-1 min-h-[400px]">
-                  <ScreenerWidget />
-                </div>
+            {(openPanels.has("screener") || openPanels.has("timeline")) && (
+              <div className={`grid gap-4 ${
+                openPanels.has("screener") && openPanels.has("timeline")
+                  ? "grid-cols-1 lg:grid-cols-12"
+                  : "grid-cols-1"
+              }`}>
+                {openPanels.has("screener") && (
+                  <div className={`${openPanels.has("timeline") ? "lg:col-span-7" : ""} bg-surface rounded-2xl border border-border overflow-hidden flex flex-col`}>
+                    <div className="px-4 pt-3 pb-2 border-b border-border flex items-center justify-between">
+                      <div>
+                        <h2 className="text-sm font-bold text-white">Forex screener</h2>
+                        <p className="text-[11px] text-gray-500 mt-0.5">Filter pairs by technicals and overview</p>
+                      </div>
+                      <button onClick={() => togglePanel("screener")} className="p-1 rounded-lg hover:bg-white/5 text-gray-500 hover:text-white transition-colors">
+                        <X size={13} />
+                      </button>
+                    </div>
+                    <div className="flex-1 min-h-[400px]"><ScreenerWidget /></div>
+                  </div>
+                )}
+                {openPanels.has("timeline") && (
+                  <div className={`${openPanels.has("screener") ? "lg:col-span-5" : ""} bg-surface rounded-2xl border border-border overflow-hidden flex flex-col`}>
+                    <div className="px-4 pt-3 pb-2 border-b border-border flex items-center justify-between">
+                      <div>
+                        <h2 className="text-sm font-bold text-white">Market timeline</h2>
+                        <p className="text-[11px] text-gray-500 mt-0.5">Ideas and headlines that move FX</p>
+                      </div>
+                      <button onClick={() => togglePanel("timeline")} className="p-1 rounded-lg hover:bg-white/5 text-gray-500 hover:text-white transition-colors">
+                        <X size={13} />
+                      </button>
+                    </div>
+                    <div className="flex-1 min-h-[400px]"><TimelineWidget /></div>
+                  </div>
+                )}
               </div>
+            )}
 
-              <div className="lg:col-span-5 bg-surface rounded-2xl border border-border overflow-hidden flex flex-col">
-                <div className="px-4 pt-3 pb-2 border-b border-border">
-                  <h2 className="text-sm font-bold text-white">Market timeline</h2>
-                  <p className="text-[11px] text-gray-500 mt-0.5">Ideas and headlines that move FX</p>
+            {/* ── Heatmap ────────────────────────────────────────────────── */}
+            {openPanels.has("heatmap") && (
+              <div className="bg-surface rounded-2xl border border-border overflow-hidden">
+                <div className="px-4 pt-3 pb-2 border-b border-border flex items-center justify-between">
+                  <div>
+                    <h2 className="text-sm font-bold text-white">S&amp;P 500 Heatmap</h2>
+                    <p className="text-[11px] text-gray-500 mt-0.5">Market cap · grouped by sector · color by change%</p>
+                  </div>
+                  <button onClick={() => togglePanel("heatmap")} className="p-1 rounded-lg hover:bg-white/5 text-gray-500 hover:text-white transition-colors">
+                    <X size={13} />
+                  </button>
                 </div>
-                <div className="flex-1 min-h-[400px]">
-                  <TimelineWidget />
+                <div className="h-[600px] w-full">
+                  <HeatmapWidget />
                 </div>
               </div>
-            </div>
+            )}
+
           </div>
         ) : (
           <div className="flex flex-col gap-4">

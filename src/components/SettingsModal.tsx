@@ -62,8 +62,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   <Wallet size={14} />
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-white">Include Money Buckets</p>
-                  <p className="text-xs text-gray-500">Savings goals, sinking funds</p>
+                  <p className="text-sm font-bold text-white">Include Accounts</p>
+                  <p className="text-xs text-gray-500">Cash accounts, savings buckets</p>
                 </div>
               </div>
               <button
