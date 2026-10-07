@@ -144,6 +144,7 @@ export default function LedgerPage() {
   const [isCustomCategory, setIsCustomCategory] = useState(false);
   const [customCategory, setCustomCategory] = useState("");
   const [isDepositToOpen, setIsDepositToOpen] = useState(false);
+  const [recordDate, setRecordDate] = useState(() => new Date().toISOString().split("T")[0]);
   
   // Wallet Selection
   const [selectedWalletId, setSelectedWalletId] = useState<string>("all");
@@ -287,6 +288,7 @@ export default function LedgerPage() {
     setNote("");
     setIsCustomCategory(false);
     setCustomCategory("");
+    setRecordDate(new Date().toISOString().split("T")[0]);
     setActionCurrency(currency as "USD" | "THB");
     if (selectedWalletId === 'all') {
       setDepositTo(type === 'INCOME' ? 'auto_split' : 'unassigned');
@@ -303,7 +305,8 @@ export default function LedgerPage() {
     setIsAdding(true);
     try {
       const raw = Number(amount);
-      const now = new Date().toISOString();
+      const isToday = recordDate === new Date().toISOString().split("T")[0];
+      const now = isToday ? new Date().toISOString() : new Date(recordDate).toISOString();
       const usdAmt = raw / (exchangeRates[actionCurrency] || 1);
 
       if (activePanel === 'INCOME' && depositTo === 'auto_split') {
@@ -417,6 +420,14 @@ export default function LedgerPage() {
         setShowConfetti(true);
         setTimeout(() => setShowConfetti(false), 1700);
       }
+      
+      const recordD = new Date(now);
+      const isCurrentlyViewingRecordMonth = dateRange.mode === "month" && dateRange.year === recordD.getFullYear() && dateRange.month === recordD.getMonth();
+      
+      if (dateRange.mode !== "all" && !isCurrentlyViewingRecordMonth) {
+        setDateRange({ mode: "month", year: recordD.getFullYear(), month: recordD.getMonth() });
+      }
+
       setActivePanel(null);
     } catch (err) {
       addToast(t("errorOccurred"), "error");
@@ -952,7 +963,14 @@ export default function LedgerPage() {
                       value={note}
                       onChange={e => setNote(e.target.value)}
                       placeholder={t("noteOptional") || "Note (Optional)"}
-                      className="w-full bg-background border border-white/5 focus:border-white/20 rounded-xl px-4 py-3 text-sm font-medium text-white placeholder-gray-500 outline-none transition-colors"
+                      className="w-full bg-background border border-white/5 focus:border-white/20 rounded-xl px-4 py-3 text-sm font-medium text-white placeholder-gray-500 outline-none transition-colors mb-2"
+                    />
+                    <input
+                      type="date"
+                      value={recordDate}
+                      onChange={e => setRecordDate(e.target.value)}
+                      className="w-full bg-background border border-white/5 focus:border-white/20 rounded-xl px-4 py-3 text-sm font-medium text-white outline-none transition-colors"
+                      required
                     />
                   </div>
                 </div>

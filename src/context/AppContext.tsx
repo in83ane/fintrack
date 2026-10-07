@@ -3486,8 +3486,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       totalRealizedPL,
       totalDividends,
       customCategories,
-      addCustomCategory: isAllPortfolios ? blockAllPortfolioMutationAsync : addCustomCategory,
-      removeCustomCategory: isAllPortfolios ? blockAllPortfolioMutationAsync : removeCustomCategory,
+      addCustomCategory,
+      removeCustomCategory,
     }}>
       {children}
       
