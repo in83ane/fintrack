@@ -409,7 +409,7 @@ export default function LedgerPage() {
           c => c.type === activePanel && c.label.toLowerCase() === trimmed.toLowerCase()
         );
         if (!alreadySaved) {
-          addCustomCategory(activePanel!, trimmed);
+          await addCustomCategory(activePanel!, trimmed);
         }
       }
 
