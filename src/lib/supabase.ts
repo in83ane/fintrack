@@ -19,6 +19,7 @@ export interface Asset {
   id: string; // uuid
   user_id: string;
   portfolio_id?: string | null;
+  brokerage_account_id?: string | null;
   name: string;
   symbol: string;
   asset_type: string | null;
@@ -57,6 +58,7 @@ export interface Trade {
   currency: string | null;
   original_amount: number | null;
   source_bucket_id: string | null;
+  brokerage_account_id?: string | null;
   tag: string | null;
   created_at: string;
 }
@@ -67,8 +69,36 @@ export interface Portfolio {
   name: string;
   color: string;
   is_default: boolean;
+  kind: 'trading' | 'cash_management';
   created_at: string;
   updated_at: string;
+}
+
+export interface BrokerageAccount {
+  id: string;
+  user_id: string;
+  portfolio_id: string;
+  name: string;
+  broker: string | null;
+  currency: 'USD' | 'THB' | 'JPY' | 'EUR';
+  color: string;
+  kind: 'cash' | 'asset_group';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BrokerageCashEntry {
+  id: string;
+  user_id: string;
+  portfolio_id: string;
+  brokerage_account_id: string;
+  type: 'DEPOSIT' | 'WITHDRAW' | 'TRADE_BUY' | 'TRADE_SELL' | 'ADJUSTMENT';
+  amount: number;
+  currency: 'USD' | 'THB' | 'JPY' | 'EUR';
+  trade_id: string | null;
+  occurred_at: string;
+  note: string | null;
+  created_at: string;
 }
 
 export interface Allocation {
@@ -128,6 +158,33 @@ export interface CashActivity {
   created_at: string;
 }
 
+export interface HistoryEvent {
+  id: string;
+  user_id: string;
+  portfolio_id: string | null;
+  source_table: 'trades';
+  source_record_id: string;
+  action: 'CREATED' | 'UPDATED' | 'DELETED';
+  transaction_type: string;
+  asset_symbol: string | null;
+  quantity: number | null;
+  price: number | null;
+  gross_amount: number;
+  fees: number;
+  taxes: number;
+  net_amount: number;
+  currency: string | null;
+  exchange_rate: number | null;
+  realized_pnl: number | null;
+  unrealized_pnl: number | null;
+  category: string | null;
+  related_bucket_id: string | null;
+  note: string | null;
+  occurred_at: string;
+  recorded_at: string;
+  metadata: Record<string, unknown>;
+}
+
 // Create Supabase client with validation
 const supabaseUrl = getSupabaseUrl();
 const supabaseAnonKey = getSupabaseAnonKey();
@@ -150,6 +207,30 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 
 // Database helper functions
 export const db = {
+  // Immutable trade ledger. The database is the writer (via trade triggers);
+  // clients can only read a bounded, indexed page.
+  history: {
+    getPage: async (
+      userId: string,
+      portfolioId?: string | null,
+      from?: string,
+      to?: string,
+      limit = 250,
+    ) => {
+      let query = supabase
+        .from('history_events')
+        .select('*')
+        .eq('user_id', userId)
+        .order('occurred_at', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(limit);
+      if (portfolioId) query = query.eq('portfolio_id', portfolioId);
+      if (from) query = query.gte('occurred_at', from);
+      if (to) query = query.lt('occurred_at', to);
+      return await query;
+    },
+  },
+
   // Assets
   assets: {
     getAll: async (userId: string, portfolioId?: string | null) => {
@@ -228,7 +309,7 @@ export const db = {
     getAll: async (userId: string, portfolioId?: string | null) => {
       let query = supabase
         .from('trades')
-        .select('*')
+        .select('*, cost_basis_sales(method,selections,request)')
         .eq('user_id', userId)
         .order('execution_date', { ascending: false });
       if (portfolioId) query = query.eq('portfolio_id', portfolioId);
@@ -242,6 +323,34 @@ export const db = {
     },
     delete: async (id: string) => {
       return await supabase.from('trades').delete().eq('id', id);
+    },
+    deleteWithBrokerageCash: async (id: string) => {
+      return await supabase.rpc('delete_trade_with_brokerage_cash', { p_trade_id: id });
+    },
+    deletePositionWithBrokerageCash: async (symbol: string, portfolioId: string) => {
+      return await supabase.rpc('delete_position_with_brokerage_cash', {
+        p_symbol: symbol,
+        p_portfolio_id: portfolioId,
+      });
+    },
+    replaceWithBrokerageCash: async (input: {
+      id: string;
+      symbol: string;
+      executionDate: string;
+      quantity: number;
+      priceAtExecution: number;
+      amountUSD: number;
+      originalAmount: number;
+    }) => {
+      return await supabase.rpc('replace_brokerage_trade', {
+        p_trade_id: input.id,
+        p_symbol: input.symbol,
+        p_execution_date: input.executionDate,
+        p_quantity: input.quantity,
+        p_price_at_execution: input.priceAtExecution,
+        p_amount_usd: input.amountUSD,
+        p_original_amount: input.originalAmount,
+      });
     },
     deleteBySymbol: async (userId: string, symbol: string, portfolioId?: string | null) => {
       let query = supabase
@@ -279,6 +388,66 @@ export const db = {
     },
     delete: async (id: string) => {
       return await supabase.from('portfolios').delete().eq('id', id);
+    },
+  },
+
+  // Brokerage cash accounts belong only to trading portfolios. Their balance
+  // is calculated from the append-only brokerage_cash_entries ledger.
+  brokerageAccounts: {
+    getAll: async (userId: string, portfolioId?: string | null) => {
+      let query = supabase
+        .from('brokerage_accounts')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at');
+      if (portfolioId) query = query.eq('portfolio_id', portfolioId);
+      return await query;
+    },
+    insert: async (account: Omit<BrokerageAccount, 'id' | 'created_at' | 'updated_at'>) => {
+      return await supabase.from('brokerage_accounts').insert(account).select().single();
+    },
+    update: async (id: string, updates: Partial<BrokerageAccount>) => {
+      return await supabase
+        .from('brokerage_accounts')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single();
+    },
+  },
+
+  brokerageCashEntries: {
+    transferFromBucket: async (transfer: { id: string; bucketId: string; accountId: string; sourceAmount: number; receivedAmount: number; fee: number; thbPerUsd: number; legacyThbPerUsd: number }) => {
+      return await supabase.rpc('transfer_bucket_to_broker', {
+        p_transfer_id: transfer.id,
+        p_bucket_id: transfer.bucketId,
+        p_account_id: transfer.accountId,
+        p_source_amount: transfer.sourceAmount,
+        p_received_amount: transfer.receivedAmount,
+        p_fee: transfer.fee,
+        p_thb_per_usd: transfer.thbPerUsd,
+        p_legacy_thb_per_usd: transfer.legacyThbPerUsd,
+      });
+    },
+    insert: async (entry: Omit<BrokerageCashEntry, 'id' | 'created_at'>) => {
+      return await supabase.from('brokerage_cash_entries').insert(entry).select().single();
+    },
+    getBalances: async (userId: string, portfolioId?: string | null) => {
+      let query = supabase
+        .from('brokerage_account_balances')
+        .select('*')
+        .eq('user_id', userId);
+      if (portfolioId) query = query.eq('portfolio_id', portfolioId);
+      return await query;
+    },
+    getAll: async (userId: string, portfolioId?: string | null) => {
+      let query = supabase
+        .from('brokerage_cash_entries')
+        .select('*')
+        .eq('user_id', userId)
+        .order('occurred_at', { ascending: false });
+      if (portfolioId) query = query.eq('portfolio_id', portfolioId);
+      return await query;
     },
   },
 
@@ -404,20 +573,10 @@ export const db = {
 
   // Wipe all user data
   deleteAllUserData: async (userId: string) => {
-    const tables = [
-      'assets', 
-      'trades', 
-      'allocations', 
-      'money_buckets', 
-      'bucket_activities', 
-      'cash_activities', 
-      'trade_journal',
-      'dca_drafts'
-    ];
-    const promises = tables.map(table => 
-      supabase.from(table).delete().eq('user_id', userId)
-    );
-    return await Promise.all(promises);
+    // `userId` is intentionally not sent to the RPC. The database derives the
+    // target from auth.uid(), preventing a client from purging another account.
+    void userId;
+    return await supabase.rpc('purge_my_financial_data');
   },
 
   // User Custom Categories (for Ledger)

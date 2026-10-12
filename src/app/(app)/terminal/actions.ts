@@ -34,12 +34,16 @@ async function yahooFetchWithRetry(url: string, retries = 2): Promise<Response> 
     try {
       const res = await yahooFetch(url);
       if (res.ok) return res;
+      // A missing Yahoo symbol is an expected user-input result, not a server
+      // failure.  Do not retry it or surface an HTTP stack trace to the app.
+      if (res.status === 404) throw new Error('Symbol not found');
       if (res.status === 429) {
         await new Promise(r => setTimeout(r, 2000 * (i + 1)));
         continue;
       }
       throw new Error(`HTTP ${res.status}`);
     } catch (e) {
+      if (e instanceof Error && e.message === 'Symbol not found') throw e;
       if (i === retries) throw e;
       await new Promise(r => setTimeout(r, 500 * (i + 1)));
     }

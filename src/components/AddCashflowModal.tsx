@@ -1,13 +1,18 @@
 "use client";
+import { bucketNativeAmount } from '@/src/lib/native-money';
+import { requireCurrency } from '@/src/lib/fx';
 
+import { FinanceIcon } from "@/src/components/FinanceIcon";
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { X, Wallet, ChevronDown, Loader2, Sparkles, TrendingUp, TrendingDown, Tag, Plus } from "lucide-react";
 import { Modal } from "@/src/components/Modal";
 import { useApp } from "@/src/context/AppContext";
 import { cn } from "@/src/lib/utils";
 import { motion, AnimatePresence } from "motion/react";
+import { CustomSelect } from "@/src/components/CustomSelect";
 import { createPortal } from "react-dom";
 import { AnimatedNumber } from "@/src/components/AnimatedNumber";
+import { getLocalDateKey, localDateKeyToIso } from "@/src/lib/local-date";
 
 function SuccessConfetti({ active }: { active: boolean }) {
   const [particles, setParticles] = useState<any[]>([]);
@@ -92,7 +97,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
   const [amount, setAmount] = useState("");
   const [inputCurrency, setInputCurrency] = useState<"USD" | "THB">(currency === "THB" ? "THB" : "USD");
   const [category, setCategory] = useState("salary");
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState(getLocalDateKey);
   const [note, setNote] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
@@ -101,7 +106,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
     const usd = amount / (exchangeRates[from] || 1);
     return usd * (exchangeRates[to] || 1);
   };
-  const bucketCurrency = (bucket: { currency?: string }) => (bucket.currency === "THB" ? "THB" : "USD");
+  const bucketCurrency = (bucket: { currency?: string }) => { requireCurrency(bucket.currency); return bucket.currency; };
 
   // Calculate current month's net cashflow for preview
   const currentNetCashflow = useMemo(() => {
@@ -239,13 +244,18 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
     if (!amount || Number(amount) <= 0) return;
 
     const rawAmount = Number(amount);
-    const THB_RATE = exchangeRates['THB'] || 36.5;
+    try {
+      const targets = selectedBucketId === '<auto-distribute>' ? moneyBuckets : moneyBuckets.filter(b => b.id === selectedBucketId);
+      targets.forEach(b => bucketNativeAmount({ original_amount: rawAmount, currency: inputCurrency }, b.currency));
+    } catch (error) { addToast(String(error), 'error'); return; }
+    const THB_RATE = exchangeRates.THB;
     const amountNum = inputCurrency === 'THB' ? rawAmount / THB_RATE : rawAmount;
+    if (!Number.isFinite(amountNum)) { addToast('ยังไม่มีข้อมูลเรท USD/THB กรุณารอข้อมูลก่อนบันทึก', 'error'); return; }
 
     // Validate bucket deduction
     if ((type === "EXPENSE" || type === "WITHDRAW") && selectedBucketId !== "<no-bucket>") {
       const bucket = moneyBuckets.find(b => b.id === selectedBucketId);
-      if (bucket && bucket.currentAmount < convertCurrency(rawAmount, inputCurrency, bucketCurrency(bucket))) {
+      if (bucket && bucket.currentAmount < bucketNativeAmount({ original_amount: rawAmount, currency: inputCurrency }, bucket.currency)) {
         addToast(
           t("insufficientBucketBalance").replace("{bucket}", t(bucket.name) || bucket.name),
           "error"
@@ -276,12 +286,13 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
     try {
       // Get current time for the activity
       const currentTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+      const activityDate = date === getLocalDateKey() ? new Date().toISOString() : localDateKeyToIso(date);
 
       console.log("Adding CashActivity:", {
         type,
         amountUSD: amountNum,
         category,
-        date: date === new Date().toISOString().split("T")[0] ? new Date().toISOString() : new Date(date).toISOString(),
+        date: activityDate,
         time: type === "DEPOSIT" || type === "WITHDRAW" ? currentTime : undefined,
         note: detailedNote,
         bucketId: selectedBucketId !== "<no-bucket>" && selectedBucketId !== "<auto-distribute>" ? selectedBucketId : undefined
@@ -291,7 +302,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
         type,
         amountUSD: amountNum,
         category: category,
-        date: date === new Date().toISOString().split("T")[0] ? new Date().toISOString() : new Date(date).toISOString(),
+        date: activityDate,
         time: type === "DEPOSIT" || type === "WITHDRAW" ? currentTime : undefined,
         note: detailedNote,
         bucketId: selectedBucketId !== "<no-bucket>" && selectedBucketId !== "<auto-distribute>" ? selectedBucketId : undefined,
@@ -305,7 +316,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
       if ((type === "EXPENSE" || type === "WITHDRAW") && selectedBucketId !== "<no-bucket>") {
         const bucket = moneyBuckets.find(b => b.id === selectedBucketId);
         if (bucket) {
-          const bucketAmount = convertCurrency(rawAmount, inputCurrency, bucketCurrency(bucket));
+          const bucketAmount = bucketNativeAmount({ original_amount: savedActivity.originalAmount, currency: savedActivity.currency }, bucket.currency);
           const newAmount = Math.max(0, bucket.currentAmount - bucketAmount);
           updateMoneyBucket(bucket.id, { currentAmount: newAmount });
           addBucketActivity({
@@ -330,8 +341,15 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
             for (const bucket of moneyBuckets) {
               const pct = bucket.targetPercent || 0;
               const originalShare = (pct / totalAllocated) * rawAmount;
-              const share = convertCurrency(originalShare, inputCurrency, bucketCurrency(bucket));
+              const share = bucketNativeAmount({ original_amount: originalShare, currency: inputCurrency }, bucket.currency);
               if (share > 0) {
+                const savedShare = await addCashActivity({
+                  type: 'DEPOSIT', amountUSD: share / (exchangeRates[inputCurrency] || 1),
+                  originalAmount: share, currency: inputCurrency, rateAtTime: exchangeRates[inputCurrency],
+                  bucketId: bucket.id, date: activityDate, category, isTransfer: true,
+                  note: `Income distribution - ${bucket.name}`,
+                });
+                if (!savedShare) throw Error('บันทึก native leg ไม่สำเร็จ');
                 updateMoneyBucket(bucket.id, { currentAmount: bucket.currentAmount + share });
                 addBucketActivity({
                   bucketId: bucket.id,
@@ -351,7 +369,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
           // Deposit entirely into one specific bucket
           const bucket = moneyBuckets.find(b => b.id === selectedBucketId);
           if (bucket) {
-            const bucketAmount = convertCurrency(rawAmount, inputCurrency, bucketCurrency(bucket));
+            const bucketAmount = bucketNativeAmount({ original_amount: savedActivity.originalAmount, currency: savedActivity.currency }, bucket.currency);
             updateMoneyBucket(bucket.id, { currentAmount: bucket.currentAmount + bucketAmount });
             addBucketActivity({
               bucketId: bucket.id,
@@ -392,7 +410,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
     setType("INCOME");
     setAmount("");
     setCategory("salary");
-    setDate(new Date().toISOString().split("T")[0]);
+    setDate(getLocalDateKey());
     setNote("");
     setSelectedBucketId("<auto-distribute>");
     setAutoSuggested(false);
@@ -603,7 +621,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
                   onClick={() => { setCategory("other"); setShowCustomCatInput(false); }}
                   className="ml-0.5 opacity-60 hover:opacity-100"
                 >
-                  ✕
+                  <FinanceIcon name="close" size={16} />
                 </button>
               </div>
             )}
@@ -656,7 +674,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
                     onClick={() => setShowCustomCatInput(false)}
                     className="p-2 text-gray-500 hover:text-white transition-colors"
                   >
-                    ✕
+                    <FinanceIcon name="close" size={16} />
                   </button>
                 </div>
               </motion.div>
@@ -673,40 +691,27 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
                 ? t("selectBucket") || "Deposit to Bucket"
                 : t("deductFromBucket")}
             </label>
-            <div className="relative">
-              <select
-                value={selectedBucketId}
-                onChange={(e) => setSelectedBucketId(e.target.value)}
-                className="w-full px-4 py-4 bg-white/5 border border-border rounded-2xl text-white text-sm font-medium appearance-none focus:outline-none focus:border-[#ADC6FF]/50 transition-colors"
-              >
-                {type === "INCOME" || type === "DEPOSIT" ? (
-                  <>
-                    <option value="<auto-distribute>" className="bg-surface">
-                      ⚡ Auto-distribute (Target Plan)
-                    </option>
-                    {moneyBuckets.map(bucket => (
-                      <option key={bucket.id} value={bucket.id} className="bg-surface">
-                        {bucket.icon} {t(bucket.name) || bucket.name} ({formatMoney(bucket.currentAmount / (exchangeRates[bucket.currency || 'USD'] || 1), bucket.currency as any, undefined, bucket.currentAmount)})
-                      </option>
-                    ))}
-                  </>
-                ) : (
-                  <>
-                    {moneyBuckets.map(bucket => (
-                      <option key={bucket.id} value={bucket.id} className="bg-surface">
-                        {bucket.icon} {t(bucket.name) || bucket.name} ({formatMoney(bucket.currentAmount / (exchangeRates[bucket.currency || 'USD'] || 1), bucket.currency as any, undefined, bucket.currentAmount)})
-                      </option>
-                    ))}
-                    <option value="<no-bucket>" className="bg-surface">
-                      {t("none") || "None (General Cashflow)"}
-                    </option>
-                  </>
-                )}
-              </select>
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
-                <ChevronDown size={16} />
-              </div>
-            </div>
+            <CustomSelect
+              value={selectedBucketId}
+              onChange={(val) => setSelectedBucketId(val)}
+              items={
+                type === "INCOME" || type === "DEPOSIT"
+                  ? [
+                      { value: "<auto-distribute>", label: "Auto-distribute (Target Plan)" },
+                      ...moneyBuckets.map(bucket => ({
+                        value: bucket.id,
+                        label: `${t(bucket.name) || bucket.name} (${formatMoney(bucket.currentAmount / (exchangeRates[bucket.currency || 'USD'] || 1), bucket.currency as any, undefined, bucket.currentAmount)})`,
+                      })),
+                    ]
+                  : [
+                      ...moneyBuckets.map(bucket => ({
+                        value: bucket.id,
+                        label: `${t(bucket.name) || bucket.name} (${formatMoney(bucket.currentAmount / (exchangeRates[bucket.currency || 'USD'] || 1), bucket.currency as any, undefined, bucket.currentAmount)})`,
+                      })),
+                      { value: "<no-bucket>", label: t("none") || "None (General Cashflow)" },
+                    ]
+              }
+            />
           </div>
         )}
 

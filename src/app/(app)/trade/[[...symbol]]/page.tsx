@@ -1,4 +1,5 @@
 "use client";
+import { FinanceIcon } from "@/src/components/FinanceIcon";
 import React, { useState, useCallback, useEffect } from "react";
 import { Search, TrendingUp, Shield, Target, Activity, BarChart3, Zap, Eye, XCircle, Loader2, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
@@ -286,10 +287,10 @@ export default function TradePage() {
                   </span>
                 </div>
                 <div className="flex gap-1 mt-1">
-                  {res.smc?.priceInDemand && <span className="bg-blue-500/20 text-blue-400 text-[9px] px-1.5 py-0.5 rounded font-black">📐 SMC</span>}
-                  {res.priceAction?.latestBullish && <span className="bg-orange-500/20 text-orange-400 text-[9px] px-1.5 py-0.5 rounded font-black">🕯️ PA</span>}
-                  {res.stoch?.signal === 'BUY' && <span className="bg-purple-500/20 text-purple-400 text-[9px] px-1.5 py-0.5 rounded font-black">📊 STOCH</span>}
-                  {res.trendlines?.currentTrend === 'UP' && <span className="bg-green-500/20 text-green-400 text-[9px] px-1.5 py-0.5 rounded font-black">📈 TREND</span>}
+                  {res.smc?.priceInDemand && <span className="bg-blue-500/20 text-blue-400 text-[9px] px-1.5 py-0.5 rounded font-black">SMC</span>}
+                  {res.priceAction?.latestBullish && <span className="bg-orange-500/20 text-orange-400 text-[9px] px-1.5 py-0.5 rounded font-black">PA</span>}
+                  {res.stoch?.signal === 'BUY' && <span className="bg-purple-500/20 text-purple-400 text-[9px] px-1.5 py-0.5 rounded font-black">STOCH</span>}
+                  {res.trendlines?.currentTrend === 'UP' && <span className="bg-green-500/20 text-green-400 text-[9px] px-1.5 py-0.5 rounded font-black">TREND</span>}
                 </div>
                 <div className="w-full bg-black rounded-full h-1 mt-1 overflow-hidden">
                   <div className="bg-[#ADC6FF] h-full" style={{ width: `${res.confidence}%` }} />
@@ -347,7 +348,7 @@ export default function TradePage() {
         </motion.form>
       </section>
 
-      {error && <div className="bg-[#FFB4AB]/10 border border-[#FFB4AB]/20 rounded-2xl p-4 text-sm text-[#FFB4AB] font-bold">⚠️ {error}</div>}
+      {error && <div className="bg-[#FFB4AB]/10 border border-[#FFB4AB]/20 rounded-2xl p-4 text-sm text-[#FFB4AB] font-bold">{error}</div>}
 
       {/* SECTION 3 & 4: Detail View */}
       <AnimatePresence mode="wait">
@@ -434,7 +435,7 @@ export default function TradePage() {
               
               {/* Panel A: Price Action */}
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-[#1C1B1B] rounded-3xl p-6 border border-white/5">
-                <h3 className="text-sm font-black text-white mb-4">🕯️ Price Action Patterns (ล่าสุด)</h3>
+                <h3 className="text-sm font-black text-white mb-4">Price Action Patterns (ล่าสุด)</h3>
                 {result.priceAction.patterns.length > 0 ? (
                   <div className="space-y-2">
                     {result.priceAction.patterns.slice(-3).map((p, i) => (
@@ -445,7 +446,7 @@ export default function TradePage() {
                         </div>
                         <div className="flex gap-2 items-center">
                           <span className={cn("px-2 py-0.5 rounded text-[10px] font-black", p.type === 'BULLISH' ? "bg-[#4EDEA3]/10 text-[#4EDEA3]" : "bg-[#FFB4AB]/10 text-[#FFB4AB]")}>{p.type}</span>
-                          <span className="text-[#E9C349] text-xs">{'★'.repeat(p.strength)}</span>
+                          <span className="text-[#E9C349] text-xs"><span aria-label={`Strength ${p.strength}`}>{p.strength} / 5</span></span>
                         </div>
                       </div>
                     ))}
@@ -455,27 +456,27 @@ export default function TradePage() {
 
               {/* Panel B: SMC Analysis */}
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-[#1C1B1B] rounded-3xl p-6 border border-white/5">
-                <h3 className="text-sm font-black text-white mb-4">🏦 Smart Money Concepts</h3>
+                <h3 className="text-sm font-black text-white mb-4">Smart Money Concepts</h3>
                 <div className="space-y-4">
                   {result.smc.nearestDemand && (
                     <div className="border-l-2 border-[#4EDEA3] pl-3 py-1">
-                      <div className="text-[10px] font-black text-gray-500">📗 Nearest Demand Zone</div>
+                      <div className="text-[10px] font-black text-gray-500">Nearest Demand Zone</div>
                       <div className="text-sm font-bold text-white">{cur(result.smc.nearestDemand.low)} – {cur(result.smc.nearestDemand.high)}</div>
                     </div>
                   )}
                   {result.smc.nearestSupply && (
                     <div className="border-l-2 border-[#FFB4AB] pl-3 py-1">
-                      <div className="text-[10px] font-black text-gray-500">📕 Nearest Supply Zone</div>
+                      <div className="text-[10px] font-black text-gray-500">Nearest Supply Zone</div>
                       <div className="text-sm font-bold text-white">{cur(result.smc.nearestSupply.low)} – {cur(result.smc.nearestSupply.high)}</div>
                     </div>
                   )}
-                  {result.smc.priceInDemand && <div className="bg-[#4EDEA3]/10 text-[#4EDEA3] p-2 rounded-lg text-xs font-bold border border-[#4EDEA3]/20">✅ ราคาอยู่ใน Demand Zone — โซน BUY ที่ดี</div>}
+                  {result.smc.priceInDemand && <div className="bg-[#4EDEA3]/10 text-[#4EDEA3] p-2 rounded-lg text-xs font-bold border border-[#4EDEA3]/20">ราคาอยู่ใน Demand Zone — โซน BUY ที่ดี</div>}
                 </div>
               </motion.div>
 
               {/* Panel C: Speed Lines & Trendlines */}
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-[#1C1B1B] rounded-3xl p-6 border border-white/5">
-                <h3 className="text-sm font-black text-white mb-4">📐 Speed Lines & Trendlines</h3>
+                <h3 className="text-sm font-black text-white mb-4">Speed Lines & Trendlines</h3>
                 <div className="space-y-4 text-sm">
                   <div className="flex justify-between items-center bg-black/20 p-2 rounded-lg">
                     <span className="text-xs font-bold text-gray-400">Current Trend</span>
@@ -496,7 +497,7 @@ export default function TradePage() {
 
               {/* Panel D: Moving Averages */}
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="bg-[#1C1B1B] rounded-3xl p-6 border border-white/5">
-                <h3 className="text-sm font-black text-white mb-4">📊 Moving Averages</h3>
+                <h3 className="text-sm font-black text-white mb-4">Moving Averages</h3>
                 <div className="space-y-2">
                   {[20, 50, 200].map(p => (
                     <div key={p} className="flex justify-between items-center bg-black/20 p-3 rounded-xl border border-white/5">
@@ -530,7 +531,7 @@ export default function TradePage() {
                   </div>
                 </div>
                 {result.stoch.crossover && result.stoch.signal === 'BUY' && (
-                  <div className="bg-[#4EDEA3]/10 text-[#4EDEA3] text-center p-2 rounded-lg text-xs font-bold animate-pulse border border-[#4EDEA3]/30">🔔 Bullish Crossover ✓</div>
+                  <div className="bg-[#4EDEA3]/10 text-[#4EDEA3] text-center p-2 rounded-lg text-xs font-bold animate-pulse border border-[#4EDEA3]/30">Bullish Crossover </div>
                 )}
               </motion.div>
             </div>
@@ -541,7 +542,7 @@ export default function TradePage() {
                 
                 <div>
                   <h3 className="text-sm font-black text-white mb-4 flex items-center justify-between">
-                    <span className="flex items-center gap-2">📐 แผนเข้าซื้อ (Entry Strategy - {pyramidPlan.timeframe})</span>
+                    <span className="flex items-center gap-2">แผนเข้าซื้อ (Entry Strategy - {pyramidPlan.timeframe})</span>
                     <span className="text-xs text-gray-400 font-normal px-2 py-1 bg-white/5 rounded-md">Total Weight: 100%</span>
                   </h3>
                   <div className="overflow-x-auto rounded-xl border border-white/5 bg-black/20">
@@ -572,9 +573,9 @@ export default function TradePage() {
                               <span className="text-[10px] font-bold text-gray-400 block">{entry.reason}</span>
                             </td>
                             <td className="p-3 text-right">
-                              {entry.status === 'READY' ? <span className="text-[10px] font-black px-2 py-1 bg-[#4EDEA3]/10 text-[#4EDEA3] rounded border border-[#4EDEA3]/20">🟢 เข้าได้เลย</span> :
-                               entry.status === 'PASSED' ? <span className="text-[10px] font-black px-2 py-1 bg-white/5 text-gray-500 rounded border border-white/10">⚪ ราคาผ่านไปแล้ว</span> :
-                               <span className="text-[10px] font-black px-2 py-1 bg-[#E9C349]/10 text-[#E9C349] rounded border border-[#E9C349]/20">🟡 รอราคาตกถึงจุด</span>}
+                              {entry.status === 'READY' ? <span className="text-[10px] font-black px-2 py-1 bg-[#4EDEA3]/10 text-[#4EDEA3] rounded border border-[#4EDEA3]/20">เข้าได้เลย</span> :
+                               entry.status === 'PASSED' ? <span className="text-[10px] font-black px-2 py-1 bg-white/5 text-gray-500 rounded border border-white/10">ราคาผ่านไปแล้ว</span> :
+                               <span className="text-[10px] font-black px-2 py-1 bg-[#E9C349]/10 text-[#E9C349] rounded border border-[#E9C349]/20">รอราคาตกถึงจุด</span>}
                             </td>
                           </tr>
                         ))}
@@ -584,7 +585,7 @@ export default function TradePage() {
                 </div>
 
                 <div>
-                  <h3 className="text-sm font-black text-white mb-4 flex items-center gap-2">🎯 แผนทำกำไร (Take Profit Zones)</h3>
+                  <h3 className="text-sm font-black text-white mb-4 flex items-center gap-2">แผนทำกำไร (Take Profit Zones)</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     {pyramidPlan.takeProfits.map((tp, i) => (
                       <div key={i} className="bg-black/20 rounded-xl p-4 border border-white/5 relative overflow-hidden group hover:border-[#4EDEA3]/30 transition-colors">
@@ -620,17 +621,17 @@ export default function TradePage() {
                 </div>
 
                 <div className="mt-4 text-xs font-bold text-gray-500 bg-white/5 p-4 rounded-xl flex items-start gap-3">
-                  <span className="text-lg">💡</span>
+                  <FinanceIcon name="utilities" size={20} />
                   <div>
                     <div className="text-white mb-1">สรุปกลยุทธ์: {pyramidPlan.summary}</div>
-                    <div>⚠️ เติมไม้เฉพาะเมื่อ trend ยังคงอยู่ และ volume ยืนยัน — หากราคาหลุดเส้น Stop Loss ให้ตัดขาดทุนทันที ห้ามถัวเพิ่มเด็ดขาด</div>
+                    <div>เติมไม้เฉพาะเมื่อ trend ยังคงอยู่ และ volume ยืนยัน — หากราคาหลุดเส้น Stop Loss ให้ตัดขาดทุนทันที ห้ามถัวเพิ่มเด็ดขาด</div>
                   </div>
                 </div>
               </motion.div>
             )}
 
             <div className="text-center py-6">
-              <p className="text-[10px] text-gray-600 font-medium">⚠️ {language === "th" ? "การวิเคราะห์นี้เพื่อการศึกษาเท่านั้น ไม่ใช่คำแนะนำทางการเงิน" : "This analysis is for educational purposes only."}</p>
+              <p className="text-[10px] text-gray-600 font-medium">{language === "th" ? "การวิเคราะห์นี้เพื่อการศึกษาเท่านั้น ไม่ใช่คำแนะนำทางการเงิน" : "This analysis is for educational purposes only."}</p>
             </div>
           </motion.div>
         )}

@@ -91,6 +91,8 @@ export async function GET(request: Request) {
             price,
             changePercent: Number(changePercent.toFixed(2)),
             name,
+            quoteCurrency: meta.currency || 'USD',
+            exchange: meta.fullExchangeName || meta.exchangeName || '',
             chartData: combined,
             intradayData
           };

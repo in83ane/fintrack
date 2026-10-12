@@ -131,7 +131,7 @@ export function CommandPalette() {
     });
     const label = `${quickLogResult.type === "INCOME" ? "+" : "-"}${formatMoney(quickLogResult.amount)} · ${quickLogResult.category}`;
     setLoggedFlash(label);
-    addToast(`${quickLogResult.type === "INCOME" ? "💰" : "💸"} ${label}`, "success");
+    addToast(label, "success");
     trackAction(`Logged: ${label}`, "/cashflow");
     setTimeout(() => { setLoggedFlash(null); setOpen(false); }, 1200);
   }, [quickLogResult, query, addCashActivity, addToast, formatMoney]);
@@ -140,11 +140,11 @@ export function CommandPalette() {
     const navItems: CommandItem[] = [
       { id: "nav-dashboard", label: isTh ? "แดชบอร์ด" : "Dashboard", icon: <LayoutDashboard size={16} />, action: () => handleNavigate("Dashboard", "/dashboard"), category: "navigation" },
       { id: "nav-portfolio", label: isTh ? "พอร์ตโฟลิโอ" : "Portfolio", icon: <Briefcase size={16} />, action: () => handleNavigate("Portfolio", "/portfolio"), category: "navigation" },
-      { id: "nav-trade", label: isTh ? "ผู้ช่วยเทรด" : "Trade Assistant", icon: <TrendingUp size={16} />, action: () => handleNavigate("Trade Assistant", "/terminal"), category: "navigation" },
+      { id: "nav-trade", label: isTh ? "Trade · วางแผนซื้อขาย" : "Trade", icon: <TrendingUp size={16} />, action: () => handleNavigate("Trade", "/trade/plan"), category: "navigation" },
       { id: "nav-budget", label: isTh ? "งบประมาณ" : "Budget", icon: <Wallet size={16} />, action: () => handleNavigate("Budget", "/budget"), category: "navigation" },
       { id: "nav-cashflow", label: isTh ? "กระแสเงินสด" : "Cashflow", icon: <ArrowRightLeft size={16} />, action: () => handleNavigate("Cashflow", "/cashflow"), category: "navigation" },
       { id: "nav-transactions", label: isTh ? "ธุรกรรม" : "Transactions", icon: <Receipt size={16} />, action: () => handleNavigate("Transactions", "/transactions"), category: "navigation" },
-      { id: "nav-calendar", label: isTh ? "ปฏิทิน" : "Calendar", icon: <Calendar size={16} />, action: () => handleNavigate("Calendar", "/calendar"), category: "navigation" },
+      { id: "nav-history", label: isTh ? "ประวัติ" : "History", icon: <Calendar size={16} />, action: () => handleNavigate("History", "/history"), category: "navigation" },
       { id: "nav-settings", label: isTh ? "ตั้งค่า" : "Settings", icon: <Settings size={16} />, action: () => handleNavigate("Settings", "/settings"), category: "navigation" },
     ];
 
@@ -155,7 +155,7 @@ export function CommandPalette() {
       badge: `${a.change >= 0 ? "+" : ""}${a.change.toFixed(2)}%`,
       badgeColor: a.change >= 0 ? "#4EDEA3" : "#FFB4AB",
       icon: a.change >= 0 ? <ArrowUpRight size={16} className="text-[#4EDEA3]" /> : <ArrowDownRight size={16} className="text-[#FFB4AB]" />,
-      action: () => { handleNavigate(a.symbol, `/trade/${a.symbol}`); },
+      action: () => { handleNavigate(a.symbol, `/trade/plan?symbol=${encodeURIComponent(a.symbol)}`); },
       category: "asset" as const,
     }));
 
@@ -288,7 +288,7 @@ export function CommandPalette() {
                       </div>
                       <div>
                         <p className="text-xs font-black text-white">
-                          ⚡ Quick Log: {quickLogResult.type === "INCOME" ? "Income" : "Expense"}
+                          Quick Log: {quickLogResult.type === "INCOME" ? "Income" : "Expense"}
                         </p>
                         <p className="text-[10px] text-gray-400">
                           {formatMoney(quickLogResult.amount)} · {quickLogResult.category} · Press Enter ↵
@@ -314,7 +314,7 @@ export function CommandPalette() {
                 >
                   <div className="mx-3 my-2 px-4 py-3 rounded-xl bg-[#4EDEA3]/15 border border-[#4EDEA3]/30 flex items-center gap-2">
                     <Zap size={14} className="text-[#4EDEA3]" />
-                    <span className="text-xs font-black text-[#4EDEA3]">✓ Logged: {loggedFlash}</span>
+                    <span className="text-xs font-black text-[#4EDEA3]">Logged: {loggedFlash}</span>
                   </div>
                 </motion.div>
               )}

@@ -50,8 +50,8 @@ export function PriceAlertManager() {
         if (!notifiedBucketsRef.current.has(bucket.id)) {
           notifiedBucketsRef.current.add(bucket.id);
           addNotification(
-            `🎉 ${language === 'th' ? 'ถึงเป้าแล้ว!' : 'Goal Reached!'}: ${bucket.name}`,
-            `${bucket.icon} ${bucket.name} ${language === 'th' ? 'เก็บเงินครบเป้า' : 'has reached its target'} ${formatMoney(bucket.targetAmount)}`,
+            `${language === 'th' ? 'ถึงเป้าแล้ว!' : 'Goal Reached!'}: ${bucket.name}`,
+            `${bucket.name} ${language === 'th' ? 'เก็บเงินครบเป้า' : 'has reached its target'} ${formatMoney(bucket.targetAmount)}`,
             'system'
           );
         }
@@ -94,7 +94,7 @@ export function PriceAlertManager() {
         if (triggered) {
           changed = true;
           addNotification(
-            `🔔 ${language === "th" ? "แจ้งเตือนราคา" : "Price Alert"}: ${alert.symbol}`,
+            `${language === "th" ? "แจ้งเตือนราคา" : "Price Alert"}: ${alert.symbol}`,
             `${alert.symbol} ${alert.direction === "above" ? "↑" : "↓"} ${formatMoney(currentPrice)} (${language === "th" ? "เป้าหมาย" : "Target"}: ${formatMoney(alert.targetPrice)})`,
             "price"
           );
@@ -179,7 +179,7 @@ export function PriceAlertManager() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-bold text-white">
-                {language === "th" ? "🔔 แจ้งเตือนราคา" : "🔔 Price Alerts"}
+                {language === "th" ? "แจ้งเตือนราคา" : "Price Alerts"}
               </h2>
               <p className="text-xs text-gray-500 mt-0.5">
                 {language === "th" ? "รับแจ้งเตือนเมื่อถึงแนวรับหรือแนวต้าน" : "Get notified when assets hit support/resistance"}

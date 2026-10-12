@@ -8,7 +8,7 @@ import { cn } from "@/src/lib/utils";
 import { supabase, db } from "@/src/lib/supabase";
 
 export default function SettingsPage() {
-  const { t, language, setLanguage, currency, setCurrency, addToast, notifPreferences, setNotifPreferences, darkMode, setDarkMode } = useApp();
+  const { t, language, setLanguage, currency, setCurrency, addToast, notifPreferences, setNotifPreferences, darkMode, setDarkMode, trades, cashActivities, moneyBuckets, bucketActivities, allocations, activePortfolioId } = useApp();
   const [activeSection, setActiveSection] = useState<string | null>(null);
   
   const [deleteConfirm, setDeleteConfirm] = useState("");
@@ -27,13 +27,15 @@ export default function SettingsPage() {
 
   const handleExportData = () => {
     const data = {
-      trades: JSON.parse(localStorage.getItem('trades') || '[]'),
-      cashActivities: JSON.parse(localStorage.getItem('cashActivities') || '[]'),
-      moneyBuckets: JSON.parse(localStorage.getItem('moneyBuckets') || '[]'),
-      bucketActivities: JSON.parse(localStorage.getItem('bucketActivities') || '[]'),
-      allocations: JSON.parse(localStorage.getItem('allocations') || '[]'),
-      language: localStorage.getItem('preferred-lang') || 'en',
-      currency: localStorage.getItem('preferred-currency') || 'USD',
+      version: 1,
+      portfolioId: activePortfolioId,
+      trades,
+      cashActivities,
+      moneyBuckets,
+      bucketActivities,
+      allocations,
+      language,
+      currency,
       exportDate: new Date().toISOString(),
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -52,15 +54,23 @@ export default function SettingsPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const data = JSON.parse(event.target?.result as string);
-        if (data.trades) localStorage.setItem('trades', JSON.stringify(data.trades));
-        if (data.cashActivities) localStorage.setItem('cashActivities', JSON.stringify(data.cashActivities));
-        if (data.moneyBuckets) localStorage.setItem('moneyBuckets', JSON.stringify(data.moneyBuckets));
-        if (data.bucketActivities) localStorage.setItem('bucketActivities', JSON.stringify(data.bucketActivities));
-        if (data.allocations) localStorage.setItem('allocations', JSON.stringify(data.allocations));
+        const { data: authData } = await supabase.auth.getUser();
+        if (authData.user) {
+          addToast(language === 'th' ? 'การนำเข้ารองรับเฉพาะโหมดออฟไลน์ กรุณาออกจากระบบก่อน' : 'Import is available in offline mode only. Sign out before importing a backup.', 'warning');
+          return;
+        }
+        if (data.trades) localStorage.setItem('fintrack-trades', JSON.stringify(data.trades));
+        if (data.cashActivities) localStorage.setItem('fintrack-cash-activities', JSON.stringify(data.cashActivities));
+        if (data.moneyBuckets) localStorage.setItem('fintrack-buckets', JSON.stringify(data.moneyBuckets));
+        if (data.bucketActivities) localStorage.setItem('fintrack-bucket-activities', JSON.stringify(data.bucketActivities));
+        if (data.allocations) localStorage.setItem('fintrack-allocations', JSON.stringify(data.allocations));
+        if (data.language) localStorage.setItem('preferred-lang', data.language);
+        if (data.currency) localStorage.setItem('preferred-currency', data.currency);
         addToast(t("importSuccessData"), 'success');
+        window.location.reload();
       } catch (error) {
         addToast(t("invalidBackupFile"), 'error');
       }
@@ -84,10 +94,15 @@ export default function SettingsPage() {
       const user = sessionData?.session?.user;
       
       if (user) {
-        await db.deleteAllUserData(user.id);
+        const { error } = await db.deleteAllUserData(user.id);
+        if (error) throw error;
       }
       
-      localStorage.clear();
+      [
+        'fintrack-assets', 'fintrack-trades', 'fintrack-allocations',
+        'fintrack-buckets', 'fintrack-bucket-activities', 'fintrack-cash-activities',
+        'fintrack-custom-categories', 'fintrack-nw-settings', 'fintrack-active-portfolio',
+      ].forEach(key => localStorage.removeItem(key));
       addToast(language === "th" ? "ข้อมูลทั้งหมดถูกลบแล้ว ยกเว้นชื่อและอีเมล กำลังรีเฟรช..." : "All data deleted except account profile. Refreshing...", "success");
       setTimeout(() => window.location.reload(), 1500);
     } catch (e) {

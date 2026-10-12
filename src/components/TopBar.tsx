@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useFxRate } from '@/src/hooks/useFxRate';
 import { Bell, Globe, ChevronDown, Search, Menu, X, Plus, Check, Layers, Pencil } from "lucide-react";
 import { useApp, Language, Currency, AppNotification } from "@/src/context/AppContext";
 import { cn } from "@/src/lib/utils";
@@ -22,8 +23,19 @@ function formatTimeAgo(time: Date, t: (key: string) => string): string {
 }
 
 export function TopBar() {
+  const fx = useFxRate();
   const { language, setLanguage, currency, setCurrency, t, userProfile, notifications, markNotificationRead, clearNotifications, portfolios, activePortfolio, isAllPortfolios, selectPortfolio, createPortfolio, renamePortfolio } = useApp();
   const pathname = usePathname();
+
+  // Separate Bucket (cash_management) from trading portfolios — Bucket should not be renamable
+  const tradingPortfolios = React.useMemo(
+    () => portfolios.filter((p) => p.kind === "trading"),
+    [portfolios]
+  );
+  const cashManagementPortfolio = React.useMemo(
+    () => portfolios.find((p) => p.kind === "cash_management") || null,
+    [portfolios]
+  );
   const [showLangMenu, setShowLangMenu] = React.useState(false);
   const [showMobileMenu, setShowMobileMenu] = React.useState(false);
   const [showProfileMenu, setShowProfileMenu] = React.useState(false);
@@ -117,7 +129,7 @@ export function TopBar() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 flex w-full min-w-0 items-center justify-between gap-2 border-b border-border bg-surface/80 px-3 py-3 backdrop-blur-md sm:px-4 lg:px-12 lg:py-4">
+      <header className="sticky top-0 z-50 flex w-full min-w-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-surface/80 px-3 py-3 backdrop-blur-md sm:px-4 lg:px-12 lg:py-4">
         <div className="flex min-w-0 shrink items-center gap-2 lg:gap-8">
           <button 
             onClick={() => setShowMobileMenu(true)}
@@ -149,7 +161,7 @@ export function TopBar() {
           <div id="topbar-price-portal" className="hidden items-center gap-3 xl:flex"></div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5 sm:gap-3">
           {/* ⌘K Search Trigger */}
           <div className="hidden md:flex h-9 box-border items-center rounded-full bg-white/5 border border-border hover:border-[#ADC6FF]/30 transition-all">
             <button
@@ -203,7 +215,22 @@ export function TopBar() {
                       <span className="flex items-center gap-2"><Layers size={14} /> All portfolios</span>
                       {isAllPortfolios && <Check size={14} />}
                     </button>
-                    {portfolios.map((portfolio) => (
+                    {cashManagementPortfolio && (
+                      <button
+                        onClick={() => { selectPortfolio(cashManagementPortfolio.id); setShowPortfolioMenu(false); }}
+                        className={cn(
+                          "flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-xs font-bold transition-colors",
+                          activePortfolio?.id === cashManagementPortfolio.id ? "bg-[#4EDEA3]/15 text-[#4EDEA3]" : "text-gray-400 hover:bg-white/5 hover:text-white"
+                        )}
+                      >
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: cashManagementPortfolio.color }} />
+                          <span className="truncate">{cashManagementPortfolio.name}</span>
+                        </span>
+                        {activePortfolio?.id === cashManagementPortfolio.id && <Check size={14} />}
+                      </button>
+                    )}
+                    {tradingPortfolios.map((portfolio) => (
                       <div key={portfolio.id} className={cn("flex items-center gap-1 rounded-xl", activePortfolio?.id === portfolio.id && "bg-[#ADC6FF]/15")}>
                         {editingPortfolioId === portfolio.id ? (
                           <form onSubmit={handleRenamePortfolio} className="flex min-w-0 flex-1 gap-1 p-1">
@@ -309,6 +336,12 @@ export function TopBar() {
             </AnimatePresence>
           </div>
 
+          <div className="shrink-0 rounded-xl border border-border bg-white/5 px-2 py-1 text-right tabular-nums" aria-live="polite" aria-label="USD THB exchange rate">
+            <div className="text-[10px] font-bold text-[#ADC6FF] sm:text-xs">1 USD = {fx.rate ? Number(fx.rate).toLocaleString('en-US', { maximumFractionDigits: 4 }) : '—'} THB</div>
+            <div className="text-[9px] text-gray-500">
+              {!fx.rate ? (language === 'th' ? 'รอข้อมูลเรท' : 'Rate unavailable') : fx.mode === 'manual' ? 'Manual' : `${fx.stale ? (language === 'th' ? 'เรทเก่า · ' : 'Stale · ') : 'Auto · '}${fx.quote ? new Date(fx.quote.fetchedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' }) : ''} ICT`}
+            </div>
+          </div>
           {/* Currency Selector - Capsule Toggle */}
           <div className="relative flex h-9 shrink-0 items-center rounded-full border border-border bg-white/5 p-1 box-border">
             <motion.div

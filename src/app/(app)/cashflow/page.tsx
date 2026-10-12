@@ -1,5 +1,6 @@
 "use client";
 
+import { FinanceIcon } from "@/src/components/FinanceIcon";
 import React, { useState, useRef, useMemo } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
@@ -287,23 +288,23 @@ export default function CashflowPage() {
   // Category icons mapping (#18)
   const getCategoryIcon = (category: string): string => {
     const cat = category.toLowerCase();
-    if (cat.includes('food') || cat.includes('อาหาร')) return '🍔';
-    if (cat.includes('transport') || cat.includes('เดินทาง')) return '🚗';
-    if (cat.includes('housing') || cat.includes('บ้าน') || cat.includes('rent')) return '🏠';
-    if (cat.includes('invest') || cat.includes('ลงทุน')) return '📈';
-    if (cat.includes('health') || cat.includes('สุขภาพ')) return '🏥';
-    if (cat.includes('entertainment') || cat.includes('บันเทิง')) return '🎬';
-    if (cat.includes('shopping') || cat.includes('ช้อปปิ้ง')) return '🛍️';
-    if (cat.includes('education') || cat.includes('การศึกษา')) return '📚';
-    if (cat.includes('salary') || cat.includes('เงินเดือน')) return '💰';
-    if (cat.includes('freelance') || cat.includes('ฟรีแลนซ์')) return '💻';
-    if (cat.includes('dividend') || cat.includes('ปันผล')) return '🪙';
-    if (cat.includes('emergency') || cat.includes('ฉุกเฉิน')) return '🛡️';
-    if (cat.includes('saving') || cat.includes('ออม')) return '🏦';
-    if (cat.includes('profit') || cat.includes('กำไร')) return '📊';
-    if (cat.includes('income') || cat.includes('รายได้')) return '💵';
-    if (cat.includes('transfer')) return '🔄';
-    return '💳';
+    if (cat.includes('food') || cat.includes('อาหาร')) return 'food';
+    if (cat.includes('transport') || cat.includes('เดินทาง')) return 'transport';
+    if (cat.includes('housing') || cat.includes('บ้าน') || cat.includes('rent')) return 'home';
+    if (cat.includes('invest') || cat.includes('ลงทุน')) return 'investment';
+    if (cat.includes('health') || cat.includes('สุขภาพ')) return 'health';
+    if (cat.includes('entertainment') || cat.includes('บันเทิง')) return 'entertainment';
+    if (cat.includes('shopping') || cat.includes('ช้อปปิ้ง')) return 'shopping';
+    if (cat.includes('education') || cat.includes('การศึกษา')) return 'education';
+    if (cat.includes('salary') || cat.includes('เงินเดือน')) return 'wallet';
+    if (cat.includes('freelance') || cat.includes('ฟรีแลนซ์')) return 'laptop';
+    if (cat.includes('dividend') || cat.includes('ปันผล')) return 'coins';
+    if (cat.includes('emergency') || cat.includes('ฉุกเฉิน')) return 'shield';
+    if (cat.includes('saving') || cat.includes('ออม')) return 'bank';
+    if (cat.includes('profit') || cat.includes('กำไร')) return 'chart';
+    if (cat.includes('income') || cat.includes('รายได้')) return 'income';
+    if (cat.includes('transfer')) return 'transfer';
+    return 'card';
   };
 
   // Monthly bar chart data (#19)
@@ -360,7 +361,7 @@ export default function CashflowPage() {
     if (totalBudget === 0 && thisMonthStats.income > 0) return (thisMonthStats.expense / thisMonthStats.income) * 100;
     if (totalBudget > 0) return (thisMonthStats.expense / totalBudget) * 100;
     return 0;
-  }, [moneyBuckets, thisMonthStats]);
+  }, [moneyBuckets, thisMonthStats, exchangeRates]);
 
   // Trend helpers
   const getTrend = (current: number, previous: number) => {
@@ -732,7 +733,7 @@ export default function CashflowPage() {
                     <div key={cat}>
                       <div className="flex justify-between text-xs font-bold mb-1">
                         <span className="text-gray-400 flex items-center gap-1.5">
-                          <span style={{ fontFamily: "'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif" }}>{getCategoryIcon(cat)}</span> {t(cat)}
+                          <FinanceIcon name={getCategoryIcon(cat)} size={16} /> {t(cat)}
                         </span>
                         <span className="text-white">{formatEntryMoney(total)} <span className="text-gray-500">({pct.toFixed(0)}%)</span></span>
                       </div>
@@ -770,7 +771,7 @@ export default function CashflowPage() {
                     <div key={cat}>
                       <div className="flex justify-between text-xs font-bold mb-1">
                         <span className="text-gray-400 flex items-center gap-1.5">
-                          <span style={{ fontFamily: "'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif" }}>{getCategoryIcon(cat)}</span> {t(cat)}
+                          <FinanceIcon name={getCategoryIcon(cat)} size={16} /> {t(cat)}
                         </span>
                         <span className="text-white">{formatEntryMoney(total)} <span className="text-gray-500">({pct.toFixed(0)}%)</span></span>
                       </div>

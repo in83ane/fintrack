@@ -1,11 +1,13 @@
 "use client";
 
+import { FinanceIcon } from "@/src/components/FinanceIcon";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Briefcase, Calendar, Target, X, ChevronDown, TrendingUp, BarChart2, Bell, CalendarDays, Globe, Search, Newspaper, Flame } from "lucide-react";
 import { useApp } from "@/src/context/AppContext";
 import { supabase } from "@/src/lib/supabase";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useSharedMarketSymbol } from '@/src/hooks/useSharedMarketSymbol';
 import {
   SupportResistancePanel,
   FibonacciPanel,
@@ -19,7 +21,6 @@ import {
   ScreenerWidget,
   TimelineWidget,
 } from "@/src/components/TradingViewWidgets";
-import { DcaOrderSystem } from "@/src/components/DcaOrderSystem";
 
 function useMounted() {
   const [mounted, setMounted] = useState(false);
@@ -91,14 +92,14 @@ export default function TerminalPage() {
 
 function TerminalContent() {
   const { language } = useApp();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const mounted = useMounted();
   const requestedSymbol = searchParams.get("symbol")?.trim().toUpperCase();
-  const [symbol, setSymbol] = useState(requestedSymbol || "XAUUSD");
+  const { symbol, selectSymbol: setSymbol, ready: symbolReady } = useSharedMarketSymbol(requestedSymbol || '', 'XAUUSD');
   const [searchInput, setSearchInput] = useState(requestedSymbol || "XAUUSD");
   const [interval, setInterval] = useState("60");
   const [stateLoaded, setStateLoaded] = useState(false);
-  const [isTradeAssistantOpen, setIsTradeAssistantOpen] = useState(false);
   const [openPanels, setOpenPanels] = useState<Set<string>>(new Set());
 
   const togglePanel = (id: string) =>
@@ -107,15 +108,15 @@ function TerminalContent() {
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
+  const openTradePlan = () => {
+    router.push(`/trade/plan?symbol=${encodeURIComponent(symbol)}`);
+  };
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // ─── Load saved terminal state from Supabase on mount ───────────────
   useEffect(() => {
-    if (requestedSymbol) {
-      setSymbol(requestedSymbol);
-      setSearchInput(requestedSymbol);
-    }
-  }, [requestedSymbol]);
+    setSearchInput(symbol);
+  }, [symbol]);
 
   useEffect(() => {
     async function loadTerminalState() {
@@ -130,10 +131,7 @@ function TerminalContent() {
           .single();
 
         if (profile && !requestedSymbol) {
-          if (profile.terminal_symbol) {
-            setSymbol(profile.terminal_symbol);
-            setSearchInput(profile.terminal_symbol);
-          }
+          // Shared selection wins; an older profile response must not reset it.
           if (profile.terminal_interval) {
             setInterval(profile.terminal_interval);
           }
@@ -163,13 +161,13 @@ function TerminalContent() {
   }, []);
 
   useEffect(() => {
-    if (!stateLoaded) return; // Don't save until initial load is complete
+    if (!stateLoaded || !symbolReady || !symbol) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
       saveTerminalState(symbol, interval);
     }, 1000);
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
-  }, [symbol, interval, stateLoaded, saveTerminalState]);
+  }, [symbol, interval, stateLoaded, symbolReady, saveTerminalState]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -227,7 +225,7 @@ function TerminalContent() {
           </div>
         </div>
 
-        {mounted ? (
+        {mounted && symbolReady ? (
           <div className="flex flex-col gap-4">
             {/* ═══════════════════════════════════════════════════════════════
                 ROW 1 — Advanced Chart
@@ -236,11 +234,11 @@ function TerminalContent() {
               <div className="px-4 pt-3 pb-2 flex items-center justify-between border-b border-border shrink-0">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-primary text-sm font-bold">✦</span>
+                    <FinanceIcon name="chart" size={16} className="text-primary" />
                     <h2 className="text-sm font-bold text-white">Advanced chart</h2>
                   </div>
                   <p className="text-[11px] text-gray-500 mt-0.5 ml-5">
-                    Full TradingView chart — switch pairs anytime
+                    ค้นหาหุ้นด้านบนเพื่อใช้หุ้นเดียวกันกับหน้า Trade
                   </p>
                 </div>
                 
@@ -282,10 +280,10 @@ function TerminalContent() {
                     />
                   </form>
                   <button
-                    onClick={() => setIsTradeAssistantOpen(true)}
+                    onClick={openTradePlan}
                     className="hidden sm:flex items-center gap-1.5 rounded-lg border border-[#ADC6FF]/30 bg-[#ADC6FF]/10 px-3 py-1.5 text-xs font-black text-[#ADC6FF] transition-all hover:bg-[#ADC6FF]/20"
                   >
-                    <Target size={14} /> DCA Assistant
+                    <Target size={14} /> Trade
                   </button>
                 </div>
               </div>
@@ -466,36 +464,11 @@ function TerminalContent() {
       </div>
 
       <button
-        onClick={() => setIsTradeAssistantOpen(true)}
+        onClick={openTradePlan}
         className="fixed bottom-20 right-4 z-40 flex items-center gap-2 rounded-full bg-[#ADC6FF] px-4 py-3 text-xs font-black text-[#00285d] shadow-xl shadow-[#ADC6FF]/20 lg:hidden"
       >
-        <Target size={16} /> DCA
+        <Target size={16} /> Trade
       </button>
-
-      {isTradeAssistantOpen && (
-        <div className="fixed inset-0 z-[100] flex items-end bg-black/70 p-0 backdrop-blur-sm sm:items-center sm:justify-center sm:p-6">
-          <div className="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-t-3xl border border-border bg-background shadow-2xl sm:rounded-3xl">
-            <div className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-6">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-wider text-gray-500">Terminal Trade Assistant</p>
-                <h2 className="text-base font-black text-white">DCA plan for {symbol}</h2>
-              </div>
-              <button onClick={() => setIsTradeAssistantOpen(false)} className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-white/5 hover:text-white" aria-label="Close trade assistant">
-                <X size={18} />
-              </button>
-            </div>
-            <div className="overflow-y-auto p-4 sm:p-6">
-              <DcaOrderSystem
-                key={`terminal-dca-${symbol}`}
-                initialSymbol={symbol}
-                marketCurrency={symbol.endsWith('.BK') ? 'THB' : 'USD'}
-                compact
-                onClose={() => setIsTradeAssistantOpen(false)}
-              />
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

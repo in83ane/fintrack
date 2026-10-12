@@ -59,7 +59,12 @@ export async function GET(request: Request) {
       { headers: { 'Cache-Control': 'no-store' } }
     );
   } catch (error) {
-    console.error('Market analysis error:', error);
-    return NextResponse.json({ error: 'Failed to analyze symbol' }, { status: 500 });
+    const message = error instanceof Error ? error.message : '';
+    const isMissingSymbol = /symbol not found|no data found|insufficient data|http 404/i.test(message);
+    if (!isMissingSymbol) console.error('Market analysis error:', error);
+    return NextResponse.json(
+      { error: isMissingSymbol ? 'Symbol not found' : 'Failed to analyze symbol' },
+      { status: isMissingSymbol ? 404 : 500 }
+    );
   }
 }

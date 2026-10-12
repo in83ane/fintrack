@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const source=readFileSync(new URL('../src/components/CostBasisPanel.tsx',import.meta.url),'utf8');
+const revision=source.match(/const ledgerRevision=([^;]+);/)[1];
+const key=new Function('trades','portfolioId','symbol',`return ${revision};`);
+const trades=[{id:1,portfolioId:'p',asset:'TSLA',shares:1,pricePerUnit:200},{id:2,portfolioId:'p',asset:'NVDA',shares:1}];
+assert.equal(key(trades,'p','TSLA'),key(structuredClone(trades),'p','TSLA'),'same ledger, new references should not reload');
+assert.equal(key(trades,'p','TSLA'),key([trades[0],{...trades[1],shares:2}],'p','TSLA'),'unrelated symbol must not reload');
+assert.notEqual(key(trades,'p','TSLA'),key([{...trades[0],shares:2},trades[1]],'p','TSLA'));
+const effect=source.slice(source.indexOf('useEffect(()=>'),source.indexOf('},[portfolioId,symbol,ledgerRevision]);')+43);
+assert.ok(effect.includes('ledgerRevision'));
+assert.ok(!effect.includes('setSnapshot(null)'),'background refresh must not collapse card');
+assert.ok(!effect.includes('setSelection({})'),'background refresh must not discard draft');
+assert.ok(effect.includes('if(cancelled)return'),'ignore stale requests');
+console.log('PASS: stable refresh dependencies, retained card/draft during reload, stale request guard.');

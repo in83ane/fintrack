@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { LayoutDashboard, Wallet, Settings, HelpCircle, User, PiggyBank, Monitor, ReceiptText, CalendarDays, ArrowRightLeft, Plus, Check, Layers, Pencil, ChevronDown } from "lucide-react";
+import { LayoutDashboard, Wallet, Settings, HelpCircle, User, PiggyBank, Monitor, ReceiptText, CalendarDays, ArrowRightLeft, Plus, Check, Layers, Pencil, ChevronDown, Target } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 import { useApp } from "@/src/context/AppContext";
 import Link from "next/link";
@@ -17,6 +17,17 @@ interface SidebarProps {
 
 export function Sidebar({ isMobile, onClose }: SidebarProps) {
   const { t, language, portfolios, activePortfolio, isAllPortfolios, selectPortfolio, createPortfolio, renamePortfolio } = useApp();
+  // Bucket is a cash-management workspace, not an investment broker.  Keep it
+  // in the Bucket navigation item and show only tradeable broker portfolios in
+  // this selector.
+  const tradingPortfolios = React.useMemo(
+    () => portfolios.filter((portfolio) => portfolio.kind === "trading"),
+    [portfolios]
+  );
+  const cashManagementPortfolio = React.useMemo(
+    () => portfolios.find((portfolio) => portfolio.kind === "cash_management") || null,
+    [portfolios]
+  );
   const pathname = usePathname();
   const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
   const [portfolioName, setPortfolioName] = React.useState("");
@@ -43,8 +54,9 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
     { icon: ReceiptText, label: "Ledger", href: "/ledger" },
     { icon: ArrowRightLeft, label: language === "th" ? "กระแสเงินสด" : "Cash Flow", href: "/cashflow" },
     { icon: Monitor, label: "Terminal", href: "/terminal" },
+    { icon: Target, label: "Trade", href: "/trade/plan" },
     { icon: PiggyBank, label: t("budgetPage"), href: "/budget" },
-    { icon: CalendarDays, label: "Calendar", href: "/calendar" },
+    { icon: CalendarDays, label: "History", href: "/history" },
     { icon: Settings, label: t("settings"), href: "/settings" },
   ];
 
@@ -135,7 +147,7 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
               )}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500">Investment portfolio</span>
+              <span className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500">Investment accounts</span>
               <span className="block truncate text-xs font-bold text-white">
                 {isAllPortfolios ? "All portfolios" : (activePortfolio?.name || "Portfolio")}
               </span>
@@ -161,7 +173,24 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
                   <span className="flex min-w-0 items-center gap-2 truncate"><Layers size={14} /> <span className="truncate">All portfolios</span></span>
                   {isAllPortfolios && <Check size={14} />}
                 </button>
-                {portfolios.map((portfolio) => (
+                {cashManagementPortfolio && (
+                  <button
+                    onClick={() => { selectPortfolio(cashManagementPortfolio.id); setIsPortfolioSectionOpen(false); onClose?.(); }}
+                    className={cn(
+                      "flex min-h-10 w-full items-center justify-between rounded-xl px-3 text-left text-xs font-bold transition-colors",
+                      activePortfolio?.id === cashManagementPortfolio.id
+                        ? "bg-[#4EDEA3]/15 text-[#4EDEA3]"
+                        : "text-gray-400 hover:bg-white/5 hover:text-white"
+                    )}
+                  >
+                    <span className="flex min-w-0 items-center gap-2 truncate">
+                      <PiggyBank size={14} className="shrink-0" />
+                      <span className="truncate">{cashManagementPortfolio.name || "Bucket"}</span>
+                    </span>
+                    {activePortfolio?.id === cashManagementPortfolio.id && <Check size={14} />}
+                  </button>
+                )}
+                {tradingPortfolios.map((portfolio) => (
                   <div key={portfolio.id} className={cn("flex items-center gap-1 rounded-xl", activePortfolio?.id === portfolio.id && "bg-[#ADC6FF]/15")}>
                     {editingPortfolioId === portfolio.id ? (
                       <form onSubmit={handleRenamePortfolio} className="flex min-w-0 flex-1 gap-1 p-1">
@@ -206,7 +235,7 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
                   value={portfolioName}
                   onChange={(event) => setPortfolioName(event.target.value)}
                   maxLength={80}
-                  placeholder="New portfolio"
+                  placeholder="New broker"
                   className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 py-2 text-xs text-white outline-none placeholder:text-gray-600 focus:border-[#ADC6FF]/60"
                 />
                 <button
@@ -229,6 +258,7 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
             <Link
               key={item.label}
               href={item.href}
+              replace={false}
               onClick={onClose}
               className={cn(
                 "flex items-center gap-3 mx-3 py-2.5 px-4 rounded-xl transition-all duration-200",

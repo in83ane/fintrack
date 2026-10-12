@@ -1,5 +1,7 @@
 "use client";
+import { bucketNativeAmount } from '@/src/lib/native-money';
 
+import { FinanceIcon } from "@/src/components/FinanceIcon";
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { motion, AnimatePresence, PanInfo } from "motion/react";
 import {
@@ -26,26 +28,28 @@ import { ConfirmModal } from "@/src/components/ConfirmModal";
 import { createPortal } from "react-dom";
 import { AnimatedNumber } from "@/src/components/AnimatedNumber";
 import { DateRangeBar, DateRangeState, getDateBounds, isInRange, toLocalDateKey } from "@/src/components/DateRangeBar";
+import { BrokerLedgerView } from "@/src/components/BrokerLedgerView";
+import { getLocalDateKey, localDateKeyToIso } from "@/src/lib/local-date";
 
 const INCOME_PRESET_KEYS = [
-  { icon: "💰", key: "salary" },
-  { icon: "💻", key: "freelance" },
-  { icon: "📈", key: "investment" },
-  { icon: "🪙", key: "dividend" },
-  { icon: "🎁", key: "gift" },
-  { icon: "🏠", key: "rental" },
+  { icon: "wallet", key: "salary" },
+  { icon: "laptop", key: "freelance" },
+  { icon: "investment", key: "investment" },
+  { icon: "coins", key: "dividend" },
+  { icon: "gift", key: "gift" },
+  { icon: "home", key: "rental" },
 ];
 
 const EXPENSE_PRESET_KEYS = [
-  { icon: "🍔", key: "food" },
-  { icon: "🚗", key: "transport" },
-  { icon: "💡", key: "utilities" },
-  { icon: "🎬", key: "entertainment" },
-  { icon: "🛍️", key: "shopping" },
-  { icon: "🏥", key: "health" },
-  { icon: "📚", key: "education" },
-  { icon: "☕", key: "coffee" },
-  { icon: "✈️", key: "travel" },
+  { icon: "food", key: "food" },
+  { icon: "transport", key: "transport" },
+  { icon: "utilities", key: "utilities" },
+  { icon: "entertainment", key: "entertainment" },
+  { icon: "shopping", key: "shopping" },
+  { icon: "health", key: "health" },
+  { icon: "education", key: "education" },
+  { icon: "coffee", key: "coffee" },
+  { icon: "travel", key: "travel" },
 ];
 
 function SuccessConfetti({ active }: { active: boolean }) {
@@ -82,22 +86,22 @@ function SuccessConfetti({ active }: { active: boolean }) {
 
 function getCategoryIcon(cat: string): string {
   const c = cat.toLowerCase();
-  if (c.includes("food") || c.includes("อาหาร") || c.includes("lunch") || c.includes("dinner")) return "🍔";
-  if (c.includes("coffee") || c.includes("กาแฟ")) return "☕";
-  if (c.includes("transport") || c.includes("taxi") || c.includes("grab") || c.includes("เดินทาง")) return "🚗";
-  if (c.includes("travel") || c.includes("flight") || c.includes("ท่องเที่ยว")) return "✈️";
-  if (c.includes("util") || c.includes("electric") || c.includes("internet") || c.includes("สาธารณ")) return "💡";
-  if (c.includes("entertainment") || c.includes("บันเทิง") || c.includes("movie")) return "🎬";
-  if (c.includes("shopping") || c.includes("ช้อปปิ้ง")) return "🛍️";
-  if (c.includes("health") || c.includes("สุขภาพ") || c.includes("medical")) return "🏥";
-  if (c.includes("education") || c.includes("การศึกษา") || c.includes("book")) return "📚";
-  if (c.includes("salary") || c.includes("เงินเดือน")) return "💰";
-  if (c.includes("freelance") || c.includes("ฟรีแลนซ์")) return "💻";
-  if (c.includes("invest") || c.includes("ลงทุน")) return "📈";
-  if (c.includes("dividend") || c.includes("ปันผล")) return "🪙";
-  if (c.includes("gift") || c.includes("ของขวัญ")) return "🎁";
-  if (c.includes("rental") || c.includes("rent") || c.includes("ค่าเช่า")) return "🏠";
-  return "💳";
+  if (c.includes("food") || c.includes("อาหาร") || c.includes("lunch") || c.includes("dinner")) return "food";
+  if (c.includes("coffee") || c.includes("กาแฟ")) return "coffee";
+  if (c.includes("transport") || c.includes("taxi") || c.includes("grab") || c.includes("เดินทาง")) return "transport";
+  if (c.includes("travel") || c.includes("flight") || c.includes("ท่องเที่ยว")) return "travel";
+  if (c.includes("util") || c.includes("electric") || c.includes("internet") || c.includes("สาธารณ")) return "utilities";
+  if (c.includes("entertainment") || c.includes("บันเทิง") || c.includes("movie")) return "entertainment";
+  if (c.includes("shopping") || c.includes("ช้อปปิ้ง")) return "shopping";
+  if (c.includes("health") || c.includes("สุขภาพ") || c.includes("medical")) return "health";
+  if (c.includes("education") || c.includes("การศึกษา") || c.includes("book")) return "education";
+  if (c.includes("salary") || c.includes("เงินเดือน")) return "wallet";
+  if (c.includes("freelance") || c.includes("ฟรีแลนซ์")) return "laptop";
+  if (c.includes("invest") || c.includes("ลงทุน")) return "investment";
+  if (c.includes("dividend") || c.includes("ปันผล")) return "coins";
+  if (c.includes("gift") || c.includes("ของขวัญ")) return "gift";
+  if (c.includes("rental") || c.includes("rent") || c.includes("ค่าเช่า")) return "home";
+  return "card";
 }
 
 function formatDateGroup(dateStr: string, todayLabel: string, yesterdayLabel: string, language: string): string {
@@ -123,9 +127,10 @@ function formatDateGroup(dateStr: string, todayLabel: string, yesterdayLabel: st
 
 export default function LedgerPage() {
   const {
-    t, formatMoney, cashActivities, bucketActivities, moneyBuckets, removeCashActivity, removeBucketActivity, language, currency, exchangeRates,
+    t, formatMoney, cashActivities, bucketActivities, trades, moneyBuckets, removeCashActivity, removeBucketActivity, language, currency, exchangeRates,
     addCashActivity, updateMoneyBucket, addBucketActivity, addToast,
     customCategories, addCustomCategory, removeCustomCategory,
+    activePortfolio, allBrokerageAccounts, brokerageAccounts, portfolios,
   } = useApp();
 
   const [activePanel, setActivePanel] = useState<"INCOME" | "EXPENSE" | null>(null);
@@ -134,7 +139,8 @@ export default function LedgerPage() {
   const [note, setNote] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
-  const [toDelete, setToDelete] = useState<{id: string, source: 'cash' | 'bucket'} | null>(null);
+  const [toDelete, setToDelete] = useState<{id: string, source: 'cash' | 'bucket' | 'trade'} | null>(null);
+  const [activityFilter, setActivityFilter] = useState<"all" | "cash" | "transfer" | "trade">("all");
   // Swipe-to-delete (mobile): which row is currently swiped open, plus refs to detect outside taps.
   const [swipedId, setSwipedId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
@@ -144,7 +150,7 @@ export default function LedgerPage() {
   const [isCustomCategory, setIsCustomCategory] = useState(false);
   const [customCategory, setCustomCategory] = useState("");
   const [isDepositToOpen, setIsDepositToOpen] = useState(false);
-  const [recordDate, setRecordDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [recordDate, setRecordDate] = useState(getLocalDateKey);
   
   // Wallet Selection
   const [selectedWalletId, setSelectedWalletId] = useState<string>("all");
@@ -221,28 +227,58 @@ export default function LedgerPage() {
   };
 
 
-  // Cash activities are the user-facing financial records. Bucket activities
-  // are an internal audit trail used to maintain wallet balances, so rendering
-  // both would show every income/expense twice (for example, `Food` and
-  // `NEXT · Food`).
   const allMergedActivities = useMemo(() => {
-    const cash = cashActivities
-      .filter(a => !a.isTransfer)
-      .map(a => ({
-      id: a.id,
-      type: (a.type === "INCOME" || a.type === "DEPOSIT") ? "INCOME" : "EXPENSE" as const,
-      amountUSD: a.amountUSD ?? 0,
-      originalAmount: a.originalAmount ?? a.amount ?? 0,
-      originalCurrency: (a.currency || currency) as string,
-      category: a.category,
-      date: a.date,
-      note: a.note,
-      source: 'cash' as const,
-      bucketId: a.bucketId || 'unassigned'
-    }));
+    // 1. Cash Activities (Income/Expense and Transfers)
+    // cashActivities already contains ALL bucket deposits/withdrawals/transfers as well as regular income/expenses.
+    const cash = cashActivities.map(a => {
+      const isTransfer = a.type === 'DEPOSIT' || a.type === 'WITHDRAW' || a.isTransfer;
+      return {
+        id: a.id,
+        type: (a.type === "INCOME" || a.type === "DEPOSIT") ? "INCOME" : "EXPENSE" as const,
+        amountUSD: a.amountUSD ?? 0,
+        originalAmount: a.originalAmount ?? a.amount ?? 0,
+        originalCurrency: (a.currency || currency) as string,
+        category: a.category,
+        date: a.date,
+        note: a.note,
+        source: 'cash' as const,
+        bucketId: a.bucketId || 'unassigned',
+        walletLabel: undefined as string | undefined,
+        filterType: isTransfer ? 'transfer' as const : 'cash' as const
+      };
+    });
 
-    return cash.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [cashActivities, currency]);
+    // 2. Trades (Investments)
+    const tradesList = trades.filter(trade => trade.type !== 'IMPORT').map(trade => {
+      const account = allBrokerageAccounts.find(item => item.id === trade.brokerageAccountId)
+        || brokerageAccounts.find(item => item.id === trade.brokerageAccountId);
+      const broker = portfolios.find(item => item.id === (account?.portfolioId || trade.portfolioId));
+      const walletLabel = trade.brokerageAccountId
+        ? `${broker?.name || 'Broker'} · ${account?.name || 'เงินสดโบรก'} (${account?.currency || trade.currency})`
+        : undefined;
+      const isCashIn = trade.type === 'SELL' || trade.type === 'DIVIDEND' || trade.type === 'SHORT';
+      const tCurrency = trade.currency || 'USD';
+      const amt = trade.originalAmount ?? trade.amountUSD;
+      return {
+        id: `trade-${trade.id}`,
+        type: isCashIn ? "INCOME" : "EXPENSE" as const,
+        amountUSD: trade.amountUSD,
+        originalAmount: amt,
+        originalCurrency: trade.originalAmount ? tCurrency : 'USD',
+        category: `${trade.type} ${trade.asset}`,
+        date: trade.date,
+        note: trade.tag || `Asset Trade (${trade.type})`,
+        source: 'trade' as const,
+        bucketId: trade.brokerageAccountId ? `broker:${trade.brokerageAccountId}` : trade.sourceBucketId || 'unassigned',
+        walletLabel,
+        filterType: 'trade' as const,
+        portfolioId: trade.portfolioId,
+        tradeDbId: trade.dbId,
+      };
+    });
+
+    return [...cash, ...tradesList].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [cashActivities, trades, currency, allBrokerageAccounts, brokerageAccounts, portfolios]);
 
   const dateBounds = getDateBounds(dateRange);
 
@@ -261,8 +297,9 @@ export default function LedgerPage() {
   const records = useMemo(() => {
     return allMergedActivities
       .filter(a => isInRange(a.date, dateBounds))
-      .filter(a => selectedWalletId === 'all' ? true : a.bucketId === selectedWalletId);
-  }, [allMergedActivities, dateBounds, selectedWalletId]);
+      .filter(a => selectedWalletId === 'all' ? true : a.bucketId === selectedWalletId)
+      .filter(a => activityFilter === 'all' ? true : a.filterType === activityFilter);
+  }, [allMergedActivities, dateBounds, selectedWalletId, activityFilter]);
 
   const grouped = useMemo(() => {
     const groups: Record<string, typeof records> = {};
@@ -288,7 +325,7 @@ export default function LedgerPage() {
     setNote("");
     setIsCustomCategory(false);
     setCustomCategory("");
-    setRecordDate(new Date().toISOString().split("T")[0]);
+    setRecordDate(getLocalDateKey());
     setActionCurrency(currency as "USD" | "THB");
     if (selectedWalletId === 'all') {
       setDepositTo(type === 'INCOME' ? 'auto_split' : 'unassigned');
@@ -305,11 +342,12 @@ export default function LedgerPage() {
     setIsAdding(true);
     try {
       const raw = Number(amount);
-      const isToday = recordDate === new Date().toISOString().split("T")[0];
-      const now = isToday ? new Date().toISOString() : new Date(recordDate).toISOString();
+      const isToday = recordDate === getLocalDateKey();
+      const now = isToday ? new Date().toISOString() : localDateKeyToIso(recordDate);
       const usdAmt = raw / (exchangeRates[actionCurrency] || 1);
 
       if (activePanel === 'INCOME' && depositTo === 'auto_split') {
+        moneyBuckets.forEach(b => bucketNativeAmount({ original_amount: raw, currency: actionCurrency }, b.currency));
         const totalTargetPercent = moneyBuckets.reduce((s, b) => s + b.targetPercent, 0);
         if (totalTargetPercent > 0) {
           // One source record for the income; generated deposits below are
@@ -331,7 +369,7 @@ export default function LedgerPage() {
             if (splitAmount > 0) {
               const targetCurrency = bucketCurrency(b);
               let usd = splitAmount / (exchangeRates[actionCurrency] || 1);
-              const splitBucketAmount = usd * (exchangeRates[targetCurrency] || 1);
+              const splitBucketAmount = bucketNativeAmount({ original_amount: splitAmount, currency: actionCurrency }, b.currency);
               
               updateMoneyBucket(b.id, { currentAmount: b.currentAmount + splitBucketAmount });
               addBucketActivity({
@@ -375,7 +413,7 @@ export default function LedgerPage() {
         const bucket = moneyBuckets.find(b => b.id === depositTo);
         if (bucket) {
           const targetCurrency = bucketCurrency(bucket);
-          const bucketAmount = usdAmt * (exchangeRates[targetCurrency] || 1);
+          const bucketAmount = bucketNativeAmount({ original_amount: raw, currency: actionCurrency }, bucket.currency);
           const type = activePanel === 'INCOME' ? 'deposit' : 'withdraw';
           
           await addBucketActivity({
@@ -454,7 +492,12 @@ export default function LedgerPage() {
     setCustomCategory("");
   };
 
-  const handleDelete = (item: {id: string, source: 'cash' | 'bucket'}) => {
+  const handleDelete = (item: {id: string, source: 'cash' | 'bucket' | 'trade'}) => {
+    if (item.source === 'trade') {
+      addToast(t("cannotDeleteTradeFromLedger") || "Cannot delete trades from Ledger", "error");
+      setToDelete(null);
+      return;
+    }
     if (item.source === 'cash') {
       removeCashActivity(item.id);
     } else {
@@ -483,6 +526,19 @@ export default function LedgerPage() {
       return acc + amountInTarget;
     }, 0);
   }, [moneyBuckets, currency, exchangeRates]);
+
+  // Trading (broker) portfolios, e.g. Webull, get their own ledger: cash wallets inside the
+  // broker, bucket→broker transfers, and buy/sell/dividend history.
+  // Must stay below every hook above, so hook order never changes.
+  if (activePortfolio?.kind === "trading") {
+    return (
+      <BrokerLedgerView
+        portfolio={activePortfolio}
+        dateRange={dateRange}
+        setDateRange={setDateRange}
+      />
+    );
+  }
 
   return (
     <div className="flex min-h-screen min-w-0 flex-col pb-24 lg:pb-8">
@@ -540,6 +596,11 @@ export default function LedgerPage() {
                 <span className="text-sm">unassigned</span>
               </div>
             </button>
+            {Array.from(new Map(allMergedActivities.filter(item => item.walletLabel).map(item => [item.bucketId, item.walletLabel!])).entries()).map(([id, label]) => (
+              <button key={id} onClick={() => setSelectedWalletId(id)} className={cn('flex-shrink-0 flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-xs', selectedWalletId === id ? 'bg-white text-background border-white' : 'border-white/5 text-gray-400')}>
+                <Wallet size={14} />{label}
+              </button>
+            ))}
             {moneyBuckets.map(b => (
               <button
                 key={b.id}
@@ -549,7 +610,7 @@ export default function LedgerPage() {
                   selectedWalletId === b.id ? "bg-white text-background font-black border-white" : "bg-surface/50 border-white/5 text-gray-400 font-bold hover:bg-white/5"
                 )}
               >
-                <span className={selectedWalletId === b.id ? "text-background" : "opacity-80"}>{b.icon}</span>
+                <span className={selectedWalletId === b.id ? "text-background" : "opacity-80"}><FinanceIcon name={b.icon} /></span>
                 <div className="flex flex-col text-left">
                   <span className="text-xs leading-none">{b.name}</span>
                   {selectedWalletId === b.id && <span className="text-[10px] leading-none mt-1 opacity-70">{formatBucketAmount(b, b.currentAmount)}</span>}
@@ -580,6 +641,39 @@ export default function LedgerPage() {
             </div>
           </div>
         </div>
+        
+        {/* Activity Type Filter */}
+        <div className="px-3 sm:px-4 pb-4 border-t border-white/5 pt-3">
+          <div className="flex gap-2 overflow-x-auto no-scrollbar">
+            <button
+              onClick={() => setActivityFilter('all')}
+              className={cn("px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap", activityFilter === 'all' ? "bg-white text-background" : "bg-white/5 text-gray-400 hover:bg-white/10")}
+            >
+              {t("all") || "All Records"}
+            </button>
+            <button
+              onClick={() => setActivityFilter('cash')}
+              className={cn("px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5", activityFilter === 'cash' ? "bg-[#4EDEA3] text-[#00285d]" : "bg-[#4EDEA3]/10 text-[#4EDEA3] hover:bg-[#4EDEA3]/20")}
+            >
+              <ReceiptText size={14} />
+              {t("incomeExpense") || "Income / Expense"}
+            </button>
+            <button
+              onClick={() => setActivityFilter('transfer')}
+              className={cn("px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5", activityFilter === 'transfer' ? "bg-[#ADC6FF] text-[#00285d]" : "bg-[#ADC6FF]/10 text-[#ADC6FF] hover:bg-[#ADC6FF]/20")}
+            >
+              <Wallet size={14} />
+              {t("transfers") || "Transfers"}
+            </button>
+            <button
+              onClick={() => setActivityFilter('trade')}
+              className={cn("px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5", activityFilter === 'trade' ? "bg-[#E9C349] text-[#00285d]" : "bg-[#E9C349]/10 text-[#E9C349] hover:bg-[#E9C349]/20")}
+            >
+              <TrendingUp size={14} />
+              {t("investments") || "Investments"}
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* ─── Record List ────────────────────────────────────────────── */}
@@ -587,7 +681,7 @@ export default function LedgerPage() {
         {records.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4 text-3xl">
-              📝
+              <FinanceIcon name="receipt" size={26} />
             </div>
             <h3 className="text-lg font-bold text-white mb-2">{t("noTransactions") || "No transactions"}</h3>
             <p className="text-sm text-gray-500 max-w-[250px]">{t("addTransactionToSee") || "Record a transaction to see it appear here."}</p>
@@ -650,7 +744,7 @@ export default function LedgerPage() {
                               "w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center text-lg sm:text-xl flex-shrink-0 transition-transform group-hover:scale-105",
                               isIncome ? "bg-[#4EDEA3]/10" : "bg-white/5"
                             )}>
-                              {getCategoryIcon(item.category)}
+                              <FinanceIcon name={getCategoryIcon(item.category)} size={22} />
                             </div>
                             <div className="flex-1 min-w-0">
                               <h4 className="text-sm sm:text-base font-bold text-white truncate">{t(item.category) || item.category}</h4>
@@ -658,14 +752,14 @@ export default function LedgerPage() {
                                 {item.note && <span className="text-xs text-gray-500 truncate max-w-[120px] sm:max-w-[200px]">{item.note}</span>}
                                 {item.note && <span className="text-gray-700 text-[10px]">•</span>}
                                 <span className="text-[10px] text-gray-500 uppercase font-black inline-flex items-center gap-1">
-                                  {item.bucketId === 'unassigned' ? (
+                                  {item.walletLabel ? <><Wallet size={12} />{item.walletLabel}</> : item.bucketId === 'unassigned' ? (
                                     <>
                                       <ReceiptText size={10} />
                                       {t("unassigned") || "Unassigned"}
                                     </>
                                   ) : (
                                     <>
-                                      <span className="normal-case">{bucketsById.get(item.bucketId)?.icon || "💳"}</span>
+                                      <span className="normal-case"><FinanceIcon name={bucketsById.get(item.bucketId)?.icon || "card"} size={14} /></span>
                                       {bucketsById.get(item.bucketId)?.name || (t("wallet") || "Wallet")}
                                     </>
                                   )}
@@ -763,7 +857,7 @@ export default function LedgerPage() {
                           {activePanel === "INCOME" ? "Deposit To" : "Pay From"}
                         </span>
                         <span className="text-sm font-bold text-white mt-0.5">
-                          {depositTo === 'auto_split' ? '✨ Auto-split' : 
+                          {depositTo === 'auto_split' ? 'Auto-split' : 
                            depositTo === 'unassigned' ? 'Unassigned' : 
                            (moneyBuckets.find(b => b.id === depositTo)?.name || 'Select Wallet')}
                         </span>
@@ -786,7 +880,7 @@ export default function LedgerPage() {
                                 onClick={() => { setDepositTo("auto_split"); setIsDepositToOpen(false); }}
                                 className="text-left px-4 py-3 hover:bg-white/5 transition-colors border-b border-white/5 flex items-center gap-2"
                               >
-                                <span>✨</span>
+                                <FinanceIcon name="transfer" size={16} />
                                 <span className="text-sm font-bold text-white">Auto-split</span>
                               </button>
                             )}
@@ -805,7 +899,7 @@ export default function LedgerPage() {
                                 onClick={() => { setDepositTo(b.id); setIsDepositToOpen(false); }}
                                 className="text-left px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-2"
                               >
-                                <span>{b.icon}</span>
+                                <span><FinanceIcon name={b.icon} /></span>
                                 <span className="text-sm font-bold text-white">{b.name}</span>
                               </button>
                             ))}
@@ -855,7 +949,7 @@ export default function LedgerPage() {
                               : "bg-white/5 border-transparent text-gray-400 hover:bg-white/10 hover:text-white"
                           )}
                         >
-                          <span>{p.icon}</span>
+                          <span><FinanceIcon name={p.icon} size={16} /></span>
                           <span>{t(p.key) || p.key}</span>
                         </button>
                       );
@@ -883,7 +977,7 @@ export default function LedgerPage() {
                                 : "bg-white/5 border-transparent text-gray-400 hover:bg-white/10 hover:text-white"
                             )}
                           >
-                            <span>{c.icon || "🏷️"}</span>
+                            <span><FinanceIcon name={c.icon || "tag"} size={16} /></span>
                             <span>{c.label}</span>
                             <span
                               role="button"

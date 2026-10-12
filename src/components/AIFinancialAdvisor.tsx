@@ -254,7 +254,7 @@ function ExpenseVelocityWidget({ currentMonthExpenses, lastMonthExpenses, dayOfM
       </div>
       {isOverPace && (
         <p className="text-[10px] text-[#FFB4AB] mt-1.5 font-bold">
-          ⚠️ On pace to exceed last month by {projectedOverspend.toFixed(0)}%
+          On pace to exceed last month by {projectedOverspend.toFixed(0)}%
         </p>
       )}
     </div>
@@ -464,7 +464,7 @@ export function AIFinancialAdvisor() {
       if (b.isOverBudget) {
         list.push({
           icon: Wallet,
-          title: `${b.icon} ${b.name} Over Budget`,
+          title: `${b.name} Over Budget`,
           desc: `Spent ${formatMoney(b.spent)} vs target ${formatMoney(b.target)}. ${((b.spent / b.target) * 100).toFixed(0)}% of allocation used.`,
           color: "#FFB4AB",
           priority: "HIGH"
@@ -521,7 +521,7 @@ export function AIFinancialAdvisor() {
     // ─── TRANSACTION PARSING ────────────────────────────────────────────────
     const parsed = parseTransaction(text);
     if (parsed && !lower.includes("summary") && !lower.includes("health") && !lower.includes("advice") && !lower.includes("budget") && !lower.includes("net worth") && !lower.includes("breakdown")) {
-      const typeLabel = parsed.type === "INCOME" ? "💰 Income" : parsed.type === "INVEST" ? "📈 Investment" : "💸 Expense";
+      const typeLabel = parsed.type === "INCOME" ? "Income" : parsed.type === "INVEST" ? "Investment" : "Expense";
       const cashType = parsed.type === "INCOME" ? "INCOME" : "EXPENSE";
 
       // Actually add the transaction
@@ -535,7 +535,7 @@ export function AIFinancialAdvisor() {
 
       const newNet = snapshot.monthNet + (parsed.type === "INCOME" ? parsed.amount : -parsed.amount);
 
-      content = `**✅ Transaction Logged**\n\n• Type: ${typeLabel}\n• Amount: ${formatMoney(parsed.amount)}\n• Category: ${parsed.category.charAt(0).toUpperCase() + parsed.category.slice(1)}\n• Note: "${parsed.note}"\n\n**Updated Net Balance:** ${newNet >= 0 ? "+" : ""}${formatMoney(newNet)}\n\n${parsed.type === "EXPENSE" && snapshot.monthExpenses + parsed.amount > snapshot.monthIncome * 0.7 ? "⚠️ Warning: Expenses approaching 70% of income threshold." : parsed.type === "INCOME" ? `💡 Consider allocating ${formatMoney(parsed.amount * 0.2)} (20%) to investments.` : `📊 Investment allocation: ${formatMoney(snapshot.monthInvested + (parsed.type === "INVEST" ? parsed.amount : 0))} this month.`}`;
+      content = `**Transaction Logged**\n\n• Type: ${typeLabel}\n• Amount: ${formatMoney(parsed.amount)}\n• Category: ${parsed.category.charAt(0).toUpperCase() + parsed.category.slice(1)}\n• Note: "${parsed.note}"\n\n**Updated Net Balance:** ${newNet >= 0 ? "+" : ""}${formatMoney(newNet)}\n\n${parsed.type === "EXPENSE" && snapshot.monthExpenses + parsed.amount > snapshot.monthIncome * 0.7 ? "Warning: Expenses approaching 70% of income threshold." : parsed.type === "INCOME" ? `Consider allocating ${formatMoney(parsed.amount * 0.2)} (20%) to investments.` : `Investment allocation: ${formatMoney(snapshot.monthInvested + (parsed.type === "INVEST" ? parsed.amount : 0))} this month.`}`;
       data = { type: "transaction_ack" };
 
       addToast(t("recordSaved") || "Transaction saved", "success");
@@ -545,27 +545,27 @@ export function AIFinancialAdvisor() {
       const incomeChange = snapshot.prevMonthIncome > 0 ? ((snapshot.monthIncome - snapshot.prevMonthIncome) / snapshot.prevMonthIncome * 100) : 0;
       const expenseChange = snapshot.prevMonthExpenses > 0 ? ((snapshot.monthExpenses - snapshot.prevMonthExpenses) / snapshot.prevMonthExpenses * 100) : 0;
 
-      content = `**📊 Monthly Financial Summary**\n\n• Income: ${formatMoney(snapshot.monthIncome)} ${incomeChange !== 0 ? `(${incomeChange > 0 ? "↑" : "↓"}${Math.abs(incomeChange).toFixed(0)}% MoM)` : ""}\n• Expenses: ${formatMoney(snapshot.monthExpenses)} (${snapshot.monthIncome > 0 ? ((snapshot.monthExpenses / snapshot.monthIncome) * 100).toFixed(0) : 0}% of income) ${expenseChange !== 0 ? `(${expenseChange > 0 ? "↑" : "↓"}${Math.abs(expenseChange).toFixed(0)}% MoM)` : ""}\n• Net Cash: ${snapshot.monthNet >= 0 ? "+" : ""}${formatMoney(snapshot.monthNet)}\n• Invested: ${formatMoney(snapshot.monthInvested)}\n• Savings Rate: ${snapshot.savingsRate.toFixed(1)}%\n\n${snapshot.savingsRate >= 20 ? "✅ Excellent savings discipline." : snapshot.savingsRate >= 10 ? "⚠️ Moderate — room to improve." : "🚨 Below 10% — action needed."}\n\n${snapshot.topExpenses.length > 0 ? `**Top Expense Categories:**\n${snapshot.topExpenses.map(([cat, amt]) => `• ${cat}: ${formatMoney(amt as number)} (${snapshot.monthIncome > 0 ? ((amt as number / snapshot.monthIncome) * 100).toFixed(0) : 0}% of income)`).join("\n")}` : ""}\n\n${snapshot.prevMonthNet !== 0 ? `**vs Last Month:** Net ${snapshot.monthNet > snapshot.prevMonthNet ? "improved" : "declined"} by ${formatMoney(Math.abs(snapshot.monthNet - snapshot.prevMonthNet))}` : ""}`;
+      content = `**Monthly Financial Summary**\n\n• Income: ${formatMoney(snapshot.monthIncome)} ${incomeChange !== 0 ? `(${incomeChange > 0 ? "↑" : "↓"}${Math.abs(incomeChange).toFixed(0)}% MoM)` : ""}\n• Expenses: ${formatMoney(snapshot.monthExpenses)} (${snapshot.monthIncome > 0 ? ((snapshot.monthExpenses / snapshot.monthIncome) * 100).toFixed(0) : 0}% of income) ${expenseChange !== 0 ? `(${expenseChange > 0 ? "↑" : "↓"}${Math.abs(expenseChange).toFixed(0)}% MoM)` : ""}\n• Net Cash: ${snapshot.monthNet >= 0 ? "+" : ""}${formatMoney(snapshot.monthNet)}\n• Invested: ${formatMoney(snapshot.monthInvested)}\n• Savings Rate: ${snapshot.savingsRate.toFixed(1)}%\n\n${snapshot.savingsRate >= 20 ? "Excellent savings discipline." : snapshot.savingsRate >= 10 ? "Moderate — room to improve." : "Below 10% — action needed."}\n\n${snapshot.topExpenses.length > 0 ? `**Top Expense Categories:**\n${snapshot.topExpenses.map(([cat, amt]) => `• ${cat}: ${formatMoney(amt as number)} (${snapshot.monthIncome > 0 ? ((amt as number / snapshot.monthIncome) * 100).toFixed(0) : 0}% of income)`).join("\n")}` : ""}\n\n${snapshot.prevMonthNet !== 0 ? `**vs Last Month:** Net ${snapshot.monthNet > snapshot.prevMonthNet ? "improved" : "declined"} by ${formatMoney(Math.abs(snapshot.monthNet - snapshot.prevMonthNet))}` : ""}`;
       data = { type: "monthly_summary" };
     }
     // ─── HEALTH SCORE ───────────────────────────────────────────────────────
     else if (lower.includes("health") || lower.includes("score") || lower.includes("สุขภาพ")) {
       const score = snapshot.healthScore;
-      content = `**Financial Health Score: ${score}/100** ${score >= 80 ? "🏆 Excellent" : score >= 60 ? "✅ Good" : score >= 40 ? "⚠️ Fair" : "🚨 Needs Attention"}\n\n• Savings Rate (${snapshot.savingsRate.toFixed(0)}%): ${snapshot.savingsRate >= 20 ? "+15" : snapshot.savingsRate >= 10 ? "+8" : "0"} pts\n• Investment Ratio (${snapshot.investRatio.toFixed(0)}%): ${snapshot.investRatio >= 15 ? "+15" : snapshot.investRatio >= 5 ? "+8" : "0"} pts\n• Expense Control: ${snapshot.monthExpenses <= snapshot.monthIncome * 0.5 ? "+10" : "0"} pts\n• Portfolio Return (${snapshot.portfolioReturn.toFixed(1)}%): ${snapshot.portfolioReturn >= 10 ? "+10" : snapshot.portfolioReturn >= 0 ? "+5" : "0"} pts\n• Budget System: ${moneyBuckets.length > 0 ? "+5" : "0"} pts\n• Realized Profits: ${snapshot.totalRealizedPL > 0 ? "+5" : "0"} pts`;
+      content = `**Financial Health Score: ${score}/100** ${score >= 80 ? "Excellent" : score >= 60 ? "Good" : score >= 40 ? "Fair" : "Needs Attention"}\n\n• Savings Rate (${snapshot.savingsRate.toFixed(0)}%): ${snapshot.savingsRate >= 20 ? "+15" : snapshot.savingsRate >= 10 ? "+8" : "0"} pts\n• Investment Ratio (${snapshot.investRatio.toFixed(0)}%): ${snapshot.investRatio >= 15 ? "+15" : snapshot.investRatio >= 5 ? "+8" : "0"} pts\n• Expense Control: ${snapshot.monthExpenses <= snapshot.monthIncome * 0.5 ? "+10" : "0"} pts\n• Portfolio Return (${snapshot.portfolioReturn.toFixed(1)}%): ${snapshot.portfolioReturn >= 10 ? "+10" : snapshot.portfolioReturn >= 0 ? "+5" : "0"} pts\n• Budget System: ${moneyBuckets.length > 0 ? "+5" : "0"} pts\n• Realized Profits: ${snapshot.totalRealizedPL > 0 ? "+5" : "0"} pts`;
       data = { type: "health_score" };
     }
     // ─── BUDGET CHECK ───────────────────────────────────────────────────────
     else if (lower.includes("budget") || lower.includes("bucket") || lower.includes("งบ")) {
       if (snapshot.bucketHealth.length === 0) {
-        content = `**💼 Budget Status**\n\nNo money buckets configured yet. Set up budget buckets in the Budget page to enable:\n• Auto-distribution of income\n• Per-category spending limits\n• Budget vs actual tracking\n\n💡 Recommended buckets: Emergency Fund (20%), Investments (20%), Living Expenses (50%), Fun Money (10%)`;
+        content = `**Budget Status**\n\nNo money buckets configured yet. Set up budget buckets in the Budget page to enable:\n• Auto-distribution of income\n• Per-category spending limits\n• Budget vs actual tracking\n\nRecommended buckets: Emergency Fund (20%), Investments (20%), Living Expenses (50%), Fun Money (10%)`;
       } else {
         const overBudget = snapshot.bucketHealth.filter(b => b.isOverBudget);
         const bucketLines = snapshot.bucketHealth.map(b => {
-          const status = b.isOverBudget ? "🔴" : b.pctUsed > 80 ? "🟡" : "🟢";
-          return `${status} ${b.icon} **${b.name}**: ${formatMoney(b.current / (exchangeRates[b.currency] || 1), b.currency as any, undefined, b.current)} balance${b.target > 0 ? ` | ${b.pctUsed.toFixed(0)}% of budget used` : ""}`;
+          const status = b.isOverBudget ? "Over budget:" : b.pctUsed > 80 ? "Near limit:" : "Within budget:";
+          return `${status} **${b.name}**: ${formatMoney(b.current / (exchangeRates[b.currency] || 1), b.currency as any, undefined, b.current)} balance${b.target > 0 ? ` | ${b.pctUsed.toFixed(0)}% of budget used` : ""}`;
         }).join("\n");
 
-        content = `**💼 Budget Health Check**\n\n${bucketLines}\n\n${overBudget.length > 0 ? `⚠️ ${overBudget.length} bucket(s) over budget! Review: ${overBudget.map(b => b.name).join(", ")}` : "✅ All buckets within budget."}\n\n• Total Liquidity: ${formatMoney(snapshot.liquidity)}\n• Day ${snapshot.dayOfMonth}/${snapshot.daysInMonth} of month`;
+        content = `**Budget Health Check**\n\n${bucketLines}\n\n${overBudget.length > 0 ? `${overBudget.length} bucket(s) over budget! Review: ${overBudget.map(b => b.name).join(", ")}` : "All buckets within budget."}\n\n• Total Liquidity: ${formatMoney(snapshot.liquidity)}\n• Day ${snapshot.dayOfMonth}/${snapshot.daysInMonth} of month`;
       }
       data = { type: "budget_check" };
     }
@@ -575,7 +575,7 @@ export function AIFinancialAdvisor() {
       const portfolioPct = totalNW > 0 ? (snapshot.totalPortfolioValue / totalNW * 100) : 0;
       const cashPct = totalNW > 0 ? (snapshot.liquidity / totalNW * 100) : 0;
 
-      content = `**💎 Net Worth Overview**\n\n• Total Net Worth: **${formatMoney(totalNW)}**\n• Portfolio Value: ${formatMoney(snapshot.totalPortfolioValue)} (${portfolioPct.toFixed(0)}%)\n• Cash & Buckets: ${formatMoney(snapshot.liquidity)} (${cashPct.toFixed(0)}%)\n• Unrealized P/L: ${snapshot.totalUnrealizedPL >= 0 ? "+" : ""}${formatMoney(snapshot.totalUnrealizedPL)}\n• Realized P/L: ${snapshot.totalRealizedPL >= 0 ? "+" : ""}${formatMoney(snapshot.totalRealizedPL)}\n• Dividends: ${formatMoney(snapshot.totalDividends)}\n\n${snapshot.topAssets.length > 0 ? `**Top Performers:**\n${snapshot.topAssets.map(a => `• ${a.symbol}: ${a.change >= 0 ? "+" : ""}${a.change.toFixed(2)}% (${formatMoney(a.valueUSD)})`).join("\n")}` : ""}\n\n${snapshot.worstAssets.length > 0 && snapshot.worstAssets[0].change < 0 ? `**Underperformers:**\n${snapshot.worstAssets.filter(a => a.change < 0).map(a => `• ${a.symbol}: ${a.change.toFixed(2)}% (${formatMoney(a.valueUSD)})`).join("\n")}` : ""}`;
+      content = `**Net Worth Overview**\n\n• Total Net Worth: **${formatMoney(totalNW)}**\n• Portfolio Value: ${formatMoney(snapshot.totalPortfolioValue)} (${portfolioPct.toFixed(0)}%)\n• Cash & Buckets: ${formatMoney(snapshot.liquidity)} (${cashPct.toFixed(0)}%)\n• Unrealized P/L: ${snapshot.totalUnrealizedPL >= 0 ? "+" : ""}${formatMoney(snapshot.totalUnrealizedPL)}\n• Realized P/L: ${snapshot.totalRealizedPL >= 0 ? "+" : ""}${formatMoney(snapshot.totalRealizedPL)}\n• Dividends: ${formatMoney(snapshot.totalDividends)}\n\n${snapshot.topAssets.length > 0 ? `**Top Performers:**\n${snapshot.topAssets.map(a => `• ${a.symbol}: ${a.change >= 0 ? "+" : ""}${a.change.toFixed(2)}% (${formatMoney(a.valueUSD)})`).join("\n")}` : ""}\n\n${snapshot.worstAssets.length > 0 && snapshot.worstAssets[0].change < 0 ? `**Underperformers:**\n${snapshot.worstAssets.filter(a => a.change < 0).map(a => `• ${a.symbol}: ${a.change.toFixed(2)}% (${formatMoney(a.valueUSD)})`).join("\n")}` : ""}`;
       data = { type: "net_worth" };
     }
     // ─── EXPENSE BREAKDOWN ──────────────────────────────────────────────────
@@ -584,7 +584,7 @@ export function AIFinancialAdvisor() {
         .sort(([, a], [, b]) => (b as number) - (a as number));
 
       if (categories.length === 0) {
-        content = `**📋 Expense Breakdown**\n\nNo expenses recorded this month yet. Start logging transactions to see your spending patterns.`;
+        content = `**Expense Breakdown**\n\nNo expenses recorded this month yet. Start logging transactions to see your spending patterns.`;
       } else {
         const catLines = categories.map(([cat, amt], i) => {
           const pct = snapshot.monthExpenses > 0 ? ((amt as number) / snapshot.monthExpenses * 100) : 0;
@@ -599,7 +599,7 @@ export function AIFinancialAdvisor() {
           .reduce((s, [, amt]) => s + (amt as number), 0);
         const variableTotal = snapshot.monthExpenses - fixedTotal;
 
-        content = `**📋 Expense Breakdown — This Month**\n\n${catLines}\n\n• Fixed Expenses: ~${formatMoney(fixedTotal)} (${snapshot.monthExpenses > 0 ? (fixedTotal / snapshot.monthExpenses * 100).toFixed(0) : 0}%)\n• Variable Expenses: ~${formatMoney(variableTotal)} (${snapshot.monthExpenses > 0 ? (variableTotal / snapshot.monthExpenses * 100).toFixed(0) : 0}%)\n\n${variableTotal > fixedTotal * 1.5 ? "💡 Variable spending is significantly higher than fixed costs. Look for recurring subscriptions or dining expenses to optimize." : "✅ Spending mix looks balanced."}`;
+        content = `**Expense Breakdown — This Month**\n\n${catLines}\n\n• Fixed Expenses: ~${formatMoney(fixedTotal)} (${snapshot.monthExpenses > 0 ? (fixedTotal / snapshot.monthExpenses * 100).toFixed(0) : 0}%)\n• Variable Expenses: ~${formatMoney(variableTotal)} (${snapshot.monthExpenses > 0 ? (variableTotal / snapshot.monthExpenses * 100).toFixed(0) : 0}%)\n\n${variableTotal > fixedTotal * 1.5 ? "Variable spending is significantly higher than fixed costs. Look for recurring subscriptions or dining expenses to optimize." : "Spending mix looks balanced."}`;
       }
       data = { type: "expense_breakdown" };
     }
@@ -608,16 +608,16 @@ export function AIFinancialAdvisor() {
       const assetDetails = snapshot.topAssets.length > 0
         ? `\n\n**Your Top Positions:**\n${snapshot.topAssets.map(a => {
             const pctOfPortfolio = snapshot.totalPortfolioValue > 0 ? (a.valueUSD / snapshot.totalPortfolioValue * 100) : 0;
-            return `• **${a.symbol}**: ${formatMoney(a.valueUSD)} (${a.change >= 0 ? "+" : ""}${a.change.toFixed(2)}%) — ${pctOfPortfolio.toFixed(1)}% of portfolio${pctOfPortfolio > 30 ? " ⚠️ Concentrated" : ""}`;
+            return `• **${a.symbol}**: ${formatMoney(a.valueUSD)} (${a.change >= 0 ? "+" : ""}${a.change.toFixed(2)}%) — ${pctOfPortfolio.toFixed(1)}% of portfolio${pctOfPortfolio > 30 ? " Concentrated" : ""}`;
           }).join("\n")}`
         : "";
 
-      content = `**📈 Portfolio Intelligence**\n\n• Total Value: ${formatMoney(snapshot.totalPortfolioValue)}\n• Invested: ${formatMoney(snapshot.totalInvested)}\n• Unrealized P/L: ${formatMoney(snapshot.totalUnrealizedPL)} (${snapshot.portfolioReturn.toFixed(2)}%)\n• Realized P/L: ${formatMoney(snapshot.totalRealizedPL)}\n• Dividends: ${formatMoney(snapshot.totalDividends)}\n• Assets: ${snapshot.assetCount} positions · ${snapshot.tradeCount} trades${assetDetails}\n\n${snapshot.portfolioReturn > 10 ? "💡 Outperforming — consider rebalancing if any position > 30%." : snapshot.portfolioReturn < 0 ? "💡 Underwater — review quality positions for DCA opportunities." : "💡 Performing steadily — maintain your DCA discipline."}`;
+      content = `**Portfolio Intelligence**\n\n• Total Value: ${formatMoney(snapshot.totalPortfolioValue)}\n• Invested: ${formatMoney(snapshot.totalInvested)}\n• Unrealized P/L: ${formatMoney(snapshot.totalUnrealizedPL)} (${snapshot.portfolioReturn.toFixed(2)}%)\n• Realized P/L: ${formatMoney(snapshot.totalRealizedPL)}\n• Dividends: ${formatMoney(snapshot.totalDividends)}\n• Assets: ${snapshot.assetCount} positions · ${snapshot.tradeCount} trades${assetDetails}\n\n${snapshot.portfolioReturn > 10 ? "Outperforming — consider rebalancing if any position > 30%." : snapshot.portfolioReturn < 0 ? "Underwater — review quality positions for DCA opportunities." : "Performing steadily — maintain your DCA discipline."}`;
     }
     // ─── LIQUIDITY ──────────────────────────────────────────────────────────
     else if (lower.includes("cash") || lower.includes("liquid") || lower.includes("เงินสด")) {
       const lRatio = snapshot.totalPortfolioValue > 0 ? ((snapshot.liquidity / snapshot.totalPortfolioValue) * 100).toFixed(1) : "—";
-      content = `**💵 Liquidity Analysis**\n\n• Available Liquidity: ${formatMoney(snapshot.liquidity)}\n• Liquidity vs Portfolio: ${lRatio}%\n\n${snapshot.liquidity > snapshot.totalPortfolioValue * 0.3 ? `⚠️ Over-liquid. Consider deploying ${formatMoney(snapshot.liquidity * 0.4)} — split 50/50 between defensive (gold/bonds) and growth assets.` : snapshot.liquidity < 1000 ? "🚨 Low liquidity. Build 3–6 months emergency reserves first." : "✅ Balanced liquidity position."}`;
+      content = `**Liquidity Analysis**\n\n• Available Liquidity: ${formatMoney(snapshot.liquidity)}\n• Liquidity vs Portfolio: ${lRatio}%\n\n${snapshot.liquidity > snapshot.totalPortfolioValue * 0.3 ? `Over-liquid. Consider deploying ${formatMoney(snapshot.liquidity * 0.4)} — split 50/50 between defensive (gold/bonds) and growth assets.` : snapshot.liquidity < 1000 ? "Low liquidity. Build 3–6 months emergency reserves first." : "Balanced liquidity position."}`;
     }
     // ─── ADVICE ─────────────────────────────────────────────────────────────
     else if (lower.includes("advice") || lower.includes("recommend") || lower.includes("แนะนำ") || lower.includes("tip")) {
@@ -633,7 +633,7 @@ export function AIFinancialAdvisor() {
           ).join("\n")
         : "";
 
-      content = `**🎯 Personalized Recommendations**\n\n${snapshot.savingsRate < 20 && snapshot.monthIncome > 0 ? `1. **Boost Savings** — From ${snapshot.savingsRate.toFixed(1)}% to 20%. Save ${formatMoney(snapshot.monthIncome * 0.2)}/month.\n` : "1. ✅ Savings on track.\n"}${snapshot.investRatio < 10 && snapshot.monthIncome > 0 ? `2. **Deploy Capital** — Only ${snapshot.investRatio.toFixed(1)}% invested. Set up ${formatMoney(snapshot.monthIncome * 0.1)}/month recurring investment.\n` : "2. ✅ Investment allocation balanced.\n"}${snapshot.portfolioReturn < 0 ? `3. **DCA on Dips** — Portfolio down ${Math.abs(snapshot.portfolioReturn).toFixed(1)}% — review quality positions.\n` : `3. **Protect Profits** — Consider ${Math.min(25, snapshot.portfolioReturn / 2).toFixed(0)}% partial profit on top performers.\n`}4. **Emergency Fund** — Maintain ${formatMoney(Math.max(snapshot.monthExpenses * 6, 5000))} liquid.\n5. **Review Buckets** — ${snapshot.liquidity > 0 ? `${formatMoney(snapshot.liquidity)} available. Allocate based on risk tolerance.` : "Set up money buckets for better cash flow control."}\n\n${portfolioAdvice ? `\n**Portfolio-Specific Actions:**\n${portfolioAdvice}` : ""}${dcaAdvice ? `\n${dcaAdvice}` : ""}`;
+      content = `**Personalized Recommendations**\n\n${snapshot.savingsRate < 20 && snapshot.monthIncome > 0 ? `1. **Boost Savings** — From ${snapshot.savingsRate.toFixed(1)}% to 20%. Save ${formatMoney(snapshot.monthIncome * 0.2)}/month.\n` : "1. Savings on track.\n"}${snapshot.investRatio < 10 && snapshot.monthIncome > 0 ? `2. **Deploy Capital** — Only ${snapshot.investRatio.toFixed(1)}% invested. Set up ${formatMoney(snapshot.monthIncome * 0.1)}/month recurring investment.\n` : "2. Investment allocation balanced.\n"}${snapshot.portfolioReturn < 0 ? `3. **DCA on Dips** — Portfolio down ${Math.abs(snapshot.portfolioReturn).toFixed(1)}% — review quality positions.\n` : `3. **Protect Profits** — Consider ${Math.min(25, snapshot.portfolioReturn / 2).toFixed(0)}% partial profit on top performers.\n`}4. **Emergency Fund** — Maintain ${formatMoney(Math.max(snapshot.monthExpenses * 6, 5000))} liquid.\n5. **Review Buckets** — ${snapshot.liquidity > 0 ? `${formatMoney(snapshot.liquidity)} available. Allocate based on risk tolerance.` : "Set up money buckets for better cash flow control."}\n\n${portfolioAdvice ? `\n**Portfolio-Specific Actions:**\n${portfolioAdvice}` : ""}${dcaAdvice ? `\n${dcaAdvice}` : ""}`;
     }
     // ─── VELOCITY ───────────────────────────────────────────────────────────
     else if (lower.includes("velocity") || lower.includes("pace") || lower.includes("rate")) {
@@ -642,12 +642,12 @@ export function AIFinancialAdvisor() {
       const dailyIncome = snapshot.dayOfMonth > 0 ? snapshot.monthIncome / snapshot.dayOfMonth : 0;
       const projectedOverspend = snapshot.prevMonthExpenses > 0 ? ((pace - snapshot.prevMonthExpenses) / snapshot.prevMonthExpenses * 100) : 0;
 
-      content = `**⚡ Spending Velocity Report**\n\n• Daily Avg Spend: ${formatMoney(dailyAvg)}/day\n• Daily Avg Income: ${formatMoney(dailyIncome)}/day\n• Net Daily Flow: ${dailyIncome - dailyAvg >= 0 ? "+" : ""}${formatMoney(dailyIncome - dailyAvg)}/day\n\n• Projected Month-End: ${formatMoney(pace)}\n• Last Month Total: ${formatMoney(snapshot.prevMonthExpenses)}\n• Projected Change: ${projectedOverspend >= 0 ? "+" : ""}${projectedOverspend.toFixed(0)}%\n\n• Progress: Day ${snapshot.dayOfMonth} of ${snapshot.daysInMonth} (${(snapshot.dayOfMonth / snapshot.daysInMonth * 100).toFixed(0)}% through month)\n• Budget Used: ${snapshot.prevMonthExpenses > 0 ? (snapshot.monthExpenses / snapshot.prevMonthExpenses * 100).toFixed(0) : "—"}%\n\n${projectedOverspend > 15 ? "🚨 You're on pace to significantly overspend. Consider a spending freeze on variable categories." : projectedOverspend > 0 ? "⚠️ Slightly above last month's pace. Monitor closely." : "✅ Spending pace is under control."}`;
+      content = `**Spending Velocity Report**\n\n• Daily Avg Spend: ${formatMoney(dailyAvg)}/day\n• Daily Avg Income: ${formatMoney(dailyIncome)}/day\n• Net Daily Flow: ${dailyIncome - dailyAvg >= 0 ? "+" : ""}${formatMoney(dailyIncome - dailyAvg)}/day\n\n• Projected Month-End: ${formatMoney(pace)}\n• Last Month Total: ${formatMoney(snapshot.prevMonthExpenses)}\n• Projected Change: ${projectedOverspend >= 0 ? "+" : ""}${projectedOverspend.toFixed(0)}%\n\n• Progress: Day ${snapshot.dayOfMonth} of ${snapshot.daysInMonth} (${(snapshot.dayOfMonth / snapshot.daysInMonth * 100).toFixed(0)}% through month)\n• Budget Used: ${snapshot.prevMonthExpenses > 0 ? (snapshot.monthExpenses / snapshot.prevMonthExpenses * 100).toFixed(0) : "—"}%\n\n${projectedOverspend > 15 ? "You're on pace to significantly overspend. Consider a spending freeze on variable categories." : projectedOverspend > 0 ? "Slightly above last month's pace. Monitor closely." : "Spending pace is under control."}`;
       data = { type: "velocity_alert" };
     }
     // ─── FALLBACK ───────────────────────────────────────────────────────────
     else {
-      content = `Noted: *"${text}"*\n\nYour snapshot:\n• Net Worth: ${formatMoney(snapshot.latestNW || (snapshot.totalPortfolioValue + snapshot.liquidity))}\n• This Month: ${formatMoney(snapshot.monthIncome)} in / ${formatMoney(snapshot.monthExpenses)} out\n• Portfolio: ${formatMoney(snapshot.totalPortfolioValue)} (${snapshot.portfolioReturn >= 0 ? "+" : ""}${snapshot.portfolioReturn.toFixed(2)}%)\n\n💡 **Try these commands:**\n• *Monthly summary* · *Health score* · *Portfolio*\n• *Budget check* · *Net worth* · *Expense breakdown*\n• *Advice* · *Liquidity* · *Spending velocity*\n• Or log a transaction: *\"Salary 50k\"* · *\"Lunch 150\"*`;
+      content = `Noted: *"${text}"*\n\nYour snapshot:\n• Net Worth: ${formatMoney(snapshot.latestNW || (snapshot.totalPortfolioValue + snapshot.liquidity))}\n• This Month: ${formatMoney(snapshot.monthIncome)} in / ${formatMoney(snapshot.monthExpenses)} out\n• Portfolio: ${formatMoney(snapshot.totalPortfolioValue)} (${snapshot.portfolioReturn >= 0 ? "+" : ""}${snapshot.portfolioReturn.toFixed(2)}%)\n\n**Try these commands:**\n• *Monthly summary* · *Health score* · *Portfolio*\n• *Budget check* · *Net worth* · *Expense breakdown*\n• *Advice* · *Liquidity* · *Spending velocity*\n• Or log a transaction: *\"Salary 50k\"* · *\"Lunch 150\"*`;
     }
 
     setIsThinking(false);
@@ -863,10 +863,10 @@ export function AIFinancialAdvisor() {
                           </div>
                         ) : msg.data?.type === "health_score" && (
                           <div className="space-y-1.5">
-                            <p className="text-white font-black">👋 Financial Intelligence Hub Active</p>
+                            <p className="text-white font-black">Financial Intelligence Hub Active</p>
                             <p className="text-gray-400">I&apos;m monitoring <strong className="text-white">{snapshot.assetCount} assets</strong>, <strong className="text-white">{snapshot.tradeCount} trades</strong>, <strong className="text-white">{moneyBuckets.length} budget buckets</strong>, and your complete cashflow in real-time.</p>
                             <p className="text-gray-400">Financial health: <strong className="text-white">{snapshot.healthScore}/100</strong>. What would you like to analyse?</p>
-                            <p className="text-gray-500 text-[10px] mt-1">💡 Log transactions directly: type <strong className="text-[#ADC6FF]">&quot;Salary 50k&quot;</strong> or <strong className="text-[#ADC6FF]">&quot;Lunch 150&quot;</strong></p>
+                            <p className="text-gray-500 text-[10px] mt-1">Log transactions directly: type <strong className="text-[#ADC6FF]">&quot;Salary 50k&quot;</strong> or <strong className="text-[#ADC6FF]">&quot;Lunch 150&quot;</strong></p>
                           </div>
                         )}
                       </div>

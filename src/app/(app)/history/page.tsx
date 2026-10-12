@@ -1,205 +1,102 @@
 "use client";
 
-import React, { useState } from "react";
-import { 
-  Calendar as CalendarIcon, 
-  ChevronLeft, 
-  ChevronRight, 
-  ArrowUpRight, 
-  ArrowDownRight,
-  Filter
-} from "lucide-react";
-import { motion } from "motion/react";
+import React, { useEffect, useMemo, useState } from "react";
+import { CalendarDays, ChevronLeft, ChevronRight, CircleAlert, Loader2, ScrollText } from "lucide-react";
+import { useApp } from "@/src/context/AppContext";
+import { db, HistoryEvent, supabase } from "@/src/lib/supabase";
 import { cn } from "@/src/lib/utils";
+import { decimal, formatMoney as formatFxMoney, formatHistoricalStock } from '@/src/lib/fx';
 
-// Mock Data
-const MOCK_DAYS = Array.from({ length: 31 }, (_, i) => ({
-  date: i + 1,
-  profit: Math.random() > 0.3 ? Math.random() * 500 : -(Math.random() * 200),
-  hasTrades: Math.random() > 0.4
-}));
+const monthStart = (date: Date) => new Date(date.getFullYear(), date.getMonth(), 1);
+const dateKey = (date: Date) => date.toLocaleDateString("en-CA");
+const number = (value: number | string | null | undefined) => Number(value || 0);
 
-const MOCK_TRANSACTIONS = [
-  { id: 1, type: "BUY", symbol: "EURUSD", size: 1.0, openPrice: 1.0850, closePrice: 1.0875, profit: 250.00, time: "10:30 AM", date: 15 },
-  { id: 2, type: "SELL", symbol: "XAUUSD", size: 0.5, openPrice: 1950.00, closePrice: 1948.50, profit: 75.00, time: "11:15 AM", date: 15 },
-  { id: 3, type: "BUY", symbol: "US30", size: 0.1, openPrice: 34500, closePrice: 34450, profit: -50.00, time: "14:00 PM", date: 15 },
-  { id: 4, type: "SELL", symbol: "GBPUSD", size: 2.0, openPrice: 1.2500, closePrice: 1.2480, profit: 400.00, time: "09:00 AM", date: 14 },
-];
+function eventTone(event: HistoryEvent) {
+  if (event.action !== "CREATED") return "text-amber-300 bg-amber-400/10";
+  if (["BUY", "COVER", "IMPORT", "EXPENSE", "WITHDRAW", "withdraw", "invest"].includes(event.transaction_type)) return "text-red-300 bg-red-400/10";
+  return "text-emerald-300 bg-emerald-400/10";
+}
 
 export default function HistoryPage() {
-  const [selectedDate, setSelectedDate] = useState<number | null>(15);
+  const { activePortfolioId } = useApp();
+  // History amounts are recorded USD; never use the global display-currency rate.
+  const formatMoney = (amount: number) => formatFxMoney(decimal(amount), 'USD');
+  const [month, setMonth] = useState(() => monthStart(new Date()));
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [events, setEvents] = useState<HistoryEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const filteredTransactions = selectedDate 
-    ? MOCK_TRANSACTIONS.filter(t => t.date === selectedDate)
-    : MOCK_TRANSACTIONS;
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData.user) {
+        if (!cancelled) { setEvents([]); setError("Sign in to view your immutable financial history."); setLoading(false); }
+        return;
+      }
+      const start = monthStart(month);
+      const end = new Date(start.getFullYear(), start.getMonth() + 1, 1);
+      const { data, error: loadError } = await db.history.getPage(userData.user.id, activePortfolioId, start.toISOString(), end.toISOString());
+      if (cancelled) return;
+      if (loadError) { setEvents([]); setError("History is unavailable until the history ledger migration has been applied."); }
+      else setEvents((data || []) as HistoryEvent[]);
+      setLoading(false);
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, [activePortfolioId, month]);
 
-  return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-8 max-w-7xl mx-auto">
-      {/* Header Section */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <CalendarIcon className="text-primary" size={24} />
-            </div>
-            History
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Unified view of your daily performance and transaction ledger.
-          </p>
+  const eventsByDay = useMemo(() => {
+    const result = new Map<string, HistoryEvent[]>();
+    events.forEach(event => {
+      const key = dateKey(new Date(event.occurred_at));
+      result.set(key, [...(result.get(key) || []), event]);
+    });
+    return result;
+  }, [events]);
+  const visibleEvents = useMemo(() => {
+    const current = selectedDay ? eventsByDay.get(selectedDay) || [] : events;
+    return [...current].sort((a, b) => b.occurred_at.localeCompare(a.occurred_at));
+  }, [events, eventsByDay, selectedDay]);
+  const summary = useMemo(() => {
+    const created = events.filter(event => event.action === "CREATED");
+    return {
+      entries: events.length,
+      trades: created.filter(event => event.source_table === "trades").length,
+      netFlow: created.reduce((total, event) => total + number(event.net_amount), 0),
+      realized: created.reduce((total, event) => total + number(event.realized_pnl), 0),
+    };
+  }, [events]);
+
+  const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+  const leadingCells = (month.getDay() + 6) % 7;
+  const monthLabel = month.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+
+  return <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
+    <div><h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3"><span className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center"><ScrollText className="text-primary" size={23} /></span>Trade History</h1><p className="text-sm text-muted-foreground mt-1">Append-only ledger of trade executions and corrections.</p></div>
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <section className="space-y-5">
+        <div className="bg-surface/50 border border-border rounded-2xl p-5 backdrop-blur-xl">
+          <div className="flex justify-between items-center mb-5"><h2 className="font-semibold text-white">{monthLabel}</h2><div className="flex gap-1"><button aria-label="Previous month" onClick={() => { setMonth(value => new Date(value.getFullYear(), value.getMonth() - 1, 1)); setSelectedDay(null); }} className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground"><ChevronLeft size={18} /></button><button aria-label="Next month" onClick={() => { setMonth(value => new Date(value.getFullYear(), value.getMonth() + 1, 1)); setSelectedDay(null); }} className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground"><ChevronRight size={18} /></button></div></div>
+          <div className="grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground mb-2">{["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].map(day => <span key={day}>{day}</span>)}</div>
+          <div className="grid grid-cols-7 gap-1">{Array.from({ length: leadingCells }).map((_, index) => <span key={`empty-${index}`} />)}{Array.from({ length: daysInMonth }, (_, index) => {
+            const date = new Date(month.getFullYear(), month.getMonth(), index + 1); const key = dateKey(date); const items = eventsByDay.get(key) || []; const dayNet = items.filter(event => event.action === "CREATED").reduce((total, event) => total + number(event.net_amount), 0);
+            return <button key={key} onClick={() => setSelectedDay(key === selectedDay ? null : key)} className={cn("aspect-square rounded-lg flex flex-col items-center justify-center text-xs transition-colors", selectedDay === key ? "ring-2 ring-primary bg-white/10 text-white" : "hover:bg-white/5 text-muted-foreground", items.length > 0 && "text-white")}><span>{index + 1}</span>{items.length > 0 && <span className={cn("text-[9px] font-bold", dayNet >= 0 ? "text-emerald-300" : "text-red-300")}>{dayNet >= 0 ? "+" : ""}{Math.round(dayNet)}</span>}</button>;
+          })}</div>
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* Left Column: Calendar View */}
-        <div className="lg:col-span-1 space-y-6">
-          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="bg-surface/50 border border-border rounded-2xl p-5 backdrop-blur-xl">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-lg font-semibold text-white">August 2026</h2>
-              <div className="flex gap-2">
-                <button className="p-1 rounded-md hover:bg-white/5 text-muted-foreground transition-colors"><ChevronLeft size={20}/></button>
-                <button className="p-1 rounded-md hover:bg-white/5 text-muted-foreground transition-colors"><ChevronRight size={20}/></button>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-7 gap-1 text-center mb-2">
-              {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map(day => (
-                <div key={day} className="text-xs font-medium text-muted-foreground py-1">{day}</div>
-              ))}
-            </div>
-            
-            <div className="grid grid-cols-7 gap-1 sm:gap-2 text-sm">
-              {/* Padding for start of month */}
-              <div className="aspect-square"></div>
-              <div className="aspect-square"></div>
-              <div className="aspect-square"></div>
-              
-              {MOCK_DAYS.map((day) => (
-                <button 
-                  key={day.date}
-                  onClick={() => setSelectedDate(day.date)}
-                  className={cn(
-                    "relative aspect-square rounded-lg flex flex-col items-center justify-center transition-all p-1",
-                    selectedDate === day.date ? "ring-2 ring-primary bg-white/10" : "hover:bg-white/5",
-                    !day.hasTrades && "opacity-50"
-                  )}
-                >
-                  <span className={cn(
-                    "font-medium",
-                    selectedDate === day.date ? "text-white" : "text-muted-foreground"
-                  )}>
-                    {day.date}
-                  </span>
-                  
-                  {day.hasTrades && (
-                    <span className={cn(
-                      "text-[10px] font-bold mt-0.5",
-                      day.profit >= 0 ? "text-primary" : "text-red-400"
-                    )}>
-                      {day.profit >= 0 ? "+" : ""}{Math.round(day.profit)}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </motion.div>
-          
-          {/* Monthly Summary */}
-          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }} className="bg-surface/50 border border-border rounded-2xl p-5 backdrop-blur-xl">
-             <h3 className="text-sm font-semibold text-white mb-4">Monthly Summary</h3>
-             <div className="space-y-4">
-               <div className="flex justify-between items-center">
-                 <span className="text-sm text-muted-foreground">Total Net Profit</span>
-                 <span className="text-sm font-bold text-primary">+$3,450.00</span>
-               </div>
-               <div className="flex justify-between items-center">
-                 <span className="text-sm text-muted-foreground">Profitable Days</span>
-                 <span className="text-sm font-bold text-white">18 / 22</span>
-               </div>
-               <div className="flex justify-between items-center">
-                 <span className="text-sm text-muted-foreground">Total Trades</span>
-                 <span className="text-sm font-bold text-white">124</span>
-               </div>
-             </div>
-          </motion.div>
-        </div>
-
-        {/* Right Column: Transactions List */}
-        <div className="lg:col-span-2">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-surface/50 border border-border rounded-2xl backdrop-blur-xl overflow-hidden h-full">
-            <div className="p-5 sm:p-6 border-b border-border flex justify-between items-center bg-white/[0.01]">
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                Transactions 
-                {selectedDate && <span className="text-sm font-normal text-muted-foreground">for Aug {selectedDate}</span>}
-              </h2>
-              <button className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-white transition-colors bg-white/5 px-3 py-1.5 rounded-md">
-                <Filter size={14} /> Filter
-              </button>
-            </div>
-            
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-white/5 text-muted-foreground text-xs uppercase tracking-wider">
-                    <th className="p-4 font-medium">Time</th>
-                    <th className="p-4 font-medium">Symbol</th>
-                    <th className="p-4 font-medium">Type/Size</th>
-                    <th className="p-4 font-medium text-right">Open / Close</th>
-                    <th className="p-4 font-medium text-right">Profit</th>
-                  </tr>
-                </thead>
-                <tbody className="text-sm divide-y divide-border">
-                  {filteredTransactions.map((tx) => (
-                    <tr key={tx.id} className="hover:bg-white/[0.02] transition-colors group">
-                      <td className="p-4 text-muted-foreground tabular-nums">{tx.time}</td>
-                      <td className="p-4 font-medium text-white">{tx.symbol}</td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-2">
-                          <span className={cn(
-                            "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
-                            tx.type === "BUY" ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"
-                          )}>
-                            {tx.type}
-                          </span>
-                          <span className="text-muted-foreground tabular-nums">{tx.size.toFixed(2)}</span>
-                        </div>
-                      </td>
-                      <td className="p-4 text-right tabular-nums">
-                        <div className="flex flex-col items-end">
-                          <span className="text-muted-foreground">{tx.openPrice.toFixed(4)}</span>
-                          <span className="text-white">{tx.closePrice.toFixed(4)}</span>
-                        </div>
-                      </td>
-                      <td className="p-4 text-right">
-                        <div className="flex items-center justify-end gap-1 font-medium tabular-nums">
-                          {tx.profit >= 0 ? (
-                            <ArrowUpRight size={16} className="text-primary" />
-                          ) : (
-                            <ArrowDownRight size={16} className="text-red-400" />
-                          )}
-                          <span className={tx.profit >= 0 ? "text-primary" : "text-red-400"}>
-                            {tx.profit >= 0 ? "+" : ""}{tx.profit.toFixed(2)}
-                          </span>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {filteredTransactions.length === 0 && (
-                <div className="p-12 text-center flex flex-col items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center">
-                    <CalendarIcon className="text-muted-foreground" size={24} />
-                  </div>
-                  <p className="text-muted-foreground">No trades found for this date.</p>
-                </div>
-              )}
-            </div>
-          </motion.div>
-        </div>
-
-      </div>
+        <div className="bg-surface/50 border border-border rounded-2xl p-5 space-y-3 text-sm"><h2 className="font-semibold text-white">Monthly trade summary</h2><Summary label="Ledger events" value={String(summary.entries)} /><Summary label="Trade executions" value={String(summary.trades)} /><Summary label="Net trade cash flow" value={formatMoney(summary.netFlow)} tone={summary.netFlow >= 0 ? "good" : "bad"} /><Summary label="Stored realized P&L" value={formatMoney(summary.realized)} tone={summary.realized >= 0 ? "good" : "bad"} /></div>
+      </section>
+      <section className="lg:col-span-2 bg-surface/50 border border-border rounded-2xl backdrop-blur-xl overflow-hidden min-h-[420px]">
+        <div className="p-5 border-b border-border flex items-center justify-between"><div><h2 className="font-semibold text-white">{selectedDay ? new Date(`${selectedDay}T00:00:00`).toLocaleDateString() : "All events"}</h2><p className="text-xs text-muted-foreground mt-1">Events cannot be altered; corrections are recorded as new audit entries.</p></div>{loading && <Loader2 className="animate-spin text-primary" size={20} />}</div>
+        {error ? <div className="p-10 text-center text-muted-foreground"><CircleAlert className="mx-auto mb-3 text-amber-300" /><p>{error}</p></div> : !loading && visibleEvents.length === 0 ? <div className="p-12 text-center text-muted-foreground"><CalendarDays className="mx-auto mb-3" /><p>No history events for this period.</p></div> : <div className="divide-y divide-border">{visibleEvents.map(event => <article key={event.id} className="p-4 sm:p-5 flex gap-3 hover:bg-white/[0.02]"><span className={cn("mt-0.5 px-2 py-1 h-fit rounded text-[10px] font-bold uppercase", eventTone(event))}>{event.action === "CREATED" ? event.transaction_type : event.action}</span><div className="min-w-0 flex-1"><div className="flex justify-between gap-3"><p className="font-medium text-white truncate">{event.asset_symbol || event.category || event.transaction_type}</p><p className={cn("font-semibold tabular-nums whitespace-nowrap", number(event.net_amount) >= 0 ? "text-emerald-300" : "text-red-300")}>{number(event.net_amount) >= 0 ? "+" : ""}{formatHistoricalStock(number(event.net_amount), event.asset_symbol, event.exchange_rate)}</p></div><p className="text-xs text-muted-foreground mt-1">{new Date(event.occurred_at).toLocaleString()} · {event.source_table.replace("_", " ")}{event.quantity ? ` · ${number(event.quantity)} units @ ${formatHistoricalStock(number(event.price), event.asset_symbol, event.exchange_rate)}` : ""}{number(event.fees) ? ` · fees ${formatHistoricalStock(number(event.fees), event.asset_symbol, event.exchange_rate)}` : ""}</p>{event.note && <p className="text-xs text-muted-foreground mt-1 truncate">{event.note}</p>}</div></article>)}</div>}
+      </section>
     </div>
-  );
+  </div>;
+}
+
+function Summary({ label, value, tone }: { label: string; value: string; tone?: "good" | "bad" }) {
+  return <div className="flex items-center justify-between"><span className="text-muted-foreground">{label}</span><span className={cn("font-semibold tabular-nums", tone === "good" && "text-emerald-300", tone === "bad" && "text-red-300", !tone && "text-white")}>{value}</span></div>;
 }

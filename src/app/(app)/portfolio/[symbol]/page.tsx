@@ -117,7 +117,6 @@ const PERIOD_CONFIG: Record<TimePeriod, PeriodMeta> = {
   },
 };
 
-const THB_RATE = 36.5;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -621,6 +620,8 @@ interface AssetRowProps {
 }
 
 function AssetRow({ asset, isEditMode, onDeleteRequest, formatMoney, t, language }: AssetRowProps) {
+  const { exchangeRates } = useApp();
+  const THB_RATE = exchangeRates.THB;
   const isThaiAsset = asset.symbol.toUpperCase().endsWith('.BK') || asset.symbol.toUpperCase().endsWith('.TH');
   const shares = asset.shares || 0;
   const livePrice = shares > 0 ? (asset.valueUSD / shares) : 0;
@@ -710,7 +711,8 @@ export default function AssetDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { assets, removeAsset, reorderAssets, t, formatMoney, language, currency } = useApp();
+  const { assets, removeAsset, reorderAssets, t, formatMoney, language, currency, exchangeRates } = useApp();
+  const THB_RATE = exchangeRates.THB;
 
   const symbol = params.symbol as string;
   const assetIndex = assets.findIndex(a => a.symbol.toUpperCase() === symbol.toUpperCase());
@@ -953,7 +955,7 @@ export default function AssetDetailPage() {
                 <ChevronRight size={20} />
               </button>
 
-              <Link href={`/terminal?symbol=${encodeURIComponent(asset.symbol)}`} className="ml-2 px-4 py-2 bg-[#ADC6FF] text-[#00285d] font-bold text-xs rounded-xl uppercase tracking-wide flex items-center gap-2 hover:brightness-110 transition-all">
+              <Link href={`/terminal?symbol=${encodeURIComponent(asset.symbol)}`} replace={false} className="ml-2 px-4 py-2 bg-[#ADC6FF] text-[#00285d] font-bold text-xs rounded-xl uppercase tracking-wide flex items-center gap-2 hover:brightness-110 transition-all">
                 <Activity size={16} /> {language === "th" ? "วิเคราะห์เทรด" : "Trade Assistant"}
               </Link>
             </div>
@@ -1203,7 +1205,7 @@ export default function AssetDetailPage() {
 
               <p className="text-xs text-gray-500 mt-1">
                 {isEditMode
-                  ? (language === "th" ? "ลากเพื่อเรียงลำดับ • กด 🗑 เพื่อลบ" : "Drag to reorder • tap 🗑 to remove")
+                  ? (language === "th" ? "ลากเพื่อเรียงลำดับ • กดปุ่มลบเพื่อลบ" : "Drag to reorder • tap delete to remove")
                   : `${assets.length} ${t("assetsInPortfolio")}`
                 }
               </p>

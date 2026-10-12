@@ -1,5 +1,6 @@
 "use client";
 
+import { FinanceIcon } from "@/src/components/FinanceIcon";
 import React, { useMemo } from "react";
 import { useApp, WidgetType, Asset } from "@/src/context/AppContext";
 import { cn } from "@/src/lib/utils";
@@ -10,6 +11,8 @@ import {
 import { motion } from "motion/react";
 import Link from "next/link";
 import { calcExpectancy, calcStreak } from "@/src/lib/finance";
+import { getNativeLeg } from '@/src/lib/native-money';
+import { decimal, sumNativeMoney, isFxCurrency, formatMoney as formatNativeMoney, nativeDisplay } from '@/src/lib/fx';
 
 // ─── Equity Curve Widget ───────────────────────────────────────────────────────
 function EquityCurveWidget() {
@@ -88,6 +91,8 @@ function AllocationPieWidget() {
   const C = 50;
   let cumulativePercent = 0;
 
+  if (assets.some(a => !isFxCurrency(a.currency))) return <EmptyWidget label="unresolved: asset currency" />;
+
   return (
     <div className="h-full flex flex-col">
       <span className="text-[10px] font-black text-gray-500 uppercase tracking-wide mb-2">{t("widgetAllocationPie")}</span>
@@ -137,23 +142,27 @@ function AllocationPieWidget() {
 
 // ─── Monthly Summary Widget ────────────────────────────────────────────────────
 function MonthlySummaryWidget() {
-  const { t, formatMoney, cashActivities, currency } = useApp();
+  const { t, cashActivities, currency, exchangeRates } = useApp();
   const now = new Date();
   const thisMonth = cashActivities.filter(a => {
     const d = new Date(a.date);
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   });
-  const getEntryAmount = (a: any) => a.amountUSD ?? a.amount ?? 0;
-  const income = thisMonth.filter(a => a.type === "INCOME").reduce((s, a) => s + getEntryAmount(a), 0);
-  const expense = thisMonth.filter(a => a.type === "EXPENSE").reduce((s, a) => s + getEntryAmount(a), 0);
-  const net = income - expense;
+  const target = currency === 'THB' ? 'THB' : 'USD';
+  const sum = (type: string) => {
+    try { return sumNativeMoney(thisMonth.filter(a => a.type === type).map(a => getNativeLeg({ original_amount: a.originalAmount, currency: a.currency })), target, String(exchangeRates.THB)); }
+    catch { return null; }
+  };
+  const income = sum('INCOME'), expense = sum('EXPENSE');
+  const net = income && expense ? decimal(income.amount).sub(decimal(expense.amount)) : null;
+  const positive = net ? net.cmp(decimal('0')) >= 0 : true;
 
   return (
     <div className="h-full flex flex-col">
       <span className="text-[10px] font-black text-gray-500 uppercase tracking-wide mb-3">{t("widgetMonthlySummary")}</span>
       <div className="flex-1 flex flex-col justify-center space-y-3">
-        <div className={cn("text-2xl font-black tracking-tighter", net >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
-          {net >= 0 ? "+" : ""}{formatMoney(Math.abs(net))}
+        <div className={cn("text-2xl font-black tracking-tighter", positive ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
+          {net ? formatNativeMoney(net, target, true) : 'unresolved'}
         </div>
         <div className="space-y-2">
           <div className="flex justify-between items-center bg-white/5 p-2.5 rounded-xl">
@@ -161,14 +170,14 @@ function MonthlySummaryWidget() {
               <div className="w-2 h-2 rounded-full bg-[#4EDEA3]" />
               <span className="text-[10px] text-gray-400 font-bold">{t("income")}</span>
             </div>
-            <span className="text-xs font-black text-white">{formatMoney(income)}</span>
+            <span className="text-xs font-black text-white">{income ? formatNativeMoney(decimal(income.amount), target) : 'unresolved'}</span>
           </div>
           <div className="flex justify-between items-center bg-white/5 p-2.5 rounded-xl">
             <div className="flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full bg-[#FFB4AB]" />
               <span className="text-[10px] text-gray-400 font-bold">{t("expense")}</span>
             </div>
-            <span className="text-xs font-black text-white">{formatMoney(expense)}</span>
+            <span className="text-xs font-black text-white">{expense ? formatNativeMoney(decimal(expense.amount), target) : 'unresolved'}</span>
           </div>
         </div>
       </div>
@@ -179,6 +188,8 @@ function MonthlySummaryWidget() {
 // ─── Watchlist Widget ──────────────────────────────────────────────────────────
 function WatchlistWidget() {
   const { t, assets, formatMoney } = useApp();
+
+  if (assets.some(a => !isFxCurrency(a.currency))) return <EmptyWidget label="unresolved: asset currency" />;
 
   return (
     <div className="h-full flex flex-col">
@@ -284,8 +295,10 @@ function DailyJournalWidget() {
 
 // ─── Bucket Overview Widget ────────────────────────────────────────────────────
 function BucketOverviewWidget() {
-  const { t, moneyBuckets, formatMoney, exchangeRates } = useApp();
-  const total = moneyBuckets.reduce((s, b) => s + (b.currentAmount / (exchangeRates[b.currency || 'USD'] || 1)), 0);
+  const { t, moneyBuckets, currency, exchangeRates } = useApp();
+  const target = currency === 'THB' ? 'THB' : 'USD';
+  let total = null;
+  try { total = sumNativeMoney(moneyBuckets.map(b => getNativeLeg({ original_amount: b.currentAmount, currency: b.currency })), target, String(exchangeRates.THB)); } catch { /* unresolved */ }
 
   return (
     <div className="h-full flex flex-col">
@@ -294,19 +307,22 @@ function BucketOverviewWidget() {
           {t("widgetBucketOverview")}
           <ArrowRight size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" />
         </span>
-        <span className="text-xs font-black text-white">{formatMoney(total)}</span>
+        <span className="text-xs font-black text-white">{total ? formatNativeMoney(decimal(total.amount), target) : 'unresolved'}</span>
       </Link>
       <div className="flex-1 space-y-2 overflow-y-auto pr-1 custom-scrollbar">
         {moneyBuckets.map((b) => {
-          const pct = total > 0 ? (b.currentAmount / total) * 100 : 0;
+          const valid = isFxCurrency(b.currency) && Number.isFinite(b.currentAmount);
+          const display = valid ? nativeDisplay({ amount: b.currentAmount, currency: b.currency as 'USD' | 'THB' }, target, String(exchangeRates.THB)) : null;
+          const converted = valid ? sumNativeMoney([{ amount: b.currentAmount, currency: b.currency as 'USD' | 'THB' }], target, String(exchangeRates.THB)) : null;
+          const pct = total && converted && decimal(total.amount).cmp(decimal('0')) > 0 ? Number(decimal(converted.amount).div(decimal(total.amount)).mul(decimal('100')).toFixed(6)) : 0;
           return (
             <div key={b.id} className="space-y-1">
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-sm">{b.icon}</span>
+                  <span className="text-sm"><FinanceIcon name={b.icon} /></span>
                   <span className="text-[10px] font-bold text-gray-400">{t(b.name) || b.name}</span>
                 </div>
-                <span className="text-[10px] font-black text-white">{formatMoney(b.currentAmount / (exchangeRates[b.currency || 'USD'] || 1), b.currency as any, undefined, b.currentAmount)}</span>
+                <span className="text-[10px] font-black text-white">{display?.original && <span className="mr-2 text-gray-500">{display.original}</span>}{display?.amount || 'unresolved'}</span>
               </div>
               <div className="h-1 bg-white/5 rounded-full overflow-hidden">
                 <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: b.color }} />
@@ -374,6 +390,8 @@ function PLCalendarMiniWidget() {
 function TopMoversWidget() {
   const { t, assets, formatMoney } = useApp();
   const sorted = useMemo(() => [...assets].sort((a, b) => Math.abs(b.change) - Math.abs(a.change)).slice(0, 5), [assets]);
+
+  if (assets.some(a => !isFxCurrency(a.currency))) return <EmptyWidget label="unresolved: asset currency" />;
 
   return (
     <div className="h-full flex flex-col">

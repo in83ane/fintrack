@@ -8,6 +8,7 @@ import { useApp, Asset } from "@/src/context/AppContext";
 import { cn } from "@/src/lib/utils";
 import { formatPnL, getPnLColor } from "@/src/lib/format";
 import { motion } from "motion/react";
+import { CustomSelect } from "@/src/components/CustomSelect";
 
 interface EditAssetModalProps {
   asset: Asset | null;
@@ -40,7 +41,7 @@ export function EditAssetModal({ asset, isOpen, onClose, onDelete }: EditAssetMo
   const handleCurrencyChange = (newCur: "USD" | "THB") => {
     if (newCur === inputCurrency) return;
     const currentCost = parseFloat(editedAvgCost) || 0;
-    const THB_RATE = exchangeRates["THB"] || 36.5;
+    const THB_RATE = exchangeRates.THB;
     if (newCur === "THB") {
       setEditedAvgCost((currentCost * THB_RATE).toFixed(2));
     } else {
@@ -54,7 +55,7 @@ export function EditAssetModal({ asset, isOpen, onClose, onDelete }: EditAssetMo
     if (asset) {
       setEditedName(asset.name);
       setEditedShares(asset.shares?.toString() || "0");
-      const thbRate = exchangeRates["THB"] || 36.5;
+      const thbRate = exchangeRates.THB;
       const initialCurr = currency === "THB" ? "THB" : "USD";
       setInputCurrency(initialCurr);
       const displayCost = initialCurr === "THB" ? (asset.avgCost || 0) * thbRate : (asset.avgCost || 0);
@@ -69,7 +70,7 @@ export function EditAssetModal({ asset, isOpen, onClose, onDelete }: EditAssetMo
 
   if (!asset || !originalState) return null;
 
-  const THB_RATE = exchangeRates["THB"] || 36.5;
+  const THB_RATE = exchangeRates.THB;
   const isThaiAsset = asset.symbol.toUpperCase().endsWith('.BK') || asset.symbol.toUpperCase().endsWith('.TH');
 
   const livePrice = (asset.shares || 0) > 0 ? (asset.valueUSD / (asset.shares || 0)) : 0;
@@ -81,6 +82,7 @@ export function EditAssetModal({ asset, isOpen, onClose, onDelete }: EditAssetMo
   const handleSave = async () => {
     const cost = parseFloat(editedAvgCost) || 0;
     const finalCostUSD = inputCurrency === "THB" ? cost / THB_RATE : cost;
+    if (!Number.isFinite(finalCostUSD)) { addToast('ยังไม่มีข้อมูลเรท USD/THB กรุณารอข้อมูลก่อนบันทึก', 'error'); return; }
     const updates: Partial<Asset> = {
       name: editedName,
       shares: parseFloat(editedShares) || 0,
@@ -113,7 +115,7 @@ export function EditAssetModal({ asset, isOpen, onClose, onDelete }: EditAssetMo
     if (asset) {
       setEditedName(asset.name);
       setEditedShares(asset.shares?.toString() || "0");
-      const thbRate = exchangeRates["THB"] || 36.5;
+      const thbRate = exchangeRates.THB;
       const initialCurr = currency === "THB" ? "THB" : "USD";
       setInputCurrency(initialCurr);
       const displayCost = initialCurr === "THB" ? (asset.avgCost || 0) * thbRate : (asset.avgCost || 0);
@@ -129,7 +131,7 @@ export function EditAssetModal({ asset, isOpen, onClose, onDelete }: EditAssetMo
     if (originalState) {
       setEditedName(originalState.name);
       setEditedShares(originalState.shares?.toString() || "0");
-      const thbRate = exchangeRates["THB"] || 36.5;
+      const thbRate = exchangeRates.THB;
       const initialCurr = currency === "THB" ? "THB" : "USD";
       setInputCurrency(initialCurr);
       const displayCost = initialCurr === "THB" ? (originalState.avgCost || 0) * thbRate : (originalState.avgCost || 0);
@@ -278,17 +280,14 @@ export function EditAssetModal({ asset, isOpen, onClose, onDelete }: EditAssetMo
 
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-400 uppercase">{t("allocation")}</label>
-                <select
+                <CustomSelect
                   value={editedAllocation}
-                  onChange={(e) => setEditedAllocation(e.target.value)}
-                  className="w-full px-4 py-3 bg-white/5 border border-border rounded-xl text-white text-sm focus:outline-none focus:border-[#ADC6FF]/50"
-                >
-                  {ALLOCATION_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {language === "th" ? opt.labelTh : opt.label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setEditedAllocation(val)}
+                  items={ALLOCATION_OPTIONS.map((opt) => ({
+                    value: opt.value,
+                    label: language === "th" ? opt.labelTh : opt.label,
+                  }))}
+                />
               </div>
 
               {/* Exclude from Net Worth Toggle */}
@@ -336,7 +335,7 @@ export function EditAssetModal({ asset, isOpen, onClose, onDelete }: EditAssetMo
               <div className="flex justify-between items-center py-2">
                 <span className="text-sm text-gray-500">Favorite</span>
                 <span className={cn("text-sm font-bold", isFavorite ? "text-[#E9C349]" : "text-gray-600")}>
-                  {isFavorite ? "★ Favorited" : "☆ Not Favorited"}
+                  {isFavorite ? "Favorited" : "Not Favorited"}
                 </span>
               </div>
               <div className="flex justify-between items-center py-2">

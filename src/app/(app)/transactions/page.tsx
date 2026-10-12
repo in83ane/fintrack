@@ -1,5 +1,6 @@
 "use client";
 
+import { FinanceIcon } from "@/src/components/FinanceIcon";
 import React, { useState, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
@@ -642,7 +643,7 @@ export default function TransactionsPage() {
                           title={txn.asset}
                         >
                           {txn.category === 'bucket' && txn.bucketIcon
-                            ? <span style={{ fontSize: '8px', lineHeight: 1 }}>{txn.bucketIcon}</span>
+                            ? <span style={{ fontSize: '8px', lineHeight: 1 }}><FinanceIcon name={txn.bucketIcon} /></span>
                             : txn.asset.charAt(0).toUpperCase()
                           }
                         </div>
@@ -664,7 +665,7 @@ export default function TransactionsPage() {
                     <td className="px-3 sm:px-6 py-3 sm:py-4 hidden sm:table-cell">
                       {txn.bucketIcon ? (
                         <div className="flex items-center gap-1.5">
-                          <span className="text-sm">{txn.bucketIcon}</span>
+                          <span className="text-sm"><FinanceIcon name={txn.bucketIcon} /></span>
                           <span className="text-xs font-bold text-gray-300">{t(txn.bucketName || '') || txn.bucketName}</span>
                         </div>
                       ) : (

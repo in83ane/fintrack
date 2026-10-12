@@ -1,5 +1,6 @@
 "use client";
 
+import { FinanceIcon } from "@/src/components/FinanceIcon";
 import React from "react";
 import { Modal } from "@/src/components/Modal";
 import { useApp } from "@/src/context/AppContext";
@@ -224,7 +225,7 @@ export function TransactionDetailModal({ isOpen, onClose, transaction }: Transac
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-xl">{sourceBucket.icon}</span>
+                    <span className="text-xl"><FinanceIcon name={sourceBucket.icon} /></span>
                     <div>
                       <p className="text-sm font-bold text-white">
                         {t(sourceBucket.name) || sourceBucket.name}

@@ -960,16 +960,16 @@ export async function analyzeMultiTimeframe(symbol: string, timeframe: 'DAY' | '
   let advice = '';
   if (timeframe === 'DAY') {
     advice = baseData.signals.volume.ratio >= 1.5
-      ? '✅ Volume สูง เหมาะกับ Day Trade — เข้าไม้แรกได้'
-      : '⚠️ Volume ยังไม่สูงพอ — รอ breakout ก่อน';
+      ? 'Volume สูง เหมาะกับ Day Trade — เข้าไม้แรกได้'
+      : 'Volume ยังไม่สูงพอ — รอ breakout ก่อน';
   } else if (timeframe === 'SWING') {
     advice = baseData.trendlines.currentTrend === 'UP'
-      ? '✅ Trend ขาขึ้น — เหมาะ Swing 3-7 วัน'
-      : '⚠️ ยังไม่ชัดเจน — รอ trend ยืนยัน';
+      ? 'Trend ขาขึ้น — เหมาะ Swing 3-7 วัน'
+      : 'ยังไม่ชัดเจน — รอ trend ยืนยัน';
   } else {
     advice = baseData.ma[20] > baseData.ma[50]
-      ? '✅ MA20 > MA50 — Structure ดี เหมาะถือ 1-3 เดือน'
-      : '⚠️ MA ยังไม่ cross — รอจังหวะดีกว่า';
+      ? 'MA20 > MA50 — Structure ดี เหมาะถือ 1-3 เดือน'
+      : 'MA ยังไม่ cross — รอจังหวะดีกว่า';
   }
 
   return { ...baseData, timeframe, tfData, pyramidPlan, advice };

@@ -1,8 +1,13 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { db, supabase } from "@/src/lib/supabase";
 import { User } from "@supabase/supabase-js";
+import { projectLotPosition } from "@/src/lib/trade-lots";
+import { tradeDeletionReason, tradeDeleteError } from '@/src/lib/trade-deletion-policy';
+import { bucketNativeAmount, getNativeLeg, nativeBucketBalance } from '@/src/lib/native-money';
+import { decimal, isFxCurrency } from '@/src/lib/fx';
+import { useFxRate } from '@/src/hooks/useFxRate';
 
 export type Language = "en" | "th";
 export type Currency = "USD" | "THB" | "JPY" | "EUR";
@@ -19,7 +24,12 @@ export interface Trade {
   shares?: number;
   pricePerUnit?: number;
   fees?: number;
+  fxRateTHB?: number;
+  costMethod?: 'SPECIFIC_LOT' | 'PROPORTIONAL';
+  closeMode?: 'SPECIFIC_LOT' | 'PROPORTIONAL';
+  lotSelections?: { lotId: string; qty: string }[];
   sourceBucketId?: string;
+  brokerageAccountId?: string;
   tag?: string;
   dbId?: string;
   portfolioId?: string;
@@ -123,6 +133,7 @@ export interface NotifPreferences {
 }
 
 export interface MoneyBucket {
+  nativeStatus?: 'resolved' | 'unresolved';
   id: string;
   name: string;
   targetPercent: number;
@@ -132,6 +143,7 @@ export interface MoneyBucket {
   color: string;
   icon: string;
   linkedToExpenses?: boolean;
+  portfolioId?: string;
 }
 
 export interface BucketActivity {
@@ -186,6 +198,7 @@ export interface Asset {
   currency?: string;
   excludeFromTotal?: boolean;
   portfolioId?: string;
+  brokerageAccountId?: string;
 }
 
 export interface Portfolio {
@@ -193,6 +206,44 @@ export interface Portfolio {
   name: string;
   color: string;
   isDefault: boolean;
+  kind: 'trading' | 'cash_management';
+}
+
+export interface BrokerageAccount {
+  id: string;
+  name: string;
+  broker?: string;
+  currency: Currency;
+  color: string;
+  portfolioId: string;
+  kind: 'cash' | 'asset_group';
+}
+
+export interface BrokerageCashBalance {
+  accountId: string;
+  balance: number;
+}
+
+export interface BrokerageCashEntry {
+  id: string;
+  accountId: string;
+  portfolioId: string;
+  type: 'DEPOSIT' | 'WITHDRAW' | 'TRADE_BUY' | 'TRADE_SELL' | 'ADJUSTMENT';
+  amount: number;
+  currency: Currency;
+  tradeId?: string;
+  occurredAt: string;
+  note?: string;
+}
+
+export interface InvestmentTransfer {
+  id: string;
+  bucketId: string;
+  accountId: string;
+  sourceAmount: number;
+  receivedAmount: number;
+  fee: number;
+  thbPerUsd: number;
 }
 
 export const ALL_PORTFOLIOS_ID = "__all_portfolios__";
@@ -234,21 +285,37 @@ interface AppState {
   t: (key: string) => string;
   formatMoney: (amount: number, originalCurrency?: Currency, originalRate?: number, originalAmount?: number) => string;
   exchangeRates: Record<Currency, number>;
+  setExchangeRate: (currency: Currency, rate: number) => void;
+  resetExchangeRateToAuto: () => Promise<void>;
+  isExchangeRateCustom: boolean;
   trades: Trade[];
-  addTrade: (trade: Omit<Trade, "id">) => void;
+  /** Returns false when the trade was rejected (for example, insufficient cash). */
+  addTrade: (trade: Omit<Trade, "id">) => Promise<boolean>;
   cashActivities: CashActivity[];
   addCashActivity: (activity: Omit<CashActivity, "id">) => Promise<CashActivity | null>;
   removeCashActivity: (id: string) => void;
   allocations: Allocation[];
   updateAllocation: (label: string, value: number) => void;
   assets: Asset[];
+  marketQuotes: Record<string, { priceUSD: number; updatedAt: number }>;
   portfolios: Portfolio[];
   activePortfolioId: string | null;
   activePortfolio: Portfolio | null;
   isAllPortfolios: boolean;
   selectPortfolio: (id: string | null) => void;
-  createPortfolio: (name: string) => Promise<Portfolio | null>;
-  renamePortfolio: (id: string, name: string) => Promise<boolean>;
+  createPortfolio: (name: string, color?: string) => Promise<Portfolio | null>;
+  renamePortfolio: (id: string, name: string, color?: string) => Promise<boolean>;
+  brokerageAccounts: BrokerageAccount[];
+  allBrokerageAccounts: BrokerageAccount[];
+  brokerageCashBalances: BrokerageCashBalance[];
+  brokerageCashEntries: BrokerageCashEntry[];
+  addBrokerageAccount: (account: Omit<BrokerageAccount, 'id' | 'portfolioId'>) => Promise<BrokerageAccount | null>;
+  updateBrokerageAccount: (id: string, updates: Pick<BrokerageAccount, 'name' | 'broker' | 'currency' | 'kind'>) => Promise<boolean>;
+  recordBrokerageCashMovement: (accountId: string, type: 'DEPOSIT' | 'WITHDRAW' | 'ADJUSTMENT', amount: number, note?: string) => Promise<boolean>;
+  transferBucketToBroker: (transfer: InvestmentTransfer) => Promise<boolean>;
+  transferBrokerToBucket: (id: string, accountId: string, bucketId: string, amount: number, rate: number) => Promise<boolean>;
+  deleteBrokerCashMovement: (id: string) => Promise<boolean>;
+  deleteTradeJournalTransactions: (id: string) => Promise<boolean>;
   addAsset: (asset: Asset) => void;
   syncDcaPosition: (symbol: string, entries: unknown) => void;
   bulkAddTrades: (trades: Omit<Trade, "id">[]) => void;
@@ -256,11 +323,11 @@ interface AppState {
   userProfile?: { email: string; avatarUrl: string; initials: string };
   setUserProfile: (profile: { email: string; avatarUrl: string; initials: string } | undefined) => void;
   fetchAssetMarketData: (symbol: string) => Promise<any>;
-  removeAsset: (symbol: string) => void;
+  removeAsset: (symbol: string, portfolioId?: string) => Promise<void>;
   updateAsset: (symbol: string, updates: Partial<Asset>) => void;
   reorderAssets: (reordered: Asset[]) => void;
-  removeTrade: (id: number) => void;
-  updateTrade: (id: number, updates: Partial<Trade>) => void;
+  removeTrade: (id: number) => Promise<boolean>;
+  updateTrade: (id: number, updates: Partial<Trade>) => Promise<boolean>;
   updateCashActivity: (id: string, updates: Partial<CashActivity>) => void;
   toasts: AppToast[];
   addToast: (message: string, type?: AppToast['type']) => void;
@@ -277,6 +344,7 @@ interface AppState {
   notifPreferences: NotifPreferences;
   setNotifPreferences: (prefs: NotifPreferences) => void;
   moneyBuckets: MoneyBucket[];
+  allMoneyBuckets: MoneyBucket[];
   addMoneyBucket: (bucket: Omit<MoneyBucket, 'id'>) => void;
   updateMoneyBucket: (id: string, updates: Partial<MoneyBucket>) => void;
   removeMoneyBucket: (id: string) => void;
@@ -1490,11 +1558,11 @@ const translations: Record<Language, Record<string, string>> = {
   },
 };
 
-const exchangeRates: Record<Currency, number> = {
+const defaultExchangeRates: Record<Currency, number> = {
   USD: 1,
-  THB: 36.5,
-  JPY: 150.5,
-  EUR: 0.92,
+  THB: Number.NaN,
+  JPY: 158.0,
+  EUR: 0.89,
 };
 
 const AppContext = createContext<AppState | undefined>(undefined);
@@ -1504,6 +1572,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [currency, setCurrency] = useState<Currency>("USD");
 
   const [darkMode, setDarkModeState] = useState(true);
+
+  const fx = useFxRate();
+  const exchangeRates = React.useMemo(() => ({ ...defaultExchangeRates, THB: fx.rate ? Number(fx.rate) : Number.NaN }), [fx.rate]);
+  const isExchangeRateCustom = fx.mode === 'manual';
+
+  const setExchangeRate = useCallback((cur: Currency, rate: number) => {
+    if (cur === 'THB' && Number.isFinite(rate) && rate > 0) fx.setManual(String(rate));
+  }, [fx.setManual]);
+
+  const resetExchangeRateToAuto = fx.resetAuto;
 
   const [netWorthSettings, setNetWorthSettings] = useState<NetWorthSettings>({
     includeAssets: true,
@@ -1594,24 +1672,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [trades, setTrades] = useState<Trade[]>(defaultTrades);
   const [allocations, setAllocations] = useState<Allocation[]>(defaultAllocations);
   const [assets, setAssets] = useState<Asset[]>(defaultAssets);
+  const [marketQuotes, setMarketQuotes] = useState<Record<string, { priceUSD: number; updatedAt: number }>>({});
   const assetsRef = React.useRef<Asset[]>(assets);
   useEffect(() => {
     assetsRef.current = assets;
   }, [assets]);
   const [cashActivities, setCashActivities] = useState<CashActivity[]>([]);
   const [moneyBuckets, setMoneyBuckets] = useState<MoneyBucket[]>(defaultMoneyBuckets);
+  const [allMoneyBuckets, setAllMoneyBuckets] = useState<MoneyBucket[]>([]);
   const [bucketActivities, setBucketActivities] = useState<BucketActivity[]>([]);
   const [userProfile, setUserProfile] = useState<{ email: string; avatarUrl: string; initials: string } | undefined>();
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [financialRevision, setFinancialRevision] = useState(0);
   const [dcaPositions, setDcaPositions] = useState<DcaPosition[]>([]);
   const dcaAssetSaveTimers = React.useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const deletedAssetSymbols = React.useRef<Set<string>>(new Set());
+  // Date.now() can repeat within the same millisecond when several async
+  // actions fail together. Keep a local counter as a deterministic fallback
+  // so React toast keys are always unique.
+  const toastSequence = React.useRef(0);
   const [toasts, setToasts] = useState<AppToast[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [customCategories, setCustomCategories] = useState<CustomCategory[]>([]);
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
+  const [brokerageAccounts, setBrokerageAccounts] = useState<BrokerageAccount[]>([]);
+  const [allBrokerageAccounts, setAllBrokerageAccounts] = useState<BrokerageAccount[]>([]);
+  const [brokerageCashBalances, setBrokerageCashBalances] = useState<BrokerageCashBalance[]>([]);
+  const [brokerageCashEntries, setBrokerageCashEntries] = useState<BrokerageCashEntry[]>([]);
   const [activePortfolioId, setActivePortfolioId] = useState<string | null>(null);
   const [portfoliosReady, setPortfoliosReady] = useState(false);
 
@@ -1620,18 +1709,40 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try { localStorage.setItem('fintrack-active-portfolio', id || ALL_PORTFOLIOS_ID); } catch {}
   }, []);
 
-  const createPortfolio = React.useCallback(async (name: string): Promise<Portfolio | null> => {
+  const createPortfolio = React.useCallback(async (name: string, color?: string): Promise<Portfolio | null> => {
     const trimmedName = name.trim().slice(0, 80);
     if (!trimmedName) return null;
+    const portfolioColor = /^#[0-9a-f]{6}$/i.test(color || "") ? color! : '#ADC6FF';
 
     if (!user) {
       const portfolio: Portfolio = {
         id: `local-${Date.now()}`,
         name: trimmedName,
-        color: '#ADC6FF',
+        color: portfolioColor,
         isDefault: portfolios.length === 0,
+        kind: 'trading',
       };
+      const defaultAccounts: BrokerageAccount[] = [
+        {
+          id: `local-brokerage-${Date.now()}-thb`,
+          name: 'เงินสด THB',
+          currency: 'THB',
+          color: '#4EDEA3',
+          portfolioId: portfolio.id,
+          kind: 'cash',
+        },
+        {
+          id: `local-brokerage-${Date.now() + 1}-usd`,
+          name: 'เงินสด USD',
+          currency: 'USD',
+          color: '#8B6CFF',
+          portfolioId: portfolio.id,
+          kind: 'cash',
+        },
+      ];
       setPortfolios(prev => [...prev, portfolio]);
+      setBrokerageAccounts(prev => [...prev, ...defaultAccounts]);
+      setAllBrokerageAccounts(prev => [...prev, ...defaultAccounts]);
       selectPortfolio(portfolio.id);
       return portfolio;
     }
@@ -1639,8 +1750,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const { data, error } = await db.portfolios.insert({
       user_id: user.id,
       name: trimmedName,
-      color: '#ADC6FF',
+      color: portfolioColor,
       is_default: portfolios.length === 0,
+      kind: 'trading',
     });
     if (error || !data) {
       console.error('Failed to create portfolio', error);
@@ -1651,105 +1763,208 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       name: data.name,
       color: data.color,
       isDefault: data.is_default,
+      kind: data.kind || 'trading',
     };
     setPortfolios(prev => [...prev, portfolio]);
+    const defaultAccounts = [
+      { name: 'เงินสด THB', currency: 'THB' as Currency, color: '#4EDEA3' },
+      { name: 'เงินสด USD', currency: 'USD' as Currency, color: '#8B6CFF' },
+    ];
+    const accountResults = await Promise.all(defaultAccounts.map((account) => db.brokerageAccounts.insert({
+      user_id: user.id,
+      portfolio_id: portfolio.id,
+      name: account.name,
+      broker: null,
+      currency: account.currency,
+      color: account.color,
+      kind: 'cash',
+    })));
+    const createdAccounts = accountResults.flatMap(({ data, error }) => {
+      if (error) {
+        console.error('Failed to create default brokerage account', error);
+        return [];
+      }
+      return data ? [{
+        id: data.id,
+        name: data.name,
+        broker: data.broker || undefined,
+        currency: data.currency as Currency,
+        color: data.color,
+        portfolioId: data.portfolio_id,
+        kind: data.kind || 'cash',
+      }] : [];
+    });
+    if (createdAccounts.length) {
+      setBrokerageAccounts(prev => [...prev, ...createdAccounts]);
+      setAllBrokerageAccounts(prev => [...prev, ...createdAccounts]);
+    }
     selectPortfolio(portfolio.id);
     return portfolio;
   }, [portfolios.length, selectPortfolio, user]);
 
-  const renamePortfolio = React.useCallback(async (id: string, name: string): Promise<boolean> => {
-    const trimmedName = name.trim().slice(0, 80);
-    if (!trimmedName) return false;
+  const addBrokerageAccount = React.useCallback(async (account: Omit<BrokerageAccount, 'id' | 'portfolioId'>): Promise<BrokerageAccount | null> => {
+    const selectedPortfolio = portfolios.find(portfolio => portfolio.id === activePortfolioId);
+    if (!activePortfolioId || selectedPortfolio?.kind !== 'trading') return null;
+    // Trading portfolios deliberately have one standard cash wallet per
+    // supported currency. Prevent a second THB/USD wallet from reintroducing
+    // ambiguous balances and transfer destinations.
+    if (account.kind === 'cash' && (account.currency === 'THB' || account.currency === 'USD')) {
+      const existing = allBrokerageAccounts.find(item =>
+        item.portfolioId === activePortfolioId && item.kind === 'cash' && item.currency === account.currency
+      );
+      if (existing) {
+        console.warn(`Portfolio already has its standard ${account.currency} cash wallet`);
+        return existing;
+      }
+    }
+    const name = account.name.trim().slice(0, 80);
+    if (!name) return null;
     if (!user) {
-      setPortfolios(prev => prev.map(portfolio => portfolio.id === id ? { ...portfolio, name: trimmedName } : portfolio));
+      const localAccount = { ...account, id: `local-brokerage-${Date.now()}`, name, portfolioId: activePortfolioId };
+      setBrokerageAccounts(prev => [...prev, localAccount]);
+      setAllBrokerageAccounts(prev => [...prev, localAccount]);
+      return localAccount;
+    }
+    const { data, error } = await db.brokerageAccounts.insert({
+      user_id: user.id, portfolio_id: activePortfolioId, name,
+      broker: account.broker || null, currency: account.currency, color: account.color, kind: account.kind,
+    });
+    if (error || !data) { console.error('Failed to create brokerage account', error); return null; }
+    const created = { id: data.id, name: data.name, broker: data.broker || undefined, currency: data.currency as Currency, color: data.color, portfolioId: data.portfolio_id, kind: data.kind || 'cash' as const };
+    setBrokerageAccounts(prev => [...prev, created]);
+    setAllBrokerageAccounts(prev => [...prev, created]);
+    return created;
+  }, [activePortfolioId, allBrokerageAccounts, portfolios, user]);
+
+  const updateBrokerageAccount = React.useCallback(async (
+    id: string,
+    updates: Pick<BrokerageAccount, 'name' | 'broker' | 'currency' | 'kind'>,
+  ): Promise<boolean> => {
+    const name = updates.name.trim().slice(0, 80);
+    if (!name || !brokerageAccounts.some(account => account.id === id)) return false;
+    const current = allBrokerageAccounts.find(account => account.id === id)
+      || brokerageAccounts.find(account => account.id === id);
+    if (current?.kind === 'cash' && (current.currency === 'THB' || current.currency === 'USD')) {
+      console.warn('Standard THB/USD cash wallets cannot be changed');
+      return false;
+    }
+    if (!user) {
+      setBrokerageAccounts(prev => prev.map(account => account.id === id ? { ...account, ...updates, name } : account));
+      setAllBrokerageAccounts(prev => prev.map(account => account.id === id ? { ...account, ...updates, name } : account));
       return true;
     }
-    const { data, error } = await db.portfolios.update(id, { name: trimmedName });
+    const { data, error } = await db.brokerageAccounts.update(id, {
+      name,
+      broker: updates.broker || null,
+      currency: updates.currency,
+      kind: updates.kind,
+    });
+    if (error || !data) { console.error('Failed to update brokerage account', error); return false; }
+    setBrokerageAccounts(prev => prev.map(account => account.id === id ? {
+      ...account,
+      name: data.name,
+      broker: data.broker || undefined,
+      currency: data.currency as Currency,
+      kind: data.kind || 'cash',
+    } : account));
+    setAllBrokerageAccounts(prev => prev.map(account => account.id === id ? {
+      ...account,
+      name: data.name,
+      broker: data.broker || undefined,
+      currency: data.currency as Currency,
+      kind: data.kind || 'cash',
+    } : account));
+    return true;
+  }, [allBrokerageAccounts, brokerageAccounts, user]);
+
+  const recordBrokerageCashMovement = React.useCallback(async (
+    accountId: string,
+    type: 'DEPOSIT' | 'WITHDRAW' | 'ADJUSTMENT',
+    amount: number,
+    note?: string,
+  ): Promise<boolean> => {
+    const account = allBrokerageAccounts.find(item => item.id === accountId)
+      || brokerageAccounts.find(item => item.id === accountId);
+    if (!account || amount <= 0) return false;
+    if (!user) {
+      const occurredAt = new Date().toISOString();
+      setBrokerageCashBalances(prev => {
+        const current = prev.find(item => item.accountId === accountId)?.balance || 0;
+        const next = type === 'WITHDRAW' ? current - amount : current + amount;
+        return [...prev.filter(item => item.accountId !== accountId), { accountId, balance: next }];
+      });
+      setBrokerageCashEntries(prev => [{
+        id: `local-brokerage-entry-${Date.now()}`,
+        accountId,
+        portfolioId: account.portfolioId,
+        type,
+        amount,
+        currency: account.currency,
+        occurredAt,
+        note,
+      }, ...prev]);
+      return true;
+    }
+    const { data, error } = await db.brokerageCashEntries.insert({
+      user_id: user.id,
+      portfolio_id: account.portfolioId,
+      brokerage_account_id: accountId,
+      type,
+      amount,
+      currency: account.currency,
+      trade_id: null,
+      occurred_at: new Date().toISOString(),
+      note: note || null,
+    });
+    if (error) { console.error('Failed to record brokerage cash movement', error); return false; }
+    setBrokerageCashBalances(prev => {
+      const current = prev.find(item => item.accountId === accountId)?.balance || 0;
+      const next = type === 'WITHDRAW' ? current - amount : current + amount;
+      const rest = prev.filter(item => item.accountId !== accountId);
+      return [...rest, { accountId, balance: next }];
+    });
+    if (data) {
+      setBrokerageCashEntries(prev => [{
+        id: data.id,
+        accountId: data.brokerage_account_id,
+        portfolioId: data.portfolio_id,
+        type: data.type,
+        amount: Number(data.amount || 0),
+        currency: data.currency as Currency,
+        tradeId: data.trade_id || undefined,
+        occurredAt: data.occurred_at,
+        note: data.note || undefined,
+      }, ...prev]);
+    }
+    return true;
+  }, [allBrokerageAccounts, brokerageAccounts, user]);
+
+  const renamePortfolio = React.useCallback(async (id: string, name: string, color?: string): Promise<boolean> => {
+    const trimmedName = name.trim().slice(0, 80);
+    if (!trimmedName) return false;
+    const portfolioColor = /^#[0-9a-f]{6}$/i.test(color || "") ? color : undefined;
+    // Guard: Bucket (cash_management) portfolio must not be renamed
+    const target = portfolios.find(p => p.id === id);
+    if (target?.kind === 'cash_management') return false;
+    if (!user) {
+      setPortfolios(prev => prev.map(portfolio => portfolio.id === id ? { ...portfolio, name: trimmedName, ...(portfolioColor ? { color: portfolioColor } : {}) } : portfolio));
+      return true;
+    }
+    const { data, error } = await db.portfolios.update(id, { name: trimmedName, ...(portfolioColor ? { color: portfolioColor } : {}) });
     if (error || !data) {
       console.error('Failed to rename portfolio', error);
       return false;
     }
     setPortfolios(prev => prev.map(portfolio => portfolio.id === id ? { ...portfolio, name: data.name, color: data.color } : portfolio));
     return true;
-  }, [user]);
+  }, [user, portfolios]);
 
   // Makes the Terminal and Portfolio agree immediately, then persists the
   // calculated holding so a refresh has the exact same source of truth.
   const syncDcaPosition = React.useCallback((symbol: string, entries: unknown) => {
-    // “All portfolios” is an aggregate/read-only view. Never assign a DCA
-    // draft or its mirrored asset to an unscoped portfolio from this view.
-    if (!activePortfolioId) return;
-    const normalizedSymbol = symbol.trim().toUpperCase();
-    if (!normalizedSymbol) return;
-    const nextPosition = getDcaPositions([{ symbol: normalizedSymbol, entries }])[0];
-    const manualPosition = getTradePosition(trades, normalizedSymbol);
-    const totalQuantity = manualPosition.quantity + (nextPosition?.quantity || 0);
-    const totalCost = manualPosition.cost + (nextPosition?.cost || 0);
-
-    setDcaPositions(prev => {
-      const remaining = prev.filter(position => position.symbol.toUpperCase() !== normalizedSymbol);
-      return nextPosition ? [...remaining, nextPosition] : remaining;
-    });
-
-    if (totalQuantity <= 0) return;
-
-    const existingAsset = assetsRef.current.find(asset => asset.symbol.toUpperCase() === normalizedSymbol);
-    const currentPrice = existingAsset?.currentPrice || (totalCost / totalQuantity);
-    const nextAsset: Asset = {
-      id: existingAsset?.id,
-      name: existingAsset?.name || normalizedSymbol,
-      symbol: normalizedSymbol,
-      valueUSD: currentPrice * totalQuantity,
-      currentPrice,
-      avgCost: totalCost / totalQuantity,
-      shares: totalQuantity,
-      change: currentPrice > 0 && totalCost > 0 ? ((currentPrice - (totalCost / totalQuantity)) / (totalCost / totalQuantity)) * 100 : 0,
-      allocation: existingAsset?.allocation || 'Equities',
-      realizedPL: existingAsset?.realizedPL || 0,
-      dividendTotal: existingAsset?.dividendTotal || 0,
-      isFavorite: existingAsset?.isFavorite,
-      sortOrder: existingAsset?.sortOrder,
-      is_active: true,
-    };
-
-    setAssets(prev => {
-      const index = prev.findIndex(asset => asset.symbol.toUpperCase() === normalizedSymbol);
-      const next = index >= 0
-        ? prev.map((asset, assetIndex) => assetIndex === index ? { ...asset, ...nextAsset } : asset)
-        : [nextAsset, ...prev];
-      localStorage.setItem('fintrack-assets', JSON.stringify(next));
-      return next;
-    });
-
-    const previousTimer = dcaAssetSaveTimers.current[normalizedSymbol];
-    if (previousTimer) clearTimeout(previousTimer);
-    dcaAssetSaveTimers.current[normalizedSymbol] = setTimeout(async () => {
-      if (!user) return;
-      await db.assets.upsert({
-        user_id: user.id,
-        portfolio_id: activePortfolioId,
-        name: nextAsset.name,
-        symbol: nextAsset.symbol,
-        asset_type: nextAsset.allocation,
-        allocation: nextAsset.allocation,
-        value_usd: nextAsset.valueUSD,
-        quantity: nextAsset.shares || 0,
-        avg_purchase_price: nextAsset.avgCost || 0,
-        current_price: nextAsset.currentPrice || 0,
-        is_active: true,
-        is_favorite: nextAsset.isFavorite || false,
-        sort_order: nextAsset.sortOrder || 0,
-        notes: null,
-        sector: null,
-        country: null,
-        allocation_target: 0,
-        allocation_current: 0,
-        change_24h: 0,
-        change_percentage: nextAsset.change,
-        exclude_from_total: nextAsset.excludeFromTotal || false,
-      });
-    }, 350);
-  }, [activePortfolioId, trades, user]);
+    // No-op: Users explicitly requested that unexecuted DCA drafts should NOT
+    // automatically mirror into the portfolio. They must be explicitly executed.
+  }, []);
 
   const loadFromLocalStorage = React.useCallback(() => {
     let hasLocalData = false;
@@ -1866,7 +2081,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setPortfoliosReady(false);
 
     if (!user) {
-      const localPortfolio: Portfolio = { id: 'local-main', name: 'Main Portfolio', color: '#ADC6FF', isDefault: true };
+      const localPortfolio: Portfolio = { id: 'local-main', name: 'Main Portfolio', color: '#ADC6FF', isDefault: true, kind: 'trading' };
       setPortfolios([localPortfolio]);
       setActivePortfolioId(localPortfolio.id);
       setPortfoliosReady(true);
@@ -1881,7 +2096,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         // Do not fall back to an unfiltered account query: that would expose
         // Main Portfolio data while the user thinks another portfolio is open.
         console.warn('Unable to load portfolios', error.message);
-        setPortfolios([{ id: 'portfolio-migration-required', name: 'Portfolio setup required', color: '#FFB4AB', isDefault: true }]);
+        setPortfolios([{ id: 'portfolio-migration-required', name: 'Portfolio setup required', color: '#FFB4AB', isDefault: true, kind: 'trading' }]);
         setActivePortfolioId('portfolio-migration-required');
         setPortfoliosReady(true);
         return;
@@ -1894,6 +2109,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           name: 'Main Portfolio',
           color: '#ADC6FF',
           is_default: true,
+          kind: 'trading',
         });
         if (cancelled) return;
         records = created.data ? [created.data] : [];
@@ -1905,6 +2121,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         name: record.name,
         color: record.color,
         isDefault: record.is_default,
+        kind: record.kind || 'trading',
       }));
 
       nextPortfolios.sort((a, b) => {
@@ -1929,6 +2146,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Fetch data when user or selected portfolio changes
   useEffect(() => {
     if (!authReady || (user && !portfoliosReady)) return;
+    let cancelled = false;
 
     setIsDataLoaded(false);
 
@@ -1945,6 +2163,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const loadData = async () => {
       try {
+        const cashManagementPortfolioId = portfolios.find(portfolio => portfolio.kind === 'cash_management')?.id || null;
+        const selectedPortfolio = portfolios.find(portfolio => portfolio.id === activePortfolioId);
+        const tradingPortfolioId = selectedPortfolio?.kind === 'trading' ? activePortfolioId : null;
         const [
           { data: assetsData, error: assetsError },
           { data: tradesData, error: tradesError },
@@ -1953,15 +2174,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           { data: bucketActivitiesData, error: bucketActivitiesError },
           { data: cashActivitiesData, error: cashActivitiesError },
           { data: userCategoriesData, error: userCategoriesError },
+          { data: brokerageAccountsData, error: brokerageAccountsError },
+          { data: allBrokerageAccountsData, error: allBrokerageAccountsError },
+          { data: brokerageCashBalancesData, error: brokerageCashBalancesError },
+          { data: brokerageCashEntriesData, error: brokerageCashEntriesError },
         ] = await Promise.all([
-          db.assets.getAll(user.id, activePortfolioId),
-          db.trades.getAll(user.id, activePortfolioId),
-          db.allocations.getAll(user.id, activePortfolioId),
-          db.buckets.getAll(user.id, activePortfolioId),
-          db.bucketActivities.getAll(user.id, activePortfolioId),
-          db.cashActivities.getAll(user.id, activePortfolioId),
+          db.assets.getAll(user.id, tradingPortfolioId),
+          db.trades.getAll(user.id, tradingPortfolioId),
+          db.allocations.getAll(user.id, tradingPortfolioId),
+          db.buckets.getAll(user.id, null),
+          db.bucketActivities.getAll(user.id, cashManagementPortfolioId),
+          db.cashActivities.getAll(user.id, cashManagementPortfolioId),
           db.userCategories.getAll(user.id, activePortfolioId),
+          db.brokerageAccounts.getAll(user.id, tradingPortfolioId),
+          db.brokerageAccounts.getAll(user.id, null),
+          db.brokerageCashEntries.getBalances(user.id, tradingPortfolioId),
+          db.brokerageCashEntries.getAll(user.id, tradingPortfolioId),
         ]);
+        if (cancelled) return;
 
         const loadErrors = [
           ["assets", assetsError],
@@ -1971,6 +2201,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           ["bucket_activities", bucketActivitiesError],
           ["cash_activities", cashActivitiesError],
           ["user_categories", userCategoriesError],
+          ["brokerage_accounts", brokerageAccountsError],
+          ["all_brokerage_accounts", allBrokerageAccountsError],
+          ["brokerage_account_balances", brokerageCashBalancesError],
+          ["brokerage_cash_entries", brokerageCashEntriesError],
         ].filter(([, error]) => Boolean(error));
 
         if (loadErrors.length > 0) {
@@ -2012,12 +2246,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 sortOrder: a.sort_order,
                 is_active: a.is_active,
                 portfolioId: a.portfolio_id || undefined,
+                brokerageAccountId: a.brokerage_account_id || undefined,
               };
             const existing = uniqueAssetsMap.get(symbolKey);
             // The all-portfolios view is an aggregate. Keep one row per symbol
             // and combine its quantity/cost/value instead of silently keeping
             // the first portfolio's copy.
-            if (existing && !activePortfolioId) {
+            if (existing && !tradingPortfolioId) {
               const combinedShares = (existing.shares || 0) + quantity;
               const existingCost = (existing.avgCost || 0) * (existing.shares || 0);
               const nextCost = (a.avg_purchase_price || 0) * quantity;
@@ -2041,6 +2276,56 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setAssets([]);
         }
 
+        if (brokerageAccountsData) {
+          setBrokerageAccounts(brokerageAccountsData.map(account => ({
+            id: account.id,
+            name: account.name,
+            broker: account.broker || undefined,
+            currency: account.currency as Currency,
+            color: account.color,
+            portfolioId: account.portfolio_id,
+            kind: account.kind || 'cash',
+          })));
+        } else {
+          setBrokerageAccounts([]);
+        }
+        if (allBrokerageAccountsData) {
+          setAllBrokerageAccounts(allBrokerageAccountsData.map(account => ({
+            id: account.id,
+            name: account.name,
+            broker: account.broker || undefined,
+            currency: account.currency as Currency,
+            color: account.color,
+            portfolioId: account.portfolio_id,
+            kind: account.kind || 'cash',
+          })));
+        } else {
+          setAllBrokerageAccounts([]);
+        }
+        if (brokerageCashBalancesData) {
+          setBrokerageCashBalances(brokerageCashBalancesData.map(balance => ({
+            accountId: balance.brokerage_account_id,
+            balance: Number(balance.cash_balance || 0),
+          })));
+        } else {
+          setBrokerageCashBalances([]);
+        }
+        if (brokerageCashEntriesData) {
+          setBrokerageCashEntries(brokerageCashEntriesData.map(entry => ({
+            id: entry.id,
+            accountId: entry.brokerage_account_id,
+            portfolioId: entry.portfolio_id,
+            type: entry.type,
+            amount: Number(entry.amount || 0),
+            currency: entry.currency as Currency,
+            tradeId: entry.trade_id || undefined,
+            occurredAt: entry.occurred_at,
+            note: entry.note || undefined,
+          })));
+        } else {
+          setBrokerageCashEntries([]);
+        }
+
         if (tradesData) {
           setTrades(tradesData.map(t => {
             // Extract source bucket ID from notes if present
@@ -2056,11 +2341,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               amountUSD: t.amount_usd,
               date: t.execution_date,
               rateAtTime: t.exchange_rate_at_time || 1,
+              fees: Number(t.fees || 0),
+              costMethod: t.cost_basis_sales?.method,
+              closeMode: t.cost_basis_sales?.request?.closeMode,
+              lotSelections: t.cost_basis_sales?.selections,
+              fxRateTHB: Number(t.tags?.find((tag: string) => tag.startsWith('FX USD/THB '))?.slice(11)) || undefined,
               currency: t.currency || 'USD',
               originalAmount: t.original_amount || undefined,
               shares: t.quantity || 0,
               pricePerUnit: t.price_at_execution || 0,
               sourceBucketId: sourceBucketId,
+              brokerageAccountId: t.brokerage_account_id || undefined,
               tag: (t.tags && t.tags.length > 0) ? t.tags[0] : undefined,
               dbId: t.id,
               portfolioId: t.portfolio_id || undefined,
@@ -2081,18 +2372,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (bucketsData && bucketsData.length > 0) {
-          setMoneyBuckets(bucketsData.map(b => ({
+          const parsedBuckets = bucketsData.map(b => ({
             id: b.id,
             name: b.name,
             targetPercent: b.target_percent,
             targetAmount: b.target_amount,
             currentAmount: b.current_amount,
-            currency: (b.currency as Currency) || "USD",
+            currency: b.currency as Currency | undefined,
             color: b.color,
             icon: b.icon,
-            linkedToExpenses: b.linked_to_expenses
-          })));
+            linkedToExpenses: b.linked_to_expenses,
+            portfolioId: b.portfolio_id || undefined
+          }));
+          setAllMoneyBuckets(parsedBuckets);
+          setMoneyBuckets(parsedBuckets);
         } else {
+          setAllMoneyBuckets([]);
           setMoneyBuckets([]);
         }
 
@@ -2123,7 +2418,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             note: ca.note || undefined,
             currency: ca.currency || undefined,
             rateAtTime: ca.rate_at_time || undefined,
-            originalAmount: ca.original_amount || undefined,
+            originalAmount: ca.original_amount ?? undefined,
             bucketId: ca.bucket_id || undefined,
             isTransfer: ca.is_transfer || false
           })));
@@ -2145,12 +2440,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       } catch (err) {
         console.error("Failed to load data from Supabase", err);
       } finally {
-        setIsDataLoaded(true);
+        if (!cancelled) setIsDataLoaded(true);
       }
     };
 
     loadData();
-  }, [user, authReady, activePortfolioId, portfoliosReady, loadFromLocalStorage]);
+    return () => { cancelled = true; };
+  }, [user, authReady, activePortfolioId, portfolios, portfoliosReady, loadFromLocalStorage, financialRevision]);
+
+  // Reconcile all financial views together after returning from another tab.
+  // A shared reload prevents an old cash balance being mixed with newer lots.
+  useEffect(() => {
+    if (!user) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const refresh = () => {
+      if (document.visibilityState !== 'visible') return;
+      clearTimeout(timer);
+      timer = setTimeout(() => setFinancialRevision(value => value + 1), 250);
+    };
+    window.addEventListener('focus', refresh);
+    window.addEventListener('fintrack:financial-change', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('fintrack:financial-change', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [user]);
 
   // Never let a previous portfolio's virtual DCA lots appear while the next
   // selected portfolio is still loading its own draft.
@@ -2190,7 +2507,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           .from('dca_drafts')
           .select('symbol, entries')
           .eq('user_id', user.id);
-        if (activePortfolioId) query = query.eq('portfolio_id', activePortfolioId);
+        const selectedPortfolio = portfolios.find(p => p.id === activePortfolioId);
+        const tradingPortfolioId = selectedPortfolio?.kind === 'trading' ? activePortfolioId : null;
+        if (tradingPortfolioId) query = query.eq('portfolio_id', tradingPortfolioId);
         const { data, error } = await query;
 
         if (cancelled) return;
@@ -2252,7 +2571,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   });
 
   const addToast = (message: string, type: 'success' | 'info' | 'warning' | 'error' = 'info') => {
-    const id = Date.now().toString();
+    const sequence = ++toastSequence.current;
+    const id = typeof globalThis.crypto?.randomUUID === 'function'
+      ? globalThis.crypto.randomUUID()
+      : `toast-${Date.now()}-${sequence}`;
     setToasts(prev => [...prev, { id, message, type }]);
     setTimeout(() => {
       removeToast(id);
@@ -2279,41 +2601,120 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Compute dynamic bucket balances directly from Ledger transactions (Single Source of Truth)
   const dynamicMoneyBuckets = React.useMemo(() => {
     return moneyBuckets.map(bucket => {
-      let currentAmount = 0;
-      const bCur = bucket.currency || "USD";
+      try {
+      if (!isFxCurrency(bucket.currency)) throw Error('unresolved');
+      let currentAmount = decimal('0');
       
       const activities = cashActivities.filter(a => a.bucketId === bucket.id);
       activities.forEach(a => {
-        let amountInBucketCur = 0;
-        // If the activity was recorded in the same currency, use originalAmount
-        if (a.currency === bCur && a.originalAmount !== undefined) {
-          amountInBucketCur = a.originalAmount;
-        } else {
-          // Otherwise use amountUSD converted to bucket currency at current rate
-          amountInBucketCur = a.amountUSD * (exchangeRates[bCur] || 1);
-        }
+        const amountInBucketCur = bucketNativeAmount({ original_amount: a.originalAmount, currency: a.currency }, bucket.currency);
 
         if (a.type === "INCOME" || a.type === "DEPOSIT") {
-          currentAmount += amountInBucketCur;
+          currentAmount = currentAmount.add(decimal(amountInBucketCur));
         } else if (a.type === "EXPENSE" || a.type === "WITHDRAW") {
-          currentAmount -= amountInBucketCur;
+          currentAmount = currentAmount.sub(decimal(amountInBucketCur));
         }
       });
       
-      return { ...bucket, currentAmount };
+      return { ...bucket, nativeStatus: 'resolved' as const, currentAmount: Number(currentAmount.toFixed(12)) };
+      } catch {
+        return { ...bucket, nativeStatus: 'unresolved' as const, currentAmount: Number.NaN };
+      }
     });
-  }, [moneyBuckets, cashActivities, exchangeRates]);
+  }, [moneyBuckets, cashActivities]);
+
+  const transferBucketToBroker = async (transfer: InvestmentTransfer): Promise<boolean> => {
+    // Existing 018 has a legacy FX fallback. Reject unresolved source records
+    // before calling it; never let today's reference rate repair old legs.
+    try {
+      const bucket = moneyBuckets.find(b => b.id === transfer.bucketId);
+      if (!bucket || !isFxCurrency(bucket.currency)) throw Error('unresolved: Bucket currency');
+      cashActivities.filter(a => a.bucketId === bucket.id).forEach(a =>
+        bucketNativeAmount({ original_amount: a.originalAmount, currency: a.currency }, bucket.currency));
+    } catch (error) { addToast(String(error), 'error'); return false; }
+    if (!user) {
+      addToast('เข้าสู่ระบบเพื่อบันทึกการโอนเงินเข้าพอร์ต', 'warning');
+      return false;
+    }
+    try {
+      const { data, error } = await db.brokerageCashEntries.transferFromBucket({ ...transfer, legacyThbPerUsd: exchangeRates.THB });
+      if (error || !data) {
+        console.error('Failed to transfer Bucket funds', error);
+        const message = error?.message || '';
+        addToast(message.includes('Insufficient') ? 'เงินใน Bucket ไม่เพียงพอ กรุณาตรวจสอบยอดอีกครั้ง'
+          : error?.code === 'PGRST202' ? 'ระบบโอนเงินยังไม่พร้อม กรุณาอัปเดตฐานข้อมูลก่อน'
+          : 'บันทึกการโอนไม่สำเร็จ กรุณาลองใหม่ด้วยยอดเดิม', 'error');
+        return false;
+      }
+      const cash = data.cash_activity;
+      const activity = data.bucket_activity;
+      const entry = data.brokerage_entry;
+      const bucket = moneyBuckets.find(item => item.id === transfer.bucketId);
+      const savedCash: CashActivity = {
+        id: cash.id, type: cash.type, amountUSD: Number(cash.amount),
+        category: cash.category, date: cash.date, note: cash.note,
+        bucketId: cash.bucket_id, currency: cash.currency,
+        rateAtTime: Number(cash.rate_at_time), originalAmount: Number(cash.original_amount), isTransfer: true,
+      };
+      setCashActivities(prev => [...prev.filter(item => item.id !== cash.id), savedCash]);
+      setBucketActivities(prev => [{
+        id: activity.id, bucketId: activity.bucket_id, bucketName: bucket?.name || '',
+        type: activity.type, amount: Number(activity.amount), date: activity.date,
+        note: activity.note, currency: activity.currency,
+        rateAtTime: Number(activity.rate_at_time), originalAmount: Number(activity.original_amount),
+      }, ...prev.filter(item => item.id !== activity.id)]);
+      setBrokerageCashEntries(prev => [{
+        id: entry.id, accountId: entry.brokerage_account_id, portfolioId: entry.portfolio_id,
+        type: entry.type, amount: Number(entry.amount), currency: entry.currency,
+        occurredAt: entry.occurred_at, note: entry.note,
+      }, ...prev.filter(item => item.id !== entry.id)]);
+      setBrokerageCashBalances(prev => [...prev.filter(item => item.accountId !== entry.brokerage_account_id), {
+        accountId: entry.brokerage_account_id, balance: Number(data.brokerage_balance),
+      }]);
+      addToast(`โอนเข้าพอร์ตสำเร็จ ${Number(entry.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} ${entry.currency}`, 'success');
+      return true;
+    } catch (error) {
+      console.error('Failed to transfer Bucket funds', error);
+      addToast('ยังยืนยันผลการโอนไม่ได้ กรุณาลองใหม่ด้วยยอดเดิม', 'error');
+      return false;
+    }
+  };
 
   // Compute net worth history from actual trade data + current portfolio value
   const netWorthHistory = React.useMemo(() => {
     const toUSD = (amount: number, fromCurrency: Currency = "USD") => {
       return amount / (exchangeRates[fromCurrency] || 1);
     };
-    const currentCashUSD = dynamicMoneyBuckets.reduce(
-      (acc, curr) => acc + toUSD(curr.currentAmount, curr.currency || "USD"),
-      0
-    );
-    const currentTotalUSD = assets.reduce((acc, curr) => acc + curr.valueUSD, 0) + currentCashUSD;
+    const selectedPortfolioKind = portfolios.find(portfolio => portfolio.id === activePortfolioId)?.kind;
+    const currentCashUSD = (() => {
+      if (!activePortfolioId) {
+        const bucketsTotal = netWorthSettings.includeBuckets !== false
+          ? dynamicMoneyBuckets.reduce((acc, curr) => acc + toUSD(curr.currentAmount, curr.currency || "USD"), 0)
+          : 0;
+        const brokerageTotal = netWorthSettings.includeCash !== false
+          ? brokerageAccounts.reduce((acc, account) => {
+              const balance = brokerageCashBalances.find(item => item.accountId === account.id)?.balance || 0;
+              return acc + toUSD(balance, account.currency);
+            }, 0)
+          : 0;
+        return bucketsTotal + brokerageTotal;
+      }
+      if (selectedPortfolioKind === "cash_management") {
+        return netWorthSettings.includeBuckets !== false
+          ? dynamicMoneyBuckets.reduce((acc, curr) => acc + toUSD(curr.currentAmount, curr.currency || "USD"), 0)
+          : 0;
+      }
+      if (selectedPortfolioKind === "trading") {
+        return netWorthSettings.includeCash !== false
+          ? brokerageAccounts.reduce((acc, account) => {
+              const balance = brokerageCashBalances.find(item => item.accountId === account.id)?.balance || 0;
+              return acc + toUSD(balance, account.currency);
+            }, 0)
+          : 0;
+      }
+      return 0;
+    })();
+    const currentTotalUSD = (selectedPortfolioKind === "cash_management" ? 0 : (netWorthSettings.includeAssets !== false ? assets.reduce((acc, curr) => acc + curr.valueUSD, 0) : 0)) + currentCashUSD;
     const now = new Date();
     const currentDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
@@ -2322,7 +2723,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     trades.forEach(trade => {
       const month = trade.date.substring(0, 7); // "2024-01"
       if (!monthlyInvested[month]) monthlyInvested[month] = 0;
-      monthlyInvested[month] += trade.type === "BUY" ? trade.amountUSD : -trade.amountUSD;
+      if (trade.type === "BUY" || trade.type === "COVER" || trade.type === "IMPORT") {
+        monthlyInvested[month] += trade.amountUSD + (trade.fees || 0);
+      } else if (trade.type === "SELL" || trade.type === "SHORT") {
+        monthlyInvested[month] -= Math.max(0, trade.amountUSD - (trade.fees || 0));
+      }
     });
 
     // Build cumulative timeline
@@ -2346,7 +2751,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     return history;
-  }, [assets, trades, moneyBuckets]);
+  }, [activePortfolioId, assets, brokerageAccounts, brokerageCashBalances, dynamicMoneyBuckets, portfolios, trades]);
 
 
   // Update userProfile when Supabase user session changes
@@ -2374,16 +2779,39 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isDataLoaded) return;
 
-    const stats: Record<string, { shares: number; totalCost: number; realizedPL: number; dividendTotal: number }> = {};
+    type PositionStats = {
+      portfolioId?: string;
+      symbol: string;
+      shares: number;
+      totalCost: number;
+      realizedPL: number;
+      dividendTotal: number;
+    };
+    const stats: Record<string, PositionStats> = {};
+    // The same ticker can legitimately be held in more than one broker.
+    // Never combine those positions merely because their symbols match.
+    const positionKey = (portfolioId: string | undefined, symbol: string) => `${portfolioId || 'local-main'}::${symbol.toUpperCase()}`;
     const sortedTrades = [...trades].sort((a, b) => a.date.localeCompare(b.date));
 
     sortedTrades.forEach(trade => {
       const sym = trade.asset.toUpperCase();
       // Skip trades for assets that were manually deleted
       if (deletedAssetSymbols.current.has(sym)) return;
-      if (!stats[sym]) stats[sym] = { shares: 0, totalCost: 0, realizedPL: 0, dividendTotal: 0 };
+      // Legacy local trades were saved before portfolioId existed.  Attach
+      // those rows to the currently selected portfolio once so they remain
+      // visible instead of silently disappearing after this migration.
+      const tradePortfolioId = trade.portfolioId || activePortfolioId || undefined;
+      const key = positionKey(tradePortfolioId, sym);
+      if (!stats[key]) stats[key] = {
+        portfolioId: tradePortfolioId,
+        symbol: sym,
+        shares: 0,
+        totalCost: 0,
+        realizedPL: 0,
+        dividendTotal: 0,
+      };
       
-      const s = stats[sym];
+      const s = stats[key];
       const tradeShares = trade.shares || (trade.pricePerUnit && trade.pricePerUnit > 0 ? trade.amountUSD / trade.pricePerUnit : 0);
       const fee = trade.fees || 0;
 
@@ -2405,28 +2833,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         s.shares -= tradeShares;
         s.totalCost += trade.amountUSD - fee;
       } else if (trade.type === "COVER") {
-        // Close short position
-        const costOfSharesCovered = (tradeShares / Math.abs(s.shares)) * s.totalCost;
-        s.realizedPL += (costOfSharesCovered - trade.amountUSD - fee);
-        s.shares += tradeShares;
-        s.totalCost -= costOfSharesCovered;
+        // Close a short only when an open short lot exists. A malformed COVER
+        // must not divide by zero and poison the whole portfolio with NaN.
+        if (s.shares < 0) {
+          const coveredShares = Math.min(tradeShares, Math.abs(s.shares));
+          const costOfSharesCovered = (coveredShares / Math.abs(s.shares)) * s.totalCost;
+          s.realizedPL += (costOfSharesCovered - (trade.pricePerUnit || 0) * coveredShares - fee);
+          s.shares += coveredShares;
+          s.totalCost -= costOfSharesCovered;
+        }
       } else if (trade.type === "DIVIDEND") {
         s.dividendTotal += trade.amountUSD;
       }
     });
 
-    // Open DCA lots are virtual holdings backed by dca_drafts.  They merge
-    // with any regular position in the same symbol, then disappear as soon as
-    // the assistant closes the remaining lots and clears its draft.
-    const dcaSymbols = new Set<string>();
-    dcaPositions.forEach(position => {
-      const sym = position.symbol.toUpperCase();
-      if (position.quantity <= 0 || position.cost <= 0) return;
-      dcaSymbols.add(sym);
-      if (!stats[sym]) stats[sym] = { shares: 0, totalCost: 0, realizedPL: 0, dividendTotal: 0 };
-      stats[sym].shares += position.quantity;
-      stats[sym].totalCost += position.cost;
+    // Long holdings share the same lot projection as Portfolio and Trade.
+    Object.values(stats).forEach(position => {
+      if (!position.portfolioId) return;
+      const projected = projectLotPosition(trades, position.portfolioId, position.symbol);
+      if (projected) {
+        position.shares = projected.shares;
+        position.totalCost = projected.cost;
+        position.realizedPL = projected.realized;
+      }
     });
+
+    // Removed virtual holding merge for open DCA lots. Users explicitly requested
+    // that unexecuted DCA entries should not affect the actual portfolio quantities.
+    // Executed entries are saved as actual trades and processed above.
 
     setAssets(prev => {
       // Build a set of symbols that exist in Supabase with is_active: false
@@ -2442,7 +2876,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const newAssets = [...filtered];
       // Update existing
       newAssets.forEach((asset, idx) => {
-        const s = stats[asset.symbol.toUpperCase()];
+        const s = stats[positionKey(asset.portfolioId, asset.symbol)];
         if (s) {
           newAssets[idx] = {
             ...asset,
@@ -2453,16 +2887,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             valueUSD: asset.currentPrice ? (asset.currentPrice * s.shares) : s.totalCost,
             currentPrice: asset.currentPrice || (s.shares > 0 ? s.totalCost / s.shares : 0)
           };
-          delete stats[asset.symbol.toUpperCase()];
+          delete stats[positionKey(asset.portfolioId, asset.symbol)];
         }
       });
       // Add new ones that aren't in the deleted set and have positive shares
-      Object.entries(stats).forEach(([symbol, s]) => {
-        if (deletedAssetSymbols.current.has(symbol) && !dcaSymbols.has(symbol)) return;
+      Object.values(stats).forEach((s) => {
+        const symbol = s.symbol;
+        if (deletedAssetSymbols.current.has(symbol) ) return;
         // Don't recreate assets with 0 shares (fully sold)
         if (s.shares <= 0) return;
         // Don't recreate soft-deleted assets
-        if (softDeletedSymbols.has(symbol) && !dcaSymbols.has(symbol)) return;
+        if (softDeletedSymbols.has(symbol) ) return;
         const CRYPTO_SYM = ['BTC', 'ETH', 'SOL', 'USDT', 'DOGE', 'XRP'];
         const autoAlloc = CRYPTO_SYM.includes(symbol) ? 'Alternatives'
           : (symbol.endsWith('.BK') || symbol.endsWith('.TH')) ? 'Equities'
@@ -2470,6 +2905,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         newAssets.push({
           name: symbol,
           symbol: symbol,
+          portfolioId: s.portfolioId,
           valueUSD: s.totalCost,
           currentPrice: s.shares > 0 ? s.totalCost / s.shares : 0,
           change: 0,
@@ -2481,17 +2917,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         });
       });
       // Deduplicate to avoid React key collisions
-      const deduplicatedAssets = Array.from(new Map(newAssets.map(item => [item.symbol.toUpperCase(), item])).values());
+      const deduplicatedAssets = Array.from(new Map(newAssets.map(item => [positionKey(item.portfolioId, item.symbol), item])).values());
       localStorage.setItem("fintrack-assets", JSON.stringify(deduplicatedAssets));
       return deduplicatedAssets;
     });
-  }, [trades, dcaPositions, isDataLoaded]);
+  }, [activePortfolioId, trades, dcaPositions, isDataLoaded]);
 
-  // Fetch Live Market Data and persist prices to Supabase
+  // Fetch Live Market Data and persist prices to Supabase.  Depend on the
+  // symbol list, not the asset objects themselves, so a newly executed trade
+  // receives a quote immediately without creating a price-update loop.
+  const marketSymbolKey = React.useMemo(
+    () => [...new Set([...assets.map(asset => asset.symbol), ...trades.map(trade => trade.asset)])].map(symbol => symbol.toUpperCase()).sort().join('|'),
+    [assets, trades]
+  );
   useEffect(() => {
     if (!isDataLoaded) return;
 
     let mounted = true;
+    let inFlight = false;
+    const controller = new AbortController();
 
     const mapToMarketSymbol = (sym: string) => {
       const upper = sym.toUpperCase();
@@ -2508,39 +2952,41 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const fetchMarketData = async () => {
       // Snapshot current assets using the ref to get the latest state immediately
       const snapshot = assetsRef.current;
-      if (snapshot.length === 0) return;
-
-      // Apply interim cost-based values while API loads
-      setAssets(prev => prev.map(asset => ({
-        ...asset,
-        valueUSD: asset.currentPrice && asset.shares
-          ? asset.shares * asset.currentPrice
-          : (asset.avgCost && asset.shares ? asset.avgCost * asset.shares : asset.valueUSD),
-        currentPrice: asset.currentPrice || asset.avgCost || 0,
-      })));
-
-      const symbolsQuery = snapshot.map(a => mapToMarketSymbol(a.symbol)).join(',');
-      if (!symbolsQuery) return;
+      const symbolsQuery = marketSymbolKey.split('|').filter(Boolean).map(mapToMarketSymbol).join(',');
+      if (!symbolsQuery || inFlight || document.visibilityState === 'hidden') return;
+      inFlight = true;
 
       try {
-        const res = await fetch(`/api/market?symbols=${symbolsQuery}`, {
+        const res = await fetch(`/api/market?symbols=${encodeURIComponent(symbolsQuery)}`, {
           cache: 'no-store',
+          signal: controller.signal,
           headers: { 'Cache-Control': 'no-cache' }
         });
         if (!res.ok || !mounted) return;
         const data = await res.json();
         if (!data?.results || !Array.isArray(data.results) || !mounted) return;
 
+        const validQuotes = data.results.filter((quote: any) => Number.isFinite(Number(quote.price)) && Number(quote.price) > 0);
+        const usdPrice = (quote: any) => Number(quote.price) / (exchangeRates[quote.quoteCurrency as Currency] || 1);
+        setMarketQuotes(previous => {
+          const next = { ...previous };
+          for (const symbol of marketSymbolKey.split('|')) {
+            const quote = validQuotes.find((item: any) => item.symbol.toUpperCase() === mapToMarketSymbol(symbol));
+            if (quote) next[symbol] = { priceUSD: usdPrice(quote), updatedAt: data.timestamp || Date.now() };
+          }
+          return next;
+        });
+
         // 1. Update React state with live prices
         setAssets(prev => prev.map(asset => {
           const marketSym = mapToMarketSymbol(asset.symbol);
-          const liveData = data.results.find((r: any) => r.symbol === marketSym);
+          const liveData = validQuotes.find((r: any) => r.symbol.toUpperCase() === marketSym);
           if (!liveData) return asset;
           return {
             ...asset,
             change: Number(liveData.changePercent.toFixed(2)),
-            valueUSD: asset.shares ? asset.shares * liveData.price : asset.valueUSD,
-            currentPrice: liveData.price,
+            valueUSD: asset.shares ? asset.shares * usdPrice(liveData) : asset.valueUSD,
+            currentPrice: usdPrice(liveData),
             name: liveData.name || asset.name,
             chartData: liveData.chartData || asset.chartData,
             intradayData: liveData.intradayData || asset.intradayData,
@@ -2555,11 +3001,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             .filter(a => a.id)
             .map(a => {
               const marketSym = mapToMarketSymbol(a.symbol);
-              const liveData = data.results.find((r: any) => r.symbol === marketSym);
+              const liveData = validQuotes.find((r: any) => r.symbol.toUpperCase() === marketSym);
               if (!liveData) return null;
-              const newValueUSD = a.shares ? a.shares * liveData.price : a.valueUSD;
+              const newValueUSD = a.shares ? a.shares * usdPrice(liveData) : a.valueUSD;
               const updatePayload = {
-                current_price: liveData.price,
+                current_price: usdPrice(liveData),
                 value_usd: newValueUSD,
                 change_24h: Number((liveData.price - liveData.price / (1 + liveData.changePercent / 100)).toFixed(2)),
                 change_percentage: liveData.changePercent,
@@ -2583,17 +3029,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (err) {
         console.debug('Market fetch failed', err);
+      } finally {
+        inFlight = false;
       }
     };
 
     fetchMarketData();
     const interval = setInterval(fetchMarketData, 30000);
+    window.addEventListener('focus', fetchMarketData);
+    document.addEventListener('visibilitychange', fetchMarketData);
 
     return () => {
       mounted = false;
+      controller.abort();
       clearInterval(interval);
+      window.removeEventListener('focus', fetchMarketData);
+      document.removeEventListener('visibilitychange', fetchMarketData);
     };
-  }, [activePortfolioId, isDataLoaded, user]);
+  }, [activePortfolioId, exchangeRates, isDataLoaded, marketSymbolKey, user]);
 
 
   const fetchAssetMarketData = async (symbol: string) => {
@@ -2621,6 +3074,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // use it directly to bypass floating-point math drift (e.g. 50.00 THB vs 50.01 THB).
     const isExactMatch = originalAmount !== undefined && originalCurrency === targetCurrency;
     const convertedAmount = isExactMatch ? originalAmount! : (amountUSD * rate);
+    if (!Number.isFinite(convertedAmount)) return '—';
 
     // For THB: force en-US locale which reliably returns ฿ (U+0E3F).
     // th-TH locale may return "B" on some browsers/environments.
@@ -2654,19 +3108,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
 
   const addAsset = async (assetData: Asset) => {
-    const existingIdx = assets.findIndex(a => a.symbol.toUpperCase() === assetData.symbol.toUpperCase());
+    const targetPortfolioId = assetData.portfolioId ?? activePortfolioId;
+    const selectedPortfolio = portfolios.find(portfolio => portfolio.id === targetPortfolioId);
+    if (targetPortfolioId && selectedPortfolio?.kind !== 'trading') {
+      addToast(language === 'th' ? 'Bucket ใช้สำหรับเงินสดและบัญชีธนาคาร ไม่สามารถเพิ่มสินทรัพย์ลงทุนได้' : 'Cash-management portfolios cannot contain investment assets.', 'warning');
+      return;
+    }
+    const existingIdx = assets.findIndex(a => a.symbol.toUpperCase() === assetData.symbol.toUpperCase() && (a.portfolioId ?? activePortfolioId) === targetPortfolioId);
     if (!user) {
-      if (existingIdx === -1) {
-        const newAssets = [assetData, ...assets];
-        setAssets(newAssets);
-        localStorage.setItem("fintrack-assets", JSON.stringify(newAssets));
-      }
+      const nextAsset = { ...assetData, portfolioId: targetPortfolioId || undefined };
+      const newAssets = existingIdx === -1
+        ? [nextAsset, ...assets]
+        : assets.map((asset, index) => index === existingIdx ? { ...asset, ...nextAsset } : asset);
+      setAssets(newAssets);
+      localStorage.setItem("fintrack-assets", JSON.stringify(newAssets));
       return;
     }
     try {
       const { data, error } = await db.assets.upsert({
         user_id: user.id,
-        portfolio_id: activePortfolioId,
+        portfolio_id: targetPortfolioId,
+        brokerage_account_id: assetData.brokerageAccountId || null,
         name: assetData.name,
         symbol: assetData.symbol,
         asset_type: assetData.allocation,
@@ -2690,13 +3152,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (data) {
         const newAsset = {
           ...assetData,
+          portfolioId: data.portfolio_id || targetPortfolioId || undefined,
           id: data.id,
           is_active: data.is_active,
           isFavorite: data.is_favorite,
           sortOrder: data.sort_order
         };
         setAssets(prev => {
-          const idx = prev.findIndex(a => a.symbol.toUpperCase() === newAsset.symbol.toUpperCase());
+          const idx = prev.findIndex(a => a.symbol.toUpperCase() === newAsset.symbol.toUpperCase() && (a.portfolioId ?? activePortfolioId) === targetPortfolioId);
           if (idx >= 0) {
             const next = [...prev];
             next[idx] = { ...next[idx], ...newAsset };
@@ -2710,18 +3173,91 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const addTrade = async (tradeData: Omit<Trade, "id">) => {
+  const addTrade = async (tradeData: Omit<Trade, "id">): Promise<boolean> => {
+    if (tradeData.type === 'SELL') {
+      addToast(language === 'th' ? 'บันทึกการขายผ่าน Live P&L ในหน้า Trade / Plan เพื่อตรวจสอบต้นทุนและไม้ก่อนยืนยัน' : 'Use Trade / Plan → Live P&L to preview allocations before selling.', 'warning');
+      return false;
+    }
+    const targetPortfolioId = tradeData.portfolioId ?? activePortfolioId;
+    if (!targetPortfolioId) {
+      addToast(language === 'th' ? 'เลือกโบรกเกอร์ในฟอร์มก่อนบันทึก' : 'Select a broker before saving.', 'warning');
+      return false;
+    }
+    const selectedPortfolio = portfolios.find(portfolio => portfolio.id === targetPortfolioId);
+    if (targetPortfolioId && selectedPortfolio?.kind !== 'trading') {
+      addToast(language === 'th' ? 'Bucket ใช้สำหรับเงินสดและบัญชีธนาคาร ไม่สามารถบันทึกการเทรดได้' : 'Trades can only be recorded in a trading portfolio.', 'warning');
+      return false;
+    }
+
+    // A BUY settled from a brokerage cash account must be affordable before
+    // we add any client-side state.  The database trigger repeats this check
+    // under a transaction lock, so concurrent browser tabs cannot overspend.
+    const isBrokerageSettlement = tradeData.type === 'BUY';
+    const settlementAccount = tradeData.brokerageAccountId
+      ? (allBrokerageAccounts.find(account => account.id === tradeData.brokerageAccountId)
+        || brokerageAccounts.find(account => account.id === tradeData.brokerageAccountId))
+      : undefined;
+    const settlementAmount = Math.max(0, Number(
+      tradeData.originalAmount ?? (tradeData.amountUSD * (tradeData.rateAtTime || 1))
+    ) || 0);
+
+    if (isBrokerageSettlement && tradeData.brokerageAccountId) {
+      if (!settlementAccount || settlementAccount.kind !== 'cash' || settlementAccount.portfolioId !== targetPortfolioId) {
+        addToast(language === 'th'
+          ? 'บัญชีเงินสดที่เลือกไม่อยู่ในพอร์ตนี้ กรุณาเลือกใหม่'
+          : 'The selected cash account does not belong to this portfolio.', 'error');
+        return false;
+      }
+      if (tradeData.type === 'BUY') {
+        const availableCash = brokerageCashBalances.find(balance => balance.accountId === settlementAccount.id)?.balance || 0;
+        if (settlementAmount > availableCash + 0.000001) {
+          const message = language === 'th'
+            ? `เงินใน ${settlementAccount.name} ไม่พอ (ใช้ ${settlementAmount.toLocaleString()} ${settlementAccount.currency}, คงเหลือ ${availableCash.toLocaleString()} ${settlementAccount.currency})`
+            : `Insufficient cash in ${settlementAccount.name}.`;
+          addToast(message, 'error');
+          return false;
+        }
+      }
+    }
     if (!user) {
       const nextId = trades.length > 0 ? Math.max(...trades.map(t => t.id)) + 1 : 1;
-      const newTrades = [...trades, { ...tradeData, id: nextId }];
+      // Local mode must keep the portfolio identity too; Portfolio and Trade
+      // reconcile positions from this same transaction stream.
+      const newTrades = [...trades, { ...tradeData, portfolioId: targetPortfolioId || undefined, id: nextId }];
       setTrades(newTrades);
       localStorage.setItem("fintrack-trades", JSON.stringify(newTrades));
-      return;
+
+      // Mirror the same buy/sell into the local brokerage-cash ledger.  The
+      // hosted database does this in a trigger; local mode needs the matching
+      // behaviour so Portfolio never shows an unadjusted wallet balance.
+      if (tradeData.brokerageAccountId && isBrokerageSettlement) {
+        const account = settlementAccount;
+        if (account) {
+          const cashAmount = settlementAmount;
+          const direction = tradeData.type === 'BUY' ? -1 : 1;
+          const occurredAt = new Date(tradeData.date).toISOString();
+          setBrokerageCashBalances(prev => {
+            const balance = prev.find(item => item.accountId === account.id)?.balance || 0;
+            return [...prev.filter(item => item.accountId !== account.id), { accountId: account.id, balance: balance + direction * cashAmount }];
+          });
+          setBrokerageCashEntries(prev => [{
+            id: `local-trade-cash-${nextId}`,
+            accountId: account.id,
+            portfolioId: account.portfolioId,
+            type: tradeData.type === 'BUY' ? 'TRADE_BUY' : 'TRADE_SELL',
+            amount: cashAmount,
+            currency: account.currency,
+            occurredAt,
+            note: `Trade ${tradeData.type} ${tradeData.asset}`,
+          }, ...prev]);
+        }
+      }
+      return true;
     }
     try {
       const { data, error } = await db.trades.insert({
         user_id: user.id,
-        portfolio_id: activePortfolioId,
+        portfolio_id: targetPortfolioId,
         asset_id: null,
         asset_name: tradeData.asset,
         symbol: tradeData.asset,
@@ -2734,14 +3270,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         exchange_rate_at_time: tradeData.rateAtTime || 1,
         currency: tradeData.currency || "USD",
         original_amount: tradeData.originalAmount || null,
+        brokerage_account_id: tradeData.brokerageAccountId || null,
         total_cost: tradeData.amountUSD,
         status: "completed",
         notes: tradeData.sourceBucketId ? `Source Wallet ID: ${tradeData.sourceBucketId}` : null,
-        tags: tradeData.tag ? [tradeData.tag] : []
+        tags: [...(tradeData.tag ? [tradeData.tag] : []), ...(tradeData.fxRateTHB ? [`FX USD/THB ${tradeData.fxRateTHB}`] : [])]
       } as any);
+      if (error || !data) {
+        const message = error?.message || (language === 'th' ? 'บันทึกรายการซื้อขายไม่สำเร็จ' : 'Could not save the trade.');
+        console.error('Failed to add trade to Supabase', error);
+        addToast(message.includes('Insufficient brokerage cash balance')
+          ? (language === 'th' ? 'เงินในบัญชีโบรกไม่พอสำหรับรายการนี้' : 'Insufficient brokerage cash for this trade.')
+          : message, 'error');
+        return false;
+      }
       if (data) {
         setTrades(prev => [...prev, {
           ...tradeData,
+          portfolioId: data.portfolio_id || targetPortfolioId || undefined,
           id: parseInt(data.id.split('-')[0], 16) || Date.now(),
           dbId: data.id
         }]);
@@ -2763,66 +3309,129 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             isTransfer: ca.is_transfer || false
           })));
         }
+
+        // The trade trigger has just appended TRADE_BUY / TRADE_SELL.  Refresh
+        // the derived brokerage cash balance now rather than waiting for a
+        // page reload, so Trade's selected wallet and Portfolio agree.
+        const [balancesResult, entriesResult] = await Promise.all([
+          db.brokerageCashEntries.getBalances(user.id, activePortfolioId),
+          db.brokerageCashEntries.getAll(user.id, activePortfolioId),
+        ]);
+        if (balancesResult.data) {
+          setBrokerageCashBalances(balancesResult.data.map(balance => ({
+            accountId: balance.brokerage_account_id,
+            balance: Number(balance.cash_balance || 0),
+          })));
+        }
+        if (entriesResult.data) {
+          setBrokerageCashEntries(entriesResult.data.map(entry => ({
+            id: entry.id,
+            accountId: entry.brokerage_account_id,
+            portfolioId: entry.portfolio_id,
+            type: entry.type,
+            amount: Number(entry.amount || 0),
+            currency: entry.currency as Currency,
+            tradeId: entry.trade_id || undefined,
+            occurredAt: entry.occurred_at,
+            note: entry.note || undefined,
+          })));
+        }
+        return true;
       }
     } catch (err) {
       console.error("Failed to add trade to Supabase", err);
+      addToast(language === 'th' ? 'บันทึกรายการซื้อขายไม่สำเร็จ กรุณาลองใหม่' : 'Could not save the trade. Please try again.', 'error');
     }
 
-    // If SELL, distribute the income to buckets automatically
-    if (tradeData.type === "SELL" && moneyBuckets.length > 0) {
-      const totalAllocated = moneyBuckets.reduce((acc, b) => acc + (b.targetPercent || 0), 0);
-      if (totalAllocated > 0) {
-        for (const bucket of moneyBuckets) {
-          const pct = bucket.targetPercent || 0;
-          const share = (pct / totalAllocated) * tradeData.amountUSD;
-          if (share > 0) {
-            updateMoneyBucket(bucket.id, { currentAmount: bucket.currentAmount + share });
-            addBucketActivity({
-              bucketId: bucket.id,
-              bucketName: bucket.name,
-              type: "deposit",
-              amount: share,
-              date: new Date().toISOString(),
-              note: `SELL ${tradeData.asset} — ${t("income")}`,
-            });
-          }
-        }
-      }
-    }
+    // Trade proceeds remain in the brokerage account.  The database records
+    // the cash effect in its own append-only brokerage ledger; bank buckets
+    // are deliberately not involved in investment execution.
+    return false;
   };
 
-  const removeAsset = async (symbol: string) => {
+  const refreshBrokerageLedger = async () => {
+    if (!user) return;
+    const [balances, entries] = await Promise.all([
+      db.brokerageCashEntries.getBalances(user.id, activePortfolioId),
+      db.brokerageCashEntries.getAll(user.id, activePortfolioId),
+    ]);
+    if (balances.data) setBrokerageCashBalances(balances.data.map(row => ({ accountId: row.brokerage_account_id, balance: Number(row.cash_balance || 0) })));
+    if (entries.data) setBrokerageCashEntries(entries.data.map(row => ({
+      id: row.id, accountId: row.brokerage_account_id, portfolioId: row.portfolio_id,
+      type: row.type, amount: Number(row.amount || 0), currency: row.currency as Currency,
+      tradeId: row.trade_id || undefined, occurredAt: row.occurred_at, note: row.note || undefined,
+    })));
+  };
+
+  const correctFinancialEvent = async (rpc: string, args: Record<string, unknown>): Promise<boolean> => {
+    if (!user) { addToast('เข้าสู่ระบบก่อนจัดการรายการเงินจริง', 'warning'); return false; }
+    const { data, error } = await supabase.rpc(rpc, args);
+    if (error || data === false || data == null) {
+      addToast(error?.message?.includes('Insufficient') ? 'ย้อนรายการไม่ได้ เพราะเงินคงเหลือไม่พอ กรุณาจัดการรายการที่ใช้เงินนี้ก่อน'
+        : error?.message?.includes('Ambiguous') ? 'ประวัติเก่ามีเลขไม้ซ้ำ กรุณาลบรายการที่ต้องการใน Ledger เพื่อไม่ให้ลบผิดไม้'
+        : error?.message || 'บันทึกไม่สำเร็จ', 'error');
+      return false;
+    }
+    if (rpc === 'delete_trade_journal_transactions' && Array.isArray(data)) {
+      setTrades(previous => previous.filter(trade => !data.includes(trade.dbId)));
+    }
+    setFinancialRevision(revision => revision + 1);
+    addToast('บันทึกแล้ว กำลังอัปเดตยอดทุกหน้า', 'success');
+    return true;
+  };
+  const deleteBrokerCashMovement = (id: string) => correctFinancialEvent('delete_broker_cash_movement', { p_id: id });
+  const deleteTradeJournalTransactions = (id: string) => correctFinancialEvent('delete_trade_journal_transactions', { p_id: id });
+  const transferBrokerToBucket = (id: string, accountId: string, bucketId: string, amount: number, rate: number) =>
+    correctFinancialEvent('transfer_broker_to_bucket', { p_id: id, p_account_id: accountId, p_bucket_id: bucketId, p_amount: amount, p_rate: rate });
+
+  const removeAsset = async (symbol: string, portfolioId?: string) => {
     const sym = symbol.toUpperCase();
+    const targetPortfolioId = portfolioId ?? activePortfolioId;
+    const isTargetAsset = (asset: Asset) => asset.symbol.toUpperCase() === sym
+      && (asset.portfolioId ?? activePortfolioId) === targetPortfolioId;
+    const isTargetTrade = (trade: Trade) => trade.asset.toUpperCase() === sym
+      && (trade.portfolioId ?? activePortfolioId) === targetPortfolioId;
     if (!user) {
-      deletedAssetSymbols.current.add(sym);
       setAssets(prev => {
-        const newAssets = prev.filter(a => a.symbol.toUpperCase() !== sym);
+        const newAssets = prev.filter(asset => !isTargetAsset(asset));
         localStorage.setItem("fintrack-assets", JSON.stringify(newAssets));
         return newAssets;
       });
       setTrades(prev => {
-        const newTrades = prev.filter(t => t.asset.toUpperCase() !== sym);
+        const newTrades = prev.filter(trade => !isTargetTrade(trade));
         localStorage.setItem("fintrack-trades", JSON.stringify(newTrades));
         return newTrades;
       });
       return;
     }
     try {
-      // Option B: Soft delete all rows matching symbol
-      await db.assets.softDeleteBySymbol(user.id, sym, activePortfolioId);
+      if (!targetPortfolioId) {
+        addToast(language === 'th' ? 'เลือกพอร์ตเดี่ยวก่อนลบสินทรัพย์' : 'Select one portfolio before deleting an asset.', 'warning');
+        return;
+      }
+
+      // Broker cash entries deliberately protect their linked trade from a
+      // plain DELETE.  The RPC removes both sides atomically, so the asset
+      // cannot return after a refresh because the original trade survived.
+      const { error } = await db.trades.deletePositionWithBrokerageCash(sym, targetPortfolioId);
+      if (error) throw error;
       
-      // Delete all trades for this asset
-      await db.trades.deleteBySymbol(user.id, sym, activePortfolioId);
-      
-      deletedAssetSymbols.current.add(sym);
-      setAssets(prev => prev.filter(a => a.symbol.toUpperCase() !== sym));
-      setTrades(prev => prev.filter(t => t.asset.toUpperCase() !== sym));
+      setAssets(prev => prev.filter(asset => !isTargetAsset(asset)));
+      setTrades(prev => prev.filter(trade => !isTargetTrade(trade)));
+      await refreshBrokerageLedger();
+      addToast(language === 'th' ? `ลบ ${sym} จากพอร์ตแล้ว` : `Removed ${sym} from the portfolio.`, 'success');
     } catch (err) {
       console.error("Failed to remove asset from Supabase", err);
+      addToast(language === 'th' ? 'ลบสินทรัพย์ไม่สำเร็จ กรุณาลองใหม่' : 'Could not remove the asset. Please try again.', 'error');
     }
   };
 
   const updateAsset = async (symbol: string, updates: Partial<Asset>) => {
+    const selectedPortfolio = portfolios.find(portfolio => portfolio.id === activePortfolioId);
+    if (activePortfolioId && selectedPortfolio?.kind !== 'trading') {
+      addToast(language === 'th' ? 'แก้ไขสินทรัพย์ได้เฉพาะพอร์ตลงทุน' : 'Assets can only be changed in a trading portfolio.', 'warning');
+      return;
+    }
     const sym = symbol.toUpperCase();
     if (!user) {
       setAssets(prev => {
@@ -2845,6 +3454,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           supabaseUpdates.allocation = updates.allocation;
         }
         if (updates.is_active !== undefined) supabaseUpdates.is_active = updates.is_active;
+        if (updates.brokerageAccountId !== undefined) supabaseUpdates.brokerage_account_id = updates.brokerageAccountId || null;
         
         await db.assets.update(asset.id, supabaseUpdates);
       }
@@ -2874,27 +3484,48 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const removeTrade = async (id: number) => {
+  const removeTrade = async (id: number): Promise<boolean> => {
     const tradeToRemove = trades.find(t => t.id === id);
+    if (!tradeToRemove) return false;
+    const blockedReason = tradeDeletionReason(tradeToRemove, trades, language);
+    if (blockedReason) { addToast(blockedReason, 'warning'); return false; }
     if (!user || !tradeToRemove?.dbId) {
       setTrades(prev => {
         const newTrades = prev.filter(t => t.id !== id);
         localStorage.setItem("fintrack-trades", JSON.stringify(newTrades));
         return newTrades;
       });
-      return;
+      return true;
     }
     try {
-      await db.trades.delete(tradeToRemove.dbId);
+      const { data, error } = await db.trades.deleteWithBrokerageCash(tradeToRemove.dbId);
+      if (error) throw error;
+      if (!data) throw new Error('Trade was not deleted');
       setTrades(prev => prev.filter(t => t.id !== id));
+      if (!trades.some(trade => trade.id !== id && trade.asset === tradeToRemove.asset && trade.portfolioId === tradeToRemove.portfolioId)) {
+        setAssets(prev => prev.filter(asset => !(asset.symbol === tradeToRemove.asset && asset.portfolioId === tradeToRemove.portfolioId)));
+      }
+      await refreshBrokerageLedger();
+      addToast(language === 'th' ? 'ลบรายการโบรกแล้ว' : 'Brokerage entry deleted.', 'success');
+      return true;
     } catch (err) {
-      console.error("Failed to remove trade from Supabase", err);
+      const message = tradeDeleteError(err, language);
+      console.warn('Trade deletion rejected:', message);
+      addToast(message, 'error');
+      return false;
     }
   };
 
-  const updateTrade = async (id: number, updates: Partial<Trade>) => {
+  const updateTrade = async (id: number, updates: Partial<Trade>): Promise<boolean> => {
     const tradeToUpdate = trades.find(t => t.id === id);
-    if (!tradeToUpdate) return;
+    if (!tradeToUpdate) return false;
+    // Editors submit gross execution amounts. Preserve the already-paid fee
+    // in settlement when changing quantity/price; never silently refund it.
+    if (updates.originalAmount !== undefined && updates.amountUSD !== undefined) {
+      const rate = tradeToUpdate.currency === 'USD' ? 1 : tradeToUpdate.rateAtTime || 1;
+      const fee = tradeToUpdate.fees || 0;
+      updates = { ...updates, originalAmount: updates.originalAmount + (tradeToUpdate.type === 'SELL' ? -fee : fee) * rate };
+    }
     
     if (!user || !tradeToUpdate.dbId) {
       setTrades(prev => {
@@ -2902,34 +3533,88 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem("fintrack-trades", JSON.stringify(newTrades));
         return newTrades;
       });
-      return;
+      return true;
     }
     
-    // Update local state first for optimistic UI
+    const originalTrade = tradeToUpdate;
+    // Update local state first for optimistic UI, then restore it if the
+    // database rejects the change.
     setTrades(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
     
     try {
-      // Map to db format if necessary, assuming simple mapping here
       const dbUpdates: any = {};
-      if (updates.asset !== undefined) dbUpdates.asset = updates.asset;
+      if (updates.asset !== undefined) {
+        dbUpdates.symbol = updates.asset;
+        dbUpdates.asset_name = updates.asset;
+      }
       if (updates.type !== undefined) dbUpdates.type = updates.type;
       if (updates.amountUSD !== undefined) dbUpdates.amount_usd = updates.amountUSD;
-      if (updates.date !== undefined) dbUpdates.date = updates.date;
-      if (updates.shares !== undefined) dbUpdates.shares = updates.shares;
-      if (updates.pricePerUnit !== undefined) dbUpdates.price_per_unit = updates.pricePerUnit;
+      if (updates.date !== undefined) dbUpdates.execution_date = new Date(updates.date).toISOString();
+      if (updates.shares !== undefined) dbUpdates.quantity = updates.shares;
+      if (updates.pricePerUnit !== undefined) dbUpdates.price_at_execution = updates.pricePerUnit;
+      if (updates.fees !== undefined) dbUpdates.fees = updates.fees;
       if (updates.originalAmount !== undefined) dbUpdates.original_amount = updates.originalAmount;
       if (updates.currency !== undefined) dbUpdates.currency = updates.currency;
       if (updates.rateAtTime !== undefined) dbUpdates.exchange_rate_at_time = updates.rateAtTime;
       
-      if (Object.keys(dbUpdates).length > 0) {
-        await db.trades.update(tradeToUpdate.dbId, dbUpdates);
+      const nextTrade = { ...tradeToUpdate, ...updates };
+      const isPostedBrokerageTrade = Boolean(nextTrade.brokerageAccountId)
+        && (nextTrade.type === 'BUY' || nextTrade.type === 'SELL');
+
+      if (isPostedBrokerageTrade) {
+        const { error } = await db.trades.replaceWithBrokerageCash({
+          id: tradeToUpdate.dbId,
+          symbol: nextTrade.asset,
+          executionDate: new Date(nextTrade.date).toISOString(),
+          quantity: Number(nextTrade.shares),
+          priceAtExecution: Number(nextTrade.pricePerUnit),
+          amountUSD: Number(nextTrade.amountUSD),
+          originalAmount: Number(nextTrade.originalAmount ?? nextTrade.amountUSD),
+        });
+        if (error) throw error;
+      } else if (Object.keys(dbUpdates).length > 0) {
+        const { error } = await db.trades.update(tradeToUpdate.dbId, dbUpdates);
+        if (error) throw error;
       }
+      if (isPostedBrokerageTrade && nextTrade.portfolioId) {
+        const [balancesResult, entriesResult] = await Promise.all([
+          db.brokerageCashEntries.getBalances(user.id, nextTrade.portfolioId),
+          db.brokerageCashEntries.getAll(user.id, nextTrade.portfolioId),
+        ]);
+        if (balancesResult.data) {
+          setBrokerageCashBalances(balancesResult.data.map(balance => ({
+            accountId: balance.brokerage_account_id,
+            balance: Number(balance.cash_balance || 0),
+          })));
+        }
+        if (entriesResult.data) {
+          setBrokerageCashEntries(entriesResult.data.map(entry => ({
+            id: entry.id,
+            accountId: entry.brokerage_account_id,
+            portfolioId: entry.portfolio_id,
+            type: entry.type,
+            amount: Number(entry.amount || 0),
+            currency: entry.currency as Currency,
+            tradeId: entry.trade_id || undefined,
+            occurredAt: entry.occurred_at,
+            note: entry.note || undefined,
+          })));
+        }
+      }
+      return true;
     } catch (err) {
       console.error("Failed to update trade in Supabase", err);
+      setTrades(prev => prev.map(t => t.id === id ? originalTrade : t));
+      addToast(t("errorOccurred") || "Failed to update trade", "error");
+      return false;
     }
   };
 
   const updateCashActivity = async (id: string, updates: Partial<CashActivity>) => {
+    if (cashActivities.find(activity => activity.id === id)?.note?.includes('[funding:')) {
+      addToast('รายการนี้เชื่อมกับยอดเงินในโบรกเกอร์ ไม่สามารถแก้ไขฝั่งเดียวได้', 'warning');
+      return;
+    }
     const activityToUpdate = cashActivities.find(c => c.id === id);
     if (!activityToUpdate) return;
     
@@ -2964,10 +3649,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Bucket/Cash operations are global — when "All portfolios" is active, fall back to the first portfolio
-  const bucketPortfolioId = activePortfolioId || (portfolios.length > 0 ? portfolios[0].id : null);
+  // Bucket data lives only in the dedicated cash-management portfolio.  The
+  // All-portfolios view is allowed to show/manage that shared bank view, but
+  // must never fall back to an arbitrary trading portfolio.
+  const selectedPortfolioForBuckets = portfolios.find(portfolio => portfolio.id === activePortfolioId);
+  const bucketPortfolioId = selectedPortfolioForBuckets?.kind === 'cash_management'
+    ? selectedPortfolioForBuckets.id
+    : portfolios.find(portfolio => portfolio.kind === 'cash_management')?.id || null;
 
   const addMoneyBucket = async (bucket: Omit<MoneyBucket, 'id'>) => {
+    if (!isFxCurrency(bucket.currency)) { addToast('unresolved: กรุณาระบุสกุล Bucket', 'error'); return; }
     if (!user) {
       const id = Date.now().toString();
       setMoneyBuckets(prev => {
@@ -2988,7 +3679,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         target_percent: bucket.targetPercent,
         target_amount: bucket.targetAmount || 0,
         current_amount: bucket.currentAmount,
-        currency: bucket.currency || "USD",
+        currency: bucket.currency,
         color: bucket.color,
         icon: bucket.icon,
         linked_to_expenses: bucket.linkedToExpenses || false
@@ -3008,6 +3699,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateMoneyBucket = async (id: string, updates: Partial<MoneyBucket>) => {
+    const bucket = moneyBuckets.find(b => b.id === id);
+    if (!bucket || !isFxCurrency(bucket.currency) || (updates.currentAmount !== undefined && (!Number.isFinite(updates.currentAmount) || updates.currentAmount < 0))
+      || (updates.currency !== undefined && updates.currency !== bucket.currency)) {
+      addToast('unresolved: ตรวจสกุลและยอด Bucket ก่อนบันทึก ห้ามเปลี่ยนสกุลยอดเดิม', 'error'); return;
+    }
     if (!user) {
       setMoneyBuckets(prev => {
         const newBuckets = prev.map(b => b.id === id ? { ...b, ...updates } : b);
@@ -3053,6 +3749,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addBucketActivity = async (activity: Omit<BucketActivity, 'id'>) => {
+    try {
+      const bucket = moneyBuckets.find(b => b.id === activity.bucketId);
+      bucketNativeAmount({ original_amount: activity.originalAmount, currency: activity.currency }, bucket?.currency);
+    } catch (error) { addToast(String(error), 'error'); return; }
     if (!user) {
       const id = Date.now().toString() + "-" + Math.random().toString(36).substr(2, 9);
       setBucketActivities(prev => {
@@ -3078,7 +3778,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         date: activity.date,
         currency: activity.currency || null,
         rate_at_time: activity.rateAtTime || null,
-        original_amount: activity.originalAmount || null
+        original_amount: activity.originalAmount ?? null
       } as any);
 
       if (error) {
@@ -3098,6 +3798,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
 
   const removeBucketActivity = async (id: string) => {
+    if (bucketActivities.find(activity => activity.id === id)?.note?.includes('[funding:')) {
+      addToast('รายการนี้เชื่อมกับยอดเงินในโบรกเกอร์ ไม่สามารถลบฝั่งเดียวได้', 'warning');
+      return;
+    }
     if (!user) {
       setBucketActivities(prev => {
         const newActivities = prev.filter(a => a.id !== id);
@@ -3115,6 +3819,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addCashActivity = async (activityData: Omit<CashActivity, "id">): Promise<CashActivity | null> => {
+    try {
+      const row = { original_amount: activityData.originalAmount, currency: activityData.currency };
+      getNativeLeg(row);
+      if (activityData.bucketId) {
+        const bucket = moneyBuckets.find(b => b.id === activityData.bucketId);
+        bucketNativeAmount(row, bucket?.currency);
+      }
+    } catch (error) { addToast(String(error), 'error'); return null; }
     if (!user) {
       const id = Math.random().toString(36).substr(2, 9);
       const newActivity = { ...activityData, id };
@@ -3144,7 +3856,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         is_transfer: activityData.isTransfer || false,
         currency: activityData.currency || null,
         rate_at_time: activityData.rateAtTime || null,
-        original_amount: activityData.originalAmount || null
+        original_amount: activityData.originalAmount ?? null
       } as any);
 
       if (error) {
@@ -3172,23 +3884,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const removeCashActivity = async (id: string) => {
     const activity = cashActivities.find(a => a.id === id);
     if (!activity) return;
+    if (activity.note?.includes('[funding:')) {
+      addToast('รายการนี้เชื่อมกับยอดเงินในโบรกเกอร์ ไม่สามารถลบฝั่งเดียวได้', 'warning');
+      return;
+    }
 
-    // Bucket reversion logic
+    // Validate BEFORE deletion; a missing native leg must never remove the source.
+    const sourceBucket = moneyBuckets.find(b => b.id === activity.bucketId);
+    let reversalBalance: number | undefined;
+    try {
+      getNativeLeg({ original_amount: activity.originalAmount, currency: activity.currency });
+      if (activity.bucketId) {
+        if (!sourceBucket) throw Error('unresolved: ไม่พบ Bucket ของรายการเดิม');
+        reversalBalance = nativeBucketBalance(sourceBucket.currentAmount,
+          { original_amount: activity.originalAmount, currency: activity.currency }, sourceBucket.currency,
+          activity.type === 'EXPENSE' || activity.type === 'WITHDRAW' ? 1 : -1);
+      }
+    } catch (error) { addToast(String(error), 'error'); return; }
+    // Reverse the recorded native leg, never today's FX quote.
     const revertBucket = () => {
       if (activity.bucketId && activity.bucketId !== "<no-bucket>" && activity.bucketId !== "<auto-distribute>") {
         const bucket = moneyBuckets.find(b => b.id === activity.bucketId);
         if (bucket) {
-          const bCur = bucket.currency === "THB" ? "THB" : "USD";
-          // @ts-ignore - we assume exchangeRates is available in the same scope since this is inside AppContext.tsx
-          const bRate = (typeof exchangeRates !== 'undefined' && exchangeRates[bCur]) || 1;
-          const amountInBucketCur = (activity.amountUSD ?? 0) * bRate;
-          
-          let newAmount = bucket.currentAmount;
-          if (activity.type === "EXPENSE" || activity.type === "WITHDRAW") {
-            newAmount = bucket.currentAmount + amountInBucketCur; // Revert withdrawal by adding back
-          } else if (activity.type === "INCOME" || activity.type === "DEPOSIT") {
-            newAmount = Math.max(0, bucket.currentAmount - amountInBucketCur); // Revert deposit by subtracting
-          }
+          const leg = getNativeLeg({ original_amount: activity.originalAmount, currency: activity.currency });
+          const bCur = leg.currency;
+          const bRate = activity.rateAtTime;
+          const amountInBucketCur = leg.amount;
+          const newAmount = reversalBalance!;
           
           updateMoneyBucket(bucket.id, { currentAmount: newAmount });
           addBucketActivity({
@@ -3216,7 +3938,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     try {
-      await db.cashActivities.delete(id);
+      const { error } = await db.cashActivities.delete(id);
+      if (error) throw error;
       setCashActivities(prev => prev.filter(a => a.id !== id));
       revertBucket();
     } catch (err) {
@@ -3301,15 +4024,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const addTradeFromBucket = async (tradeData: Omit<Trade, 'id'>, bucketId: string) => {
     const bucket = moneyBuckets.find(b => b.id === bucketId);
     if (!bucket) return;
-    const bucketCurrency = bucket.currency || "USD";
-    const tradeAmountInBucketCurrency = tradeData.amountUSD * (exchangeRates[bucketCurrency] || 1);
+    let tradeAmountInBucketCurrency: number;
+    try {
+      tradeAmountInBucketCurrency = bucketNativeAmount({ original_amount: tradeData.originalAmount, currency: tradeData.currency }, bucket.currency);
+    } catch (error) { addToast(String(error), 'error'); return; }
     if (tradeAmountInBucketCurrency > bucket.currentAmount) {
       addToast(t("amountExceedsBalance"), 'error');
       return;
     }
 
     // Add the trade
-    await addTrade({ ...tradeData, sourceBucketId: bucketId });
+    const saved = await addTrade({ ...tradeData, sourceBucketId: bucketId });
+    if (!saved) return;
 
     // Deduct from bucket
     await updateMoneyBucket(bucketId, { currentAmount: bucket.currentAmount - tradeAmountInBucketCurrency });
@@ -3322,6 +4048,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       amount: tradeAmountInBucketCurrency,
       date: new Date().toISOString(),
       note: `Trade ${tradeData.asset} — ${t('deductedFromBucket')}`,
+      currency: tradeData.currency,
+      originalAmount: tradeAmountInBucketCurrency,
+      rateAtTime: tradeData.rateAtTime,
     });
   };
 
@@ -3354,7 +4083,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [includedAssets]);
 
   // ── Custom Category Actions ───────────────────────────────────
-  const addCustomCategory = async (type: 'INCOME' | 'EXPENSE', label: string, icon = '🏷️') => {
+  const addCustomCategory = async (type: 'INCOME' | 'EXPENSE', label: string, icon = 'tag') => {
     const trimmed = label.trim();
     if (!trimmed) return;
     // Optimistic update
@@ -3416,8 +4145,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     blockAllPortfolioMutation();
     return null;
   };
-  const blockAllPortfolioMutationAsync = async (): Promise<void> => {
+  const blockAllPortfolioMutationAsync = async (): Promise<boolean> => {
     blockAllPortfolioMutation();
+    return false;
+  };
+  const blockAllPortfolioMutationVoidAsync = async (): Promise<void> => {
+    blockAllPortfolioMutation();
+  };
+  // Bucket is the shared bank layer.  It remains usable regardless of the
+  // selected investment broker so funds can move into that broker's account.
+  const canUseMoneyBuckets = true;
+  const blockMoneyBucketMutation = () => {
+    addToast(
+      language === 'th'
+        ? 'Bucket ใช้ได้เฉพาะพอร์ตบัญชีธนาคาร/เงินสดเท่านั้น'
+        : 'Money Buckets are available only in the cash-management portfolio.',
+      'warning'
+    );
   };
 
   return (
@@ -3429,14 +4173,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       t, 
       formatMoney,
       exchangeRates,
+      setExchangeRate,
+      resetExchangeRateToAuto,
+      isExchangeRateCustom,
       trades,
-      addTrade: isAllPortfolios ? blockAllPortfolioMutation : addTrade,
-      cashActivities,
-      addCashActivity,
-      removeCashActivity,
+      addTrade,
+      cashActivities: canUseMoneyBuckets ? cashActivities : [],
+      addCashActivity: canUseMoneyBuckets ? addCashActivity : readOnlyCashActivity,
+      removeCashActivity: canUseMoneyBuckets ? removeCashActivity : blockMoneyBucketMutation,
       allocations,
       updateAllocation: isAllPortfolios ? blockAllPortfolioMutation : updateAllocation,
       assets,
+      marketQuotes,
       portfolios,
       activePortfolioId,
       activePortfolio,
@@ -3444,6 +4192,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       selectPortfolio,
       createPortfolio,
       renamePortfolio,
+      brokerageAccounts,
+      allBrokerageAccounts,
+      brokerageCashBalances,
+      brokerageCashEntries,
+      transferBucketToBroker,
+      transferBrokerToBucket,
+      deleteBrokerCashMovement,
+      deleteTradeJournalTransactions,
+      addBrokerageAccount,
+      updateBrokerageAccount,
+      recordBrokerageCashMovement,
       addAsset: isAllPortfolios ? blockAllPortfolioMutation : addAsset,
       syncDcaPosition,
       bulkAddTrades: isAllPortfolios ? blockAllPortfolioMutation : bulkAddTrades,
@@ -3451,12 +4210,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       userProfile,
       setUserProfile,
       fetchAssetMarketData,
-      removeAsset: isAllPortfolios ? blockAllPortfolioMutation : removeAsset,
+      removeAsset: isAllPortfolios ? blockAllPortfolioMutationVoidAsync : removeAsset,
       updateAsset: isAllPortfolios ? blockAllPortfolioMutation : updateAsset,
       reorderAssets: isAllPortfolios ? blockAllPortfolioMutation : reorderAssets,
-      removeTrade: isAllPortfolios ? blockAllPortfolioMutation : removeTrade,
-      updateTrade: isAllPortfolios ? blockAllPortfolioMutation : updateTrade,
-      updateCashActivity,
+      removeTrade: isAllPortfolios ? blockAllPortfolioMutationAsync : removeTrade,
+      updateTrade: isAllPortfolios ? blockAllPortfolioMutationAsync : updateTrade,
+      updateCashActivity: canUseMoneyBuckets ? updateCashActivity : blockMoneyBucketMutation,
       toasts,
       addToast,
       removeToast,
@@ -3471,14 +4230,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       isDataLoaded,
       notifPreferences,
       setNotifPreferences,
-      moneyBuckets: dynamicMoneyBuckets,
-      addMoneyBucket,
-      updateMoneyBucket,
-      removeMoneyBucket,
-      bucketActivities,
-      addBucketActivity,
-      removeBucketActivity,
-      addTradeFromBucket,
+      moneyBuckets: canUseMoneyBuckets ? dynamicMoneyBuckets : [],
+      allMoneyBuckets: canUseMoneyBuckets ? allMoneyBuckets : [],
+      addMoneyBucket: canUseMoneyBuckets ? addMoneyBucket : blockMoneyBucketMutation,
+      updateMoneyBucket: canUseMoneyBuckets ? updateMoneyBucket : blockMoneyBucketMutation,
+      removeMoneyBucket: canUseMoneyBuckets ? removeMoneyBucket : blockMoneyBucketMutation,
+      bucketActivities: canUseMoneyBuckets ? bucketActivities : [],
+      addBucketActivity: canUseMoneyBuckets ? addBucketActivity : blockMoneyBucketMutation,
+      removeBucketActivity: canUseMoneyBuckets ? removeBucketActivity : blockMoneyBucketMutation,
+      // Investments are always funded by brokerage cash accounts, never by a
+      // personal/bank Money Bucket (including in the All-portfolios view).
+      addTradeFromBucket: ((..._args: Parameters<typeof addTradeFromBucket>) => blockMoneyBucketMutation()),
       dashboardWidgets,
       setDashboardWidgets,
       totalInvested,

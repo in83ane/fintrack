@@ -11,7 +11,7 @@ const NAV_ITEMS = [
   { path: "/portfolio", icon: Briefcase, label: "Portfolio", color: "#ADC6FF" },
   { path: "/ledger", icon: ReceiptText, label: "Ledger", color: "#E9C349" },
   { path: "/budget", icon: PiggyBank, label: "Bucket", color: "#FF8B9A" },
-  { path: "/calendar", icon: CalendarDays, label: "Calendar", color: "#A78BFA" },
+  { path: "/history", icon: CalendarDays, label: "History", color: "#A78BFA" },
 ];
 
 export function BottomNav() {

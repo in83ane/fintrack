@@ -1,14 +1,17 @@
 "use client";
 
+import { FinanceIcon } from "@/src/components/FinanceIcon";
 import React, { useState } from "react";
 import { Search, Plus, Loader2, Wallet, ChevronDown, ArrowDownToLine, ShoppingCart } from "lucide-react";
 import { Modal } from "@/src/components/Modal";
 import { useApp, Asset } from "@/src/context/AppContext";
 import { cn } from "@/src/lib/utils";
+import { CustomSelect } from "@/src/components/CustomSelect";
 
 interface AddAssetModalProps {
   isOpen: boolean;
   onClose: () => void;
+  variant?: "search" | "portfolio";
 }
 
 const POPULAR_ASSETS = [
@@ -24,7 +27,7 @@ const POPULAR_ASSETS = [
   { symbol: "GLD", name: "SPDR Gold Shares ETF", exchange: "NYSE" },
 ];
 
-export function AddAssetModal({ isOpen, onClose }: AddAssetModalProps) {
+export function AddAssetModal({ isOpen, onClose, variant = "search" }: AddAssetModalProps) {
   const { t, addAsset, addTrade, addTradeFromBucket, fetchAssetMarketData, exchangeRates, currency, language, moneyBuckets, formatMoney, addToast } = useApp();
 
   const [step, setStep] = useState<"search" | "details">("search");
@@ -70,13 +73,14 @@ export function AddAssetModal({ isOpen, onClose }: AddAssetModalProps) {
   };
 
   // Convert input price to USD for internal storage
-  const THB_RATE = exchangeRates['THB'] || 36.5;
+  const THB_RATE = exchangeRates.THB;
   const avgCostUSD = priceCurrency === 'THB' ? Number(avgCost) / THB_RATE : Number(avgCost);
   const totalCostUSD = avgCostUSD * Number(shares);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedResult || !shares || !avgCost) return;
+    if (!Number.isFinite(totalCostUSD)) { addToast('ยังไม่มีข้อมูลเรท USD/THB กรุณารอข้อมูลก่อนบันทึก', 'error'); return; }
 
     // Validate bucket balance (only for new purchases with bucket)
     if (!isImport && selectedBucketId) {
@@ -115,13 +119,18 @@ export function AddAssetModal({ isOpen, onClose }: AddAssetModalProps) {
           // For Thai-priced assets: live price from API may be in THB, convert to USD
           const rawPrice = liveData?.price || 0;
           const apiCurrency = (sym.endsWith('.BK') || sym.endsWith('.TH') || sym === 'GLD965') ? 'THB' : 'USD';
-          livePrice = rawPrice > 0
-            ? (apiCurrency === 'THB' ? rawPrice / THB_RATE : rawPrice)
-            : avgCostUSD;
+          if (rawPrice <= 0) {
+            addToast('ไม่พบราคาตลาดของสัญลักษณ์นี้ จึงยังเพิ่มสินทรัพย์ไม่ได้', 'error');
+            setIsAdding(false);
+            return;
+          }
+          livePrice = apiCurrency === 'THB' ? rawPrice / THB_RATE : rawPrice;
           liveName = liveData?.name || selectedResult.name || selectedResult.symbol;
           chartData = liveData?.chartData;
         } catch {
-          // fallback to manual price
+          addToast('ดึงราคาตลาดไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 'error');
+          setIsAdding(false);
+          return;
         }
       }
 
@@ -187,6 +196,10 @@ export function AddAssetModal({ isOpen, onClose }: AddAssetModalProps) {
     resetState();
     onClose();
   };
+
+  if (variant === "portfolio") {
+    return <PortfolioAssetEntryModal isOpen={isOpen} onClose={onClose} />;
+  }
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title={t("addAsset")}>
@@ -415,7 +428,7 @@ export function AddAssetModal({ isOpen, onClose }: AddAssetModalProps) {
                     {selectedBucketId
                       ? (() => {
                           const b = moneyBuckets.find(b => b.id === selectedBucketId);
-                          return b ? `${b.icon} ${t(b.name) || b.name}` : t("selectSourceBucket");
+                          return b ? `${t(b.name) || b.name}` : t("selectSourceBucket");
                         })()
                       : t("noBucketSelected")
                     }
@@ -448,7 +461,7 @@ export function AddAssetModal({ isOpen, onClose }: AddAssetModalProps) {
                           )}
                         >
                           <span className="flex items-center gap-2">
-                            <span>{b.icon}</span>
+                            <span><FinanceIcon name={b.icon} /></span>
                             <span>{t(b.name) || b.name}</span>
                           </span>
                           <span className={cn("text-xs font-bold", hasEnough || totalCost === 0 ? "text-gray-500" : "text-[#FFB4AB]")}>
@@ -488,7 +501,7 @@ export function AddAssetModal({ isOpen, onClose }: AddAssetModalProps) {
                 return (
                   <div className="flex justify-between text-xs pt-1 border-t border-border">
                     <span className="text-gray-500 flex items-center gap-1">
-                      <Wallet size={10} /> {t("bucketBalance")}: {b.icon} {t(b.name) || b.name}
+                      <Wallet size={10} /> {t("bucketBalance")}: <FinanceIcon name={b.icon} /> {t(b.name) || b.name}
                     </span>
                     <span className={cn("font-bold", remaining >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
                       {formatMoney(remaining)}
@@ -545,6 +558,196 @@ export function AddAssetModal({ isOpen, onClose }: AddAssetModalProps) {
           </div>
         </form>
       )}
+    </Modal>
+  );
+}
+
+type PortfolioMarket = "US" | "TH" | "GOLD" | "FUND";
+
+const PORTFOLIO_MARKETS: Array<{ id: PortfolioMarket; label: string; currency: "USD" | "THB" }> = [
+  { id: "US", label: "หุ้นสหรัฐฯ", currency: "USD" },
+  { id: "TH", label: "หุ้นไทย", currency: "THB" },
+  { id: "GOLD", label: "ทองคำ", currency: "USD" },
+  { id: "FUND", label: "กองทุนรวม", currency: "THB" },
+];
+
+function PortfolioAssetEntryModal({ isOpen, onClose }: Pick<AddAssetModalProps, "isOpen" | "onClose">) {
+  const {
+    portfolios, activePortfolio, selectPortfolio, addAsset, addTrade,
+    fetchAssetMarketData, exchangeRates, addToast,
+  } = useApp();
+  const tradingPortfolios = portfolios.filter(portfolio => portfolio.kind === "trading");
+  const [brokerId, setBrokerId] = useState("");
+  const [market, setMarket] = useState<PortfolioMarket>("US");
+  const [symbol, setSymbol] = useState("");
+  const [name, setName] = useState("");
+  const [shares, setShares] = useState("");
+  const [avgCost, setAvgCost] = useState("");
+  const [marketPrice, setMarketPrice] = useState<number | null>(null);
+  const [quoteState, setQuoteState] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>('idle');
+  const [isSaving, setIsSaving] = useState(false);
+  const fetchQuoteRef = React.useRef(fetchAssetMarketData);
+
+  React.useEffect(() => {
+    if (activePortfolio?.kind === "trading") setBrokerId(activePortfolio.id);
+  }, [activePortfolio]);
+
+  React.useEffect(() => {
+    if (!isOpen) {
+      setMarket("US");
+      setSymbol("");
+      setName("");
+      setShares("");
+      setAvgCost("");
+      setMarketPrice(null);
+      setQuoteState('idle');
+      setIsSaving(false);
+    }
+  }, [isOpen]);
+
+  const selectedMarket = PORTFOLIO_MARKETS.find(item => item.id === market) ?? PORTFOLIO_MARKETS[0];
+  const currency = selectedMarket.currency;
+  const sharesNumber = Number(shares);
+  const avgCostNumber = Number(avgCost);
+  const isValid = Boolean(brokerId && symbol.trim() && sharesNumber > 0 && avgCostNumber > 0 && marketPrice && quoteState === 'ready');
+
+  React.useEffect(() => {
+    fetchQuoteRef.current = fetchAssetMarketData;
+  }, [fetchAssetMarketData]);
+
+  React.useEffect(() => {
+    const ticker = symbol.trim().toUpperCase();
+    if (!isOpen || !ticker) {
+      setMarketPrice(null);
+      setQuoteState('idle');
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setQuoteState('loading');
+      setMarketPrice(null);
+      try {
+        const quote = await fetchQuoteRef.current(ticker);
+        const rawPrice = Number(quote?.price || 0);
+        const quoteCurrency = quote?.quoteCurrency === 'THB' || ticker.endsWith('.BK') || ticker.endsWith('.TH') ? 'THB' : 'USD';
+        const rate = exchangeRates.THB || 1;
+        const displayPrice = quoteCurrency === currency ? rawPrice : quoteCurrency === 'THB' ? rawPrice / rate : rawPrice * rate;
+        if (cancelled) return;
+        if (displayPrice > 0) {
+          setMarketPrice(displayPrice);
+          setQuoteState('ready');
+        } else setQuoteState('unavailable');
+      } catch {
+        if (!cancelled) setQuoteState('unavailable');
+      }
+    }, 350);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [currency, exchangeRates.THB, isOpen, symbol]);
+
+  const chooseBroker = (id: string) => {
+    setBrokerId(id);
+    selectPortfolio(id);
+  };
+
+  const save = async () => {
+    if (!isValid) return;
+    const targetPortfolio = tradingPortfolios.find(portfolio => portfolio.id === brokerId);
+    if (!targetPortfolio) return;
+    if (activePortfolio?.id !== brokerId) {
+      selectPortfolio(brokerId);
+      addToast("เลือกโบรกเกอร์แล้ว กรุณายืนยันเพิ่มสินทรัพย์อีกครั้ง", "info");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const ticker = symbol.trim().toUpperCase();
+      const rate = currency === "THB" ? (exchangeRates.THB || 1) : 1;
+      const marketData = await fetchQuoteRef.current(ticker);
+      const rawPrice = Number(marketData?.price || 0);
+      const apiPriceCurrency = marketData?.quoteCurrency === "THB" || ticker.endsWith('.BK') || ticker.endsWith('.TH') ? "THB" : "USD";
+      if (rawPrice <= 0) {
+        addToast('ไม่พบราคาตลาดของสัญลักษณ์นี้ จึงยังเพิ่มสินทรัพย์ไม่ได้', 'error');
+        return;
+      }
+      const currentPriceUSD = apiPriceCurrency === "THB" ? rawPrice / (exchangeRates.THB || 1) : rawPrice;
+      const avgCostUSD = avgCostNumber / rate;
+      const allocation = market === "GOLD" ? "Gold" : market === "FUND" ? "Funds" : "Equities";
+
+      await addAsset({
+        name: name.trim() || marketData?.name || ticker,
+        symbol: ticker,
+        valueUSD: currentPriceUSD * sharesNumber,
+        change: 0,
+        allocation,
+        shares: sharesNumber,
+        avgCost: avgCostUSD,
+        currency,
+        chartData: marketData?.chartData,
+      });
+      await addTrade({
+        asset: ticker,
+        type: "BUY",
+        amountUSD: avgCostUSD * sharesNumber,
+        originalAmount: avgCostNumber * sharesNumber,
+        date: new Date().toISOString(),
+        rateAtTime: rate,
+        currency,
+        shares: sharesNumber,
+        pricePerUnit: avgCostUSD,
+      });
+      onClose();
+    } catch (error) {
+      console.error("Failed to add portfolio asset", error);
+      addToast("ไม่สามารถเพิ่มสินทรัพย์ได้ กรุณาลองใหม่อีกครั้ง", "error");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="เพิ่มสินทรัพย์">
+      <div className="space-y-4">
+        <div>
+          <label className="mb-2 block text-xs font-bold text-gray-400">หัวข้อเริ่มต้น</label>
+          <div className="flex flex-wrap gap-2">
+            {PORTFOLIO_MARKETS.map(item => (
+              <button key={item.id} type="button" onClick={() => setMarket(item.id)} className={cn(
+                "rounded-full border px-3 py-1.5 text-xs font-bold transition-colors",
+                market === item.id ? "border-[#ADC6FF]/70 bg-[#ADC6FF]/10 text-white" : "border-white/10 text-gray-400 hover:text-white"
+              )}>{item.label}</button>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] text-gray-500">ภายหลังสามารถจัดกลุ่มสินทรัพย์นี้ใหม่ได้ในหน้า Portfolio</p>
+        </div>
+
+        <div>
+          <label className="mb-2 block text-xs font-bold text-gray-400">โบรกเกอร์</label>
+          <CustomSelect
+            value={brokerId}
+            onChange={chooseBroker}
+            placeholder="เลือกโบรกเกอร์"
+            items={tradingPortfolios.map(portfolio => ({ value: portfolio.id, label: portfolio.name }))}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <label className="space-y-2"><span className="block text-xs font-bold text-gray-400">สัญลักษณ์</span><input value={symbol} onChange={event => setSymbol(event.target.value)} placeholder="NVDA" className="w-full rounded-xl border border-border bg-white/5 px-3 py-3 text-sm font-semibold uppercase text-white placeholder:text-gray-600 focus:border-[#4EDEA3]/50 focus:outline-none" /></label>
+          <label className="space-y-2"><span className="block text-xs font-bold text-gray-400">ชื่อ (ไม่บังคับ)</span><input value={name} onChange={event => setName(event.target.value)} placeholder="NVIDIA" className="w-full rounded-xl border border-border bg-white/5 px-3 py-3 text-sm font-semibold text-white placeholder:text-gray-600 focus:border-[#4EDEA3]/50 focus:outline-none" /></label>
+        </div>
+
+        <label className="space-y-2"><span className="block text-xs font-bold text-gray-400">จำนวนหน่วยที่ถือ</span><input inputMode="decimal" value={shares} onChange={event => setShares(event.target.value)} placeholder="0.000000" className="w-full rounded-xl border border-border bg-white/5 px-3 py-3 text-sm font-semibold text-white placeholder:text-gray-600 focus:border-[#4EDEA3]/50 focus:outline-none" /></label>
+
+        <div className="grid grid-cols-2 gap-3">
+          <label className="space-y-2"><span className="block text-xs font-bold text-gray-400">ต้นทุนเฉลี่ย ({currency})</span><input inputMode="decimal" value={avgCost} onChange={event => setAvgCost(event.target.value)} placeholder="0.00" className="w-full rounded-xl border border-border bg-white/5 px-3 py-3 text-sm font-semibold text-white placeholder:text-gray-600 focus:border-[#4EDEA3]/50 focus:outline-none" /></label>
+          <label className="space-y-2"><span className="block text-xs font-bold text-gray-400">ราคาตลาดล่าสุด ({currency})</span><div className={cn("flex min-h-[46px] items-center justify-between rounded-xl border bg-white/5 px-3 py-3 text-sm font-semibold", quoteState === 'unavailable' ? "border-[#FFB4AB]/40 text-[#FFB4AB]" : "border-border text-white")}><span>{quoteState === 'loading' ? 'กำลังดึงราคา…' : quoteState === 'ready' ? marketPrice?.toLocaleString(undefined, { maximumFractionDigits: 4 }) : 'ไม่พบราคาตลาด'}</span><span className="text-[10px] font-black text-[#4EDEA3]">MARKET</span></div></label>
+        </div>
+        <p className="text-[11px] leading-5 text-gray-500">ดึงราคาตลาดตามสัญลักษณ์โดยอัตโนมัติ และไม่ใช้ต้นทุนเฉลี่ยแทนราคาตลาด</p>
+
+        <button type="button" onClick={save} disabled={!isValid || isSaving} className="flex w-full items-center justify-center rounded-xl bg-[#B8DECA] px-4 py-3.5 text-sm font-bold text-[#14261C] transition hover:bg-[#CEEBDC] disabled:cursor-not-allowed disabled:opacity-40">
+          {isSaving ? "กำลังเพิ่มสินทรัพย์…" : "เพิ่มสินทรัพย์"}
+        </button>
+      </div>
     </Modal>
   );
 }

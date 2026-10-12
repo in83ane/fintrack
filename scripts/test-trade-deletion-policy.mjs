@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import ts from 'typescript';
+const code=ts.transpileModule(readFileSync(new URL('../src/lib/trade-deletion-policy.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
+const {tradeDeletionReason,tradeDeleteError}=await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`);
+const buy={id:1,type:'BUY',portfolioId:'p',asset:'TSLA'};
+const sale={...buy,id:2,type:'SELL'};
+assert.equal(tradeDeletionReason(buy,[buy],'th'),null);
+assert.ok(tradeDeletionReason(buy,[buy,sale],'th'));
+assert.ok(tradeDeletionReason(sale,[sale],'en'));
+assert.equal(tradeDeletionReason(buy,[buy,{...sale,portfolioId:'other'}],'en'),null);
+assert.equal(tradeDeletionReason(buy,[buy,{...sale,asset:'NVDA'}],'en'),null);
+assert.match(tradeDeleteError({message:'Posted sale is append-only'},'en'),/ledger correction/);
+assert.match(tradeDeleteError({message:'Lot has sales'},'th'),/ประวัติขาย/);
+assert.match(tradeDeleteError({message:'permission denied'},'en'),/permission denied/);
+console.log('PASS: deletion guard, portfolio/symbol isolation, explicit server errors.');

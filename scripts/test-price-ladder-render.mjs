@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import ts from 'typescript';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+const source = readFileSync(new URL('../src/components/PriceLadder.tsx', import.meta.url), 'utf8');
+const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 } }).outputText;
+const exports = {};
+new Function('require', 'exports', compiled)(createRequire(import.meta.url), exports);
+const render = props => renderToStaticMarkup(React.createElement(exports.PriceLadder, { entries: [], market: 0, average: 0, rate: 1, format: n => `$${n}`, ...props }));
+assert.equal(render({}), '');
+const html = render({ entries: [{ id: 1, price: 120, quantity: 1 }, { id: 2, price: 155, quantity: 1 }], market: 229, average: 137.5, analysis: { ath: 250, supports: [{ price: 210 }], resistances: [{ price: 240 }] } });
+for (const label of ['ไม้ 1', 'ไม้ 2', 'AVG', 'MKT', 'ATH', 'แนวรับ S1', 'แนวต้าน R1']) assert.ok(html.includes(label), label);
+assert.ok(!html.includes('max-h-'), 'all levels visible without height cap');
+assert.ok(!html.includes('overflow-y-auto'), 'no internal scrollbar');
+assert.ok(!html.includes('aria-expanded'), 'no collapse control');
+console.log('Price Ladder render checks passed: empty state, all levels always visible, no internal scrollbar.');

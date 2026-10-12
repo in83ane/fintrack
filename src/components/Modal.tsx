@@ -11,9 +11,11 @@ interface ModalProps {
   assetName?: string;
   assetSymbol?: string;
   children: React.ReactNode;
+  contentClassName?: string;
+  footer?: React.ReactNode;
 }
 
-export function Modal({ isOpen, onClose, title, assetName, assetSymbol, children }: ModalProps) {
+export function Modal({ isOpen, onClose, title, assetName, assetSymbol, children, contentClassName = 'p-8', footer }: ModalProps) {
   React.useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
@@ -64,9 +66,10 @@ export function Modal({ isOpen, onClose, title, assetName, assetSymbol, children
               </button>
             </div>
 
-            <div className="p-8 overflow-y-auto custom-scrollbar">
+            <div className={`${contentClassName} overflow-y-auto custom-scrollbar`}>
               {children}
             </div>
+            {footer && <div className="shrink-0 border-t border-border bg-background px-5 py-4 sm:px-6">{footer}</div>}
           </div>
         </div>
       )}

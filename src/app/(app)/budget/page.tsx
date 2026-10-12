@@ -1,5 +1,7 @@
 "use client";
 
+import { BUCKET_ICON_OPTIONS, resolveFinanceIcon } from "@/src/lib/finance-icons";
+import { FinanceIcon } from "@/src/components/FinanceIcon";
 import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import {
   Plus,
@@ -27,6 +29,7 @@ import {
   CreditCard,
   Target,
   ArrowRightLeft,
+  ArrowDownUp,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/src/lib/utils";
@@ -34,6 +37,9 @@ import { useApp } from "@/src/context/AppContext";
 import { Modal } from "@/src/components/Modal";
 import { ConfirmModal } from "@/src/components/ConfirmModal";
 import { TransactionDetailModal } from "@/src/components/TransactionDetailModal";
+import { InvestmentTransferModal } from "@/src/components/InvestmentTransferModal";
+import { bucketNativeAmount, nativeBucketBalance } from '@/src/lib/native-money';
+import { convertMoney, isFxCurrency, requireCurrency, sumNativeMoney, decimal, formatMoney as nativeFormat } from '@/src/lib/fx';
 
 export default function BudgetPage() {
   // Hide number input spinners (arrows) via inline style injection
@@ -54,6 +60,7 @@ export default function BudgetPage() {
     currency,
     exchangeRates,
     moneyBuckets,
+    allMoneyBuckets,
     addMoneyBucket,
     updateMoneyBucket,
     removeMoneyBucket,
@@ -64,8 +71,8 @@ export default function BudgetPage() {
   } = useApp();
 
   const convertCurrency = (amount: number, from: "USD" | "THB", to: "USD" | "THB") => {
-    const usd = amount / (exchangeRates[from] || 1);
-    return usd * (exchangeRates[to] || 1);
+    const value = convertMoney(amount, from, to, String(exchangeRates.THB));
+    return value ? Number(value.toFixed(12)) : Number.NaN;
   };
   const toUSD = (displayAmount: number, from: "USD" | "THB" = currency as "USD" | "THB") => convertCurrency(displayAmount, from, "USD");
 
@@ -82,8 +89,13 @@ export default function BudgetPage() {
     return formatted;
   };
   const currencySymbol = formatDisplay(0).replace(/[0-9,.\s-]/g, "");
-  const bucketCurrency = (bucket: { currency?: string }) => (bucket.currency === "THB" ? "THB" : "USD");
+  const bucketCurrency = (bucket: { currency?: string }) => { requireCurrency(bucket.currency); return bucket.currency; };
+  const validateNativeBuckets = (buckets: { currency?: string }[], cur: string) => {
+    try { buckets.forEach(b => bucketNativeAmount({ original_amount: 0, currency: cur }, b.currency)); return true; }
+    catch (error) { addToast(String(error), 'error'); return false; }
+  };
   const formatBucketAmount = (bucket: { currency?: string }, amount: number) => {
+    if (!isFxCurrency(bucket.currency) || !Number.isFinite(amount)) return 'unresolved';
     const bCur = bucketCurrency(bucket) as "USD" | "THB";
     const targetCur = currency as "USD" | "THB";
     
@@ -99,17 +111,8 @@ export default function BudgetPage() {
 
   const handleCurrencyChange = (newCur: "USD" | "THB") => {
     if (newCur === inputCurrency) return;
-    const THB_RATE = exchangeRates["THB"] || 36.5;
-    
-    // Convert existing form values to new currency display
-    if (bucketForm.targetAmount) {
-      const currentTarget = parseFloat(bucketForm.targetAmount) || 0;
-      setBucketForm(prev => ({ ...prev, targetAmount: (newCur === "THB" ? currentTarget * THB_RATE : currentTarget / THB_RATE).toFixed(2) }));
-    }
-    if (bucketForm.currentAmount) {
-      const currentAmount = parseFloat(bucketForm.currentAmount) || 0;
-      setBucketForm(prev => ({ ...prev, currentAmount: (newCur === "THB" ? currentAmount * THB_RATE : currentAmount / THB_RATE).toFixed(2) }));
-    }
+    if (editingBucket) { addToast('เปลี่ยนสกุล Bucket เดิมไม่ได้ ต้องบันทึกการแลกเงินจริง', 'error'); return; }
+    setBucketForm(prev => ({ ...prev, targetAmount: '', currentAmount: '' }));
     
     setInputCurrency(newCur);
   };
@@ -119,7 +122,6 @@ export default function BudgetPage() {
   const [profitAmount, setProfitAmount] = useState("");
   const [showProfitSuggestion, setShowProfitSuggestion] = useState(false);
   const [investModal, setInvestModal] = useState<{ sourceBucketId: string } | null>(null);
-  const [investAmountValue, setInvestAmountValue] = useState("");
   const [transferModal, setTransferModal] = useState<{ sourceBucketId: string; destinationBucketId: string; amount: string; currency: "USD" | "THB"; note: string } | null>(null);
   const [transferDropdownOpen, setTransferDropdownOpen] = useState(false);
   const [actionModal, setActionModal] = useState<{ id: string; type: "deposit" | "withdraw" } | null>(null);
@@ -151,7 +153,7 @@ export default function BudgetPage() {
     targetAmount: "",
     currentAmount: "",
     color: "#4EDEA3",
-    icon: "💰",
+    icon: "wallet",
     linkedToExpenses: false,
   });
 
@@ -211,7 +213,11 @@ export default function BudgetPage() {
     };
   }, [updateScrollState, moneyBuckets]);
 
-  const totalAllocated = useMemo(() => moneyBuckets.reduce((s, b) => s + (b.currentAmount / (exchangeRates[b.currency || 'USD'] || 1)), 0), [moneyBuckets, exchangeRates]);
+  const nativeTotal = useMemo(() => {
+    try { return sumNativeMoney(moneyBuckets.map(b => ({ amount: b.currentAmount, currency: bucketCurrency(b) })), currency === 'THB' ? 'THB' : 'USD', String(exchangeRates.THB)); }
+    catch { return null; }
+  }, [moneyBuckets, currency, exchangeRates]);
+  const totalAllocated = useMemo(() => moneyBuckets.reduce((s, b) => s + (isFxCurrency(b.currency) ? convertCurrency(b.currentAmount, b.currency, 'USD') : Number.NaN), 0), [moneyBuckets, exchangeRates]);
   const totalTargetPercent = useMemo(() => moneyBuckets.reduce((s, b) => s + b.targetPercent, 0), [moneyBuckets]);
 
   const canAddMoreBuckets = totalTargetPercent < 100;
@@ -235,11 +241,12 @@ export default function BudgetPage() {
 
   const handleDistributeIncome = () => {
     if (incomeNum <= 0) return;
+    if (!validateNativeBuckets(moneyBuckets, inputCurrency)) return;
     const now = new Date().toISOString();
     moneyBuckets.forEach((b) => {
       const splitDisplay = totalTargetPercent > 0 ? (incomeNum * b.targetPercent) / totalTargetPercent : 0;
       const targetCurrency = bucketCurrency(b);
-      const splitBucketAmount = convertCurrency(splitDisplay, inputCurrency, targetCurrency);
+      const splitBucketAmount = bucketNativeAmount({ original_amount: splitDisplay, currency: inputCurrency }, b.currency);
       const splitUSD = toUSD(splitDisplay, inputCurrency);
       if (splitBucketAmount > 0) {
         updateMoneyBucket(b.id, { currentAmount: b.currentAmount + splitBucketAmount });
@@ -279,18 +286,20 @@ export default function BudgetPage() {
 
   const handleApplyProfitSuggestion = () => {
     if (profitNum <= 0) return;
+    if (!validateNativeBuckets([emergencyBucket, investBucket].filter(Boolean) as { currency?: string }[], inputCurrency)) return;
     const halfADisplay = Math.floor(profitNum * 100 / 2) / 100;
     const halfBDisplay = Math.round((profitNum - halfADisplay) * 100) / 100;
     const halfAUSD = toUSD(halfADisplay, inputCurrency);
     const halfBUSD = toUSD(halfBDisplay, inputCurrency);
     const now = new Date().toISOString();
     if (emergencyBucket) {
-      updateMoneyBucket(emergencyBucket.id, { currentAmount: emergencyBucket.currentAmount + halfAUSD });
+      updateMoneyBucket(emergencyBucket.id, { currentAmount: nativeBucketBalance(emergencyBucket.currentAmount, { original_amount: halfADisplay, currency: inputCurrency }, emergencyBucket.currency, 1) });
       addBucketActivity({
         bucketId: emergencyBucket.id,
         bucketName: emergencyBucket.name,
         type: "profit_split",
-        amount: halfAUSD,
+        amount: halfADisplay,
+        originalAmount: halfADisplay,
         date: now,
         note: `${t("suggestSafeHaven")} — 50%`,
         currency: inputCurrency,
@@ -300,6 +309,7 @@ export default function BudgetPage() {
       addCashActivity({
         type: "DEPOSIT",
         amountUSD: halfAUSD,
+        originalAmount: halfADisplay,
         category: t(emergencyBucket.name) || emergencyBucket.name,
         date: now,
         bucketId: emergencyBucket.id,
@@ -309,12 +319,13 @@ export default function BudgetPage() {
       });
     }
     if (investBucket) {
-      updateMoneyBucket(investBucket.id, { currentAmount: investBucket.currentAmount + halfBUSD });
+      updateMoneyBucket(investBucket.id, { currentAmount: nativeBucketBalance(investBucket.currentAmount, { original_amount: halfBDisplay, currency: inputCurrency }, investBucket.currency, 1) });
       addBucketActivity({
         bucketId: investBucket.id,
         bucketName: investBucket.name,
         type: "profit_split",
-        amount: halfBUSD,
+        amount: halfBDisplay,
+        originalAmount: halfBDisplay,
         date: now,
         note: `${t("suggestReinvest")} — 50%`,
         currency: inputCurrency,
@@ -324,6 +335,7 @@ export default function BudgetPage() {
       addCashActivity({
         type: "DEPOSIT",
         amountUSD: halfBUSD,
+        originalAmount: halfBDisplay,
         category: t(investBucket.name) || investBucket.name,
         date: now,
         bucketId: investBucket.id,
@@ -337,55 +349,8 @@ export default function BudgetPage() {
     setShowProfitSuggestion(false);
   };
 
-  const handleInvest = () => {
-    const displayAmt = parseFloat(investAmountValue);
-    if (displayAmt < 0) {
-      addToast(t("invalidAmount") || "Invalid amount", "error");
-      return;
-    }
-    if (!displayAmt || displayAmt <= 0 || !investModal) return;
-    const bucket = moneyBuckets.find((b) => b.id === investModal.sourceBucketId);
-    if (!bucket) return;
-    const amtUSD = toUSD(displayAmt, inputCurrency);
-    if (amtUSD <= 0) return;
-
-    if (displayAmt > bucket.currentAmount) {
-      addToast(t("amountExceedsBalance"), "error");
-      return;
-    }
-
-    const bCur = bucketCurrency(bucket) as "USD" | "THB";
-    const convertedAmount = convertCurrency(displayAmt, inputCurrency, bCur);
-    updateMoneyBucket(bucket.id, {
-      currentAmount: Math.max(0, bucket.currentAmount - convertedAmount)
-    });
-
-    const now = new Date().toISOString();
-    addBucketActivity({
-      bucketId: bucket.id,
-      bucketName: bucket.name,
-      type: "withdraw",
-      amount: displayAmt,
-      date: now,
-      note: t("noteInvest") || "Move to Portfolio (Invest)",
-      currency: inputCurrency,
-      rateAtTime: exchangeRates[inputCurrency] || 1,
-      originalAmount: displayAmt,
-    });
-    addCashActivity({
-      type: "WITHDRAW",
-      amountUSD: amtUSD,
-      category: "invest",
-      date: now,
-      bucketId: bucket.id,
-      note: t("noteInvest") || "Move to Portfolio (Invest)",
-      currency: inputCurrency,
-      rateAtTime: exchangeRates[inputCurrency] || 1,
-      originalAmount: displayAmt,
-    });
-    addToast(`${t("movedToPortfolio")}: ${formatDisplay(displayAmt)}`, "success");
-    setInvestModal(null);
-    setInvestAmountValue("");
+  const openInvestmentTransfer = (bucketId: string) => {
+    setInvestModal({ sourceBucketId: bucketId });
   };
 
   const handleTransfer = () => {
@@ -403,11 +368,12 @@ export default function BudgetPage() {
     const destBucket = moneyBuckets.find(b => b.id === destinationBucketId);
     
     if (!sourceBucket || !destBucket) return;
+    if (!validateNativeBuckets([sourceBucket, destBucket], inputCur)) return;
 
     const sourceCurrency = bucketCurrency(sourceBucket) as "USD" | "THB";
     const destCurrency = bucketCurrency(destBucket) as "USD" | "THB";
 
-    const convertedToSourceCur = convertCurrency(transferAmount, inputCur, sourceCurrency);
+    const convertedToSourceCur = bucketNativeAmount({ original_amount: transferAmount, currency: inputCur }, sourceBucket.currency);
 
     if (convertedToSourceCur > sourceBucket.currentAmount) {
       addToast(t("amountExceedsBalance"), "error");
@@ -415,7 +381,7 @@ export default function BudgetPage() {
     }
 
     const amountUSD = toUSD(transferAmount, inputCur);
-    const destAmount = convertCurrency(transferAmount, inputCur, destCurrency);
+    const destAmount = bucketNativeAmount({ original_amount: transferAmount, currency: inputCur }, destBucket.currency);
     const now = new Date().toISOString();
 
     // Withdraw from Source
@@ -515,9 +481,10 @@ export default function BudgetPage() {
     if (!displayVal || displayVal <= 0 || !actionModal) return;
     const bucket = moneyBuckets.find((b) => b.id === actionModal.id);
     if (!bucket) return;
+    if (!validateNativeBuckets([bucket], actionCurrency)) return;
     
     const targetCurrency = bucketCurrency(bucket) as "USD" | "THB";
-    const bucketAmount = convertCurrency(displayVal, actionCurrency, targetCurrency);
+    const bucketAmount = bucketNativeAmount({ original_amount: displayVal, currency: actionCurrency }, bucket.currency);
     
     if (actionModal.type === "withdraw" && bucketAmount > bucket.currentAmount) {
       addToast(t("amountExceedsBalance"), "error");
@@ -596,7 +563,7 @@ export default function BudgetPage() {
             {t("moneyManagement")}
           </span>
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tighter mb-1">{t("budgetPage")}</h1>
-          <p className="text-gray-500 font-medium text-xs uppercase tracking-wide">{t("moneyBucketsDesc")}</p>
+          <p className="text-gray-500 font-medium text-xs tracking-wide">ธนาคารกลางของคุณ · ใช้เงินจาก Bucket โอนเข้าบัญชีเงินสดของทุกพอร์ตลงทุนได้</p>
         </motion.div>
         <div className="flex gap-2 flex-wrap">
           <button
@@ -607,7 +574,7 @@ export default function BudgetPage() {
               const unusedColor = presetColors.find(c => !usedColorsList.includes(c)) || "#4EDEA3";
               const initialCurr = currency === "THB" ? "THB" : "USD";
               setInputCurrency(initialCurr);
-              setBucketForm({ name: "", targetPercent: "", targetAmount: "", currentAmount: "", color: unusedColor, icon: "💰", linkedToExpenses: false });
+              setBucketForm({ name: "", targetPercent: "", targetAmount: "", currentAmount: "", color: unusedColor, icon: "wallet", linkedToExpenses: false });
               setIsBucketModalOpen(true);
             }}
             disabled={!canAddMoreBuckets}
@@ -631,7 +598,7 @@ export default function BudgetPage() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between relative z-10 gap-4">
           <div className="flex-1">
             <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">{t("bucketTotal")}</span>
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white tracking-tighter">{formatMoney(totalAllocated)}</h2>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white tracking-tighter">{nativeTotal ? nativeFormat(decimal(nativeTotal.amount), nativeTotal.currency) : 'unresolved'}</h2>
             <div className="flex items-center gap-3 mt-1">
               <span className="text-xs font-bold text-gray-500">{moneyBuckets.length} {t("buckets")}</span>
               <span className={cn("text-xs font-bold", totalTargetPercent === 100 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
@@ -728,13 +695,10 @@ export default function BudgetPage() {
               ? (bucket.currentAmount / bucket.targetAmount) * 100 
               : (totalAllocated > 0 ? ((bucket.currentAmount / (exchangeRates[bucket.currency || 'USD'] || 1)) / totalAllocated) * 100 : 0);
             
-            // Generate gradient colors based on bucket color
-            const hsl = hexToHsl(bucket.color);
-            const grad1 = `hsl(${hsl.h}, ${Math.min(hsl.s + 20, 100)}%, ${Math.min(hsl.l + 10, 60)}%)`;
-            const grad2 = `hsl(${(hsl.h + 30) % 360}, ${Math.min(hsl.s + 10, 100)}%, ${Math.max(hsl.l - 20, 15)}%)`;
-            const grad3 = `hsl(${(hsl.h + 60) % 360}, ${hsl.s}%, ${Math.max(hsl.l - 30, 10)}%)`;
-            const textColor = hsl.l > 50 ? '#1a1a1a' : '#ffffff';
-            const textColorMuted = hsl.l > 50 ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.6)';
+            const textColor = '#f3f4f6';
+            const textColorMuted = '#a5adba';
+            if (!isFxCurrency(bucket.currency) || !Number.isFinite(bucket.currentAmount)) return <div key={bucket.id} className="rounded-2xl border border-white/10 p-5 text-gray-400">{bucket.name} · unresolved</div>;
+            const denomination = bucket.currency;
 
             return (
               <motion.div
@@ -742,13 +706,13 @@ export default function BudgetPage() {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 className="group relative flex-shrink-0 snap-start w-[calc(100vw-2rem)] max-w-[20rem] sm:w-[19rem] sm:max-w-none"
-                style={{ willChange: "transform", height: '14rem' }}
+                style={{ willChange: "transform", minHeight: '19rem' }}
               >
                 {/* ===== CREDIT CARD FACE ===== */}
                 <div
-                  className="relative w-full h-full rounded-2xl sm:rounded-[1.5rem] overflow-hidden shadow-2xl group-hover:scale-[1.02] transition-all duration-300"
+                  className="relative w-full h-full min-h-[19rem] rounded-2xl sm:rounded-[1.5rem] border border-white/10 overflow-hidden shadow-xl transition-all duration-300"
                   style={{
-                    background: `linear-gradient(135deg, ${grad1} 0%, ${grad2} 55%, ${grad3} 100%)`,
+                    background: `linear-gradient(145deg, ${bucket.color}30, #181b21 65%)`,
                   }}
                 >
                   {/* Decorative blobs */}
@@ -764,12 +728,12 @@ export default function BudgetPage() {
                   />
 
                   {/* Card content */}
-                  <div className="relative z-10 h-full flex flex-col justify-between p-4 sm:p-5">
+                  <div className="relative z-10 min-h-[19rem] h-full flex flex-col justify-between gap-4 p-4 sm:p-5">
                     {/* Top: name + icon badge */}
                     <div className="flex items-start justify-between">
                       <div>
                         <p className="text-[0.6rem] font-black uppercase tracking-[0.2em] mb-0.5" style={{ color: textColorMuted }}>
-                          {bucket.targetPercent}% {t("incomeSplit") || "Income Split"}
+                          {bucket.targetPercent}% {language === "th" ? "จัดสรรรายได้" : "Income split"}
                         </p>
                         <h3 className="font-black text-sm sm:text-base tracking-tight leading-tight" style={{ color: textColor }}>
                           {t(bucket.name) || bucket.name}
@@ -779,7 +743,7 @@ export default function BudgetPage() {
                         className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-xl shadow-lg flex-shrink-0"
                         style={{ backgroundColor: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(8px)' }}
                       >
-                        {bucket.icon}
+                        <FinanceIcon name={bucket.icon} />
                       </div>
                     </div>
 
@@ -790,44 +754,34 @@ export default function BudgetPage() {
                       <p className="text-[0.55rem] font-black uppercase tracking-[0.18em]" style={{ color: textColorMuted }}>
                         {bucket.targetAmount && bucket.targetAmount > 0 ? t("savings") : t("currentAmount")}
                       </p>
-                      <div className="flex items-end justify-between">
-                        <div className="flex items-baseline gap-1">
-                          <span className="font-light text-sm" style={{ color: textColorMuted }}>
-                            {formatBucketAmount(bucket, 0).replace(/[0-9,.\s-]/g, "")}
-                          </span>
-                          <span className="text-2xl sm:text-3xl font-black tracking-[-0.04em]" style={{ color: textColor }}>
-                            {formatBucketAmount(bucket, bucket.currentAmount).replace(/[^0-9,.]/g, "")}
-                          </span>
-                          {bucket.targetAmount && bucket.targetAmount > 0 ? (
-                            <span className="text-xs font-bold ml-0.5" style={{ color: textColorMuted }}>
-                              / {formatBucketAmount(bucket, bucket.targetAmount).replace(/[^0-9,.]/g, "")}
-                            </span>
-                          ) : null}
-                        </div>
-                        <span className="text-xs font-black" style={{ color: textColor }}>
-                          {actualPct.toFixed(0)}%
-                        </span>
+                      <div className="flex flex-wrap items-baseline gap-x-2">
+                        <span className="text-2xl sm:text-3xl font-black tracking-tight tabular-nums" style={{ color: textColor }}>{formatBucketAmount(bucket, bucket.currentAmount)}</span>
+                        {denomination !== currency && <span className="text-xs font-bold" style={{ color: textColorMuted }}>{nativeFormat(decimal(bucket.currentAmount), denomination)}</span>}
+                      </div>
+                      <div className="flex items-center justify-between gap-2 text-[11px]" style={{ color: textColorMuted }}>
+                        <span>{bucket.targetAmount && bucket.targetAmount > 0 ? `เป้าหมาย ${formatDisplay(bucket.targetAmount, denomination)}` : 'สัดส่วนเงินใน Bucket'}</span>
+                        <span className="shrink-0 font-bold">{actualPct.toFixed(0)}%</span>
                       </div>
                       <div className="h-1 w-full rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}>
                         <div
                           className="h-full rounded-full transition-all duration-500"
-                          style={{ width: `${Math.min(actualPct, 100)}%`, backgroundColor: 'rgba(255,255,255,0.75)' }}
+                          style={{ width: `${Math.max(0, Math.min(actualPct, 100))}%`, backgroundColor: bucket.color }}
                         />
                       </div>
                     </div>
 
                     {/* Action buttons inside card */}
-                    <div className="mt-auto pt-3 border-t border-white/10 space-y-1.5">
+                    <div className="mt-auto pt-3 border-t border-white/10 space-y-2.5">
                       {(bucket.targetAmount && bucket.targetAmount > 0 && bucket.currentAmount > bucket.targetAmount) ? (
                         <div 
                           className="text-[9px] sm:text-[10px] font-bold px-2 py-1 rounded-lg inline-flex items-center gap-1 cursor-pointer transition-colors"
                           style={{ backgroundColor: 'rgba(255,255,255,0.12)', color: textColor }}
                           onClick={(e) => {
                             e.stopPropagation();
-                            setInvestModal({ sourceBucketId: bucket.id });
+                            openInvestmentTransfer(bucket.id);
                           }}
                         >
-                          💡 {t("suggestionInvest")} {formatBucketAmount(bucket, bucket.currentAmount - bucket.targetAmount)}
+                          {t("suggestionInvest")} {formatBucketAmount(bucket, bucket.currentAmount - bucket.targetAmount)}
                         </div>
                       ) : null}
 
@@ -839,7 +793,7 @@ export default function BudgetPage() {
                               setActionAmount("");
                               setActionNote("");
                             }}
-                            className="flex-1 py-1.5 sm:py-2 rounded-lg font-black text-[9px] sm:text-[10px] uppercase transition-all flex items-center justify-center gap-1"
+                            className="flex-1 min-h-10 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5"
                             style={{ backgroundColor: 'rgba(255,255,255,0.12)', color: textColor }}
                             onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.22)')}
                             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.12)')}
@@ -854,7 +808,7 @@ export default function BudgetPage() {
                               setActionAmount("");
                               setActionNote("");
                             }}
-                            className="flex-1 py-1.5 sm:py-2 rounded-lg font-black text-[9px] sm:text-[10px] uppercase transition-all flex items-center justify-center gap-1"
+                            className="flex-1 min-h-10 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5"
                             style={{ backgroundColor: 'rgba(255,255,255,0.12)', color: textColor }}
                             onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.22)')}
                             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.12)')}
@@ -862,16 +816,32 @@ export default function BudgetPage() {
                             <ArrowUpFromLine size={11} />
                             {t("withdraw")}
                           </button>
+                        </div>
+                        <div className="flex gap-1.5">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openInvestmentTransfer(bucket.id);
+                            }}
+                            className="flex-1 min-h-10 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5"
+                            style={{ backgroundColor: 'rgba(255,255,255,0.12)', color: textColor }}
+                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.22)')}
+                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.12)')}
+                          >
+                            <Rocket size={11} />
+                            โอนไปพอร์ต
+                          </button>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               setTransferModal({ sourceBucketId: bucket.id, destinationBucketId: "", amount: "", currency: currency as "USD" | "THB", note: "" });
                             }}
-                            className="py-1.5 sm:py-2 px-2.5 rounded-lg font-black text-[9px] sm:text-[10px] uppercase transition-all flex items-center justify-center"
+                            className="min-h-10 min-w-10 rounded-xl font-bold text-xs transition-all flex items-center justify-center"
                             style={{ backgroundColor: 'rgba(255,255,255,0.12)', color: textColor }}
                             onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.22)')}
                             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.12)')}
-                            title={t("transfer") || "Transfer"}
+                            title="โอนระหว่าง Bucket"
+                            aria-label="โอนระหว่าง Bucket"
                           >
                             <ArrowRightLeft size={11} />
                           </button>
@@ -980,7 +950,7 @@ export default function BudgetPage() {
               const unusedColor = presetColors.find(c => !usedColorsList.includes(c)) || "#4EDEA3";
               const initialCurr = currency === "THB" ? "THB" : "USD";
               setInputCurrency(initialCurr);
-              setBucketForm({ name: "", targetPercent: "", targetAmount: "", currentAmount: "", color: unusedColor, icon: "💰", linkedToExpenses: false });
+              setBucketForm({ name: "", targetPercent: "", targetAmount: "", currentAmount: "", color: unusedColor, icon: "wallet", linkedToExpenses: false });
               setIsBucketModalOpen(true);
             }}
             className={cn(
@@ -1088,7 +1058,7 @@ export default function BudgetPage() {
                     {incomePreview.map((b) => (
                       <div key={b.id} className="flex justify-between items-center">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm">{b.icon}</span>
+                          <span className="text-sm"><FinanceIcon name={b.icon} /></span>
                           <span className="text-xs font-bold text-gray-400">{t(b.name) || b.name}</span>
                         </div>
                         <span className="text-xs font-black text-white">+{formatDisplay(b.split)}</span>
@@ -1292,17 +1262,17 @@ export default function BudgetPage() {
           <div className="space-y-2">
             <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">Icon</label>
             <div className="flex gap-2 flex-wrap">
-              {["💰", "🏦", "🛡️", "📊", "🚀", "🎯", "💎", "🏠", "🎓", "✈️", "🏥", "🎁", "🛒"].map((icon) => (
+              {BUCKET_ICON_OPTIONS.map(({ name: icon, label }) => (
                 <button
                   key={icon}
                   type="button"
                   onClick={() => setBucketForm((prev) => ({ ...prev, icon }))}
                   className={cn(
                     "w-10 h-10 rounded-xl flex items-center justify-center text-lg border transition-all",
-                    bucketForm.icon === icon ? "bg-white/10 border-[#E9C349]/50 scale-110" : "bg-white/5 border-border hover:border-border"
+                    resolveFinanceIcon(bucketForm.icon) === icon ? "bg-white/10 border-[#E9C349]/50 scale-110" : "bg-white/5 border-border hover:border-border"
                   )}
                 >
-                  {icon}
+                  <FinanceIcon name={icon} size={20} />
                 </button>
               ))}
             </div>
@@ -1401,7 +1371,7 @@ export default function BudgetPage() {
                     <span className="text-sm font-bold text-gray-500">%</span>
                   </div>
                   {maxAllowed <= 0 && (
-                    <p className="text-[10px] text-[#FFB4AB] font-bold">⚠ {t("exceeds100")} - {t("noRemainingPercent")}</p>
+                    <p className="text-[10px] text-[#FFB4AB] font-bold">{t("exceeds100")} - {t("noRemainingPercent")}</p>
                   )}
                 </>
               );
@@ -1507,78 +1477,16 @@ export default function BudgetPage() {
       </Modal>
 
 
-      {/* Invest Modal */}
-      <Modal isOpen={!!investModal} onClose={() => setInvestModal(null)} title={t("investFromBucket")}>
-        <div className="space-y-5">
-          {investModal && (() => {
-            const bucket = moneyBuckets.find(b => b.id === investModal.sourceBucketId);
-            return bucket ? (
-              <div className="bg-white/5 rounded-2xl p-4 flex items-center gap-3">
-                <span className="text-xl">{bucket.icon}</span>
-                <div>
-                  <p className="text-xs font-bold text-white">{t(bucket.name) || bucket.name}</p>
-                  <p className="text-xs text-gray-500">{t("currentAmount")}: {formatBucketAmount(bucket, bucket.currentAmount)}</p>
-                </div>
-              </div>
-            ) : null;
-          })()}
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">{t("investAmount")}</label>
-            <div className="relative">
-              <input
-                type="number"
-                step="any"
-                min="0"
-                value={investAmountValue}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val.includes('-')) return;
-                  setInvestAmountValue(val);
-                }}
-                placeholder="0.00"
-                autoFocus
-                className="w-full bg-white/5 border border-border rounded-2xl px-4 py-4 pr-24 text-white text-lg font-black outline-none focus:border-[#FF8B9A]/50 transition-all text-center"
-              />
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 p-0.5 bg-white/5 rounded-lg border border-border">
-                {(['USD', 'THB'] as const).map(cur => (
-                  <button
-                    key={cur}
-                    type="button"
-                    onClick={() => handleCurrencyChange(cur)}
-                    className={cn(
-                      'px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-wide transition-all',
-                      inputCurrency === cur
-                        ? cur === 'THB'
-                          ? 'bg-[#E9C349] text-[#241a00]'
-                          : 'bg-[#ADC6FF] text-[#00285d]'
-                        : 'text-gray-500 hover:text-gray-300'
-                    )}
-                  >
-                    {cur}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-          <div className="flex gap-4">
-            <button onClick={() => setInvestModal(null)} className="flex-1 py-4 text-gray-500 font-bold text-sm hover:text-white transition-colors">
-              {t("cancel")}
-            </button>
-            <button
-              onClick={handleInvest}
-              className="flex-1 py-4 bg-gradient-to-r from-[#FF8B9A] to-[#FF6B81] text-white rounded-full font-black text-sm uppercase tracking-tight hover:brightness-110 transition-all active:scale-95"
-            >
-              {t("investFromBucket")}
-            </button>
-          </div>
-        </div>
-      </Modal>
+      {investModal && (() => {
+        const bucket = moneyBuckets.find(item => item.id === investModal.sourceBucketId);
+        return bucket ? <InvestmentTransferModal key={bucket.id} bucket={bucket} onClose={() => setInvestModal(null)} /> : null;
+      })()}
 
       {/* Transfer Modal */}
       <Modal isOpen={!!transferModal} onClose={() => { setTransferModal(null); setTransferDropdownOpen(false); }} title={t("transfer") || "Transfer Funds"}>
         <div className="space-y-5">
           {transferModal && (() => {
-            const sourceBucket = moneyBuckets.find(b => b.id === transferModal.sourceBucketId);
+            const sourceBucket = allMoneyBuckets.find(b => b.id === transferModal.sourceBucketId);
             return sourceBucket ? (
               <>
                 <div className="bg-white/5 rounded-2xl p-4 flex items-center justify-between">
@@ -1586,7 +1494,7 @@ export default function BudgetPage() {
                     <p className="text-xs text-gray-400 font-bold mb-1 uppercase tracking-wider">{t("sourceBucket") || "From"}</p>
                     <div className="flex items-center gap-2">
                       <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs" style={{ backgroundColor: `${sourceBucket.color}20` }}>
-                        {sourceBucket.icon}
+                        <FinanceIcon name={sourceBucket.icon} />
                       </div>
                       <span className="font-bold text-sm text-white">{t(sourceBucket.name) || sourceBucket.name}</span>
                     </div>
@@ -1599,6 +1507,24 @@ export default function BudgetPage() {
                   </div>
                 </div>
 
+                <div className="flex justify-center -my-3 relative z-10">
+                  <button 
+                    onClick={() => {
+                      if (!transferModal.destinationBucketId) return;
+                      setTransferModal({
+                        ...transferModal,
+                        sourceBucketId: transferModal.destinationBucketId,
+                        destinationBucketId: transferModal.sourceBucketId
+                      });
+                    }}
+                    className={"w-8 h-8 rounded-full bg-[#1a1a1a] border border-[#333] flex items-center justify-center transition-colors "}
+                    disabled={!transferModal.destinationBucketId}
+                    title="Swap Source and Destination"
+                  >
+                    <ArrowDownUp size={14} />
+                  </button>
+                </div>
+
                 <div className="space-y-2 relative">
                   <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest pl-1">{t("destinationBucket") || "To Destination"}</label>
                   <div className="relative">
@@ -1608,11 +1534,11 @@ export default function BudgetPage() {
                     >
                       {transferModal.destinationBucketId 
                         ? (() => {
-                            const db = moneyBuckets.find(b => b.id === transferModal.destinationBucketId);
+                            const db = allMoneyBuckets.find(b => b.id === transferModal.destinationBucketId);
                             return db ? (
                               <div className="flex items-center gap-2">
                                 <div className="w-5 h-5 rounded-full flex items-center justify-center text-[10px]" style={{ backgroundColor: `${db.color}20` }}>
-                                  {db.icon}
+                                  <FinanceIcon name={db.icon} />
                                 </div>
                                 <span>{t(db.name) || db.name}</span>
                               </div>
@@ -1626,28 +1552,22 @@ export default function BudgetPage() {
                     {transferDropdownOpen && (
                       <div className="absolute top-full left-0 mt-2 w-full bg-[#1a1a1a] border border-[#333] rounded-xl overflow-hidden z-[60] shadow-2xl">
                         <div className="max-h-60 overflow-y-auto custom-scrollbar">
-                          {moneyBuckets.filter(b => b.id !== sourceBucket.id).map(b => (
+                          {allMoneyBuckets.filter(b => b.id !== sourceBucket.id).map(b => (
                             <button
                               key={b.id}
                               onClick={() => {
-                                const currentDest = transferModal.destinationBucketId ? moneyBuckets.find(bk => bk.id === transferModal.destinationBucketId) : null;
-                                const defaultOldNote = currentDest ? `Transfer to ${t(currentDest.name) || currentDest.name}` : "";
-                                const newNote = (!transferModal.note || transferModal.note === defaultOldNote) 
-                                  ? `Transfer to ${t(b.name) || b.name}` 
-                                  : transferModal.note;
-                                
-                                setTransferModal({ ...transferModal, destinationBucketId: b.id, note: newNote });
+                                setTransferModal({ ...transferModal, destinationBucketId: b.id });
                                 setTransferDropdownOpen(false);
                               }}
                               className="w-full text-left px-4 py-3 hover:bg-[#333] text-sm font-medium text-white transition-colors flex items-center gap-2"
                             >
                               <div className="w-5 h-5 rounded-full flex items-center justify-center text-[10px]" style={{ backgroundColor: `${b.color}20` }}>
-                                {b.icon}
+                                <FinanceIcon name={b.icon} />
                               </div>
                               {t(b.name) || b.name}
                             </button>
                           ))}
-                          {moneyBuckets.filter(b => b.id !== sourceBucket.id).length === 0 && (
+                          {allMoneyBuckets.filter(b => b.id !== sourceBucket.id).length === 0 && (
                             <div className="px-4 py-3 text-sm text-gray-500 italic">
                               No other buckets available
                             </div>
@@ -1734,3 +1654,8 @@ export default function BudgetPage() {
     </div>
   );
 }
+
+
+
+
+
