@@ -1,10 +1,8 @@
 # Specific-lot and proportional closing
 
 ## Backup before selective changes
-Git stash: 22d5acdb4aae1c9c9cf0db5bbf8a9eb09f4a383a (backup-before-revert).
-It includes tracked changes and untracked files and was applied back, not dropped.
-Restore with git stash apply <hash> only after protecting newer work; conflicts may require manual merging.
-No commit or push performed.
+Before selective changes, back up both tracked changes and untracked files, for example with `git stash push -u` or a separate local copy. Ignored files require a separate backup if needed; creating a branch alone does not preserve uncommitted or untracked files.
+Restore carefully after protecting newer work, and review any conflicts before continuing. Keep backups local when they contain sensitive data, and retain them until the changes have been verified.
 
 ## Current client
 - Removed symbol method setting and automatic priority closing modes from the UI/engine.
