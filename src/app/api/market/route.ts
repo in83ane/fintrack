@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { dailyMove } from '@/src/lib/holding-order';
 import { marketCache, generateCacheKey, queryDeduplicator } from '@/src/lib/cache';
 
 export async function GET(request: Request) {
@@ -75,9 +76,11 @@ export async function GET(request: Request) {
 
           let dailyChartData = parseChartData(dailyData);
           let intradayData: { time: number; price: number }[] = [];
+          let intradayMeta;
 
           if (intradayResult) {
             const intraData = await intradayResult.json();
+            intradayMeta = intraData?.chart?.result?.[0]?.meta;
             intradayData = parseChartData(intraData);
           }
 
@@ -89,6 +92,7 @@ export async function GET(request: Request) {
           return {
             symbol: meta.symbol || symbol,
             price,
+            ...dailyMove(price, meta, intradayMeta),
             changePercent: Number(changePercent.toFixed(2)),
             name,
             quoteCurrency: meta.currency || 'USD',

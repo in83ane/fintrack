@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback, useContext, createContext } from "react";
+import { createPortal } from 'react-dom';
 import {
   ArrowLeft,
   ArrowDownToLine,
@@ -16,6 +17,7 @@ import {
   Pencil,
   Trash2,
   GripVertical,
+  Star,
   FolderOpen,
   TrendingUp,
   TrendingDown,
@@ -30,6 +32,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/src/lib/utils";
 import { useApp } from "@/src/context/AppContext";
+import { orderHoldings, moveHoldingBefore, toggleHoldingSort, filterHoldings, type HoldingSort, type HoldingSortField } from '@/src/lib/holding-order';
 import { CustomSelect } from "@/src/components/CustomSelect";
 import { AssetFundingFields, type AssetEntryMode } from '@/src/components/AssetFundingFields';
 import { InvestmentTransferModal } from "@/src/components/InvestmentTransferModal";
@@ -77,6 +80,10 @@ interface Bucket {
 }
 
 interface Holding {
+  isFavorite?: boolean;
+  sortOrder?: number;
+  dayChangePercent?: number | null;
+  dayChange?: number | null;
   id: string;
   brokerId: string;
   market: Market;
@@ -579,7 +586,9 @@ function usePortfolioStore() {
             && Object.is(holding.price, next?.price) && holding.name === next?.name
             && holding.currency === next?.currency && holding.market === next?.market
             && Object.is(holding.realizedPL, next?.realizedPL) && Object.is(holding.dividends, next?.dividends)
-            && Object.is(holding.investedCost, next?.investedCost);
+            && Object.is(holding.investedCost, next?.investedCost)
+            && holding.isFavorite === next?.isFavorite && holding.sortOrder === next?.sortOrder
+            && holding.dayChange === next?.dayChange && holding.dayChangePercent === next?.dayChangePercent;
         });
       return unchanged ? current : { ...current, holdings: nextHoldings, holdingGroups: groups, holdingGroupIds: nextGroupIds };
     });
@@ -719,7 +728,14 @@ function Label({ children, right }: { children: React.ReactNode; right?: React.R
   );
 }
 
-function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+function Sheet({ title, onClose, children, wide = false, footer }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean; footer?: React.ReactNode }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, []);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -728,12 +744,13 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  return (
+  if (!mounted) return null;
+  return createPortal(
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm sm:px-4"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-3 sm:p-6"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -744,10 +761,11 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
         exit={{ y: 40, opacity: 0 }}
         transition={{ type: "spring", stiffness: 320, damping: 32 }}
         role="dialog"
+        aria-modal="true"
         aria-label={title}
-        className="w-full sm:max-w-md max-h-[92vh] overflow-y-auto bg-[#1C1B1B] border border-white/10 rounded-t-3xl sm:rounded-2xl p-5 shadow-2xl"
+        className={cn("flex w-full max-h-[min(85dvh,760px)] flex-col overflow-hidden bg-[#1C1B1B] border border-white/10 rounded-2xl shadow-2xl", wide ? "sm:max-w-[640px]" : "sm:max-w-md")}
       >
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-5 py-3">
           <h3 className="text-base font-bold text-white">{title}</h3>
           <button
             onClick={onClose}
@@ -757,9 +775,10 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
             <X size={16} />
           </button>
         </div>
-        {children}
+        <div className="min-h-0 overflow-y-auto overscroll-contain custom-scrollbar p-4 sm:p-5">{children}</div>
+        {footer && <div className="shrink-0 border-t border-white/10 px-5 py-3">{footer}</div>}
       </motion.div>
-    </motion.div>
+    </motion.div>, document.body
   );
 }
 
@@ -1206,7 +1225,31 @@ function HoldingModal({
   };
 
   return (
-    <Sheet title={holding ? `แก้ไข ${holding.symbol}` : "เพิ่มสินทรัพย์"} onClose={onClose}>
+    <Sheet title={holding ? `แก้ไข ${holding.symbol}` : "เพิ่มสินทรัพย์"} onClose={onClose} wide footer={
+      <div className="flex gap-3">
+        {holding && (
+          <button
+            onClick={() => {
+              if (!confirmDelete) return setConfirmDelete(true);
+              onDelete(holding);
+              onClose();
+            }}
+            className={cn(
+              "rounded-xl border px-4 text-sm font-bold flex items-center gap-2 transition-colors",
+              confirmDelete
+                ? "bg-[#FFB4AB]/20 border-[#FFB4AB]/50 text-[#FFB4AB]"
+                : "border-white/10 text-gray-400 hover:text-[#FFB4AB]"
+            )}
+          >
+            <Trash2 size={14} />
+            {confirmDelete ? "ยืนยันลบ" : "ลบ"}
+          </button>
+        )}
+        <button onClick={save} disabled={!valid || isSaving} className={cn(PRIMARY_BTN, "flex-1")}>
+          {holding ? "บันทึกการแก้ไข" : "เพิ่มสินทรัพย์"}
+        </button>
+      </div>
+    }>
       <div className="mb-4">
         <Label>หัวข้อเริ่มต้น</Label>
         <div className="flex flex-wrap gap-2">
@@ -1239,7 +1282,7 @@ function HoldingModal({
             label: b.name,
           }))}
         />
-        <p className="mt-2 text-xs text-gray-400">เมื่อเพิ่ม จะบันทึกเป็นไม้ซื้อและหักจากบัญชีเงินสด {currency} ของ {brokers.find(b => b.id === brokerId)?.name || 'โบรกเกอร์ที่เลือก'} ตามต้นทุนที่กรอก</p>
+        <p className="mt-2 text-xs text-gray-400">บันทึกสินทรัพย์เข้า {brokers.find(b => b.id === brokerId)?.name || 'โบรกเกอร์ที่เลือก'} · {entryMode === 'IMPORT' ? 'นำเข้าจากภายนอก ไม่ตัดเงิน' : 'ตัดเงินจากกระเป๋าที่เลือกด้านล่าง'}</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3 mb-4">
@@ -1300,29 +1343,6 @@ function HoldingModal({
       <div className="mb-4"><AssetFundingFields portfolioId={brokerId} currency={currency} mode={entryMode} onModeChange={setEntryMode} accountId={fundingAccountId} onAccountChange={setFundingAccountId} /></div>
       <p className="mb-4 text-xs text-gray-400">{entryMode === 'BUY' ? 'หักเงินรวมค่าธรรมเนียม' : 'ต้นทุนรวมค่าธรรมเนียม (ไม่ตัดเงิน)'} {((sharesN * costN || 0) + (Number(executionFee) || 0)).toLocaleString()} {currency} · เรทนี้เก็บกับรายการ ไม่เปลี่ยนเรทตลาด</p>
 
-      <div className="flex gap-3">
-        {holding && (
-          <button
-            onClick={() => {
-              if (!confirmDelete) return setConfirmDelete(true);
-              onDelete(holding);
-              onClose();
-            }}
-            className={cn(
-              "rounded-xl border px-4 text-sm font-bold flex items-center gap-2 transition-colors",
-              confirmDelete
-                ? "bg-[#FFB4AB]/20 border-[#FFB4AB]/50 text-[#FFB4AB]"
-                : "border-white/10 text-gray-400 hover:text-[#FFB4AB]"
-            )}
-          >
-            <Trash2 size={14} />
-            {confirmDelete ? "ยืนยันลบ" : "ลบ"}
-          </button>
-        )}
-        <button onClick={save} disabled={!valid || isSaving} className={cn(PRIMARY_BTN, "flex-1")}>
-          {holding ? "บันทึกการแก้ไข" : "เพิ่มสินทรัพย์"}
-        </button>
-      </div>
     </Sheet>
   );
 }
@@ -2028,6 +2048,17 @@ function HoldingGroupModal({
   );
 }
 
+function HoldingSortHeader({ field, sort, onSort, children, align = 'right' }: {
+  field: HoldingSortField; sort: HoldingSort; onSort: (sort: HoldingSort) => void; children: React.ReactNode; align?: 'left' | 'right';
+}) {
+  const active = sort.startsWith(`${field}-`);
+  return <th scope="col" aria-sort={active ? (sort.endsWith('asc') ? 'ascending' : 'descending') : 'none'} className={cn('px-3 py-3 font-semibold', align === 'left' ? 'text-left min-w-[220px]' : 'text-right')}>
+    <button type="button" onClick={() => onSort(toggleHoldingSort(sort, field))} className={cn('inline-flex items-center gap-1.5 rounded py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#ADC6FF] hover:text-white', active ? 'text-[#ADC6FF]' : 'text-gray-400')}>
+      {children}<span aria-hidden="true" className="whitespace-nowrap">{active ? (field === 'name' ? (sort.endsWith('asc') ? 'A → Z' : 'Z → A') : (sort.endsWith('asc') ? '↑' : '↓')) : '↕'}</span>
+    </button>
+  </th>;
+}
+
 function HoldingGroupBoard({
   group,
   availableHoldings,
@@ -2039,6 +2070,7 @@ function HoldingGroupBoard({
   onRemoveHolding,
   onEditHolding,
   onDeleteGroup,
+  sort, favoritesFirst, onFavorite, onReorder, onSort, search,
 }: {
   group: HoldingGroup;
   availableHoldings: Holding[];
@@ -2050,11 +2082,16 @@ function HoldingGroupBoard({
   onRemoveHolding: (holdingId: string) => void;
   onEditHolding: (holding: Holding) => void;
   onDeleteGroup: () => void;
+  sort: HoldingSort; favoritesFirst: boolean;
+  onSort: (sort: HoldingSort) => void; search: string;
+  onFavorite: (holding: Holding) => void;
+  onReorder: (source: string, target: string) => void;
 }) {
   const [dragOver, setDragOver] = useState(false);
   const [choosing, setChoosing] = useState(false);
   const [query, setQuery] = useState('');
-  const candidates = availableHoldings.filter(item => item.brokerId === group.brokerId && !holdings.some(placed => placed.id === item.id) && item.symbol.toLowerCase().includes(query.trim().toLowerCase()));
+  const visibleRows = filterHoldings(holdings, search);
+  const candidates = filterHoldings(availableHoldings.filter(item => item.brokerId === group.brokerId && !holdings.some(placed => placed.id === item.id)), query);
   const text = useMoneyText();
   const color = group.market ? TABS.find((tab) => tab.key === group.market)?.color ?? ACCENT : "#FF9EC4";
   return (
@@ -2070,28 +2107,30 @@ function HoldingGroupBoard({
         <div className="min-w-0 flex-1"><h3 className="truncate text-sm font-semibold text-white">{group.name}</h3>{brokerName && <p className="mt-0.5 text-xs text-gray-500">{brokerName}</p>}</div>
         {!group.isDefault && <button type="button" onClick={onDeleteGroup} aria-label={`ลบหัวข้อ ${group.name}`} className="rounded-lg p-1 text-gray-500 hover:bg-white/5 hover:text-[#FFB4AB]"><X size={14} /></button>}
         <span className="text-xs tabular-nums text-gray-400">{holdings.length}</span>
-        <button type="button" onClick={() => setChoosing(value => !value)} aria-expanded={choosing} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-[#4EDEA3] hover:bg-white/5">{choosing ? 'ซ่อนตัวเลือกสินทรัพย์' : '+ เลือกสินทรัพย์'}</button>
+        <button type="button" onClick={() => setChoosing(value => !value)} aria-expanded={choosing} className="rounded-lg border border-[#4EDEA3]/25 bg-[#4EDEA3]/5 px-3 py-2 text-xs text-[#4EDEA3] hover:bg-[#4EDEA3]/10">{choosing ? 'ซ่อนตัวเลือกสินทรัพย์' : '+ เพิ่ม / นำสินทรัพย์กลับ'}</button>
       </div>
       {choosing && <div className="mb-4 rounded-xl border border-white/10 bg-black/20 p-3">
         <input value={query} onChange={event => setQuery(event.target.value)} placeholder="ค้นหา symbol ในโบรกนี้" aria-label={`ค้นหาสินทรัพย์สำหรับ ${group.name}`} className="mb-3 w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white" />
-        <p className="mb-2 text-xs text-gray-400">กดเพิ่ม หรือลากจากรายการนี้ลงหัวข้อ · ไม่เพิ่มจำนวนหุ้นหรือหักเงิน</p>
+        <p className="mb-2 text-xs text-gray-400">สินทรัพย์ที่มีอยู่ในโบรกนี้แต่ยังไม่อยู่ในหัวข้อนี้ รวมรายการที่เคยเอาออก · กดที่หุ้นเพื่อนำกลับมาแสดง ไม่ซื้อเพิ่มและไม่หักเงิน</p>
         <div className="flex max-h-40 flex-wrap gap-2 overflow-y-auto">{candidates.map(item => <button key={item.id} type="button" draggable onDragStart={event => { event.dataTransfer.effectAllowed = 'copy'; event.dataTransfer.setData('text/plain', item.id); }} onClick={() => onDropHolding(item.id)} className="flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-sm text-white hover:border-[#4EDEA3]/50"><AssetLogo symbol={item.symbol} /><span>{item.symbol}</span><Plus size={14} /></button>)}{candidates.length === 0 && <p className="text-xs text-gray-400">ไม่มีสินทรัพย์ที่ยังไม่อยู่ในหัวข้อนี้ตรงกับคำค้น</p>}</div>
       </div>}
-      {holdings.length === 0 ? <div className="flex min-h-24 items-center justify-center gap-2 rounded-lg border border-dashed border-white/[0.08] px-3 text-xs text-gray-500"><Plus size={14} strokeWidth={1.5} />วางสินทรัพย์ที่นี่</div> : <div className="overflow-x-auto rounded-xl" tabIndex={0} aria-label={`ตารางสินทรัพย์ ${group.name}`}>
+      {holdings.length === 0 ? <button type="button" onClick={() => setChoosing(true)} className="flex min-h-24 w-full items-center justify-center gap-2 rounded-lg border border-dashed border-white/15 px-3 text-xs text-gray-400 hover:border-[#4EDEA3]/50 hover:text-[#4EDEA3]"><Plus size={14} strokeWidth={1.5} />เพิ่ม / นำสินทรัพย์กลับเข้าหัวข้อนี้</button> : <div className="overflow-x-auto rounded-xl" tabIndex={0} aria-label={`ตารางสินทรัพย์ ${group.name}`}>
         <table className="w-full min-w-[1000px] text-left text-sm">
           <thead className="border-b border-white/[0.08] text-[10px] uppercase tracking-wide text-gray-500">
             <tr>
-              <th scope="col" className="min-w-[220px] px-3 py-3 font-semibold">Asset</th>
+              <HoldingSortHeader field="name" sort={sort} onSort={onSort} align="left">Asset / Symbol</HoldingSortHeader>
               <th scope="col" className="px-3 py-3 font-semibold">Price / Avg Cost</th>
-              <th scope="col" className="px-3 py-3 font-semibold">Holdings</th>
-              <th scope="col" className="px-3 py-3 text-right font-semibold">Unrealized P/L</th>
+              <HoldingSortHeader field="value" sort={sort} onSort={onSort}>Holdings</HoldingSortHeader>
+              <HoldingSortHeader field="day" sort={sort} onSort={onSort}>1 วัน / Daily %</HoldingSortHeader>
+              <HoldingSortHeader field="unrealized" sort={sort} onSort={onSort}>Unrealized P/L %</HoldingSortHeader>
               <th scope="col" className="px-3 py-3 text-right font-semibold">Realized P/L</th>
-              <th scope="col" className="px-3 py-3 text-right font-semibold" title="กำไรที่ยังไม่ขาย + กำไรที่ขายแล้ว + ปันผล เทียบกับต้นทุนซื้อสะสม">Total Return</th>
+              <HoldingSortHeader field="return" sort={sort} onSort={onSort}>Total Return %</HoldingSortHeader>
               <th scope="col" className="w-20 px-2 py-3"><span className="sr-only">จัดการสินทรัพย์</span></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
-            {holdings.map(holding => <HoldingTableRow key={holding.id} holding={holding} color={color} total={total} rate={rate} groupName={group.name} onEdit={() => onEditHolding(holding)} onRemove={() => onRemoveHolding(holding.id)} />)}
+            {visibleRows.length === 0 && <tr><td colSpan={8} className="p-8 text-center text-gray-400">ไม่พบสินทรัพย์ตรงกับคำค้น</td></tr>}
+            {orderHoldings(visibleRows, sort, favoritesFirst).map((holding, index, rows) => <HoldingTableRow key={holding.id} holding={holding} color={color} total={total} rate={rate} groupName={group.name} onEdit={() => onEditHolding(holding)} onRemove={() => onRemoveHolding(holding.id)} onFavorite={() => onFavorite(holding)} onReorder={sort === 'custom' ? onReorder : undefined} onMoveUp={sort === 'custom' && index > 0 ? () => onReorder(holding.id, rows[index - 1].id) : undefined} />)}
           </tbody>
         </table>
       </div>}
@@ -2099,8 +2138,10 @@ function HoldingGroupBoard({
   );
 }
 
-function HoldingTableRow({ holding: h, color, total, rate, groupName, onEdit, onRemove }: {
+function HoldingTableRow({ holding: h, color, total, rate, groupName, onEdit, onRemove, onFavorite, onReorder, onMoveUp }: {
   holding: Holding; color: string; total: number; rate: number; groupName: string; onEdit: () => void; onRemove: () => void;
+  onFavorite?: () => void; onReorder?: (source: string, target: string) => void;
+  onMoveUp?: () => void;
 }) {
   const hidden = useContext(HideContext);
   const text = useMoneyText();
@@ -2112,20 +2153,27 @@ function HoldingTableRow({ holding: h, color, total, rate, groupName, onEdit, on
   const invested = h.investedCost ?? cost;
   const percent = (amount: number, basis: number) => hidden ? MASK : basis > 0 ? `${amount > 0 ? '+' : ''}${nf(amount / basis * 100)}%` : '—';
   const profitColor = (amount: number) => moneyDisplaySign(amount) > 0 ? 'text-[#4EDEA3]' : moneyDisplaySign(amount) < 0 ? 'text-[#FFB4AB]' : 'text-gray-400';
-  return <tr draggable onDragStart={event => { event.dataTransfer.effectAllowed = 'copy'; event.dataTransfer.setData('text/plain', h.id); }} className="group transition-colors hover:bg-white/[0.025]">
+  return <tr draggable onDragStart={event => { event.dataTransfer.effectAllowed = 'copyMove'; event.dataTransfer.setData('text/plain', h.id); if (onReorder) event.dataTransfer.setData('application/x-fintrack-order', h.id); }} onDragOver={event => { if (onReorder && event.dataTransfer.types.includes('application/x-fintrack-order')) { event.preventDefault(); event.stopPropagation(); event.dataTransfer.dropEffect = 'move'; } }} onDrop={event => { const source = event.dataTransfer.getData('application/x-fintrack-order'); if (source && onReorder) { event.preventDefault(); event.stopPropagation(); onReorder(source, h.id); } }} className="group transition-colors hover:bg-white/[0.025]">
     <td className="px-3 py-5">
+      <div className="flex items-center gap-2">
+      {onReorder && <span draggable onDragStart={event => { event.stopPropagation(); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('application/x-fintrack-order', h.id); }} title={`ลากจัดลำดับ ${h.symbol}`} className="shrink-0 cursor-grab rounded p-1 text-[#ADC6FF] active:cursor-grabbing"><GripVertical size={16} /></span>}
+      <button type="button" onClick={onFavorite} aria-label={`Favorite ${h.symbol}`} aria-pressed={!!h.isFavorite} className="shrink-0 rounded p-1 text-amber-300 hover:bg-white/10"><Star size={15} fill={h.isFavorite ? 'currentColor' : 'none'} /></button>
       <button type="button" onClick={onEdit} className="flex items-center gap-3 text-left" aria-label={`แก้ไข ${h.symbol}`}>
-        <GripVertical size={13} className="shrink-0 cursor-grab text-gray-600" />
         <AssetLogo symbol={h.symbol} color={color} size="sm" />
         <span><span className="block max-w-[190px] truncate font-semibold text-white" title={h.name}>{h.name || h.symbol}</span><span className="mt-1 block text-xs text-gray-400">{hidden ? MASK : h.shares.toLocaleString(undefined, { maximumFractionDigits: 6 })} หน่วย · {h.symbol}</span><span className="mt-1 block text-[10px] text-gray-500">{hidden ? MASK : nf(total > 0 ? convert(value, h.currency, 'THB', rate) / total * 100 : 0)}% ของสินทรัพย์</span></span>
       </button>
+      </div>
     </td>
     <td className="px-3 py-5 tabular-nums"><span className="block font-semibold text-white">{text(h.price, h.currency)}</span><span className="mt-1.5 block whitespace-nowrap text-[11px] text-gray-400">Avg {text(h.avgCost, h.currency)}</span></td>
-    <td className="px-3 py-5 tabular-nums"><span className="block whitespace-nowrap font-semibold text-white">{text(value, h.currency)}</span><span className="mt-1.5 block whitespace-nowrap text-[11px] text-gray-400">≈ {text(convert(value, h.currency, h.currency === 'USD' ? 'THB' : 'USD', rate), h.currency === 'USD' ? 'THB' : 'USD')}</span></td>
+    <td className="px-3 py-5 text-right tabular-nums"><span className="block whitespace-nowrap text-base font-bold text-white">{text(value, h.currency)}</span><span className="mt-1.5 block whitespace-nowrap text-[11px] font-normal text-gray-400">≈ {text(convert(value, h.currency, h.currency === 'USD' ? 'THB' : 'USD', rate), h.currency === 'USD' ? 'THB' : 'USD')}</span></td>
+    <td className={cn('px-3 py-5 text-right tabular-nums whitespace-nowrap', profitColor(h.dayChangePercent ?? 0))} title="ราคาล่าสุดเทียบราคาปิดวันซื้อขายก่อนหน้า × จำนวนหุ้นที่ถือปัจจุบัน ไม่รวมผลจากการซื้อขายระหว่างวัน">
+      <span className={cn('inline-block rounded-md px-2 py-1 font-bold', !hidden && moneyDisplaySign(h.dayChangePercent ?? 0) > 0 ? 'bg-[#4EDEA3]/10' : !hidden && moneyDisplaySign(h.dayChangePercent ?? 0) < 0 ? 'bg-[#FFB4AB]/10' : 'bg-white/5')}>{hidden ? MASK : h.dayChangePercent == null ? '—' : `${moneyDisplaySign(h.dayChangePercent) > 0 ? '+' : ''}${nf(moneyDisplaySign(h.dayChangePercent) === 0 ? 0 : h.dayChangePercent)}%`}</span>
+      <span className="mt-1.5 block text-[11px]">{h.dayChange == null ? '—' : text(h.dayChange * h.shares, h.currency, true)}</span>
+    </td>
     <td className={cn('px-3 py-5 text-right tabular-nums', profitColor(unrealized))}><span className="block font-semibold">{percent(unrealized, cost)}</span><span className="mt-1.5 block whitespace-nowrap text-[11px]">{text(unrealized, h.currency, true)}</span></td>
     <td className={cn('px-3 py-5 text-right tabular-nums', profitColor(realized))}><span className="block whitespace-nowrap font-semibold">{text(realized, h.currency, true)}</span><span className="mt-1.5 block text-[11px] text-gray-500">กำไรที่ขายแล้ว</span></td>
     <td className={cn('px-3 py-5 text-right tabular-nums', profitColor(totalReturn))} title={`รวมปันผล ${text(h.dividends || 0, h.currency)}`}><span className="block font-semibold">{percent(totalReturn, invested)}</span><span className="mt-1.5 block whitespace-nowrap text-[11px]">{text(totalReturn, h.currency, true)}</span></td>
-    <td className="px-2 py-5"><div className="flex items-center"><button type="button" onClick={onEdit} aria-label={`แก้ไข ${h.symbol}`} className="rounded-lg p-2 text-gray-500 hover:bg-white/5 hover:text-white"><Pencil size={14} /></button><button type="button" onClick={onRemove} aria-label={`เอา ${h.symbol} ออกจาก ${groupName}`} title="เอาออกจากหัวข้อนี้เท่านั้น ไม่ลบหุ้น" className="rounded-lg p-2 text-gray-500 hover:bg-white/5 hover:text-[#FFB4AB]"><X size={14} /></button></div></td>
+    <td className="px-2 py-5"><div className="flex items-center">{onMoveUp && <button type="button" onClick={onMoveUp} aria-label={`เลื่อน ${h.symbol} ขึ้น`} className="rounded-lg p-2 text-gray-400 hover:bg-white/5">↑</button>}<button type="button" onClick={onEdit} aria-label={`แก้ไข ${h.symbol}`} className="rounded-lg p-2 text-gray-500 hover:bg-white/5 hover:text-white"><Pencil size={14} /></button><button type="button" onClick={onRemove} aria-label={`เอา ${h.symbol} ออกจาก ${groupName}`} title="เอาออกจากหัวข้อนี้เท่านั้น ไม่ลบหุ้น" className="rounded-lg p-2 text-gray-500 hover:bg-white/5 hover:text-[#FFB4AB]"><X size={14} /></button></div></td>
   </tr>;
 }
 
@@ -2336,6 +2384,7 @@ export default function PortfolioPage() {
     moneyBuckets,
     assets,
     marketQuotes,
+    saveAssetPreferences,
     trades,
     isDataLoaded,
     addAsset,
@@ -2359,11 +2408,21 @@ export default function PortfolioPage() {
     saveHolding,
     removeHolding,
     addHoldingGroup,
-    removeHoldingGroup,
+    removeHoldingGroup: confirmRemoveHoldingGroup,
     placeHoldingInGroup,
     moveHoldingToBroker,
-    removeHoldingFromGroup,
+    removeHoldingFromGroup: confirmRemoveHoldingFromGroup,
   } = usePortfolioStore();
+  const [pendingRemoval, setPendingRemoval] = useState<{ groupId: string; groupName: string; holdingId?: string; symbol?: string } | null>(null);
+  const removeHoldingFromGroup = (holdingId: string, groupId: string) => {
+    const holding = state.holdings.find(item => item.id === holdingId);
+    const group = state.holdingGroups.find(item => item.id === groupId);
+    if (holding && group) setPendingRemoval({ holdingId, symbol: holding.symbol, groupId, groupName: group.name });
+  };
+  const removeHoldingGroup = (groupId: string) => {
+    const group = state.holdingGroups.find(item => item.id === groupId);
+    if (group && !group.isDefault) setPendingRemoval({ groupId, groupName: group.name });
+  };
 
   const FILTER_STORAGE_KEY = "fintrack.portfolio.filter.v1";
 
@@ -2418,6 +2477,24 @@ export default function PortfolioPage() {
   const display: Cur = "THB";
   const [hide, setHide] = useState(false);
   const [sort, setSort] = useState<"value" | "profit" | "name">("value");
+  const [tableSort, setTableSort] = useState<HoldingSort>('value-desc');
+  const [favoritesFirst, setFavoritesFirst] = useState(false);
+  const [holdingSearch, setHoldingSearch] = useState('');
+  const preferenceBusy = React.useRef(false);
+  const changeFavorite = async (holding: Holding) => {
+    if (preferenceBusy.current) return;
+    preferenceBusy.current = true;
+    try { await saveAssetPreferences(holding.brokerId, holding.symbol, { isFavorite: !holding.isFavorite }); }
+    finally { preferenceBusy.current = false; }
+  };
+  const reorderHolding = async (source: string, target: string) => {
+    if (source === target || preferenceBusy.current) return;
+    const rows = moveHoldingBefore(state.holdings, source, target);
+    if (!rows) return;
+    preferenceBusy.current = true;
+    try { for (const [sortOrder, h] of rows.entries()) { if (!await saveAssetPreferences(h.brokerId, h.symbol, { sortOrder })) break; } }
+    finally { preferenceBusy.current = false; }
+  };
   const [now, setNow] = useState<number | null>(null);
   const [moveSheet, setMoveSheet] = useState<{ mode: MoveMode; accountId: string } | null>(null);
   const [bucketFunding, setBucketFunding] = useState<{ bucketId: string; accountId: string } | null>(null);
@@ -2578,6 +2655,7 @@ export default function PortfolioPage() {
           : allocation === 'Funds' ? 'FUND'
           : position.asset?.currency === 'THB' ? 'TH' : 'US';
         const holdingCurrency: Cur = 'USD';
+        const preferences = position.asset || assets.find(asset => asset.symbol.toUpperCase() === position.symbol)?.portfolioPreferences?.[position.portfolioId];
         const avgCostUsd = position.shares > 0 ? position.cost / position.shares : 0;
         const livePriceUsd = marketQuotes[position.symbol]?.priceUSD || Number(position.asset?.currentPrice)
           || (position.shares > 0 ? Number(position.asset?.valueUSD) / position.shares : 0)
@@ -2595,6 +2673,10 @@ export default function PortfolioPage() {
           realizedPL: position.realized,
           dividends: position.dividends,
           investedCost: position.invested,
+          isFavorite: preferences?.isFavorite,
+          sortOrder: preferences?.sortOrder,
+          dayChange: marketQuotes[position.symbol]?.dayChangeUSD ?? null,
+          dayChangePercent: marketQuotes[position.symbol]?.dayChangePercent ?? null,
         };
       });
   }, [activePortfolio?.id, assets, marketQuotes, sidebarBrokers, trades]);
@@ -3076,9 +3158,9 @@ export default function PortfolioPage() {
             )}
           </div>
 
-          <div className="grid gap-6 xl:gap-8 lg:grid-cols-[minmax(0,1fr)_300px] items-start">
+          <div className="grid min-w-0 grid-cols-1 gap-6 items-start">
             {/* คอลัมน์หลัก */}
-            <div className="contents">
+            <div className="flex min-w-0 flex-col gap-6">
               <div className="min-w-0 lg:col-start-1">
               <SummaryCard
                 isCash={tab === "cash"}
@@ -3093,7 +3175,7 @@ export default function PortfolioPage() {
               </div>
 
               {showCash && (
-                <section className="min-w-0 space-y-5 lg:col-start-1">
+                <section className="order-2 min-w-0 space-y-5">
                   <h2 className="text-base font-semibold text-white">บัญชีเงินสด</h2>
                   {groups.map((g) => (
                     <div key={g.broker.id}>
@@ -3133,17 +3215,26 @@ export default function PortfolioPage() {
               )}
 
               {showHoldings && (
-                <section className="min-w-0 space-y-3 lg:col-span-2 lg:order-3">
+                <section className="order-1 min-w-0 space-y-3">
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-gray-300">
+                    <button type="button" aria-pressed={favoritesFirst} onClick={() => setFavoritesFirst(value => !value)} className={cn('flex items-center gap-2 rounded-lg border px-3 py-2.5 transition-colors', favoritesFirst ? 'border-amber-300/30 bg-amber-300/10 text-amber-200' : 'border-white/10 hover:bg-white/5')}><Star size={15} fill={favoritesFirst ? 'currentColor' : 'none'} />รายการโปรดขึ้นก่อน</button>
+                    <button type="button" aria-pressed={tableSort === 'custom'} title="ลากจัดลำดับเอง หรือคลิกหัวตารางเพื่อเรียงตามคอลัมน์" onClick={() => setTableSort(current => current === 'custom' ? 'value-desc' : 'custom')} className={cn('flex items-center gap-1.5 rounded-lg border px-3 py-2.5', tableSort === 'custom' ? 'border-[#ADC6FF]/30 bg-[#ADC6FF]/10 text-[#ADC6FF]' : 'border-white/10 text-gray-400 hover:bg-white/5')}><GripVertical size={14} />Custom</button>
+                    <div className="relative min-w-[160px] flex-1">
+                      <input type="search" aria-label="ค้นหาสินทรัพย์ในตาราง" placeholder="ค้นหาชื่อ / Symbol…" value={holdingSearch} onChange={event => setHoldingSearch(event.target.value)} className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-white placeholder:text-gray-500 focus:border-[#ADC6FF] focus:outline-none" />
+                    </div>
+                    <button onClick={() => setHoldingGroupModal(true)} className="flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2.5 text-xs font-medium text-gray-300 hover:bg-white/5"><Plus size={14} /> เพิ่มหัวข้อ</button>
+                    <p className="w-full text-[11px] text-gray-500">1 วัน: เทียบราคาปิดวันซื้อขายก่อนหน้า · ยอดเปลี่ยนแปลงตามจำนวนหุ้นปัจจุบัน · ไม่มีราคาแสดง —</p>
+                    {tableSort === 'custom' && <p className="w-full text-[11px] text-gray-400">ลากแถวไปวางเหนือแถวที่ต้องการ หรือกด ↑ · ปิด Favorite ขึ้นก่อน หากต้องการจัดทุกแถวอย่างอิสระ</p>}
+                  </div>
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div><h2 className="text-base font-semibold text-white">หัวข้อสินทรัพย์</h2><p className="mt-1 text-xs text-gray-400">จัดได้หลายหัวข้อ มูลค่ารวมนับครั้งเดียว</p></div>
-                    <button onClick={() => setHoldingGroupModal(true)} className="flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-gray-300 hover:bg-white/5"><Plus size={14} /> เพิ่มหัวข้อ</button>
                   </div>
                   {duplicatePlacements.length > 0 && <details className="rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3">
                     <summary className="cursor-pointer text-xs text-gray-300">อยู่หลายหัวข้อ {duplicatePlacements.length} รายการ · ดูรายละเอียด</summary>
                     <div className="flex items-start gap-2"><AlertTriangle size={16} className="mt-0.5 shrink-0 text-[#E8B84A]" /><div className="min-w-0"><p className="text-sm font-bold text-[#F6D783]">มีสินทรัพย์อยู่มากกว่าหนึ่งหัวข้อ</p><p className="mt-1 text-[11px] leading-relaxed text-gray-400">นี่เป็นการจัดกลุ่มเท่านั้น จึงไม่ต้องลบจำนวนหน่วย และยอดรวมจะนับสินทรัพย์จริงเพียงครั้งเดียว</p><div className="mt-3 space-y-2">{duplicatePlacements.map(({ holding, groups: placedGroups }) => <div key={holding.id} className="flex flex-wrap items-center gap-2 text-xs"><span className="font-bold text-white">{holding.symbol}</span><span className="text-gray-500">อยู่ใน</span>{placedGroups.map((group, index) => <span key={group.id} className="inline-flex items-center gap-1 rounded-lg bg-black/20 px-2 py-1 text-gray-300">{group.name}{index > 0 && <button type="button" onClick={() => removeHoldingFromGroup(holding.id, group.id)} className="text-gray-500 hover:text-[#FFB4AB]" aria-label={`เอา ${holding.symbol} ออกจาก ${group.name}`}><X size={12} /></button>}</span>)}</div>)}</div></div></div>
                   </details>}
                   {trayHoldings.length === 0 ? <EmptyHoldings onAdd={openAddHolding} /> : <div className="space-y-4">
-                    {visibleHoldingGroups.map((group) => <HoldingGroupBoard key={group.id} group={group} availableHoldings={trayHoldings} brokerName={broker === "all" ? brokerById.get(group.brokerId)?.name : undefined} holdings={holdingsByGroup.get(group.id) || []} total={trayHoldingTotalTHB} rate={rate} onDropHolding={(holdingId) => {
+                    {visibleHoldingGroups.map((group) => <HoldingGroupBoard key={group.id} group={group} sort={tableSort} onSort={setTableSort} search={holdingSearch} favoritesFirst={favoritesFirst} onFavorite={changeFavorite} onReorder={reorderHolding} availableHoldings={trayHoldings} brokerName={broker === "all" ? brokerById.get(group.brokerId)?.name : undefined} holdings={holdingsByGroup.get(group.id) || []} total={trayHoldingTotalTHB} rate={rate} onDropHolding={(holdingId) => {
                       const holding = state.holdings.find((item) => item.id === holdingId);
                       if (holding && holding.brokerId !== group.brokerId) { setToast("ลากสินทรัพย์ไปได้เฉพาะหัวข้อของโบรกเกอร์เดียวกัน"); return; }
                       placeHoldingInGroup(holdingId, group.id);
@@ -3153,16 +3244,6 @@ export default function PortfolioPage() {
               )}
             </div>
 
-            {/* Asset tray keeps the canonical holding list separate from its visual groups. */}
-            <aside className="space-y-6 min-w-0 lg:col-start-2 lg:row-start-1 lg:row-span-2">
-              {showHoldings && <HoldingTray brokers={state.brokers} holdings={trayHoldings} placementCounts={placementCounts} onEdit={(holding) => setHoldingModal({ holding })} onMoveHolding={(holdingId, brokerId) => {
-                const holding = state.holdings.find((item) => item.id === holdingId);
-                if (!holding || holding.brokerId === brokerId) return;
-                moveHoldingToBroker(holdingId, brokerId);
-                setToast(`ย้าย ${holding.symbol} ไป ${brokerById.get(brokerId)?.name || "พอร์ตที่เลือก"} แล้ว`);
-              }} />}
-              <LedgerCard entries={ledgerEntries} state={state} onStart={() => openMove("deposit")} />
-            </aside>
           </div>
         </div>
 
@@ -3217,6 +3298,23 @@ export default function PortfolioPage() {
               onDelete={deleteHoldingFromPortfolio}
               onClose={() => setHoldingModal(null)}
             />
+          )}
+          {pendingRemoval && (
+            <Sheet title={pendingRemoval.holdingId ? 'ยืนยันเอาสินทรัพย์ออกจากหัวข้อ' : 'ยืนยันลบหัวข้อ'} onClose={() => setPendingRemoval(null)} footer={
+              <div className="flex justify-end gap-3">
+                <button type="button" autoFocus onClick={() => setPendingRemoval(null)} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white hover:bg-white/5">ยกเลิก</button>
+                <button type="button" onClick={() => {
+                  if (pendingRemoval.holdingId) confirmRemoveHoldingFromGroup(pendingRemoval.holdingId, pendingRemoval.groupId);
+                  else confirmRemoveHoldingGroup(pendingRemoval.groupId);
+                  setToast('เอาออกจากหัวข้อแล้ว หุ้นยังอยู่ในพอร์ต · นำกลับได้ที่ “เพิ่ม / นำสินทรัพย์กลับ”');
+                  setPendingRemoval(null);
+                }} className="rounded-xl bg-[#FFB4AB]/15 px-5 py-3 text-sm font-semibold text-[#FFB4AB] hover:bg-[#FFB4AB]/25">{pendingRemoval.holdingId ? 'ยืนยันเอาออกจากหัวข้อ' : 'ยืนยันลบหัวข้อ'}</button>
+              </div>
+            }>
+              <p className="text-sm leading-relaxed text-white">{pendingRemoval.holdingId ? `ต้องการเอา ${pendingRemoval.symbol} ออกจากหัวข้อ “${pendingRemoval.groupName}” ใช่ไหม?` : `ต้องการลบหัวข้อ “${pendingRemoval.groupName}” ใช่ไหม?`}</p>
+              <p className="mt-3 text-sm leading-relaxed text-gray-400">การทำรายการนี้เปลี่ยนเฉพาะการจัดหัวข้อ ไม่ลบหุ้น จำนวนหน่วย เงินสด หรือประวัติซื้อขาย และไม่เปลี่ยนมูลค่ารวมพอร์ต</p>
+              <p className="mt-3 text-xs leading-relaxed text-gray-400">นำกลับมาแสดงได้ด้วยปุ่ม “เพิ่ม / นำสินทรัพย์กลับ” มุมขวาของหัวข้อ แล้วกดเลือกหุ้น หากลบหัวข้อไปแล้ว ให้เพิ่มหัวข้อใหม่ก่อน</p>
+            </Sheet>
           )}
           {holdingGroupModal && (
             <HoldingGroupModal

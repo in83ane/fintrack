@@ -194,6 +194,7 @@ export interface Asset {
   realizedPL?: number;
   isFavorite?: boolean;
   sortOrder?: number;
+  portfolioPreferences?: Record<string, { isFavorite?: boolean; sortOrder?: number }>;
   is_active?: boolean;
   currentPrice?: number;
   currency?: string;
@@ -298,7 +299,8 @@ interface AppState {
   allocations: Allocation[];
   updateAllocation: (label: string, value: number) => void;
   assets: Asset[];
-  marketQuotes: Record<string, { priceUSD: number; updatedAt: number }>;
+  marketQuotes: Record<string, { priceUSD: number; updatedAt: number; dayChangeUSD?: number | null; dayChangePercent?: number | null }>;
+  saveAssetPreferences: (portfolioId: string, symbol: string, preferences: { isFavorite?: boolean; sortOrder?: number }) => Promise<boolean>;
   portfolios: Portfolio[];
   activePortfolioId: string | null;
   activePortfolio: Portfolio | null;
@@ -1673,7 +1675,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [trades, setTrades] = useState<Trade[]>(defaultTrades);
   const [allocations, setAllocations] = useState<Allocation[]>(defaultAllocations);
   const [assets, setAssets] = useState<Asset[]>(defaultAssets);
-  const [marketQuotes, setMarketQuotes] = useState<Record<string, { priceUSD: number; updatedAt: number }>>({});
+  const [marketQuotes, setMarketQuotes] = useState<Record<string, { priceUSD: number; updatedAt: number; dayChangeUSD?: number | null; dayChangePercent?: number | null }>>({});
   const assetsRef = React.useRef<Asset[]>(assets);
   useEffect(() => {
     assetsRef.current = assets;
@@ -2245,6 +2247,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 currentPrice,
                 isFavorite: a.is_favorite,
                 sortOrder: a.sort_order,
+                portfolioPreferences: a.portfolio_id ? { [a.portfolio_id]: { isFavorite: a.is_favorite, sortOrder: a.sort_order } } : {},
                 is_active: a.is_active,
                 portfolioId: a.portfolio_id || undefined,
                 brokerageAccountId: a.brokerage_account_id || undefined,
@@ -2259,6 +2262,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               const nextCost = (a.avg_purchase_price || 0) * quantity;
               uniqueAssetsMap.set(symbolKey, {
                 ...existing,
+                portfolioPreferences: { ...existing.portfolioPreferences, ...nextAsset.portfolioPreferences },
+                isFavorite: !!existing.isFavorite || !!nextAsset.isFavorite,
                 shares: combinedShares,
                 avgCost: combinedShares > 0 ? (existingCost + nextCost) / combinedShares : 0,
                 valueUSD: (existing.valueUSD || 0) + nextAsset.valueUSD,
@@ -2973,7 +2978,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const next = { ...previous };
           for (const symbol of marketSymbolKey.split('|')) {
             const quote = validQuotes.find((item: any) => item.symbol.toUpperCase() === mapToMarketSymbol(symbol));
-            if (quote) next[symbol] = { priceUSD: usdPrice(quote), updatedAt: data.timestamp || Date.now() };
+            if (quote) {
+              const quoteRate = exchangeRates[quote.quoteCurrency as Currency];
+              next[symbol] = {
+                priceUSD: usdPrice(quote), updatedAt: data.timestamp || Date.now(),
+                dayChangePercent: typeof quote.dayChangePercent === 'number' && Number.isFinite(quote.dayChangePercent) ? quote.dayChangePercent : null,
+                dayChangeUSD: typeof quote.dayChange === 'number' && Number.isFinite(quote.dayChange) && Number.isFinite(quoteRate) && quoteRate > 0 ? quote.dayChange / quoteRate : null,
+              };
+            }
           }
           return next;
         });
@@ -3494,6 +3506,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       console.error("Failed to update asset in Supabase", err);
     }
+  };
+
+  const saveAssetPreferences = async (portfolioId: string, symbol: string, preferences: { isFavorite?: boolean; sortOrder?: number }): Promise<boolean> => {
+    if (!portfolios.some(p => p.id === portfolioId && p.kind === 'trading')) return false;
+    if (preferences.isFavorite !== undefined && typeof preferences.isFavorite !== 'boolean') return false;
+    if (preferences.sortOrder !== undefined && (!Number.isInteger(preferences.sortOrder) || preferences.sortOrder < 0)) return false;
+    const payload: { is_favorite?: boolean; sort_order?: number } = {};
+    if (preferences.isFavorite !== undefined) payload.is_favorite = preferences.isFavorite;
+    if (preferences.sortOrder !== undefined) payload.sort_order = preferences.sortOrder;
+    if (!Object.keys(payload).length) return false;
+    try {
+      if (user) {
+        const { data, error } = await supabase.from('assets').update(payload).eq('user_id', user.id).eq('portfolio_id', portfolioId).eq('symbol', symbol).select('id');
+        if (error || !data?.length) throw new Error('Asset preference was not saved');
+      }
+      setAssets(previous => {
+        const next = previous.map(a => {
+          if (a.symbol !== symbol || (a.portfolioId !== portfolioId && !a.portfolioPreferences?.[portfolioId])) return a;
+          const portfolioPreferences = { ...a.portfolioPreferences, [portfolioId]: { ...a.portfolioPreferences?.[portfolioId], ...preferences } };
+          return a.portfolioId === portfolioId ? { ...a, ...preferences, portfolioPreferences }
+            : { ...a, portfolioPreferences, isFavorite: Object.values(portfolioPreferences).some(item => item.isFavorite) };
+        });
+        if (!user) localStorage.setItem('fintrack-assets', JSON.stringify(next));
+        return next;
+      });
+      return true;
+    } catch { addToast('บันทึก Favorite / ลำดับไม่สำเร็จ กรุณาลองใหม่', 'error'); return false; }
   };
 
   const reorderAssets = async (reordered: Asset[]) => {
@@ -4244,6 +4283,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       fetchAssetMarketData,
       removeAsset: isAllPortfolios ? blockAllPortfolioMutationVoidAsync : removeAsset,
       updateAsset: isAllPortfolios ? blockAllPortfolioMutation : updateAsset,
+      saveAssetPreferences,
       reorderAssets: isAllPortfolios ? blockAllPortfolioMutation : reorderAssets,
       removeTrade: isAllPortfolios ? blockAllPortfolioMutationAsync : removeTrade,
       updateTrade: isAllPortfolios ? blockAllPortfolioMutationAsync : updateTrade,

@@ -282,7 +282,7 @@ function NetWorthSparkline({ data, formatMoney, t }: { data: NetWorthPoint[]; fo
 
 export default function DashboardPage() {
   const {
-    t, formatMoney, currency, exchangeRates, trades, assets, language,
+    t, formatMoney, currency, exchangeRates, trades, assets, language, marketQuotes,
     cashActivities, moneyBuckets, bucketActivities,
     totalInvested, totalUnrealizedPL, totalRealizedPL, totalDividends,
     fetchAssetMarketData, addAsset, addTrade,
@@ -615,9 +615,12 @@ export default function DashboardPage() {
   }, [cashActivities, bucketActivities]);
 
   // Top movers
+  const [showFavorites, setShowFavorites] = useState(false);
   const topMovers = useMemo(() => {
-    return [...assets].filter(a => a.is_active !== false).sort((a, b) => Math.abs(b.change) - Math.abs(a.change)).slice(0, 4);
-  }, [assets]);
+    const rows = assets.filter(a => a.is_active !== false);
+    if (showFavorites) return rows.filter(a => a.isFavorite).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.symbol.localeCompare(b.symbol));
+    return rows.filter(a => marketQuotes[a.symbol]?.dayChangePercent != null).sort((a, b) => Math.abs(marketQuotes[b.symbol]?.dayChangePercent ?? 0) - Math.abs(marketQuotes[a.symbol]?.dayChangePercent ?? 0)).slice(0, 4);
+  }, [assets, marketQuotes, showFavorites]);
 
   const isEmpty = assets.length === 0 && trades.length === 0;
   const selectedBrokerLabel = isAllPortfolios ? (language === 'th' ? 'ทุกพอร์ต' : 'All portfolios') : activePortfolio?.name;
@@ -822,13 +825,16 @@ export default function DashboardPage() {
 
         {/* Top Movers */}
         <div className="lg:col-span-3 bg-surface/50 rounded-2xl border border-border p-4 flex flex-col">
-          <span className="text-[10px] text-gray-500 uppercase tracking-wide font-bold mb-3">Top Movers</span>
-          <div className="space-y-2 flex-1">
+          <div className="mb-3 flex flex-wrap gap-2 text-[10px] font-bold">
+            <button type="button" aria-pressed={!showFavorites} onClick={() => setShowFavorites(false)} className={cn('rounded-lg px-2 py-2', !showFavorites ? 'bg-white/10 text-white' : 'text-gray-500')}>Top Movers · 1D</button>
+            <button type="button" aria-pressed={showFavorites} onClick={() => setShowFavorites(true)} className={cn('rounded-lg px-2 py-2', showFavorites ? 'bg-amber-300/10 text-amber-300' : 'text-gray-500')}>★ Favorites ({assets.filter(a => a.is_active !== false && a.isFavorite).length})</button>
+          </div>
+          <div className="space-y-2 flex-1 max-h-96 overflow-y-auto">
             {topMovers.length === 0 && (
-              <div className="flex-1 flex items-center justify-center py-8 text-gray-600 text-xs">No active assets</div>
+              <div className="flex-1 flex items-center justify-center py-8 text-gray-500 text-xs">{showFavorites ? 'กด ★ ที่ Portfolio เพื่อติดตามสินทรัพย์' : 'ยังไม่มีราคาเปลี่ยนแปลง 1 วัน'}</div>
             )}
             {topMovers.map(a => (
-              <button key={a.symbol} onClick={() => router.push(`/portfolio`)}
+              <button key={`${a.portfolioId}:${a.symbol}`} onClick={() => router.push(`/portfolio`)}
                 className="w-full flex items-center justify-between gap-3 p-3 text-left rounded-xl bg-white/[0.02] hover:bg-white/[0.06] transition-all border border-transparent hover:border-border">
                 <div className="flex min-w-0 flex-1 items-center gap-2">
                   <TopMoverLogo key={a.symbol} symbol={a.symbol} />
@@ -839,8 +845,8 @@ export default function DashboardPage() {
                 </div>
                 <div className="shrink-0 whitespace-nowrap text-right tabular-nums">
                   <span className="text-xs font-bold text-white block">{formatMoney(a.valueUSD)}</span>
-                  <span className={cn("text-[10px] font-bold", a.change >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
-                    {a.change >= 0 ? '+' : ''}{a.change.toFixed(2)}%
+                  <span className={cn("text-[10px] font-bold", Math.abs(marketQuotes[a.symbol]?.dayChangePercent ?? 0) < 0.005 ? 'text-gray-400' : (marketQuotes[a.symbol]?.dayChangePercent ?? 0) > 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
+                    {marketQuotes[a.symbol]?.dayChangePercent == null ? '—' : `${(marketQuotes[a.symbol].dayChangePercent ?? 0) >= 0.005 ? '+' : ''}${Math.abs(marketQuotes[a.symbol].dayChangePercent ?? 0) < 0.005 ? '0.00' : marketQuotes[a.symbol].dayChangePercent!.toFixed(2)}%`} · 1D
                   </span>
                 </div>
               </button>
