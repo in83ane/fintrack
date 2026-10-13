@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import crypto from "crypto";
+import { oauthAuthOptions, oauthRequestOrigin } from "@/src/lib/oauth-pkce";
 import {
   sanitizeEmail,
   sanitizeString,
@@ -803,9 +804,22 @@ export async function initiateGoogleAuth(data: GoogleAuthData): Promise<ActionRe
     };
   }
 
-  // We return success here and let the client handle the actual Supabase OAuth call.
-  // Doing it on the client ensures PKCE code verifier is correctly stored in localStorage.
-  return { success: true };
+  try {
+    const requestHeaders = await headers();
+    const origin = oauthRequestOrigin(requestHeaders.get('origin'),
+      requestHeaders.get('x-forwarded-host') || requestHeaders.get('host'));
+    const oauth = createClient(getSupabaseUrl(), getSupabaseAnonKey(), {
+      auth: oauthAuthOptions(await cookies(), process.env.NODE_ENV === 'production'),
+    });
+    const { data: authorization, error } = await oauth.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${origin}/auth/callback`, skipBrowserRedirect: true },
+    });
+    if (error || !authorization.url) return { success: false, errorCode: 'OAUTH_START_FAILED' };
+    return { success: true, redirectUrl: authorization.url };
+  } catch {
+    return { success: false, errorCode: 'OAUTH_START_FAILED' };
+  }
 }
 
 // ─── Get CSRF Token ────────────────────────────────────────────────────────

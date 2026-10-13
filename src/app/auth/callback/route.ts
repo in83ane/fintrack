@@ -1,157 +1,46 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { cookies } from "next/headers";
-import { headers } from "next/headers";
-import { createAuditLog, getClientIP } from "@/src/lib/security";
-import { getSupabaseUrl, getSupabaseAnonKey } from "@/src/lib/env";
-
-// ─── OAuth Callback Handler ──────────────────────────────────────────────────
-// This route handles the callback from OAuth providers (Google)
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import { cookies } from 'next/headers';
+import { getSupabaseUrl, getSupabaseAnonKey } from '@/src/lib/env';
+import { oauthAuthOptions, OAUTH_VERIFIER_COOKIE } from '@/src/lib/oauth-pkce';
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const code = searchParams.get("code");
-  const state = searchParams.get("state");
-  const error = searchParams.get("error");
-  const errorDescription = searchParams.get("error_description");
-
-  const clientIP = await getClientIP();
-  const userAgent = (await headers()).get("user-agent") || "unknown";
-
-  // Security: Check for OAuth errors
-  if (error) {
-    console.error("OAuth error:", error, errorDescription);
-    await createAuditLog({
-      action: "OAUTH_CALLBACK_ERROR",
-      ip: clientIP,
-      deviceFingerprint: "unknown",
-      userAgent,
-      success: false,
-      metadata: { error, errorDescription },
-    });
-
-    const redirectUrl = new URL("/login", request.url);
-    redirectUrl.searchParams.set("error", "oauth_failed");
-    return NextResponse.redirect(redirectUrl);
-  }
-
-  // Security: Validate state parameter (CSRF protection)
-  if (!state) {
-    await createAuditLog({
-      action: "OAUTH_MISSING_STATE",
-      ip: clientIP,
-      deviceFingerprint: "unknown",
-      userAgent,
-      success: false,
-      metadata: { reason: "Missing state parameter" },
-    });
-
-    const redirectUrl = new URL("/login", request.url);
-    redirectUrl.searchParams.set("error", "invalid_state");
-    return NextResponse.redirect(redirectUrl);
-  }
-
-  // Security: Exchange code for session
-  if (!code) {
-    const redirectUrl = new URL("/login", request.url);
-    redirectUrl.searchParams.set("error", "missing_code");
-    return NextResponse.redirect(redirectUrl);
-  }
+  const params = request.nextUrl.searchParams;
+  const store = await cookies();
+  const auth = oauthAuthOptions(store, process.env.NODE_ENV === 'production');
+  const fail = (reason: string) => {
+    auth.storage.removeItem(OAUTH_VERIFIER_COOKIE);
+    // Empty fragment prevents inheriting an old implicit-flow token hash.
+    const response = NextResponse.redirect(new URL(`/login?error=${reason}#`, request.url));
+    response.headers.set('Cache-Control', 'no-store');
+    return response;
+  };
+  if (params.has('error')) return fail('oauth_failed');
+  const code = params.get('code');
+  if (!code) return fail('missing_code');
+  if (!store.get(OAUTH_VERIFIER_COOKIE)?.value) return fail('oauth_expired');
 
   try {
-    const supabase = createClient(
-      getSupabaseUrl(),
-      getSupabaseAnonKey()
-    );
-
-    // Exchange the code for a session
-    const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-
-    if (exchangeError || !data.session) {
-      console.error("Session exchange error:", exchangeError);
-      await createAuditLog({
-        action: "OAUTH_EXCHANGE_FAILED",
-        ip: clientIP,
-        deviceFingerprint: "unknown",
-        userAgent,
-        success: false,
-        metadata: { error: exchangeError?.message },
-      });
-
-      const redirectUrl = new URL("/login", request.url);
-      redirectUrl.searchParams.set("error", "session_exchange_failed");
-      return NextResponse.redirect(redirectUrl);
-    }
-
-    // Security: Set secure session cookies
-    const cookieStore = await cookies();
-
-    cookieStore.set("session", data.session.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 24 * 60 * 60, // 24 hours
-      path: "/",
+    // Supabase validates provider state; the code must match this browser's
+    // one-time PKCE verifier. No separate provider state is expected here.
+    const client = createClient(getSupabaseUrl(), getSupabaseAnonKey(), {
+      auth,
+      global: { fetch: (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(15_000) }) },
     });
-
-    if (data.session.refresh_token) {
-      cookieStore.set("refresh_token", data.session.refresh_token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        maxAge: 24 * 60 * 60,
-        path: "/",
-      });
-    }
-
-    // Security: Log successful OAuth login
-    await createAuditLog({
-      action: "OAUTH_LOGIN_SUCCESS",
-      email: data.user?.email || undefined,
-      ip: clientIP,
-      deviceFingerprint: "unknown",
-      userAgent,
-      success: true,
-      metadata: {
-        userId: data.user?.id,
-        provider: data.user?.app_metadata?.provider,
-      },
-    });
-
-    // Determine redirect URL
-    const returnUrl = searchParams.get("returnUrl");
-    const redirectPath = returnUrl && returnUrl.startsWith("/") ? returnUrl : "/dashboard";
-
-    // Store user email in a short-lived cookie for the client to pick up
-    if (data.user?.email) {
-      cookieStore.set("user_email", data.user.email, {
-        httpOnly: false, // Client needs to read this
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        maxAge: 60, // 1 minute - just enough for the client to pick it up
-        path: "/",
-      });
-    }
-
-    const redirectUrl = new URL(redirectPath, request.url);
-    // Append session to hash so client-side Supabase can pick it up
-    redirectUrl.hash = `access_token=${data.session.access_token}&refresh_token=${data.session.refresh_token}&expires_in=${data.session.expires_in}&token_type=bearer&type=recovery`;
-
-    return NextResponse.redirect(redirectUrl);
-  } catch (err) {
-    console.error("OAuth callback error:", err);
-
-    await createAuditLog({
-      action: "OAUTH_CALLBACK_EXCEPTION",
-      ip: clientIP,
-      deviceFingerprint: "unknown",
-      userAgent,
-      success: false,
-      metadata: { error: String(err) },
-    });
-
-    const redirectUrl = new URL("/login", request.url);
-    redirectUrl.searchParams.set("error", "callback_error");
-    return NextResponse.redirect(redirectUrl);
+    const { data, error } = await client.auth.exchangeCodeForSession(code);
+    if (error || !data.session || !data.user) return fail('session_exchange_failed');
+    const cookieOptions = {
+      httpOnly: true, secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax' as const, path: '/', maxAge: 24 * 60 * 60,
+    };
+    // Existing session contract consumed by middleware and AppContext.
+    store.set('session', data.session.access_token, cookieOptions);
+    store.set('refresh_token', data.session.refresh_token, cookieOptions);
+    auth.storage.removeItem(OAUTH_VERIFIER_COOKIE);
+    const response = NextResponse.redirect(new URL('/dashboard', request.url));
+    response.headers.set('Cache-Control', 'no-store');
+    return response;
+  } catch {
+    return fail('session_exchange_failed');
   }
 }

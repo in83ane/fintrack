@@ -21,7 +21,6 @@ import {
   forgotPasswordAction,
   initiateGoogleAuth,
   getCSRFToken,
-  setSessionAction,
   type ActionResult,
 } from "./actions";
 import { useApp } from "@/src/context/AppContext";
@@ -431,6 +430,23 @@ function LoginContent() {
   }>({});
 
   const t = translations[lang];
+
+  useEffect(() => {
+    const reason = searchParams.get("error");
+    const callbackErrors = ["oauth_failed", "missing_code", "oauth_expired", "session_exchange_failed", "invalid_state", "callback_error"];
+    if (reason && callbackErrors.includes(reason)) {
+      setLoading(false);
+      setError(t.errorGoogle);
+      setErrorCode(reason);
+    }
+    // Reject old implicit callbacks; establish the server session via PKCE.
+    if (window.location.hash.includes("access_token=")) {
+      window.history.replaceState({}, "", window.location.pathname + window.location.search);
+      setLoading(false);
+      setError(t.errorGoogle);
+      setErrorCode("OAUTH_RESTART_REQUIRED");
+    }
+  }, [searchParams, t.errorGoogle]);
   const passwordStrength = checkPasswordStrength(password);
 
   // Initialize
@@ -482,40 +498,6 @@ function LoginContent() {
     };
 
     initSecurity();
-
-    // Handle Implicit Grant Flow tokens embedded in the hash (e.g. from Supabase OAuth/Google)
-    // This MUST run before checking query params errors, as OAuth may return tokens in hash
-    // even when there are errors in query params (e.g. state validation issues that we can ignore)
-    if (typeof window !== "undefined" && window.location.hash.includes("access_token=")) {
-      // Clear any query params errors since we have a valid token in hash
-      // Remove error from URL without reloading
-      if (window.location.search) {
-        const cleanUrl = window.location.pathname + window.location.hash;
-        window.history.replaceState({}, "", cleanUrl);
-      }
-
-      // Small delay to ensure UI mounts and doesn't flicker randomly
-      setTimeout(() => {
-        setLoading(true);
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
-        const accessToken = hashParams.get("access_token");
-        const refreshToken = hashParams.get("refresh_token");
-
-        if (accessToken) {
-          setSessionAction(accessToken, refreshToken || undefined).then((res) => {
-            if (res.success) {
-              // Clear fragment and navigate out securely
-              window.location.hash = "";
-              router.push("/dashboard");
-              router.refresh();
-            } else {
-              setLoading(false);
-              setError("Session initialization failed. " + (res.error || ""));
-            }
-          });
-        }
-      }, 500);
-    }
 
     const interval = setInterval(() => {
       if (isAccountLocked()) {
@@ -830,44 +812,12 @@ function LoginContent() {
         return;
       }
 
-      // If server checks pass, trigger OAuth on the client
-      const { supabase } = await import('@/src/lib/supabase');
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
-        },
-      });
-
-      if (error) {
-        recordFailedAttempt();
-        setError(t.errorGoogle);
-        setErrorCode(`OAUTH_ERROR: ${error.message}`);
-        setLoading(false);
-      }
-      // Note: If successful, the page will redirect, so no need to set loading to false
+      // The server has stored the PKCE verifier in an HttpOnly cookie.
+      if (!result.redirectUrl) throw new Error("OAUTH_URL_MISSING");
+      window.location.assign(result.redirectUrl);
     } catch (err: unknown) {
-      // Check if this is a redirect error (which means success for OAuth)
-      // Next.js redirect() throws an error with specific properties
-      const errorObj = err as { name?: string; message?: string; digest?: string };
-      if (
-        errorObj?.name === "NEXT_REDIRECT" ||
-        errorObj?.digest?.startsWith("NEXT_") ||
-        errorObj?.message?.includes("redirect") ||
-        errorObj?.message?.includes("NEXT_REDIRECT")
-      ) {
-        // This is expected - OAuth redirect is happening
-        // Don't show error, the redirect will happen automatically
-        return;
-      }
-
-      const errorMessage = err instanceof Error ? err.message : "Unknown error";
       setError(t.errorGoogle);
-      setErrorCode(`CLIENT_EXCEPTION: ${errorMessage}`);
+      setErrorCode("OAUTH_START_FAILED");
     } finally {
       setLoading(false);
     }
