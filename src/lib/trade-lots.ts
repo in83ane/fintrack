@@ -41,6 +41,9 @@ export function projectLotPosition(trades: Trade[], portfolioId: string, symbol:
   const shares = lots.reduce((sum, lot) => sum + lot.remaining, 0);
   const cost = lots.reduce((sum, lot) => sum + lot.remaining * lot.price, 0);
   const invested = lots.reduce((sum, lot) => sum + lot.trade.amountUSD + (lot.trade.fees || 0), 0);
-  const proceeds = scoped.filter(t => t.type === 'SELL').reduce((sum, t) => sum + t.amountUSD - (t.fees || 0), 0);
-  return { shares, cost, invested, realized: proceeds - (invested - cost) };
+  const sales = scoped.filter(t => t.type === 'SELL');
+  const proceeds = sales.reduce((sum, t) => sum + t.amountUSD - (t.fees || 0), 0);
+  // With no sale there cannot be realized P/L. Reconstructing it by
+  // subtracting independently rounded per-share costs creates phantom cents.
+  return { shares, cost, invested, realized: sales.length ? proceeds - (invested - cost) : 0 };
 }

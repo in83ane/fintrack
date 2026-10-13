@@ -1,12 +1,12 @@
 "use client";
 
-import { FinanceIcon } from "@/src/components/FinanceIcon";
 import React, { useState } from "react";
-import { Search, Plus, Loader2, Wallet, ChevronDown, ArrowDownToLine, ShoppingCart } from "lucide-react";
+import { Search, Plus, Loader2 } from "lucide-react";
 import { Modal } from "@/src/components/Modal";
-import { useApp, Asset } from "@/src/context/AppContext";
+import { useApp } from "@/src/context/AppContext";
 import { cn } from "@/src/lib/utils";
 import { CustomSelect } from "@/src/components/CustomSelect";
+import { AssetFundingFields, type AssetEntryMode } from "@/src/components/AssetFundingFields";
 
 interface AddAssetModalProps {
   isOpen: boolean;
@@ -28,7 +28,13 @@ const POPULAR_ASSETS = [
 ];
 
 export function AddAssetModal({ isOpen, onClose, variant = "search" }: AddAssetModalProps) {
-  const { t, addAsset, addTrade, addTradeFromBucket, fetchAssetMarketData, exchangeRates, currency, language, moneyBuckets, formatMoney, addToast } = useApp();
+  const { t, addTrade, fetchAssetMarketData, exchangeRates, language, addToast, portfolios, activePortfolio } = useApp();
+  const [brokerId, setBrokerId] = useState("");
+  const wasOpen = React.useRef(false);
+  React.useEffect(() => {
+    if (isOpen && !wasOpen.current) setBrokerId(activePortfolio?.kind === "trading" ? activePortfolio.id : "");
+    wasOpen.current = isOpen;
+  }, [isOpen, activePortfolio?.id, activePortfolio?.kind]);
 
   const [step, setStep] = useState<"search" | "details">("search");
   const [query, setQuery] = useState("");
@@ -40,8 +46,7 @@ export function AddAssetModal({ isOpen, onClose, variant = "search" }: AddAssetM
   const [priceCurrency, setPriceCurrency] = useState<'USD' | 'THB'>('USD');
   const [isAdding, setIsAdding] = useState(false);
   const [selectedBucketId, setSelectedBucketId] = useState<string>("");
-  const [showBucketDropdown, setShowBucketDropdown] = useState(false);
-  const [isImport, setIsImport] = useState(false);
+  const [isImport, setIsImport] = useState(true);
   const [excludeFromTotal, setExcludeFromTotal] = useState(false);
 
   const handleSearch = async (val: string) => {
@@ -79,17 +84,9 @@ export function AddAssetModal({ isOpen, onClose, variant = "search" }: AddAssetM
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedResult || !shares || !avgCost) return;
+    if (isAdding || !selectedResult || !shares || !avgCost || !brokerId) return;
     if (!Number.isFinite(totalCostUSD)) { addToast('ยังไม่มีข้อมูลเรท USD/THB กรุณารอข้อมูลก่อนบันทึก', 'error'); return; }
 
-    // Validate bucket balance (only for new purchases with bucket)
-    if (!isImport && selectedBucketId) {
-      const bucket = moneyBuckets.find(b => b.id === selectedBucketId);
-      if (bucket && bucket.currentAmount < totalCostUSD) {
-        addToast(t("amountExceedsBalance"), "error");
-        return;
-      }
-    }
 
     setIsAdding(true);
     try {
@@ -134,39 +131,23 @@ export function AddAssetModal({ isOpen, onClose, variant = "search" }: AddAssetM
         }
       }
 
-      const totalValue = livePrice * Number(shares);
-
-      // 1. Add to assets
-      addAsset({
-        name: liveName,
-        symbol: sym,
-        valueUSD: totalValue,
-        change: 0,
-        allocation: autoAllocation,
-        shares: Number(shares),
-        avgCost: avgCostUSD,   // always store in USD
-        chartData,
-        excludeFromTotal,
-      });
-
-      // 2. Auto-create a trade entry
+      // The accepted trade creates the holding; metadata never overwrites its quantity.
       const tradeData = {
         asset: sym,
         type: isImport ? "IMPORT" as const : "BUY" as const,
         amountUSD: totalCostUSD,
         date: new Date().toISOString(),
-        rateAtTime: exchangeRates[currency],
-        currency: currency,
+        rateAtTime: priceCurrency === "THB" ? THB_RATE : 1,
+        currency: priceCurrency,
+        originalAmount: Number(avgCost) * Number(shares),
+        portfolioId: brokerId,
         shares: Number(shares),
         pricePerUnit: avgCostUSD,
-        sourceBucketId: selectedBucketId || undefined,
+        brokerageAccountId: isImport ? undefined : selectedBucketId,
       };
 
-      if (!isImport && selectedBucketId) {
-        addTradeFromBucket(tradeData, selectedBucketId);
-      } else {
-        addTrade(tradeData);
-      }
+      const saved = await addTrade(tradeData, { name: liveName, allocation: autoAllocation, currentPrice: livePrice, currency: priceCurrency, chartData, excludeFromTotal });
+      if (!saved) return;
 
       // Reset & close
       resetState();
@@ -187,8 +168,7 @@ export function AddAssetModal({ isOpen, onClose, variant = "search" }: AddAssetM
     setAvgCost("");
     setPriceCurrency('USD');
     setSelectedBucketId("");
-    setShowBucketDropdown(false);
-    setIsImport(false);
+    setIsImport(true);
     setExcludeFromTotal(false);
   };
 
@@ -297,43 +277,10 @@ export function AddAssetModal({ isOpen, onClose, variant = "search" }: AddAssetM
             </button>
           </div>
 
-          {/* Import / New Purchase Toggle */}
-          <div className="flex gap-2 p-1 bg-white/5 rounded-2xl border border-border">
-            <button
-              type="button"
-              onClick={() => { setIsImport(false); }}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-wide transition-all",
-                !isImport
-                  ? "bg-[#ADC6FF]/20 text-[#ADC6FF] border border-[#ADC6FF]/30"
-                  : "text-gray-500 hover:text-gray-300"
-              )}
-            >
-              <ShoppingCart size={14} />
-              {t("newPurchase")}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setIsImport(true); setSelectedBucketId(""); }}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-wide transition-all",
-                isImport
-                  ? "bg-[#E9C349]/20 text-[#E9C349] border border-[#E9C349]/30"
-                  : "text-gray-500 hover:text-gray-300"
-              )}
-            >
-              <ArrowDownToLine size={14} />
-              {t("importExisting")}
-            </button>
-          </div>
-
-          {/* Info badge for import mode */}
-          {isImport && (
-            <div className="flex items-center gap-2 px-4 py-2.5 bg-[#E9C349]/10 border border-[#E9C349]/20 rounded-xl">
-              <ArrowDownToLine size={12} className="text-[#E9C349] flex-shrink-0" />
-              <span className="text-[11px] text-[#E9C349] font-medium">{t("importExistingDesc")}</span>
-            </div>
-          )}
+          <CustomSelect value={brokerId} onChange={id => { setBrokerId(id); setSelectedBucketId(""); }} placeholder="เลือกโบรกเกอร์"
+            items={portfolios.filter(p => p.kind === 'trading').map(p => ({ value: p.id, label: p.name }))} />
+          <AssetFundingFields portfolioId={brokerId} currency={priceCurrency} mode={isImport ? 'IMPORT' : 'BUY'}
+            onModeChange={mode => setIsImport(mode === 'IMPORT')} accountId={selectedBucketId} onAccountChange={setSelectedBucketId} />
 
           {/* Shares */}
           <div className="space-y-2">
@@ -408,73 +355,6 @@ export function AddAssetModal({ isOpen, onClose, variant = "search" }: AddAssetM
             )}
           </div>
 
-          {/* Source Bucket Selector — only for new purchases */}
-          {!isImport && moneyBuckets.length > 0 && (
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wide flex items-center gap-1.5">
-                <Wallet size={12} className="text-[#ADC6FF]" />
-                {t("sourceBucket")}
-              </label>
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setShowBucketDropdown(!showBucketDropdown)}
-                  className={cn(
-                    "w-full px-4 py-3 bg-white/5 border rounded-2xl text-sm font-medium flex items-center justify-between transition-colors",
-                    selectedBucketId ? "border-[#ADC6FF]/30 text-white" : "border-border text-gray-500"
-                  )}
-                >
-                  <span>
-                    {selectedBucketId
-                      ? (() => {
-                          const b = moneyBuckets.find(b => b.id === selectedBucketId);
-                          return b ? `${t(b.name) || b.name}` : t("selectSourceBucket");
-                        })()
-                      : t("noBucketSelected")
-                    }
-                  </span>
-                  <ChevronDown size={14} className={cn("transition-transform", showBucketDropdown && "rotate-180")} />
-                </button>
-                {showBucketDropdown && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-border rounded-2xl overflow-hidden z-20 shadow-2xl">
-                    <button
-                      type="button"
-                      onClick={() => { setSelectedBucketId(""); setShowBucketDropdown(false); }}
-                      className={cn("w-full px-4 py-3 text-left text-sm hover:bg-white/5 transition-colors flex items-center justify-between",
-                        !selectedBucketId ? "text-[#ADC6FF] font-bold" : "text-gray-400"
-                      )}
-                    >
-                      <span>{t("noBucketSelected")}</span>
-                    </button>
-                    {moneyBuckets.map(b => {
-                      const totalCost = Number(shares || 0) * Number(avgCost || 0);
-                      const hasEnough = b.currentAmount >= totalCost;
-                      return (
-                        <button
-                          key={b.id}
-                          type="button"
-                          onClick={() => { if (hasEnough || totalCost === 0) { setSelectedBucketId(b.id); setShowBucketDropdown(false); } }}
-                          className={cn(
-                            "w-full px-4 py-3 text-left text-sm hover:bg-white/5 transition-colors flex items-center justify-between",
-                            selectedBucketId === b.id ? "text-[#ADC6FF] font-bold" : "text-gray-300",
-                            !hasEnough && totalCost > 0 && "opacity-40 cursor-not-allowed"
-                          )}
-                        >
-                          <span className="flex items-center gap-2">
-                            <span><FinanceIcon name={b.icon} /></span>
-                            <span>{t(b.name) || b.name}</span>
-                          </span>
-                          <span className={cn("text-xs font-bold", hasEnough || totalCost === 0 ? "text-gray-500" : "text-[#FFB4AB]")}>
-                            {formatMoney(b.currentAmount / (exchangeRates[b.currency || 'USD'] || 1), b.currency as any, undefined, b.currentAmount)}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
 
           {/* Total preview */}
           {shares && avgCost && (
@@ -493,22 +373,6 @@ export function AddAssetModal({ isOpen, onClose, variant = "search" }: AddAssetM
                   )}
                 </div>
               </div>
-              {selectedBucketId && (() => {
-                const b = moneyBuckets.find(b => b.id === selectedBucketId);
-                if (!b) return null;
-                const totalCost = Number(shares) * Number(avgCost);
-                const remaining = b.currentAmount - totalCost;
-                return (
-                  <div className="flex justify-between text-xs pt-1 border-t border-border">
-                    <span className="text-gray-500 flex items-center gap-1">
-                      <Wallet size={10} /> {t("bucketBalance")}: <FinanceIcon name={b.icon} /> {t(b.name) || b.name}
-                    </span>
-                    <span className={cn("font-bold", remaining >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
-                      {formatMoney(remaining)}
-                    </span>
-                  </div>
-                );
-              })()}
             </div>
           )}
 
@@ -573,11 +437,13 @@ const PORTFOLIO_MARKETS: Array<{ id: PortfolioMarket; label: string; currency: "
 
 function PortfolioAssetEntryModal({ isOpen, onClose }: Pick<AddAssetModalProps, "isOpen" | "onClose">) {
   const {
-    portfolios, activePortfolio, selectPortfolio, addAsset, addTrade,
+    portfolios, activePortfolio, addTrade,
     fetchAssetMarketData, exchangeRates, addToast,
   } = useApp();
   const tradingPortfolios = portfolios.filter(portfolio => portfolio.kind === "trading");
   const [brokerId, setBrokerId] = useState("");
+  const [entryMode, setEntryMode] = useState<AssetEntryMode>('IMPORT');
+  const [cashAccountId, setCashAccountId] = useState('');
   const [market, setMarket] = useState<PortfolioMarket>("US");
   const [symbol, setSymbol] = useState("");
   const [name, setName] = useState("");
@@ -587,10 +453,12 @@ function PortfolioAssetEntryModal({ isOpen, onClose }: Pick<AddAssetModalProps, 
   const [quoteState, setQuoteState] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>('idle');
   const [isSaving, setIsSaving] = useState(false);
   const fetchQuoteRef = React.useRef(fetchAssetMarketData);
+  const wasOpen = React.useRef(false);
 
   React.useEffect(() => {
-    if (activePortfolio?.kind === "trading") setBrokerId(activePortfolio.id);
-  }, [activePortfolio]);
+    if (isOpen && !wasOpen.current) setBrokerId(activePortfolio?.kind === "trading" ? activePortfolio.id : '');
+    wasOpen.current = isOpen;
+  }, [isOpen, activePortfolio?.id, activePortfolio?.kind]);
 
   React.useEffect(() => {
     if (!isOpen) {
@@ -602,6 +470,8 @@ function PortfolioAssetEntryModal({ isOpen, onClose }: Pick<AddAssetModalProps, 
       setMarketPrice(null);
       setQuoteState('idle');
       setIsSaving(false);
+      setEntryMode('IMPORT');
+      setCashAccountId('');
     }
   }, [isOpen]);
 
@@ -646,23 +516,19 @@ function PortfolioAssetEntryModal({ isOpen, onClose }: Pick<AddAssetModalProps, 
 
   const chooseBroker = (id: string) => {
     setBrokerId(id);
-    selectPortfolio(id);
+    setCashAccountId('');
   };
 
   const save = async () => {
-    if (!isValid) return;
+    if (!isValid || isSaving) return;
     const targetPortfolio = tradingPortfolios.find(portfolio => portfolio.id === brokerId);
     if (!targetPortfolio) return;
-    if (activePortfolio?.id !== brokerId) {
-      selectPortfolio(brokerId);
-      addToast("เลือกโบรกเกอร์แล้ว กรุณายืนยันเพิ่มสินทรัพย์อีกครั้ง", "info");
-      return;
-    }
 
     setIsSaving(true);
     try {
       const ticker = symbol.trim().toUpperCase();
-      const rate = currency === "THB" ? (exchangeRates.THB || 1) : 1;
+      const rate = currency === "THB" ? exchangeRates.THB : 1;
+      if (!Number.isFinite(rate) || rate <= 0) { addToast('ยังไม่มีข้อมูลเรท USD/THB', 'error'); return; }
       const marketData = await fetchQuoteRef.current(ticker);
       const rawPrice = Number(marketData?.price || 0);
       const apiPriceCurrency = marketData?.quoteCurrency === "THB" || ticker.endsWith('.BK') || ticker.endsWith('.TH') ? "THB" : "USD";
@@ -674,20 +540,11 @@ function PortfolioAssetEntryModal({ isOpen, onClose }: Pick<AddAssetModalProps, 
       const avgCostUSD = avgCostNumber / rate;
       const allocation = market === "GOLD" ? "Gold" : market === "FUND" ? "Funds" : "Equities";
 
-      await addAsset({
-        name: name.trim() || marketData?.name || ticker,
-        symbol: ticker,
-        valueUSD: currentPriceUSD * sharesNumber,
-        change: 0,
-        allocation,
-        shares: sharesNumber,
-        avgCost: avgCostUSD,
-        currency,
-        chartData: marketData?.chartData,
-      });
-      await addTrade({
+      const saved = await addTrade({
         asset: ticker,
-        type: "BUY",
+        type: entryMode,
+        portfolioId: brokerId,
+        brokerageAccountId: entryMode === 'BUY' ? cashAccountId : undefined,
         amountUSD: avgCostUSD * sharesNumber,
         originalAmount: avgCostNumber * sharesNumber,
         date: new Date().toISOString(),
@@ -695,8 +552,8 @@ function PortfolioAssetEntryModal({ isOpen, onClose }: Pick<AddAssetModalProps, 
         currency,
         shares: sharesNumber,
         pricePerUnit: avgCostUSD,
-      });
-      onClose();
+      }, { name: name.trim() || marketData?.name || ticker, allocation, currentPrice: currentPriceUSD, currency, chartData: marketData?.chartData });
+      if (saved) onClose();
     } catch (error) {
       console.error("Failed to add portfolio asset", error);
       addToast("ไม่สามารถเพิ่มสินทรัพย์ได้ กรุณาลองใหม่อีกครั้ง", "error");
@@ -712,7 +569,7 @@ function PortfolioAssetEntryModal({ isOpen, onClose }: Pick<AddAssetModalProps, 
           <label className="mb-2 block text-xs font-bold text-gray-400">หัวข้อเริ่มต้น</label>
           <div className="flex flex-wrap gap-2">
             {PORTFOLIO_MARKETS.map(item => (
-              <button key={item.id} type="button" onClick={() => setMarket(item.id)} className={cn(
+              <button key={item.id} type="button" onClick={() => { setMarket(item.id); setCashAccountId(''); }} className={cn(
                 "rounded-full border px-3 py-1.5 text-xs font-bold transition-colors",
                 market === item.id ? "border-[#ADC6FF]/70 bg-[#ADC6FF]/10 text-white" : "border-white/10 text-gray-400 hover:text-white"
               )}>{item.label}</button>
@@ -730,6 +587,7 @@ function PortfolioAssetEntryModal({ isOpen, onClose }: Pick<AddAssetModalProps, 
             items={tradingPortfolios.map(portfolio => ({ value: portfolio.id, label: portfolio.name }))}
           />
         </div>
+        <AssetFundingFields portfolioId={brokerId} currency={currency} mode={entryMode} onModeChange={setEntryMode} accountId={cashAccountId} onAccountChange={setCashAccountId} />
 
         <div className="grid grid-cols-2 gap-3">
           <label className="space-y-2"><span className="block text-xs font-bold text-gray-400">สัญลักษณ์</span><input value={symbol} onChange={event => setSymbol(event.target.value)} placeholder="NVDA" className="w-full rounded-xl border border-border bg-white/5 px-3 py-3 text-sm font-semibold uppercase text-white placeholder:text-gray-600 focus:border-[#4EDEA3]/50 focus:outline-none" /></label>

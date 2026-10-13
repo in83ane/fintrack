@@ -475,9 +475,10 @@ export default function DashboardPage() {
         const rate = item.currency === 'THB' ? (exchangeRates.THB || 1) : 1;
         const priceUSD = item.price / rate;
         const amountLocal = item.type === 'DIVIDEND' ? item.price : item.price * item.shares;
-        await addTrade({
+        const saved = await addTrade({
           asset: item.symbol,
-          type: item.type,
+          // File imports describe external history, not a new cash purchase.
+          type: item.type === 'BUY' ? 'IMPORT' : item.type,
           amountUSD: amountLocal / rate,
           originalAmount: amountLocal,
           date: item.date,
@@ -489,6 +490,7 @@ export default function DashboardPage() {
           tag: 'Excel import',
           portfolioId: targetPortfolio.id,
         });
+        if (!saved) { failed++; continue; }
         importedRows.push({ ...item, portfolioId: targetPortfolio.id });
         imported++;
       } catch (error) {
@@ -890,6 +892,7 @@ export default function DashboardPage() {
             <AddCashflowModal isOpen={isAddCashflowOpen} onClose={() => setIsAddCashflowOpen(false)} />
 
       <Modal isOpen={isImportOpen} onClose={() => { setIsImportOpen(false); resetImport(); }} title={language === 'th' ? 'นำเข้าหุ้นจาก Excel' : 'Import investments from Excel'}>
+        <p className="mb-3 text-xs text-gray-400">นำเข้าข้อมูลจากภายนอก: รายการซื้อในไฟล์บันทึกเป็นสินทรัพย์ที่ถืออยู่แล้ว โดยไม่ตัดเงินจากกระเป๋า</p>
         <div className="space-y-5">
           <div className="rounded-2xl border border-border bg-white/[0.03] p-4">
             <div className="flex items-start gap-3">

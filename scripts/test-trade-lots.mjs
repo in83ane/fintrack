@@ -42,3 +42,9 @@ assert.equal(proportionalPosition.cost,337.5);
 assert.equal(proportionalPosition.invested,450);
 assert.ok(Math.abs(proportionalPosition.realized-78.85)<1e-8);
 console.log('Proportional allocation Portfolio projection passed.');
+for (const qty of [39.279381, 8.230735, 10.553298, 1.116084]) {
+  for (const type of ['BUY', 'IMPORT']) {
+    const trade = { ...buy(80, qty, 116.48), type, amountUSD: 4575.2637, fees: 0.013 };
+    assert.equal(projectLotPosition([trade], 'p1', 'NVDA').realized, 0, 'no sale means exactly zero, even for fractional lots/fees');
+  }
+}

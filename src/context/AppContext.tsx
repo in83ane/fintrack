@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { db, supabase } from "@/src/lib/supabase";
+import { validateAssetFunding } from '@/src/lib/asset-funding';
 import { User } from "@supabase/supabase-js";
 import { projectLotPosition } from "@/src/lib/trade-lots";
 import { tradeDeletionReason, tradeDeleteError } from '@/src/lib/trade-deletion-policy';
@@ -290,7 +291,7 @@ interface AppState {
   isExchangeRateCustom: boolean;
   trades: Trade[];
   /** Returns false when the trade was rejected (for example, insufficient cash). */
-  addTrade: (trade: Omit<Trade, "id">) => Promise<boolean>;
+  addTrade: (trade: Omit<Trade, "id">, metadata?: Pick<Asset, 'name' | 'allocation' | 'currentPrice' | 'currency' | 'excludeFromTotal' | 'chartData'>) => Promise<boolean>;
   cashActivities: CashActivity[];
   addCashActivity: (activity: Omit<CashActivity, "id">) => Promise<CashActivity | null>;
   removeCashActivity: (id: string) => void;
@@ -2188,7 +2189,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           db.userCategories.getAll(user.id, activePortfolioId),
           db.brokerageAccounts.getAll(user.id, tradingPortfolioId),
           db.brokerageAccounts.getAll(user.id, null),
-          db.brokerageCashEntries.getBalances(user.id, tradingPortfolioId),
+          db.brokerageCashEntries.getBalances(user.id, null),
           db.brokerageCashEntries.getAll(user.id, tradingPortfolioId),
         ]);
         if (cancelled) return;
@@ -3173,7 +3174,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const addTrade = async (tradeData: Omit<Trade, "id">): Promise<boolean> => {
+  const addTrade = async (tradeData: Omit<Trade, "id">, metadata?: Pick<Asset, 'name' | 'allocation' | 'currentPrice' | 'currency' | 'excludeFromTotal' | 'chartData'>): Promise<boolean> => {
     if (tradeData.type === 'SELL') {
       addToast(language === 'th' ? 'บันทึกการขายผ่าน Live P&L ในหน้า Trade / Plan เพื่อตรวจสอบต้นทุนและไม้ก่อนยืนยัน' : 'Use Trade / Plan → Live P&L to preview allocations before selling.', 'warning');
       return false;
@@ -3193,6 +3194,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // we add any client-side state.  The database trigger repeats this check
     // under a transaction lock, so concurrent browser tabs cannot overspend.
     const isBrokerageSettlement = tradeData.type === 'BUY';
+    const fundingError = validateAssetFunding({
+      type: tradeData.type, portfolioId: targetPortfolioId, currency: tradeData.currency,
+      amount: tradeData.originalAmount, accountId: tradeData.brokerageAccountId,
+      accounts: [...allBrokerageAccounts, ...brokerageAccounts], balances: brokerageCashBalances,
+    });
+    if (fundingError) { addToast(fundingError, 'error'); return false; }
+    if ((tradeData.type === 'BUY' || tradeData.type === 'IMPORT') &&
+      (!Number.isFinite(tradeData.shares) || (tradeData.shares || 0) <= 0 || !Number.isFinite(tradeData.pricePerUnit) || (tradeData.pricePerUnit || 0) <= 0)) {
+      addToast('ราคาและจำนวนหน่วยต้องมากกว่าศูนย์', 'error'); return false;
+    }
     const settlementAccount = tradeData.brokerageAccountId
       ? (allBrokerageAccounts.find(account => account.id === tradeData.brokerageAccountId)
         || brokerageAccounts.find(account => account.id === tradeData.brokerageAccountId))
@@ -3219,6 +3230,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
       }
     }
+    // Decorate the server-created projection only AFTER acceptance. Never
+    // overwrite aggregate quantity/cost with this individual purchase.
+    const applyMetadata = async () => {
+      if (!metadata) return;
+      if (!activePortfolioId || activePortfolioId === targetPortfolioId) setAssets(previous => {
+        const exists = previous.some(a => a.portfolioId === targetPortfolioId && a.symbol.toUpperCase() === tradeData.asset.toUpperCase());
+        if (exists) return previous.map(a => a.portfolioId === targetPortfolioId && a.symbol.toUpperCase() === tradeData.asset.toUpperCase() ? { ...a, ...metadata } : a);
+        return [...previous, { ...metadata, symbol: tradeData.asset, portfolioId: targetPortfolioId, shares: tradeData.shares, avgCost: tradeData.pricePerUnit, valueUSD: (metadata.currentPrice || 0) * (tradeData.shares || 0), change: 0 }];
+      });
+      if (user) {
+        try {
+          const { error } = await supabase.from('assets').update({ name: metadata.name, allocation: metadata.allocation, current_price: metadata.currentPrice, exclude_from_total: metadata.excludeFromTotal ?? false })
+            .eq('user_id', user.id).eq('portfolio_id', targetPortfolioId).eq('symbol', tradeData.asset);
+          if (error) throw error;
+        } catch {
+          addToast('บันทึกรายการแล้ว แต่รายละเอียดชื่อ/กลุ่มสินทรัพย์ยังไม่อัปเดต กรุณาแก้ใน Portfolio ไม่ต้องเพิ่มรายการซ้ำ', 'warning');
+        }
+      }
+    };
     if (!user) {
       const nextId = trades.length > 0 ? Math.max(...trades.map(t => t.id)) + 1 : 1;
       // Local mode must keep the portfolio identity too; Portfolio and Trade
@@ -3252,6 +3282,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           }, ...prev]);
         }
       }
+      await applyMetadata();
       return true;
     }
     try {
@@ -3285,7 +3316,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
       if (data) {
-        setTrades(prev => [...prev, {
+        await applyMetadata();
+        setTrades(prev => activePortfolioId && activePortfolioId !== targetPortfolioId ? prev : [...prev, {
           ...tradeData,
           portfolioId: data.portfolio_id || targetPortfolioId || undefined,
           id: parseInt(data.id.split('-')[0], 16) || Date.now(),
@@ -3314,7 +3346,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         // the derived brokerage cash balance now rather than waiting for a
         // page reload, so Trade's selected wallet and Portfolio agree.
         const [balancesResult, entriesResult] = await Promise.all([
-          db.brokerageCashEntries.getBalances(user.id, activePortfolioId),
+          db.brokerageCashEntries.getBalances(user.id, null),
           db.brokerageCashEntries.getAll(user.id, activePortfolioId),
         ]);
         if (balancesResult.data) {
@@ -3352,7 +3384,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const refreshBrokerageLedger = async () => {
     if (!user) return;
     const [balances, entries] = await Promise.all([
-      db.brokerageCashEntries.getBalances(user.id, activePortfolioId),
+      db.brokerageCashEntries.getBalances(user.id, null),
       db.brokerageCashEntries.getAll(user.id, activePortfolioId),
     ]);
     if (balances.data) setBrokerageCashBalances(balances.data.map(row => ({ accountId: row.brokerage_account_id, balance: Number(row.cash_balance || 0) })));
@@ -3578,7 +3610,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
       if (isPostedBrokerageTrade && nextTrade.portfolioId) {
         const [balancesResult, entriesResult] = await Promise.all([
-          db.brokerageCashEntries.getBalances(user.id, nextTrade.portfolioId),
+          db.brokerageCashEntries.getBalances(user.id, null),
           db.brokerageCashEntries.getAll(user.id, nextTrade.portfolioId),
         ]);
         if (balancesResult.data) {

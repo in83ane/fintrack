@@ -31,6 +31,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/src/lib/utils";
 import { useApp } from "@/src/context/AppContext";
 import { CustomSelect } from "@/src/components/CustomSelect";
+import { AssetFundingFields, type AssetEntryMode } from '@/src/components/AssetFundingFields';
 import { InvestmentTransferModal } from "@/src/components/InvestmentTransferModal";
 import { TradeLotEditor } from "@/src/components/TradeLotEditor";
 import { projectLotPosition } from "@/src/lib/trade-lots";
@@ -82,13 +83,15 @@ interface Holding {
   symbol: string;
   name: string;
   shares: number;
-  avgCost: number; // ราคาต้นทุนต่อหน่วย (สกุลของสินทรัพย์)
-  price: number; // ราคาปัจจุบันต่อหน่วย (สกุลของสินทรัพย์)
+  avgCost: number; // Per-unit cost in this projection's currency, not necessarily native currency.
+  price: number; // Per-unit market value in this projection's currency.
   currency: Cur;
   realizedPL?: number;
   dividends?: number;
   investedCost?: number;
   executionFee?: number;
+  entryMode?: AssetEntryMode;
+  fundingAccountId?: string;
   executionFx?: number;
 }
 
@@ -269,13 +272,21 @@ function Money({
 }
 
 /** ข้อความเงินแบบบรรทัดเดียว (เคารพโหมดซ่อน) */
+function moneyDisplaySign(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  // Presentation only: do not round the underlying P/L used by totals.
+  return decimal(decimal(value).toFixed(2)).cmp(decimal('0'));
+}
+
 function useMoneyText() {
   const hide = useContext(HideContext);
   return useCallback(
     (n: number, cur: Cur, sign = false) => {
       if (hide) return `${MASK} ${cur}`;
-      const s = sign && n > 0 ? "+" : n < 0 ? "-" : "";
-      return `${s}${nf(Math.abs(n))} ${cur}`;
+      if (!Number.isFinite(n)) return `unresolved ${cur}`;
+      const direction = moneyDisplaySign(n);
+      const s = sign && direction > 0 ? "+" : direction < 0 ? "-" : "";
+      return `${s}${direction === 0 ? '0.00' : nf(Math.abs(n))} ${cur}`;
     },
     [hide]
   );
@@ -1108,6 +1119,8 @@ function HoldingModal({
   const [shares, setShares] = useState(holding ? String(holding.shares) : "");
   const [avgCost, setAvgCost] = useState(holding ? String(holding.avgCost) : "");
   const [executionFee, setExecutionFee] = useState('0');
+  const [entryMode, setEntryMode] = useState<AssetEntryMode>('IMPORT');
+  const [fundingAccountId, setFundingAccountId] = useState('');
   const [executionFx, setExecutionFx] = useExecutionFxInput();
   const [marketPrice, setMarketPrice] = useState<number | null>(null);
   const [quoteName, setQuoteName] = useState<string>("");
@@ -1182,6 +1195,8 @@ function HoldingModal({
       shares: sharesN,
       avgCost: costN,
       executionFee: Number(executionFee),
+      entryMode,
+      fundingAccountId: entryMode === 'BUY' ? fundingAccountId : undefined,
       executionFx: Number(executionFx),
       price: priceN,
       currency,
@@ -1282,7 +1297,8 @@ function HoldingModal({
         <label><Label>ค่าธรรมเนียมซื้อ ({currency})</Label><input className={INPUT} type="number" min="0" step="any" value={executionFee} onChange={e => setExecutionFee(e.target.value)} /></label>
         <label><Label>1 USD = กี่ THB ณ วันซื้อ</Label><input className={INPUT} type="number" min="0" step="any" value={executionFx} onChange={e => setExecutionFx(e.target.value)} /></label>
       </div>
-      <p className="mb-4 text-xs text-gray-400">หักเงินรวมค่าธรรมเนียม {((sharesN * costN || 0) + (Number(executionFee) || 0)).toLocaleString()} {currency} · เรทนี้เก็บกับรายการ ไม่เปลี่ยนเรทตลาด</p>
+      <div className="mb-4"><AssetFundingFields portfolioId={brokerId} currency={currency} mode={entryMode} onModeChange={setEntryMode} accountId={fundingAccountId} onAccountChange={setFundingAccountId} /></div>
+      <p className="mb-4 text-xs text-gray-400">{entryMode === 'BUY' ? 'หักเงินรวมค่าธรรมเนียม' : 'ต้นทุนรวมค่าธรรมเนียม (ไม่ตัดเงิน)'} {((sharesN * costN || 0) + (Number(executionFee) || 0)).toLocaleString()} {currency} · เรทนี้เก็บกับรายการ ไม่เปลี่ยนเรทตลาด</p>
 
       <div className="flex gap-3">
         {holding && (
@@ -2095,7 +2111,7 @@ function HoldingTableRow({ holding: h, color, total, rate, groupName, onEdit, on
   const totalReturn = unrealized + realized + (h.dividends || 0);
   const invested = h.investedCost ?? cost;
   const percent = (amount: number, basis: number) => hidden ? MASK : basis > 0 ? `${amount > 0 ? '+' : ''}${nf(amount / basis * 100)}%` : '—';
-  const profitColor = (amount: number) => amount > 0 ? 'text-[#4EDEA3]' : amount < 0 ? 'text-[#FFB4AB]' : 'text-gray-400';
+  const profitColor = (amount: number) => moneyDisplaySign(amount) > 0 ? 'text-[#4EDEA3]' : moneyDisplaySign(amount) < 0 ? 'text-[#FFB4AB]' : 'text-gray-400';
   return <tr draggable onDragStart={event => { event.dataTransfer.effectAllowed = 'copy'; event.dataTransfer.setData('text/plain', h.id); }} className="group transition-colors hover:bg-white/[0.025]">
     <td className="px-3 py-5">
       <button type="button" onClick={onEdit} className="flex items-center gap-3 text-left" aria-label={`แก้ไข ${h.symbol}`}>
@@ -2551,13 +2567,17 @@ export default function PortfolioPage() {
     return [...positions.values()]
       .filter((position) => position.shares > 0 && sidebarBrokers.some((broker) => broker.id === position.portfolioId))
       .map((position) => {
-        // Asset native denomination is not available in the current DB schema.
-        // Do not infer it from a ticker or normalize a historical cost with FX.
-        const market: Market = 'US'; // presentation group only; not evidence of currency
-        const holdingCurrency = 'unresolved' as Cur;
-        // AppContext prices are canonical USD.  The Portfolio UI presents TH
-        // holdings in THB, while US and gold stay in USD.
-        const displayRate = Number.NaN;
+        // This is a USD valuation projection, NOT a claim about the asset's
+        // native denomination. amountUSD / priceUSD and AppContext's legacy
+        // avgCost/currentPrice are explicitly USD-normalized by their writers.
+        // Keep them in USD here; the display layer converts once, just as on
+        // Dashboard. Missing native asset metadata must not invalidate a
+        // known USD valuation or require an unrelated cash/Bucket account.
+        const allocation = position.asset?.allocation;
+        const market: Market = allocation === 'Gold' ? 'GOLD'
+          : allocation === 'Funds' ? 'FUND'
+          : position.asset?.currency === 'THB' ? 'TH' : 'US';
+        const holdingCurrency: Cur = 'USD';
         const avgCostUsd = position.shares > 0 ? position.cost / position.shares : 0;
         const livePriceUsd = marketQuotes[position.symbol]?.priceUSD || Number(position.asset?.currentPrice)
           || (position.shares > 0 ? Number(position.asset?.valueUSD) / position.shares : 0)
@@ -2569,15 +2589,15 @@ export default function PortfolioPage() {
           symbol: position.symbol,
           name: position.name,
           shares: position.shares,
-          avgCost: avgCostUsd * displayRate,
-          price: livePriceUsd * displayRate,
+          avgCost: avgCostUsd,
+          price: livePriceUsd,
           currency: holdingCurrency,
-          realizedPL: position.realized * displayRate,
-          dividends: position.dividends * displayRate,
-          investedCost: position.invested * displayRate,
+          realizedPL: position.realized,
+          dividends: position.dividends,
+          investedCost: position.invested,
         };
       });
-  }, [activePortfolio?.id, assets, exchangeRates.THB, marketQuotes, sidebarBrokers, trades]);
+  }, [activePortfolio?.id, assets, marketQuotes, sidebarBrokers, trades]);
 
   useEffect(() => {
     // Once the shared ledger has loaded it is authoritative, even when its
@@ -2880,8 +2900,8 @@ export default function PortfolioPage() {
   const openAddHolding = () => setHoldingModal({});
   const saveHoldingToPortfolio = useCallback(async (holding: Holding, isNew: boolean) => {
     if (!isNew) return false;
-    const account = effectiveBrokerageAccounts.find(item => item.portfolioId === holding.brokerId && item.kind === 'cash' && item.currency === holding.currency);
-    if (!account) {
+    const account = [...allBrokerageAccounts, ...effectiveBrokerageAccounts].find(item => item.id === holding.fundingAccountId && item.portfolioId === holding.brokerId && item.kind === 'cash' && item.currency === holding.currency);
+    if (holding.entryMode === 'BUY' && !account) {
       addToast(`ไม่พบบัญชีเงินสด ${holding.currency} ของโบรกเกอร์ที่เลือก กรุณาสร้างบัญชีก่อน`, 'error');
       return false;
     }
@@ -2891,7 +2911,7 @@ export default function PortfolioPage() {
     // holding before the server has accepted the purchase.
     const saved = await addTrade({
         asset: holding.symbol,
-        type: 'BUY',
+        type: holding.entryMode ?? 'IMPORT',
         amountUSD: importedCostUsd,
         fees: (holding.executionFee || 0) / rateAtTime,
         fxRateTHB: holding.executionFx,
@@ -2901,13 +2921,13 @@ export default function PortfolioPage() {
         shares: holding.shares,
         pricePerUnit: holding.avgCost / rateAtTime,
         originalAmount: holding.avgCost * holding.shares + (holding.executionFee || 0),
-        brokerageAccountId: account.id,
+        brokerageAccountId: holding.entryMode === 'BUY' ? account?.id : undefined,
         portfolioId: holding.brokerId,
         tag: 'Added from Portfolio',
       });
     if (saved) saveHolding(holding);
     return saved;
-  }, [addTrade, addToast, effectiveBrokerageAccounts, exchangeRates.THB, saveHolding]);
+  }, [addTrade, addToast, allBrokerageAccounts, effectiveBrokerageAccounts, exchangeRates.THB, saveHolding]);
 
   const deleteHoldingFromPortfolio = useCallback((holding: Holding) => {
     // Only the shared state removes the row after the database confirms it.

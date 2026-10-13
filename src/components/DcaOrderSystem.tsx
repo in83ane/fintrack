@@ -8,6 +8,7 @@ import { Calculator, Target, Plus, Check, TrendingUp, AlertTriangle, Info, Shiel
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { cn } from '@/src/lib/utils';
 import { useApp } from '@/src/context/AppContext';
+import { AssetFundingFields, type AssetEntryMode } from '@/src/components/AssetFundingFields';
 import { supabase } from '@/src/lib/supabase';
 import { CustomSelect } from '@/src/components/CustomSelect';
 import { PriceLadder } from '@/src/components/PriceLadder';
@@ -117,6 +118,9 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
   const [exitQuantities, setExitQuantities] = useState<Record<number, string>>({});
   const [executeModal, setExecuteModal] = useState<{ entryId: number; brokerageAccountId: string } | null>(null);
   const [executionFee, setExecutionFee] = useState('0');
+  const [entryMode, setEntryMode] = useState<AssetEntryMode>('BUY');
+  const executionPending = useRef(false);
+  const [isExecuting, setIsExecuting] = useState(false);
   const [executionFx, setExecutionFx] = useExecutionFxInput();
   const [confirmRemoveEntryId, setConfirmRemoveEntryId] = useState<number | null>(null);
 
@@ -643,6 +647,7 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
   };
 
   const executeEntry = async (entryId: number, brokerageAccountId: string) => {
+    if (executionPending.current) return;
     const entry = entries.find(item => item.id === entryId && item.active);
     if (!entry || entry.price <= 0 || entry.quantity <= 0) {
       addToast('ระบุราคาและจำนวนให้ครบก่อนยืนยันการซื้อ', 'error');
@@ -651,11 +656,11 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
     
     const now = new Date().toISOString();
     const sourceAccount = cashAccounts.find(account => account.id === brokerageAccountId);
-    if (!sourceAccount) {
+    if (entryMode === 'BUY' && !sourceAccount) {
       addToast('เลือกบัญชีเงินสดสำหรับชำระเงินก่อนยืนยันซื้อ', 'error');
       return;
     }
-    const settlementCurrency = (sourceAccount?.currency || marketCurrency || 'USD') as keyof typeof exchangeRates;
+    const settlementCurrency = marketCurrency as keyof typeof exchangeRates;
     // `amountUSD` stays canonical for P/L.  `originalAmount` is the exact
     // amount deducted from the wallet selected in the confirmation step.
     const fee = Number(executionFee);
@@ -665,14 +670,15 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
     const settlementAmount = settlementCurrency === 'USD'
       ? entry.amount
       : entry.amount * settlementRate;
-    const availableCash = brokerageCashBalances.find(balance => balance.accountId === sourceAccount.id)?.balance || 0;
-    if (settlementAmount + fee > availableCash + 0.000001) {
-      addToast(`เงินใน ${sourceAccount.name} ไม่พอสำหรับไม้ ${entry.id}`, 'error');
+    const availableCash = brokerageCashBalances.find(balance => balance.accountId === sourceAccount?.id)?.balance || 0;
+    if (entryMode === 'BUY' && settlementAmount + fee > availableCash + 0.000001) {
+      addToast(`เงินใน ${sourceAccount?.name} ไม่พอสำหรับไม้ ${entry.id}`, 'error');
       return;
     }
     const tradeData = {
       asset: symbol,
-      type: "BUY" as const,
+      type: entryMode,
+      portfolioId: activePortfolioId || undefined,
       amountUSD: entry.amount,
       date: now,
       rateAtTime: settlementRate,
@@ -682,11 +688,15 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
       fxRateTHB: fx,
       shares: entry.quantity,
       pricePerUnit: entry.price,
-      brokerageAccountId,
+      brokerageAccountId: entryMode === 'BUY' ? brokerageAccountId : undefined,
       tag: `DCA entry ${entry.id}`,
     };
 
-    const saved = await addTrade(tradeData);
+    executionPending.current = true;
+    setIsExecuting(true);
+    let saved = false;
+    try { saved = await addTrade(tradeData); }
+    finally { executionPending.current = false; setIsExecuting(false); }
     if (!saved) return;
 
     setEntries(prev => prev.map(e => e.id === entryId ? { ...e, executed: true, brokerageAccountId } : e));
@@ -993,11 +1003,8 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
                   <div className="mt-3 flex justify-end">
                     <button 
                       onClick={() => {
-                        if (cashAccounts.length === 0) {
-                          addToast('เพิ่มบัญชีซื้อขายและเงินสดในหน้า Portfolio ก่อนยืนยันคำสั่ง', 'warning');
-                          return;
-                        }
-                        setExecuteModal({ entryId: entry.id, brokerageAccountId: cashAccounts[0].id });
+                        setEntryMode('BUY');
+                        setExecuteModal({ entryId: entry.id, brokerageAccountId: '' });
                       }}
                       className="text-[10px] font-bold px-3 py-1.5 rounded-lg bg-[#ADC6FF] text-[#00285d] hover:opacity-80 transition-opacity flex items-center gap-1"
                     >
@@ -1020,24 +1027,14 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
 
                 {executeModal?.entryId === entry.id && (
                   <div className="mt-3 p-3 rounded-xl bg-black/40 border border-[#333]">
-                     <p className="text-[10px] text-gray-400 mb-2 uppercase font-bold">เลือกกระเป๋าเงินเพื่อหักยอด (Source Wallet)</p>
-                     <div className="mb-3">
-                       <CustomSelect
-                         value={executeModal.brokerageAccountId}
-                         onChange={(val) => setExecuteModal({ ...executeModal, brokerageAccountId: val })}
-                         items={cashAccounts.map(account => ({
-                           value: account.id,
-                           label: `${account.name}${account.broker ? ` · ${account.broker}` : ''} · คงเหลือ ${isDataLoaded ? (brokerageCashBalances.find(balance => balance.accountId === account.id)?.balance ?? 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '…'} ${account.currency}`,
-                         }))}
-                       />
-                     </div>
+                     <div className="mb-3"><AssetFundingFields portfolioId={activePortfolioId || ''} currency={marketCurrency} mode={entryMode} onModeChange={setEntryMode} accountId={executeModal.brokerageAccountId} onAccountChange={id => setExecuteModal({ ...executeModal, brokerageAccountId: id })} /></div>
                      <div className="flex gap-2 justify-end">
                        <div className="flex-1 space-y-2 text-xs text-gray-400">
-                         <label className="block">ค่าธรรมเนียม ({cashAccounts.find(a => a.id === executeModal.brokerageAccountId)?.currency})<input aria-label="ค่าธรรมเนียมซื้อ" className="mt-1 w-full rounded border border-white/10 bg-black/20 p-2" type="number" min="0" step="any" value={executionFee} onChange={e => setExecutionFee(e.target.value)} /></label>
+                         <label className="block">ค่าธรรมเนียม ({marketCurrency})<input aria-label="ค่าธรรมเนียมซื้อ" className="mt-1 w-full rounded border border-white/10 bg-black/20 p-2" type="number" min="0" step="any" value={executionFee} onChange={e => setExecutionFee(e.target.value)} /></label>
                          <label className="block">1 USD = กี่ THB ณ วันซื้อ<input className="mt-1 w-full rounded border border-white/10 bg-black/20 p-2" type="number" min="0" step="any" value={executionFx} onChange={e => setExecutionFx(e.target.value)} /></label>
                        </div>
                        <button onClick={() => setExecuteModal(null)} className="px-3 py-1.5 text-[10px] font-bold text-gray-400 hover:text-white transition-colors">ยกเลิก</button>
-                       <button onClick={() => executeEntry(entry.id, executeModal.brokerageAccountId)} className="px-3 py-1.5 text-[10px] font-black bg-[#ADC6FF] text-[#00285d] rounded-lg hover:opacity-80 transition-opacity">
+                       <button disabled={isExecuting} onClick={() => executeEntry(entry.id, executeModal.brokerageAccountId)} className="px-3 py-1.5 text-[10px] font-black bg-[#ADC6FF] text-[#00285d] rounded-lg hover:opacity-80 transition-opacity disabled:opacity-40">
                          ยืนยันรายการ
                        </button>
                      </div>
