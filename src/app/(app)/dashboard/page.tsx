@@ -17,6 +17,15 @@ import { useRouter } from "next/navigation";
 
 // ─── Net Worth Sparkline ──────────────────────────────────────────────────────
 
+function TopMoverLogo({ symbol }: { symbol: string }) {
+  const [failed, setFailed] = useState(false);
+  return <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-white/[0.04]" aria-hidden="true">
+    {failed ? <span className="text-[10px] font-bold text-[#ADC6FF]">{symbol.slice(0, 2)}</span> : (
+      <img src={`https://assets.parqet.com/logos/symbol/${encodeURIComponent(symbol)}?format=png`} alt="" width={32} height={32} loading="lazy" onError={() => setFailed(true)} className="h-full w-full object-contain p-1" />
+    )}
+  </span>;
+}
+
 interface NetWorthPoint {
   date: string;
   value: number;
@@ -820,12 +829,15 @@ export default function DashboardPage() {
             )}
             {topMovers.map(a => (
               <button key={a.symbol} onClick={() => router.push(`/portfolio`)}
-                className="w-full flex items-center justify-between p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.06] transition-all border border-transparent hover:border-border">
-                <div>
-                  <span className="text-xs font-bold text-white block">{a.symbol}</span>
-                  <span className="text-[9px] text-gray-500 truncate block">{a.name}</span>
+                className="w-full flex items-center justify-between gap-3 p-3 text-left rounded-xl bg-white/[0.02] hover:bg-white/[0.06] transition-all border border-transparent hover:border-border">
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <TopMoverLogo key={a.symbol} symbol={a.symbol} />
+                  <div className="min-w-0 text-left">
+                    <span className="text-xs font-bold text-white block truncate">{a.symbol}</span>
+                    <span className="text-[9px] text-gray-500 truncate block" title={a.name}>{a.name}</span>
+                  </div>
                 </div>
-                <div className="text-right">
+                <div className="shrink-0 whitespace-nowrap text-right tabular-nums">
                   <span className="text-xs font-bold text-white block">{formatMoney(a.valueUSD)}</span>
                   <span className={cn("text-[10px] font-bold", a.change >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
                     {a.change >= 0 ? '+' : ''}{a.change.toFixed(2)}%
