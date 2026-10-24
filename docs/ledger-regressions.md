@@ -14,3 +14,10 @@ Screenshots: browser access is disabled in Work settings; required captures and 
 ## 2. Ledger composition
 Restored day groups, category tiles, wallet/note captions, signed amounts, time and sticky daily net. One desktop toolbar row, collapsible filters and a slim summary strip replace the tall header and internally scrolling table. Running net is optional in compact/hover states. Income/Expense retain semantic outlines. Type check and native display regression test pass. Captures remain blocked by browser access.
 
+
+## 3. Selection and row actions
+Checkboxes reveal on hover/focus or toolbar Select mode and stay visible while selected. Space toggles a focused row; Shift+click extends selection; Esc clears it. The floating bar exports exactly selected rows as CSV (existing column contract) or JSON and supports Select all, Clear and confirmed bulk delete with count and gross total. Rows expose an actions menu; single-delete confirmation names category, exact displayed amount and date.
+
+The existing data layer permanently deletes records and reverses associated bucket legs. It exposes no soft-delete/restore operation, so no false Undo is offered; explicit confirmation is retained. Linked funding and trades keep their existing source-management restrictions. Edit reuses updateCashActivity for category/note/date only: changing amount/account is not introduced because it would require changes to balance reconciliation. Duplicate pre-fills the existing entry form; it never saves until the user submits. No live records were changed during this work.
+
+Validation: TypeScript pass. Browser interaction and capture matrix pending access.

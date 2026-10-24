@@ -2,7 +2,8 @@
 import { formatLedgerAmount } from "@/src/lib/ledger-display";
 import { bucketNativeAmount } from '@/src/lib/native-money';
 
-import { LedgerTable } from "@/src/components/LedgerTable";
+import { Modal } from "@/src/components/Modal";
+import { LedgerTable, LedgerRow } from "@/src/components/LedgerTable";
 import { DensityToggle } from "@/src/components/InterfaceControls";
 import { FinanceIcon } from "@/src/components/FinanceIcon";
 import React, { useState, useMemo, useEffect, useRef } from "react";
@@ -131,7 +132,7 @@ function formatDateGroup(dateStr: string, todayLabel: string, yesterdayLabel: st
 export default function LedgerPage() {
   const {
     t, formatMoney, cashActivities, bucketActivities, trades, moneyBuckets, removeCashActivity, removeBucketActivity, language, currency, exchangeRates,
-    addCashActivity, updateMoneyBucket, addBucketActivity, addToast,
+    addCashActivity, updateCashActivity, updateMoneyBucket, addBucketActivity, addToast,
     customCategories, addCustomCategory, removeCustomCategory,
     activePortfolio, allBrokerageAccounts, brokerageAccounts, portfolios,
   } = useApp();
@@ -141,6 +142,11 @@ export default function LedgerPage() {
   const [category, setCategory] = useState("");
   const [note, setNote] = useState("");
   const [isAdding, setIsAdding] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [editingRow, setEditingRow] = useState<LedgerRow|null>(null);
+  const [editCategory, setEditCategory] = useState('');
+  const [editNote, setEditNote] = useState('');
+  const [editDate, setEditDate] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [showConfetti, setShowConfetti] = useState(false);
@@ -498,16 +504,16 @@ export default function LedgerPage() {
     setCustomCategory("");
   };
 
-  const handleDelete = (item: { id: string, source: 'cash' | 'bucket' | 'trade' }) => {
+  const handleDelete = async (item: { id: string, source: 'cash' | 'bucket' | 'trade' }) => {
     if (item.source === 'trade') {
       addToast(t("cannotDeleteTradeFromLedger") || "Cannot delete trades from Ledger", "error");
       setToDelete(null);
       return;
     }
     if (item.source === 'cash') {
-      removeCashActivity(item.id);
+      await removeCashActivity(item.id);
     } else {
-      removeBucketActivity(item.id);
+      await removeBucketActivity(item.id);
     }
     setToDelete(null);
   };
@@ -553,6 +559,7 @@ export default function LedgerPage() {
           <h1 className="text-2xl font-semibold">{language==='th'?'สมุดรายการ':'Ledger'}</h1>
           <label className="ft-ledger-search"><Search size={16}/><input type="search" value={query} onChange={e=>setQuery(e.target.value)} aria-label={language==='th'?'ค้นหารายการ':'Search transactions'} placeholder={language==='th'?'ค้นหารายการ':'Search transactions'}/></label>
           <DensityToggle />
+          <button className="ft-button ft-secondary" aria-pressed={selectMode} onClick={()=>setSelectMode(!selectMode)}>{language==='th'?'เลือก':'Select'}</button>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 mt-3">
           <button className="ft-button ft-secondary" aria-expanded={filtersOpen} aria-controls="ledger-filters" onClick={()=>setFiltersOpen(!filtersOpen)}><CalendarDays size={15}/>{periodLabel}<ChevronDown size={14} className={filtersOpen?'rotate-180':''}/></button>
@@ -570,7 +577,7 @@ export default function LedgerPage() {
           <div><span>{language==='th'?'ออก':'OUT'}</span><strong className="text-loss">−{formatMoney(periodStats.exp)}</strong></div>
           <div><span>{language==='th'?'สุทธิ':'NET'}</span><strong className={periodStats.net>=0?'text-gain':'text-loss'}>{periodStats.net>=0?'+':''}{formatMoney(periodStats.net)}</strong></div>
         </div>
-        {records.length ? <LedgerTable rows={records} onDelete={item=>setToDelete({id:item.id,source:item.source})} categoryIcon={getCategoryIcon} walletName={item=>item.walletLabel||bucketsById.get(item.bucketId)?.name||t('unassigned')} dateLabel={day=>formatDateGroup(day,t('today'),t('yesterday'),language)}/> : <div className="py-16 text-center"><ReceiptText size={28} className="mx-auto mb-3 text-muted"/><h2 className="font-semibold">{language==='th'?'ไม่พบรายการในช่วงนี้':'No transactions in this period'}</h2><p className="mt-2 text-sm text-muted">{language==='th'?'เปลี่ยนตัวกรองหรือบันทึกรายการแรก':'Change your filters or record your first transaction.'}</p></div>}
+        {records.length ? <LedgerTable rows={records} selectMode={selectMode} onBulkDelete={async items=>{for(const item of items)await handleDelete(item);}} onEdit={item=>{setEditingRow(item);setEditCategory(item.category);setEditNote(item.note||'');setEditDate(toLocalDateKey(item.date));}} onDuplicate={item=>{handleOpenPanel(item.type as 'INCOME'|'EXPENSE');setAmount(String(item.originalAmount??''));setActionCurrency(item.originalCurrency as 'USD'|'THB');setCategory(item.category);setNote(item.note||'');setDepositTo(item.bucketId);}} onDelete={item=>setToDelete({id:item.id,source:item.source})} categoryIcon={getCategoryIcon} walletName={item=>item.walletLabel||bucketsById.get(item.bucketId)?.name||t('unassigned')} dateLabel={day=>formatDateGroup(day,t('today'),t('yesterday'),language)}/> : <div className="py-16 text-center"><ReceiptText size={28} className="mx-auto mb-3 text-muted"/><h2 className="font-semibold">{language==='th'?'ไม่พบรายการในช่วงนี้':'No transactions in this period'}</h2><p className="mt-2 text-sm text-muted">{language==='th'?'เปลี่ยนตัวกรองหรือบันทึกรายการแรก':'Change your filters or record your first transaction.'}</p></div>}
       </div>
 
       {/* ─── 1-Tap Entry Modal & Mobile Buttons ───────────────────────────── */}
@@ -850,10 +857,19 @@ export default function LedgerPage() {
         )}
       </AnimatePresence>
 
+      <Modal isOpen={!!editingRow} onClose={()=>setEditingRow(null)} title={language==='th'?'แก้ไขรายละเอียด':'Edit details'} footer={<button form="ledger-edit" type="submit" className="ft-button ft-primary" disabled={!editCategory.trim()}>{t('saveRecord')}</button>}>
+        <form id="ledger-edit" className="space-y-4" onSubmit={async event=>{event.preventDefault();if(!editingRow)return;await updateCashActivity(editingRow.id,{category:editCategory.trim(),note:editNote,date:editDate===toLocalDateKey(editingRow.date)?editingRow.date:localDateKeyToIso(editDate)});setEditingRow(null);}}>
+          <p className="tabular-nums font-semibold">{editingRow&&formatLedgerAmount(editingRow,currency,exchangeRates,language)}</p><p className="text-xs text-muted">{language==='th'?'แก้ไขหมวดหมู่ บันทึก และวันที่ ยอดเงินและบัญชีคงเดิม':'Edit category, note and date. Amount and account stay as recorded.'}</p>
+          <label className="block text-sm">{t('category')}<input autoFocus className="mt-1 w-full rounded-lg border border-border bg-background p-3" value={editCategory} onChange={e=>setEditCategory(e.target.value)} required/></label>
+          <label className="block text-sm">{t('noteOptional')}<input className="mt-1 w-full rounded-lg border border-border bg-background p-3" value={editNote} onChange={e=>setEditNote(e.target.value)}/></label>
+          <label className="block text-sm">{t('date')}<input type="date" className="mt-1 w-full rounded-lg border border-border bg-background p-3" value={editDate} onChange={e=>setEditDate(e.target.value)} required/></label>
+        </form>
+      </Modal>
       <ConfirmModal
         isOpen={!!toDelete}
         title={t("confirmDeleteRecord") || "Delete Record?"}
-        message={t("confirmDeleteRecordDesc") || "Are you sure you want to delete this transaction?"}
+        message={(()=>{const row=records.find(item=>item.id===toDelete?.id&&item.source===toDelete?.source);if(!row)return t('confirmDeleteRecordDesc');const amount=formatLedgerAmount(row,currency,exchangeRates,language);const date=new Date(row.date).toLocaleDateString(language==='th'?'th-TH':'en-GB',{day:'numeric',month:'short'});return language==='th'?`ลบ ${t(row.category)} ${amount} วันที่ ${date}? ไม่สามารถยกเลิกหลังลบได้`:`Delete ${t(row.category)} ${amount} on ${date}? This cannot be undone.`;})()}
+        confirmText={t('delete')} cancelText={t('cancel')}
         onConfirm={() => toDelete && handleDelete(toDelete)}
         onClose={() => setToDelete(null)}
       />
