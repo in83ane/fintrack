@@ -30,6 +30,7 @@ import { AnimatedNumber } from "@/src/components/AnimatedNumber";
 import { DateRangeBar, DateRangeState, getDateBounds, isInRange, toLocalDateKey } from "@/src/components/DateRangeBar";
 import { BrokerLedgerView } from "@/src/components/BrokerLedgerView";
 import { getLocalDateKey, localDateKeyToIso } from "@/src/lib/local-date";
+import { getCashflowSummary } from "@/src/lib/cashflow-selectors";
 
 const INCOME_PRESET_KEYS = [
   { icon: "wallet", key: "salary" },
@@ -313,10 +314,13 @@ export default function LedgerPage() {
   }, [records]);
 
   const periodStats = useMemo(() => {
-    const inc = records.filter(a => a.type === "INCOME").reduce((s, a) => s + a.amountUSD, 0);
-    const exp = records.filter(a => a.type === "EXPENSE").reduce((s, a) => s + a.amountUSD, 0);
-    return { inc, exp, net: inc - exp };
-  }, [records]);
+    const scope = {
+      ...(dateBounds ? { from: `${dateBounds.from.getFullYear()}-${String(dateBounds.from.getMonth() + 1).padStart(2, '0')}-${String(dateBounds.from.getDate()).padStart(2, '0')}`, to: `${dateBounds.to.getFullYear()}-${String(dateBounds.to.getMonth() + 1).padStart(2, '0')}-${String(dateBounds.to.getDate()).padStart(2, '0')}` } : {}),
+      walletId: selectedWalletId,
+    };
+    const summary = getCashflowSummary(cashActivities, scope);
+    return { inc: summary.income, exp: summary.expenses, net: summary.net };
+  }, [cashActivities, dateBounds, selectedWalletId]);
 
   const handleOpenPanel = (type: "INCOME" | "EXPENSE") => {
     setActivePanel(type);

@@ -13,6 +13,7 @@ import { Modal } from "@/src/components/Modal";
 import * as XLSX from "xlsx";
 import { formatPnL, getPnLColor, formatPercent } from "@/src/lib/format";
 import { calcMaxDrawdown, calcProfitFactor } from "@/src/lib/finance";
+import { getCashflowSummary } from "@/src/lib/cashflow-selectors";
 import { useRouter } from "next/navigation";
 
 // ─── Net Worth Sparkline ──────────────────────────────────────────────────────
@@ -233,6 +234,7 @@ function NetWorthSparkline({ data, formatMoney, t }: { data: NetWorthPoint[]; fo
   return (
     <div ref={containerRef} className="w-full h-full relative">
       <svg
+        data-chart
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
         className="w-full h-full cursor-crosshair"
@@ -580,18 +582,10 @@ export default function DashboardPage() {
   const formatEntryMoney = (v: number) => formatMoney(Math.abs(v));
 
   // Monthly cashflow — compare using local date to avoid UTC offset issues (UTC+7)
-  const now2 = new Date();
-  const currentYear = now2.getFullYear();
-  const currentMonth = now2.getMonth(); // 0-indexed
-  const monthIncome = cashActivities.filter(a => {
-    const d = new Date(a.date);
-    return d.getFullYear() === currentYear && d.getMonth() === currentMonth && a.type === 'INCOME';
-  }).reduce((s, a) => s + getEntryAmount(a), 0);
-  const monthExpense = cashActivities.filter(a => {
-    const d = new Date(a.date);
-    return d.getFullYear() === currentYear && d.getMonth() === currentMonth && (a.type === 'EXPENSE' || a.type === 'WITHDRAW') && !a.isTransfer;
-  }).reduce((s, a) => s + getEntryAmount(a), 0);
-  const monthNet = monthIncome - monthExpense;
+    const now2 = new Date();
+    const monthStart = `${now2.getFullYear()}-${String(now2.getMonth() + 1).padStart(2, '0')}-01`;
+    const monthEnd = `${now2.getFullYear()}-${String(now2.getMonth() + 1).padStart(2, '0')}-${String(new Date(now2.getFullYear(), now2.getMonth() + 1, 0).getDate()).padStart(2, '0')}`;
+    const { income: monthIncome, expenses: monthExpense, net: monthNet } = getCashflowSummary(cashActivities, { from: monthStart, to: monthEnd });
 
   // P/L metrics
   const { grossProfit, grossLoss } = useMemo(() => {
