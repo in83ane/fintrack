@@ -39,13 +39,13 @@ function EquityCurveWidget() {
   const pathD = `M ${points.join(" L ")}`;
   const areaD = `${pathD} L ${(PAD + (W - PAD * 2)).toFixed(1)},${H} L ${PAD},${H} Z`;
   const isPositive = values[values.length - 1] >= values[0];
-  const color = isPositive ? "#4EDEA3" : "#FFB4AB";
+  const color = "var(--ft-accent)";
 
   return (
     <div className="h-full flex flex-col">
       <div className="flex justify-between items-center mb-2">
-        <span className="text-[10px] font-black text-gray-500 uppercase tracking-wide">{t("equityCurve")}</span>
-        <span className={cn("text-xs font-black", isPositive ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
+        <span className="text-xs font-black text-gray-500 uppercase tracking-wide">{t("equityCurve")}</span>
+        <span className={cn("text-xs font-black", isPositive ? "text-gain" : "text-loss")}>
           {formatMoney(values[values.length - 1])}
         </span>
       </div>
@@ -95,7 +95,7 @@ function AllocationPieWidget() {
 
   return (
     <div className="h-full flex flex-col">
-      <span className="text-[10px] font-black text-gray-500 uppercase tracking-wide mb-2">{t("widgetAllocationPie")}</span>
+      <span className="text-xs font-black text-gray-500 uppercase tracking-wide mb-2">{t("widgetAllocationPie")}</span>
       <div className="flex-1 flex items-center gap-3 min-h-0">
         <svg viewBox="0 0 100 100" className="w-20 h-20 flex-shrink-0">
           {segments.map((seg, i) => {
@@ -131,7 +131,7 @@ function AllocationPieWidget() {
           {segments.map((seg, i) => (
             <div key={i} className="flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: seg.color }} />
-              <span className="text-[10px] text-gray-400 font-medium truncate">{seg.label} {seg.value.toFixed(0)}%</span>
+              <span className="text-xs text-gray-400 font-medium truncate">{seg.label} {seg.value.toFixed(0)}%</span>
             </div>
           ))}
         </div>
@@ -159,25 +159,25 @@ function MonthlySummaryWidget() {
 
   return (
     <div className="h-full flex flex-col">
-      <span className="text-[10px] font-black text-gray-500 uppercase tracking-wide mb-3">{t("widgetMonthlySummary")}</span>
+      <span className="text-xs font-black text-gray-500 uppercase tracking-wide mb-3">{t("widgetMonthlySummary")}</span>
       <div className="flex-1 flex flex-col justify-center space-y-3">
-        <div className={cn("text-2xl font-black tracking-tighter", positive ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
+        <div className={cn("text-2xl font-black tracking-tighter", positive ? "text-gain" : "text-loss")}>
           {net ? formatNativeMoney(net, target, true) : 'unresolved'}
         </div>
         <div className="space-y-2">
-          <div className="flex justify-between items-center bg-white/5 p-2.5 rounded-xl">
+          <div className="flex justify-between items-center bg-foreground/5 p-2.5 rounded-xl">
             <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-[#4EDEA3]" />
-              <span className="text-[10px] text-gray-400 font-bold">{t("income")}</span>
+              <div className="w-2 h-2 rounded-full bg-gain" />
+              <span className="text-xs text-gray-400 font-bold">{t("income")}</span>
             </div>
-            <span className="text-xs font-black text-white">{income ? formatNativeMoney(decimal(income.amount), target) : 'unresolved'}</span>
+            <span className="text-xs font-black text-foreground">{income ? formatNativeMoney(decimal(income.amount), target) : 'unresolved'}</span>
           </div>
-          <div className="flex justify-between items-center bg-white/5 p-2.5 rounded-xl">
+          <div className="flex justify-between items-center bg-foreground/5 p-2.5 rounded-xl">
             <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-[#FFB4AB]" />
-              <span className="text-[10px] text-gray-400 font-bold">{t("expense")}</span>
+              <div className="w-2 h-2 rounded-full bg-loss" />
+              <span className="text-xs text-gray-400 font-bold">{t("expense")}</span>
             </div>
-            <span className="text-xs font-black text-white">{expense ? formatNativeMoney(decimal(expense.amount), target) : 'unresolved'}</span>
+            <span className="text-xs font-black text-foreground">{expense ? formatNativeMoney(decimal(expense.amount), target) : 'unresolved'}</span>
           </div>
         </div>
       </div>
@@ -193,7 +193,7 @@ function WatchlistWidget() {
 
   return (
     <div className="h-full flex flex-col">
-      <span className="text-[10px] font-black text-gray-500 uppercase tracking-wide mb-2">{t("widgetWatchlist")}</span>
+      <span className="text-xs font-black text-gray-500 uppercase tracking-wide mb-2">{t("widgetWatchlist")}</span>
       <div className="flex-1 space-y-1 overflow-y-auto pr-1 custom-scrollbar">
         {assets.length === 0 ? (
           <EmptyWidget label={t("noDataYet")} />
@@ -203,17 +203,17 @@ function WatchlistWidget() {
             const shares = asset.shares || 0;
             const livePrice = shares > 0 ? asset.valueUSD / shares : 0;
             return (
-              <div key={`${asset.symbol}-${asset.id || i}`} className="flex items-center justify-between p-2 bg-white/[0.02] rounded-xl hover:bg-white/[0.05] transition-colors">
+              <div key={`${asset.symbol}-${asset.id || i}`} className="flex items-center justify-between p-2 bg-foreground/[0.02] rounded-xl hover:bg-foreground/[0.05] transition-colors">
                 <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-6 h-6 rounded-lg bg-white/5 flex items-center justify-center text-[9px] font-black text-[#ADC6FF] flex-shrink-0">
+                  <div className="w-6 h-6 rounded-lg bg-foreground/5 flex items-center justify-center text-xs font-black text-info flex-shrink-0">
                     {asset.symbol.slice(0, 3)}
                   </div>
                   <div className="min-w-0">
-                    <div className="text-[11px] font-bold text-white truncate">{asset.symbol}</div>
-                    <div className="text-[9px] text-gray-500">{formatMoney(livePrice, "USD", 1)}</div>
+                    <div className="text-xs font-bold text-foreground truncate">{asset.symbol}</div>
+                    <div className="text-xs text-gray-500">{formatMoney(livePrice, "USD", 1)}</div>
                   </div>
                 </div>
-                <div className={cn("flex items-center gap-0.5 text-[10px] font-black", isUp ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
+                <div className={cn("flex items-center gap-0.5 text-xs font-black", isUp ? "text-gain" : "text-loss")}>
                   {isUp ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
                   {Math.abs(asset.change).toFixed(2)}%
                 </div>
@@ -246,21 +246,21 @@ function DailyJournalWidget() {
 
   return (
     <div className="h-full flex flex-col">
-      <span className="text-[10px] font-black text-gray-500 uppercase tracking-wide mb-2">{t("widgetDailyJournal")}</span>
+      <span className="text-xs font-black text-gray-500 uppercase tracking-wide mb-2">{t("widgetDailyJournal")}</span>
       
       {tradePnLs.length > 0 && (
-        <div className="flex items-center justify-between mb-3 bg-white/5 p-2 rounded-xl">
+        <div className="flex items-center justify-between mb-3 bg-foreground/5 p-2 rounded-xl">
           <div className="text-center">
-            <div className="text-[9px] text-gray-500 uppercase font-black">Expectancy</div>
-            <div className={cn("text-xs font-black", expectancy >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>{formatMoney(expectancy)}</div>
+            <div className="text-xs text-gray-500 uppercase font-black">Expectancy</div>
+            <div className={cn("text-xs font-black", expectancy >= 0 ? "text-gain" : "text-loss")}>{formatMoney(expectancy)}</div>
           </div>
           <div className="text-center">
-            <div className="text-[9px] text-gray-500 uppercase font-black">Win Streak</div>
-            <div className="text-xs font-black text-[#4EDEA3]">{maxWinStreak}</div>
+            <div className="text-xs text-gray-500 uppercase font-black">Win Streak</div>
+            <div className="text-xs font-black text-gain">{maxWinStreak}</div>
           </div>
           <div className="text-center">
-            <div className="text-[9px] text-gray-500 uppercase font-black">Loss Streak</div>
-            <div className="text-xs font-black text-[#FFB4AB]">{maxLossStreak}</div>
+            <div className="text-xs text-gray-500 uppercase font-black">Loss Streak</div>
+            <div className="text-xs font-black text-loss">{maxLossStreak}</div>
           </div>
         </div>
       )}
@@ -270,19 +270,19 @@ function DailyJournalWidget() {
           <EmptyWidget label={t("noDataYet")} />
         ) : (
           recentTrades.map((trade) => (
-            <div key={trade.id} className="flex items-center justify-between p-2 bg-white/[0.02] rounded-xl">
+            <div key={trade.id} className="flex items-center justify-between p-2 bg-foreground/[0.02] rounded-xl">
               <div className="flex items-center gap-2">
                 <div className={cn("w-6 h-6 rounded-lg flex items-center justify-center",
-                  trade.type === "BUY" || trade.type === "IMPORT" ? "bg-[#4EDEA3]/10 text-[#4EDEA3]" : "bg-[#FFB4AB]/10 text-[#FFB4AB]"
+                  trade.type === "BUY" || trade.type === "IMPORT" ? "bg-gain/10 text-gain" : "bg-loss/10 text-loss"
                 )}>
                   {trade.type === "BUY" || trade.type === "IMPORT" ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
                 </div>
                 <div>
-                  <div className="text-[11px] font-bold text-white">{trade.asset}</div>
-                  <div className="text-[9px] text-gray-500">{trade.date}</div>
+                  <div className="text-xs font-bold text-foreground">{trade.asset}</div>
+                  <div className="text-xs text-gray-500">{trade.date}</div>
                 </div>
               </div>
-              <span className={cn("text-[11px] font-black", trade.type === "BUY" || trade.type === "IMPORT" ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
+              <span className={cn("text-xs font-black", trade.type === "BUY" || trade.type === "IMPORT" ? "text-gain" : "text-loss")}>
                 {trade.type === "BUY" || trade.type === "IMPORT" ? "+" : "-"}{formatMoney(trade.amountUSD, trade.currency as any, trade.rateAtTime, trade.originalAmount)}
               </span>
             </div>
@@ -302,12 +302,12 @@ function BucketOverviewWidget() {
 
   return (
     <div className="h-full flex flex-col">
-      <Link href="/budget" className="flex justify-between items-center mb-2 group cursor-pointer hover:bg-white/5 p-1 -mx-1 rounded-lg transition-colors">
-        <span className="text-[10px] font-black text-gray-500 uppercase tracking-wide group-hover:text-white transition-colors flex items-center gap-1">
+      <Link href="/budget" className="flex justify-between items-center mb-2 group cursor-pointer hover:bg-foreground/5 p-1 -mx-1 rounded-lg transition-colors">
+        <span className="text-xs font-black text-gray-500 uppercase tracking-wide group-hover:text-foreground transition-colors flex items-center gap-1">
           {t("widgetBucketOverview")}
           <ArrowRight size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" />
         </span>
-        <span className="text-xs font-black text-white">{total ? formatNativeMoney(decimal(total.amount), target) : 'unresolved'}</span>
+        <span className="text-xs font-black text-foreground">{total ? formatNativeMoney(decimal(total.amount), target) : 'unresolved'}</span>
       </Link>
       <div className="flex-1 space-y-2 overflow-y-auto pr-1 custom-scrollbar">
         {moneyBuckets.map((b) => {
@@ -320,11 +320,11 @@ function BucketOverviewWidget() {
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm"><FinanceIcon name={b.icon} /></span>
-                  <span className="text-[10px] font-bold text-gray-400">{t(b.name) || b.name}</span>
+                  <span className="text-xs font-bold text-gray-400">{t(b.name) || b.name}</span>
                 </div>
-                <span className="text-[10px] font-black text-white">{display?.original && <span className="mr-2 text-gray-500">{display.original}</span>}{display?.amount || 'unresolved'}</span>
+                <span className="text-xs font-black text-foreground">{display?.original && <span className="mr-2 text-gray-500">{display.original}</span>}{display?.amount || 'unresolved'}</span>
               </div>
-              <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+              <div className="h-1 bg-foreground/5 rounded-full overflow-hidden">
                 <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: b.color }} />
               </div>
             </div>
@@ -356,7 +356,7 @@ function PLCalendarMiniWidget() {
 
   return (
     <div className="h-full flex flex-col">
-      <span className="text-[10px] font-black text-gray-500 uppercase tracking-wide mb-2">{t("widgetPLCalendar")}</span>
+      <span className="text-xs font-black text-gray-500 uppercase tracking-wide mb-2">{t("widgetPLCalendar")}</span>
       <div className="flex-1 min-h-0">
         <div className="grid grid-cols-7 gap-[2px]">
           {Array.from({ length: firstDay }, (_, i) => (
@@ -372,8 +372,8 @@ function PLCalendarMiniWidget() {
                 className={cn(
                   "aspect-square rounded-sm flex items-center justify-center text-[7px] font-bold",
                   hasData
-                    ? pl >= 0 ? "bg-[#4EDEA3]/20 text-[#4EDEA3]" : "bg-[#FFB4AB]/20 text-[#FFB4AB]"
-                    : "bg-white/[0.02] text-gray-600"
+                    ? pl >= 0 ? "bg-gain/20 text-gain" : "bg-loss/20 text-loss"
+                    : "bg-foreground/[0.02] text-gray-600"
                 )}
               >
                 {day}
@@ -395,7 +395,7 @@ function TopMoversWidget() {
 
   return (
     <div className="h-full flex flex-col">
-      <span className="text-[10px] font-black text-gray-500 uppercase tracking-wide mb-2">{t("widgetTopMovers")}</span>
+      <span className="text-xs font-black text-gray-500 uppercase tracking-wide mb-2">{t("widgetTopMovers")}</span>
       <div className="flex-1 space-y-1.5 overflow-y-auto pr-1 custom-scrollbar">
         {sorted.length === 0 ? (
           <EmptyWidget label={t("noDataYet")} />
@@ -403,16 +403,16 @@ function TopMoversWidget() {
           sorted.map((asset, i) => {
             const isUp = asset.change >= 0;
             return (
-              <div key={`${asset.symbol}-${asset.id || i}`} className="flex items-center justify-between p-2 bg-white/[0.02] rounded-xl">
+              <div key={`${asset.symbol}-${asset.id || i}`} className="flex items-center justify-between p-2 bg-foreground/[0.02] rounded-xl">
                 <div className="flex items-center gap-2">
                   <div className={cn("w-6 h-6 rounded-lg flex items-center justify-center",
-                    isUp ? "bg-[#4EDEA3]/10 text-[#4EDEA3]" : "bg-[#FFB4AB]/10 text-[#FFB4AB]"
+                    isUp ? "bg-gain/10 text-gain" : "bg-loss/10 text-loss"
                   )}>
                     {isUp ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
                   </div>
-                  <span className="text-[11px] font-bold text-white">{asset.symbol}</span>
+                  <span className="text-xs font-bold text-foreground">{asset.symbol}</span>
                 </div>
-                <span className={cn("text-[11px] font-black", isUp ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
+                <span className={cn("text-xs font-black", isUp ? "text-gain" : "text-loss")}>
                   {isUp ? "+" : ""}{asset.change.toFixed(2)}%
                 </span>
               </div>
@@ -428,7 +428,7 @@ function TopMoversWidget() {
 function EmptyWidget({ label }: { label: string }) {
   return (
     <div className="h-full flex items-center justify-center">
-      <span className="text-[10px] text-gray-500 font-medium">{label}</span>
+      <span className="text-xs text-gray-500 font-medium">{label}</span>
     </div>
   );
 }

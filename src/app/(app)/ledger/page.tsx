@@ -687,7 +687,7 @@ export default function LedgerPage() {
                           className={cn(
                             "flex items-center gap-1.5 px-3 py-2 rounded-xl border flex-shrink-0 transition-all text-xs font-bold",
                             isSelected
-                              ? (activePanel === "INCOME" ? "bg-primary/20 border-primary text-primary" : "bg-loss/20 border-loss text-loss")
+                              ? "bg-primary/20 border-primary text-primary"
                               : "bg-foreground/5 border-transparent text-gray-400 hover:bg-foreground/10 hover:text-foreground"
                           )}
                         >
@@ -715,7 +715,7 @@ export default function LedgerPage() {
                             className={cn(
                               "group/chip flex items-center gap-1.5 px-3 py-2 rounded-xl border flex-shrink-0 transition-all text-xs font-bold",
                               isSelected
-                                ? (activePanel === "INCOME" ? "bg-primary/20 border-primary text-primary" : "bg-loss/20 border-loss text-loss")
+                                ? "bg-primary/20 border-primary text-primary"
                                 : "bg-foreground/5 border-transparent text-gray-400 hover:bg-foreground/10 hover:text-foreground"
                             )}
                           >
@@ -748,7 +748,7 @@ export default function LedgerPage() {
                       className={cn(
                         "flex items-center gap-1.5 px-3 py-2 rounded-xl border flex-shrink-0 transition-all text-xs font-bold",
                         isCustomCategory
-                          ? (activePanel === "INCOME" ? "bg-primary/20 border-primary text-primary" : "bg-loss/20 border-loss text-loss")
+                          ? "bg-primary/20 border-primary text-primary"
                           : "bg-foreground/5 border-transparent text-gray-400 hover:bg-foreground/10 hover:text-foreground"
                       )}
                     >
@@ -783,7 +783,7 @@ export default function LedgerPage() {
                             className={cn(
                               "px-4 rounded-xl text-sm font-black flex-shrink-0 transition-all",
                               customCategory.trim()
-                                ? (activePanel === "INCOME" ? "bg-primary text-primary-foreground hover:brightness-110" : "bg-loss text-primary-foreground hover:brightness-110")
+                                ? "bg-primary text-primary-foreground hover:brightness-110"
                                 : "bg-foreground/5 text-gray-600 cursor-not-allowed"
                             )}
                           >

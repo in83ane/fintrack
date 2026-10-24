@@ -151,7 +151,7 @@ interface MoveInput {
 const STORAGE_KEY = "fintrack.multibroker.v1";
 const DEFAULT_RATE = Number.NaN; // Unavailable until the shared FX quote is loaded.
 
-const ACCENT = "#4EDEA3";
+const ACCENT = "var(--ft-accent)";
 const GAIN = "#4EDEA3";
 const LOSS = "#FFB4AB";
 
@@ -879,7 +879,7 @@ function ChoiceCard({
         "text-left rounded-xl border p-3 transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
         active ? "bg-foreground/[0.06]" : "bg-foreground/[0.02] border-foreground/10 hover:bg-foreground/5"
       )}
-      style={active ? { borderColor: `${tone}99` } : undefined}
+      style={active ? { borderColor: `color-mix(in oklch,${tone} 60%,transparent)` } : undefined}
     >
       <Icon size={16} style={{ color: active ? tone : "#9ca3af" }} />
       <div className="text-sm font-bold text-foreground mt-2">{title}</div>
@@ -2055,7 +2055,7 @@ function HoldingSortHeader({ field, sort, onSort, children, align = 'right' }: {
 }) {
   const active = sort.startsWith(`${field}-`);
   return <th scope="col" aria-sort={active ? (sort.endsWith('asc') ? 'ascending' : 'descending') : 'none'} className={cn('px-3 py-3 font-semibold', align === 'left' ? 'text-left min-w-[220px]' : 'text-right')}>
-    <button type="button" onClick={() => onSort(toggleHoldingSort(sort, field))} className={cn('inline-flex items-center gap-1.5 rounded py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#ADC6FF] hover:text-foreground', active ? 'text-primary' : 'text-gray-400')}>
+    <button type="button" onClick={() => onSort(toggleHoldingSort(sort, field))} className={cn('inline-flex items-center gap-1.5 rounded py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary hover:text-foreground', active ? 'text-primary' : 'text-gray-400')}>
       {children}<span aria-hidden="true" className="whitespace-nowrap">{active ? (field === 'name' ? (sort.endsWith('asc') ? 'A → Z' : 'Z → A') : (sort.endsWith('asc') ? '↑' : '↓')) : '↕'}</span>
     </button>
   </th>;
@@ -2261,7 +2261,7 @@ function BucketsCard({ buckets, onAdd }: { buckets: Bucket[]; onAdd: () => void 
   return (
     <section className="rounded-2xl bg-surface-2 border border-foreground/[0.07] p-5">
       <div className="flex items-center gap-3 mb-4">
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: `${ACCENT}20`, color: ACCENT }}>
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "color-mix(in oklch,var(--ft-accent) 12%,transparent)", color: ACCENT }}>
           <PiggyBank size={18} />
         </div>
         <div className="min-w-0 flex-1">

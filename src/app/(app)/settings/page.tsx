@@ -125,9 +125,9 @@ export default function SettingsPage() {
         {/* Profile Card (#23) */}
         <section id="settings-profile">
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-surface p-6 rounded-2xl border border-border relative overflow-hidden">
-            <div className="absolute -right-8 -top-8 w-32 h-32 bg-info/5 blur-3xl rounded-full" />
+            <div className="absolute -right-8 -top-8 w-32 h-32 bg-primary/5 blur-3xl rounded-full" />
             <div className="flex items-center gap-4 relative z-10">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-info to-[#4D8EFF] flex items-center justify-center text-xl font-bold text-foreground shadow-lg">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary flex items-center justify-center text-xl font-bold text-foreground shadow-lg">
                 <User size={24} />
               </div>
               <div className="flex-1">
@@ -148,7 +148,7 @@ export default function SettingsPage() {
           <h2 className="text-sm font-bold uppercase tracking-wide text-gray-500 px-2">{t("regionalSettings")}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-surface p-6 rounded-2xl border border-border space-y-4">
-              <div className="flex items-center gap-3 text-info">
+              <div className="flex items-center gap-3 text-primary">
                 <Globe size={18} />
                 <span className="text-xs font-bold uppercase tracking-wide">{t("languageLabel")}</span>
               </div>
@@ -201,8 +201,8 @@ export default function SettingsPage() {
           <div className="bg-surface rounded-2xl border border-border p-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#8B5CF615' }}>
-                  <Moon size={18} style={{ color: '#8B5CF6' }} />
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'color-mix(in oklch,var(--ft-accent) 12%,transparent)' }}>
+                  <Moon size={18} style={{ color: 'var(--ft-accent)' }} />
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-foreground">{t("darkMode")}</h3>
@@ -214,11 +214,11 @@ export default function SettingsPage() {
                 onClick={() => { setDarkMode(!darkMode); addToast(t("settingsSaved"), "success"); }}
                 className={cn(
                   "relative w-12 h-7 rounded-full transition-all duration-300 focus:outline-none",
-                  darkMode ? "bg-[#8B5CF6]" : "bg-foreground/10"
+                  darkMode ? "bg-primary" : "bg-foreground/10"
                 )}
               >
                 <motion.div
-                  className="absolute top-1 w-5 h-5 rounded-full bg-white shadow-md"
+                  className="absolute top-1 w-5 h-5 rounded-full bg-primary-foreground shadow-md"
                   style={{left:4}} animate={{ x: darkMode ? 20 : 0 }}
                   transition={{ type: "spring", stiffness: 500, damping: 30 }}
                 />
@@ -296,7 +296,7 @@ export default function SettingsPage() {
                   )}
                 >
                   <motion.div
-                    className="absolute top-1 w-5 h-5 rounded-full bg-white shadow-md"
+                    className="absolute top-1 w-5 h-5 rounded-full bg-primary-foreground shadow-md"
                     style={{left:4}} animate={{ x: notifPreferences[item.key] ? 20 : 0 }}
                     transition={{ type: "spring", stiffness: 500, damping: 30 }}
                   />
@@ -357,7 +357,7 @@ export default function SettingsPage() {
                 />
                 <button
                   onClick={handleDeleteData}
-                  className="px-4 py-2 bg-loss text-black rounded-xl text-xs font-black uppercase whitespace-nowrap hover:bg-[#ff9a8f]"
+                  className="px-4 py-2 bg-loss text-surface rounded-xl text-xs font-black uppercase whitespace-nowrap hover:bg-[#ff9a8f]"
                 >
                   {language === "th" ? "ยืนยัน" : "Confirm"}
                 </button>
@@ -399,13 +399,13 @@ function SettingsSection({ icon: Icon, title, description, active, onClick }: an
       onClick={onClick}
       className={cn(
         "p-6 rounded-2xl border transition-all cursor-pointer group",
-        active ? "bg-info/5 border-info/20" : "bg-surface border-border hover:border-border"
+        active ? "bg-primary/5 border-primary/20" : "bg-surface border-border hover:border-border"
       )}
     >
       <div className="flex items-center gap-6">
         <div className={cn(
           "w-12 h-12 rounded-2xl flex items-center justify-center transition-colors",
-          active ? "bg-info text-primary-foreground" : "bg-foreground/5 text-gray-400 group-hover:text-foreground"
+          active ? "bg-primary text-primary-foreground" : "bg-foreground/5 text-gray-400 group-hover:text-foreground"
         )}>
           <Icon size={24} />
         </div>
@@ -415,7 +415,7 @@ function SettingsSection({ icon: Icon, title, description, active, onClick }: an
         </div>
         <div className={cn(
           "w-8 h-8 rounded-full border border-border flex items-center justify-center transition-all",
-          active ? "text-info rotate-90" : "text-gray-600 group-hover:text-foreground"
+          active ? "text-primary rotate-90" : "text-gray-600 group-hover:text-foreground"
         )}>
           <ChevronRight size={14} />
         </div>

@@ -318,7 +318,7 @@ export function StockChart({
     setHoveredIndex(null);
   }, []);
 
-  const strokeColor = isPositive ? "#4EDEA3" : "#FFB4AB";
+  const strokeColor = "var(--ft-accent)";
   const fillGradientId = `gradient-${symbol}-${isPositive ? "pos" : "neg"}`;
 
   if (data.length < 2) {
@@ -343,12 +343,12 @@ export function StockChart({
       >
         <defs>
           <linearGradient id={`gradient-${symbol}-pos`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#4EDEA3" stopOpacity={0.3} />
-            <stop offset="100%" stopColor="#4EDEA3" stopOpacity={0} />
+            <stop offset="0%" stopColor="var(--ft-accent)" stopOpacity={0.3} />
+            <stop offset="100%" stopColor="var(--ft-accent)" stopOpacity={0} />
           </linearGradient>
           <linearGradient id={`gradient-${symbol}-neg`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#FFB4AB" stopOpacity={0.3} />
-            <stop offset="100%" stopColor="#FFB4AB" stopOpacity={0} />
+            <stop offset="0%" stopColor="var(--ft-accent)" stopOpacity={0.3} />
+            <stop offset="100%" stopColor="var(--ft-accent)" stopOpacity={0} />
           </linearGradient>
           <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
@@ -445,7 +445,7 @@ export function StockChart({
               <text
                 x={W - PAD.right + 6}
                 y={cy(hov.price) + 3.5}
-                fill="#0f1115"
+                fill="var(--ft-on-accent)"
                 fontSize={9}
                 fontWeight="bold"
                 fontFamily="monospace"
@@ -459,7 +459,7 @@ export function StockChart({
                 width={60}
                 height={16}
                 rx={4}
-                fill="#2A2A2A"
+                fill="var(--ft-overlay)"
                 stroke="rgba(173,198,255,0.2)"
                 strokeWidth={0.5}
               />
@@ -467,7 +467,7 @@ export function StockChart({
                 x={cx(hoveredIndex)}
                 y={H - PAD.bottom + 15}
                 textAnchor="middle"
-                fill="#ADC6FF"
+                fill="var(--ft-ink)"
                 fontSize={8}
                 fontWeight="bold"
               >
@@ -496,24 +496,24 @@ export function StockChart({
         const tooltipY = Math.max(4, Math.min(dotScreenY - 20, containerRect.height - 50));
         return (
           <div
-            className="absolute top-0 left-0 bg-[#2A2A2A]/95 backdrop-blur-sm border border-border rounded-xl px-3 py-2 pointer-events-none z-10 shadow-xl shadow-black/30"
+            className="absolute top-0 left-0 bg-overlay border border-border rounded-xl px-3 py-2 pointer-events-none z-10 shadow-xl shadow-black/30"
             style={{
               transform: `translate3d(${tooltipX}px, ${tooltipY}px, 0)`,
               willChange: 'transform',
             }}
           >
-            <div className="text-[10px] text-gray-400 mb-0.5">
+            <div className="text-xs text-gray-400 mb-0.5">
               {period === "1d" || period === "5d" || period === "1w"
                 ? (language === "th" ? formatFullThaiDate(hov.time, period) : formatFullEnglishDate(hov.time, period))
                 : new Date(hov.time).toLocaleDateString(language === "th" ? "th-TH" : "en-US", { month: 'short', day: 'numeric', year: 'numeric' })}
             </div>
-            <div className="text-sm font-black text-white font-mono">${hov.price.toFixed(2)}</div>
+            <div className="text-sm font-black text-foreground font-mono">${hov.price.toFixed(2)}</div>
             {data.length > 1 && (() => {
               const firstPrice = data[0].price;
               const change = hov.price - firstPrice;
               const changePct = (change / firstPrice) * 100;
               return (
-                <div className={cn("text-[10px] font-bold mt-0.5", change >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
+                <div className={cn("text-xs font-bold mt-0.5", change >= 0 ? "text-gain" : "text-loss")}>
                   {change >= 0 ? "+" : ""}{change.toFixed(2)} ({changePct >= 0 ? "+" : ""}{changePct.toFixed(2)}%)
                 </div>
               );
@@ -549,7 +549,7 @@ export function PeriodSelector({ selectedPeriod, onChange, language = "en", size
   const { t } = useApp();
   return (
     <div className={cn(
-      "flex gap-1 bg-white/5 rounded-lg p-1",
+      "flex gap-1 bg-foreground/5 rounded-lg p-1",
       size === "md" && "p-1.5"
     )}>
       {PERIODS.map((period) => (
@@ -558,11 +558,11 @@ export function PeriodSelector({ selectedPeriod, onChange, language = "en", size
           onClick={() => onChange(period.key)}
           className={cn(
             "px-2 py-1 font-black uppercase tracking-wide rounded-md transition-all",
-            size === "sm" && "text-[10px]",
+            size === "sm" && "text-xs",
             size === "md" && "text-xs px-3 py-1.5",
             selectedPeriod === period.key
-              ? "bg-[#ADC6FF] text-[#00285d]"
-              : "text-gray-400 hover:text-white"
+              ? "bg-primary text-primary-foreground"
+              : "text-gray-400 hover:text-foreground"
           )}
         >
           {t(`period${period.key}`)}

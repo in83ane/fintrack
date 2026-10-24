@@ -37,3 +37,7 @@ Added 500ms ease-out scrolling with measured top-bar offset, IntersectionObserve
 ## 7. Shared page container
 The App Router template now owns one left-aligned 1440px maximum page frame with clamp(24px,3vw,48px) inline padding. Removed competing route-level centered widths/padding, including broker Ledger. Settings uses 220px/minmax(0,1fr),40px gap and960px content maximum, stacking on mobile. No route or dataset changes. TypeScript pass; viewport screenshots pending access.
 
+
+## 8. Brand and neutral surfaces
+One --brand token defaults to oklch(0.68 0.15 265); primary surfaces/selected controls/navigation/focus/charts resolve through it. Light theme derives a darker accessible tone from the same hue/chroma, so changing that line also supports the requested teal/emerald alternatives. Hero surfaces are neutral with a thin brand line. Removed the purple appearance toggle and residual multicolour selected treatments; Income/Expense outlines and financial gain/loss remain semantic. Source-token contrast tests pass4.5:1 for principal text across four surfaces and all three brand options. Composited/hover/rendered contrast remains pending browser audit.
+

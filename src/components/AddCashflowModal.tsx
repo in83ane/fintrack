@@ -446,7 +446,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
                 ? "bg-foreground/5 text-gray-600 opacity-60 cursor-not-allowed"
                 : type === "INCOME" || type === "DEPOSIT"
                   ? "bg-primary text-primary-foreground hover:brightness-110 shadow-sm"
-                  : "bg-loss text-primary-foreground hover:brightness-110 shadow-sm"
+                  : "bg-primary text-primary-foreground hover:brightness-110 shadow-sm"
             )}
           >
             {isAdding && <Loader2 size={16} className="animate-spin" />}
