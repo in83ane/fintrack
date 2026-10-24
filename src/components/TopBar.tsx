@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useFxRate } from '@/src/hooks/useFxRate';
-import { Bell, Globe, ChevronDown, Search, Menu, X, Plus, Check, Layers, Pencil } from "lucide-react";
+import { Bell, Globe, ChevronDown, Menu, X, Plus, Check, Layers, Pencil } from "lucide-react";
 import { useApp, Language, Currency, AppNotification } from "@/src/context/AppContext";
 import { cn } from "@/src/lib/utils";
 import { Sidebar } from "./Sidebar";
@@ -162,18 +162,6 @@ export function TopBar() {
         </div>
 
         <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5 sm:gap-3">
-          {/* ⌘K Search Trigger */}
-          <div className="hidden md:flex h-9 box-border items-center rounded-full bg-white/5 border border-border hover:border-[#ADC6FF]/30 transition-all">
-            <button
-              onClick={() => { const e = new KeyboardEvent('keydown', { key: 'k', metaKey: true, ctrlKey: true, bubbles: true }); window.dispatchEvent(e); }}
-              className="flex h-full items-center gap-2 px-3 leading-none cursor-pointer"
-            >
-              <Search size={12} className="text-gray-500" />
-              <span className="text-xs text-gray-500">{t('searchPlaceholder')}</span>
-              <kbd className="text-[9px] font-bold text-gray-600 bg-white/5 px-1.5 py-0.5 rounded border border-border">⌘K</kbd>
-            </button>
-          </div>
-
           <div className="relative hidden xl:block" ref={portfolioMenuRef}>
             <div
               className={cn(
@@ -336,9 +324,12 @@ export function TopBar() {
             </AnimatePresence>
           </div>
 
-          <div className="shrink-0 rounded-xl border border-border bg-white/5 px-2 py-1 text-right tabular-nums" aria-live="polite" aria-label="USD THB exchange rate">
-            <div className="text-[10px] font-bold text-[#ADC6FF] sm:text-xs">1 USD = {fx.rate ? Number(fx.rate).toLocaleString('en-US', { maximumFractionDigits: 4 }) : '—'} THB</div>
-            <div className="text-[9px] text-gray-500">
+          <div className="hidden shrink-0 flex-col items-end leading-none sm:flex" aria-live="polite" aria-label="USD THB exchange rate">
+            <div className="flex items-baseline gap-1.5 tabular-nums">
+              <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-gray-500">USD / THB</span>
+              <span className="text-xs font-bold tracking-tight text-[#ADC6FF] sm:text-sm">{fx.rate ? Number(fx.rate).toLocaleString('en-US', { maximumFractionDigits: 4 }) : '—'}</span>
+            </div>
+            <div className="mt-1 text-[9px] font-medium tracking-wide text-gray-600">
               {!fx.rate ? (language === 'th' ? 'รอข้อมูลเรท' : 'Rate unavailable') : fx.mode === 'manual' ? 'Manual' : `${fx.stale ? (language === 'th' ? 'เรทเก่า · ' : 'Stale · ') : 'Auto · '}${fx.quote ? new Date(fx.quote.fetchedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' }) : ''} ICT`}
             </div>
           </div>
