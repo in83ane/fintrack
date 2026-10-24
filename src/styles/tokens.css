@@ -216,3 +216,21 @@ td { font-size: 14px; }
 @media(hover:none){ .ft-row-menu-trigger {opacity:1;} }
 @media(max-width:1023px){ .ft-selection-bar {left:50%;bottom:90px;max-width:calc(100% - 32px);} }
 @media(prefers-reduced-motion:reduce){ .ft-row-check,.ft-row-menu-trigger {transition:none;} }
+
+html { scrollbar-gutter:stable; }
+.ft-dialog { margin:auto; padding:0; width:min(36rem,calc(100% - 48px)); max-width:none; max-height:calc(100dvh - 48px); border:0; border-radius:16px; background:var(--ft-overlay); color:var(--ft-ink); overflow:hidden; box-shadow:var(--shadow-overlay); animation:ft-dialog-in 200ms var(--ease-enter); }
+.ft-dialog-shell { display:flex; flex-direction:column; max-height:calc(100dvh - 48px); }
+.ft-dialog-header { display:flex; flex-shrink:0; align-items:center; justify-content:space-between; gap:16px; padding:12px 20px; border-bottom:1px solid var(--ft-line); }
+.ft-dialog-body { min-height:0; overflow-y:auto; overscroll-behavior:contain; }
+.ft-dialog-footer { flex-shrink:0; padding:12px 20px; border-top:1px solid var(--ft-line); background:var(--ft-overlay); }
+.ft-dialog::backdrop { background:oklch(8% .01 255 / .62); backdrop-filter:blur(3px); animation:ft-backdrop-in 200ms ease-out; }
+.ft-dialog[data-closing='true'] { animation:ft-dialog-out 200ms ease-in forwards; }
+.ft-dialog[data-closing='true']::backdrop { animation:ft-backdrop-out 200ms ease-in forwards; }
+.ft-sheet-handle {display:none;}
+.ft-amount-input:focus {outline:2px solid var(--ft-accent);outline-offset:2px;box-shadow:none;border-color:var(--ft-line);}
+@keyframes ft-dialog-in {from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes ft-dialog-out {to{opacity:0;transform:translateY(8px) scale(.97)}}
+@keyframes ft-backdrop-in {from{opacity:0;backdrop-filter:blur(0)}to{opacity:1;backdrop-filter:blur(3px)}}
+@keyframes ft-backdrop-out {to{opacity:0;backdrop-filter:blur(0)}}
+@media(max-width:639px){.ft-dialog{margin:auto 0 0;width:100%;border-radius:18px 18px 0 0;}.ft-sheet-handle{display:block;flex-shrink:0;width:36px;height:4px;margin:10px auto 0;border-radius:4px;background:var(--ft-muted);}.ft-dialog-footer{padding-bottom:calc(12px + env(safe-area-inset-bottom));}}
+@media(prefers-reduced-motion:reduce){.ft-dialog,.ft-dialog::backdrop,.ft-dialog[data-closing='true'],.ft-dialog[data-closing='true']::backdrop{animation:none;}}

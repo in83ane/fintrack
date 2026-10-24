@@ -1,78 +1,39 @@
 "use client";
-
-import React from "react";
-import { motion, AnimatePresence } from "motion/react";
-import { X } from "lucide-react";
-
-interface ModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  title: string;
-  assetName?: string;
-  assetSymbol?: string;
-  children: React.ReactNode;
-  contentClassName?: string;
-  footer?: React.ReactNode;
-}
-
-export function Modal({ isOpen, onClose, title, assetName, assetSymbol, children, contentClassName = 'p-8', footer }: ModalProps) {
-  React.useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
+import React, {useEffect,useId,useRef,useState} from "react";
+import {createPortal} from "react-dom";
+import {X} from "lucide-react";
+interface ModalProps {isOpen:boolean;onClose:()=>void;title:string;assetName?:string;assetSymbol?:string;children:React.ReactNode;contentClassName?:string;footer?:React.ReactNode;initialFocusRef?:React.RefObject<HTMLElement|null>;}
+export function Modal({isOpen,onClose,title,assetName,assetSymbol,children,contentClassName='p-5',footer,initialFocusRef}:ModalProps) {
+  const ref=useRef<HTMLDialogElement>(null);
+  const trigger=useRef<HTMLElement|null>(null);
+  const titleId=useId();
+  const [present,setPresent]=useState(false);
+  useEffect(()=>{if(isOpen)setPresent(true);},[isOpen]);
+  useEffect(()=>{
+    if(!present)return;
+    const dialog=ref.current;
+    if(!dialog)return;
+    if(isOpen){
+      if(!dialog.open){trigger.current=document.activeElement as HTMLElement;dialog.showModal();}
+      const focus=initialFocusRef?.current || dialog.querySelector<HTMLElement>('[autofocus]');
+      focus?.focus({preventScroll:true});
+      return;
     }
-    return () => {
-      document.body.style.overflow = "unset";
-    };
-  }, [isOpen]);
-
-  return (
-    <React.Fragment>
-      {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-4">
-          {/* Backdrop */}
-          <div
-            onClick={onClose}
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-          />
-          
-          {/* Modal Container */}
-          <div
-            className="relative w-full sm:max-w-lg max-h-[90dvh] bg-background sm:border sm:border-border rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl overflow-hidden flex flex-col"
-          >
-            {/* Mobile Drag Handle Indicator */}
-            <div className="shrink-0">
-              <div className="flex justify-center pt-3 pb-1 sm:hidden">
-                <div className="w-12 h-1.5 bg-white/20 rounded-full"></div>
-              </div>
-            </div>
-            
-            <div className="flex justify-between items-center px-8 py-4 sm:py-6 border-b border-border flex-shrink-0">
-              <div className="flex items-center gap-3">
-                {assetName && (
-                  <>
-                    <h3 className="text-lg font-black text-white tracking-tight">{assetName}</h3>
-                    {assetSymbol && <span className="text-sm font-medium text-gray-500">{assetSymbol}</span>}
-                  </>
-                )}
-                {!assetName && <h3 className="text-xl font-black text-white tracking-tight">{title}</h3>}
-              </div>
-              <button
-                onClick={onClose}
-                className="p-2 hover:bg-white/5 rounded-full text-gray-400 hover:text-white transition-colors"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className={`${contentClassName} overflow-y-auto custom-scrollbar`}>
-              {children}
-            </div>
-            {footer && <div className="shrink-0 border-t border-border bg-background px-5 py-4 sm:px-6">{footer}</div>}
-          </div>
-        </div>
-      )}
-    </React.Fragment>
-  );
+    const timer=setTimeout(()=>{dialog.close();setPresent(false);if(trigger.current?.isConnected)trigger.current.focus({preventScroll:true});},matchMedia('(prefers-reduced-motion: reduce)').matches?0:200);
+    return()=>clearTimeout(timer);
+  },[present,isOpen,initialFocusRef]);
+  useEffect(()=>{
+    if(!present)return;
+    const previous=document.body.style.overflow;document.body.style.overflow='hidden';
+    return()=>{document.body.style.overflow=previous;};
+  },[present]);
+  if(!present || typeof document==='undefined')return null;
+  return createPortal(<dialog ref={ref} aria-labelledby={titleId} data-closing={!isOpen} onCancel={e=>{e.preventDefault();onClose();}} onClick={e=>{if(e.target===e.currentTarget)onClose();}} className="ft-dialog">
+    <div className="ft-dialog-shell">
+      <div className="ft-sheet-handle" aria-hidden="true"/>
+      <header className="ft-dialog-header"><div><h2 id={titleId} className="text-xl font-semibold">{assetName || title}</h2>{assetSymbol && <p className="text-sm text-muted">{assetSymbol}</p>}</div><button className="ft-icon-button" aria-label="Close dialog" onClick={onClose}><X size={20}/></button></header>
+      <div className={`ft-dialog-body ${contentClassName}`}>{children}</div>
+      {footer && <footer className="ft-dialog-footer">{footer}</footer>}
+    </div>
+  </dialog>,document.body);
 }

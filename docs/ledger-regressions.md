@@ -21,3 +21,7 @@ Checkboxes reveal on hover/focus or toolbar Select mode and stay visible while s
 The existing data layer permanently deletes records and reverses associated bucket legs. It exposes no soft-delete/restore operation, so no false Undo is offered; explicit confirmation is retained. Linked funding and trades keep their existing source-management restrictions. Edit reuses updateCashActivity for category/note/date only: changing amount/account is not introduced because it would require changes to balance reconciliation. Duplicate pre-fills the existing entry form; it never saves until the user submits. No live records were changed during this work.
 
 Validation: TypeScript pass. Browser interaction and capture matrix pending access.
+
+## 4. Entry dialogs
+Ledger entry now uses the shared native dialog/top layer, capped at 100dvh minus 48px with fixed header/footer and a scrolling body only. Both Ledger and Quick Add cashflow keep Save in the footer. Added 200ms fade/scale/rise, backdrop blur transition, mobile sheet handle, amount autofocus, single 2px focus outline, stable scrollbar gutter, reduced-motion override and focus return. Validation: TypeScript pass; rendered focus/viewport tests pending browser access.
+

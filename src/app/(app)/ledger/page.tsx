@@ -581,37 +581,9 @@ export default function LedgerPage() {
       </div>
 
       {/* ─── 1-Tap Entry Modal & Mobile Buttons ───────────────────────────── */}
-      <AnimatePresence>
-        {activePanel && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 flex items-end sm:items-center justify-center sm:p-4 bg-black/60 sm:backdrop-blur-sm pointer-events-auto"
-            onClick={() => setActivePanel(null)}
-          >
-            <motion.div
-              initial={{ y: 50, opacity: 0, scale: 0.95 }}
-              animate={{ y: 0, opacity: 1, scale: 1 }}
-              exit={{ y: 50, opacity: 0, scale: 0.95 }}
-              transition={{ type: "spring", bounce: 0.4, duration: 0.6 }}
-              className="bg-surface/95 backdrop-blur-3xl border border-foreground/10 rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl w-full max-w-sm sm:max-w-md max-h-[88vh] sm:max-h-[85vh] flex flex-col overflow-hidden"
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="flex justify-between items-center p-5 pb-4 shrink-0">
-                <span className={cn(
-                  "px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider",
-                  activePanel === "INCOME" ? "bg-gain/20 text-gain" : "bg-loss/20 text-loss"
-                )}>
-                  {activePanel === "INCOME" ? (t("addIncome") || "Add Income") : (t("addExpense") || "Add Expense")}
-                </span>
-                <button onClick={() => setActivePanel(null)} className="w-8 h-8 rounded-full bg-foreground/5 flex items-center justify-center text-gray-400 hover:text-foreground hover:bg-foreground/10 transition-colors">
-                  <X size={16} />
-                </button>
-              </div>
-
-              <form onSubmit={handleQuickSubmit} className="flex flex-col flex-1 min-h-0">
-                <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 pb-2 space-y-4">
+      <Modal isOpen={!!activePanel} onClose={()=>setActivePanel(null)} title={activePanel==='INCOME'?t('addIncome'):t('addExpense')} initialFocusRef={inputRef} footer={<button type="submit" form="ledger-entry" disabled={isAdding || !amount || (!isCustomCategory && !category) || (isCustomCategory && !customCategory)} className="ft-button ft-primary w-full disabled:opacity-50">{isAdding?<Loader2 size={18} className="animate-spin"/>:<Check size={18}/>} {t('saveRecord')}</button>}>
+              <form id="ledger-entry" onSubmit={handleQuickSubmit}>
+                <div className="space-y-3">
                   {/* Deposit To / Pay From Selector */}
                   <div>
                     <button
@@ -680,6 +652,7 @@ export default function LedgerPage() {
                     <div className="relative group flex items-center">
                       <button
                         type="button"
+                        aria-label={language==='th'?'เปลี่ยนสกุลเงิน':'Switch entry currency'}
                         onClick={() => setActionCurrency(prev => prev === "USD" ? "THB" : "USD")}
                         className="absolute left-3 z-10 w-8 h-8 rounded-full bg-foreground/10 hover:bg-foreground/20 flex items-center justify-center text-sm font-black text-foreground transition-colors"
                       >
@@ -687,18 +660,20 @@ export default function LedgerPage() {
                       </button>
                       <input
                         ref={inputRef}
+                        autoFocus
+                        aria-label={t("amount")}
                         type="number"
                         step="any"
                         required
                         value={amount}
                         onChange={e => setAmount(e.target.value)}
                         placeholder="0.00"
-                        className="w-full bg-background border-2 border-foreground/5 focus:border-foreground/20 rounded-[1.5rem] py-4 pl-14 pr-4 text-3xl font-black text-foreground placeholder-gray-600 outline-none transition-colors shadow-inner"
+                        className="ft-amount-input w-full bg-background border border-border rounded-xl py-3 pl-14 pr-4 text-3xl font-semibold text-foreground placeholder:text-muted"
                       />
                     </div>
                   </div>
 
-                  <div className="flex gap-2 overflow-x-auto sm:overflow-x-visible sm:flex-wrap no-scrollbar pb-2">
+                  <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto py-1">
                     {(activePanel === "INCOME" ? INCOME_PRESET_KEYS : EXPENSE_PRESET_KEYS).map((p) => {
                       const isSelected = !isCustomCategory && category === (t(p.key) || p.key);
                       return (
@@ -818,8 +793,9 @@ export default function LedgerPage() {
                     )}
                   </AnimatePresence>
 
-                  <div>
+                  <div className="grid gap-3 sm:grid-cols-2">
                     <input
+                      aria-label={t("noteOptional")}
                       type="text"
                       value={note}
                       onChange={e => setNote(e.target.value)}
@@ -828,6 +804,7 @@ export default function LedgerPage() {
                     />
                     <input
                       type="date"
+                      aria-label={t("date")}
                       value={recordDate}
                       onChange={e => setRecordDate(e.target.value)}
                       className="w-full bg-background border border-foreground/5 focus:border-foreground/20 rounded-xl px-4 py-3 text-sm font-medium text-foreground outline-none transition-colors"
@@ -836,26 +813,8 @@ export default function LedgerPage() {
                   </div>
                 </div>
 
-                <div className="shrink-0 px-5 pt-3 pb-24 sm:pb-5 border-t border-foreground/5">
-                  <button
-                    disabled={isAdding || !amount || (!isCustomCategory && !category) || (isCustomCategory && !customCategory)}
-                    className={cn(
-                      "w-full py-4 rounded-[1.25rem] font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-xl",
-                      activePanel === "INCOME"
-                        ? "bg-primary text-primary-foreground shadow-[#4EDEA3]/20 hover:brightness-110 active:scale-95"
-                        : "bg-loss text-primary-foreground shadow-[#FFB4AB]/20 hover:brightness-110 active:scale-95",
-                      (isAdding || !amount || (!isCustomCategory && !category) || (isCustomCategory && !customCategory)) && "opacity-50 cursor-not-allowed active:scale-100 shadow-none"
-                    )}
-                  >
-                    {isAdding ? <Loader2 size={18} className="animate-spin" /> : <Check size={20} />}
-                    {t("saveRecord") || "Save"}
-                  </button>
-                </div>
               </form>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      </Modal>
 
       <Modal isOpen={!!editingRow} onClose={()=>setEditingRow(null)} title={language==='th'?'แก้ไขรายละเอียด':'Edit details'} footer={<button form="ledger-edit" type="submit" className="ft-button ft-primary" disabled={!editCategory.trim()}>{t('saveRecord')}</button>}>
         <form id="ledger-edit" className="space-y-4" onSubmit={async event=>{event.preventDefault();if(!editingRow)return;await updateCashActivity(editingRow.id,{category:editCategory.trim(),note:editNote,date:editDate===toLocalDateKey(editingRow.date)?editingRow.date:localDateKeyToIso(editDate)});setEditingRow(null);}}>
