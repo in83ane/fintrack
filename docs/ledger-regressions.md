@@ -29,3 +29,7 @@ Ledger entry now uses the shared native dialog/top layer, capped at 100dvh minus
 ## 5. Copy and dev-overlay investigation
 Added all eight requested key variants to both existing locale dictionaries and replaced literal labels. Split custom-category selection/removal into native sibling buttons and deduplicated wallet keys. Translation unit test and TypeScript pass. The observed red Next.js issue cannot be identified conclusively without browser console access; no overlay was hidden or disabled. An initial generated .next-dev routes file race caused one type-check failure; subsequent generated output and checks pass without source suppression.
 
+
+## 6. Settings navigation
+Added 500ms ease-out scrolling with measured top-bar offset, IntersectionObserver scrollspy, a shared-layout active pill, brief arrival tint, replaceState hashes and initial deep-link handling. Reduced motion skips scrolling animation, pulse and pill movement. User wheel/touch interrupts smooth scrolling. TypeScript passes; visual and keyboard browser checks pending access.
+
