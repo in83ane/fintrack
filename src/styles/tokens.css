@@ -245,3 +245,9 @@ html { scrollbar-gutter:stable; }
 .ft-section-arrived::after {content:'';position:absolute;inset:0;pointer-events:none;border-radius:16px;animation:ft-section-pulse 700ms ease-out;}
 @keyframes ft-section-pulse {0%{background:color-mix(in oklch,var(--ft-accent) 12%,transparent)}100%{background:transparent}}
 @media(prefers-reduced-motion:reduce){.ft-section-arrived::after {animation:none;}}
+
+/* One left-aligned page frame, beside the fixed rail. */
+.ft-page {width:100%;max-width:1440px;margin-inline:0 auto;padding:24px clamp(24px,3vw,48px) 32px;min-width:0;}
+.ft-settings-layout {grid-template-columns:220px minmax(0,1fr);gap:40px;}
+.ft-settings-layout > div {width:100%;max-width:960px;min-width:0;}
+@media(max-width:767px){.ft-settings-layout{grid-template-columns:minmax(0,1fr);gap:24px;}}

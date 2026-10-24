@@ -3,13 +3,13 @@
 import { FinanceIcon } from "@/src/components/FinanceIcon";
 import React, { useState, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { 
-  Plus, 
-  Download, 
-  Upload, 
-  Trash2, 
-  Search, 
-  ArrowUpRight, 
+import {
+  Plus,
+  Download,
+  Upload,
+  Trash2,
+  Search,
+  ArrowUpRight,
   ArrowDownLeft,
   FileText,
   CheckCircle2,
@@ -235,7 +235,7 @@ export default function TransactionsPage() {
       return {
         id: `bucket-${ba.id}`,
         type: ba.type === 'deposit' || ba.type === 'income_split' || ba.type === 'profit_split' ? 'BUY' :
-              ba.type === 'withdraw' ? 'SELL' : 'BUY',
+          ba.type === 'withdraw' ? 'SELL' : 'BUY',
         category: 'bucket',
         asset: bucket?.name || ba.bucketName,
         amount: ba.amount,
@@ -270,18 +270,18 @@ export default function TransactionsPage() {
   const txnBounds = getDateBounds(dateRange);
   const filteredTransactions = allTransactions.filter(txn => {
     const matchesSearch = txn.asset.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (txn.bucketName && txn.bucketName.toLowerCase().includes(searchTerm.toLowerCase()));
+      (txn.bucketName && txn.bucketName.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesFilter = filterType === "all" || txn.category === filterType;
     const matchesDate = isInRange(txn.date, txnBounds);
     return matchesSearch && matchesFilter && matchesDate;
   });
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-4 sm:space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tighter mb-1">{t("transactions") || "Ledger"}</h1>
+          <h1 className="text-2xl sm:text-3xl font-black text-foreground tracking-tighter mb-1">{t("transactions") || "Ledger"}</h1>
           <p className="text-gray-500 font-medium uppercase tracking-wide text-xs">{t("auditDetail")}</p>
         </div>
 
@@ -293,9 +293,9 @@ export default function TransactionsPage() {
         <div className="flex flex-wrap gap-2 items-center">
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-surface text-white rounded-xl font-bold text-xs uppercase tracking-wide border border-border hover:bg-white/5 transition-all"
+            className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-surface text-foreground rounded-xl font-bold text-xs uppercase tracking-wide border border-border hover:bg-foreground/5 transition-all"
           >
-            <Download size={14} className="text-[#4EDEA3]" />
+            <Download size={14} className="text-gain" />
             <span className="hidden sm:inline">{t("importCsv")}</span>
             <span className="sm:hidden">Import</span>
           </button>
@@ -309,16 +309,16 @@ export default function TransactionsPage() {
 
           <button
             onClick={handleExportCSV}
-            className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-surface text-white rounded-xl font-bold text-xs uppercase tracking-wide border border-border hover:bg-white/5 transition-all"
+            className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-surface text-foreground rounded-xl font-bold text-xs uppercase tracking-wide border border-border hover:bg-foreground/5 transition-all"
           >
-            <Upload size={14} className="text-[#ADC6FF]" />
+            <Upload size={14} className="text-info" />
             <span className="hidden sm:inline">{t("exportCsv")}</span>
             <span className="sm:hidden">Export</span>
           </button>
 
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-1.5 sm:gap-2 px-4 sm:px-5 py-2 sm:py-2.5 bg-[#4EDEA3] text-[#0E0E0E] rounded-xl font-black text-xs uppercase tracking-wide hover:brightness-110 transition-all shadow-lg shadow-[#4EDEA3]/10"
+            className="flex items-center gap-1.5 sm:gap-2 px-4 sm:px-5 py-2 sm:py-2.5 bg-primary text-primary-foreground rounded-xl font-black text-xs uppercase tracking-wide hover:brightness-110 transition-all shadow-lg shadow-[#4EDEA3]/10"
           >
             <Plus size={14} />
             <span className="hidden sm:inline">{t("addTrade")}</span>
@@ -329,25 +329,25 @@ export default function TransactionsPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4">
-        <div className="bg-surface p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-border">
-          <p className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide mb-1">{t("totalBalance")}</p>
-          <h3 className="text-xl sm:text-2xl font-black text-white tracking-tighter">
+        <div className="bg-surface p-4 sm:p-5 rounded-2xl sm:rounded-2xl border border-border">
+          <p className="text-xs sm:text-xs font-black text-gray-500 uppercase tracking-wide mb-1">{t("totalBalance")}</p>
+          <h3 className="text-xl sm:text-2xl font-black text-foreground tracking-tighter">
             {formatMoney(filteredTransactions.reduce((acc, t) => {
               const isInflow = t.type === 'BUY' ||
-                               (t.category === 'cash' && t.cashActivityType === 'INCOME') ||
-                               (t.category === 'bucket' && (t.bucketActivityType === 'deposit' || t.bucketActivityType === 'income_split' || t.bucketActivityType === 'profit_split'));
+                (t.category === 'cash' && t.cashActivityType === 'INCOME') ||
+                (t.category === 'bucket' && (t.bucketActivityType === 'deposit' || t.bucketActivityType === 'income_split' || t.bucketActivityType === 'profit_split'));
               const isOutflow = t.type === 'SELL' ||
-                                (t.category === 'cash' && t.cashActivityType === 'EXPENSE') ||
-                                (t.category === 'bucket' && (t.bucketActivityType === 'withdraw' || t.bucketActivityType === 'invest'));
+                (t.category === 'cash' && t.cashActivityType === 'EXPENSE') ||
+                (t.category === 'bucket' && (t.bucketActivityType === 'withdraw' || t.bucketActivityType === 'invest'));
               if (isInflow) return acc + t.amount;
               if (isOutflow) return acc - t.amount;
               return acc;
             }, 0))}
           </h3>
         </div>
-        <div className="bg-surface p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-border">
-          <p className="text-[10px] sm:text-xs font-black text-[#4EDEA3] uppercase tracking-wide mb-1">{t("buyVolume")}</p>
-          <h3 className="text-xl sm:text-2xl font-black text-white tracking-tighter">
+        <div className="bg-surface p-4 sm:p-5 rounded-2xl sm:rounded-2xl border border-border">
+          <p className="text-xs sm:text-xs font-black text-gain uppercase tracking-wide mb-1">{t("buyVolume")}</p>
+          <h3 className="text-xl sm:text-2xl font-black text-foreground tracking-tighter">
             {formatMoney(filteredTransactions.filter(t =>
               t.type === 'BUY' ||
               (t.category === 'cash' && t.cashActivityType === 'INCOME') ||
@@ -355,9 +355,9 @@ export default function TransactionsPage() {
             ).reduce((acc, t) => acc + t.amount, 0))}
           </h3>
         </div>
-        <div className="bg-surface p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-border">
-          <p className="text-[10px] sm:text-xs font-black text-[#FFB4AB] uppercase tracking-wide mb-1">{t("sellVolume")}</p>
-          <h3 className="text-xl sm:text-2xl font-black text-white tracking-tighter">
+        <div className="bg-surface p-4 sm:p-5 rounded-2xl sm:rounded-2xl border border-border">
+          <p className="text-xs sm:text-xs font-black text-loss uppercase tracking-wide mb-1">{t("sellVolume")}</p>
+          <h3 className="text-xl sm:text-2xl font-black text-foreground tracking-tighter">
             {formatMoney(filteredTransactions.filter(t =>
               t.type === 'SELL' ||
               (t.category === 'cash' && t.cashActivityType === 'EXPENSE') ||
@@ -365,34 +365,34 @@ export default function TransactionsPage() {
             ).reduce((acc, t) => acc + t.amount, 0))}
           </h3>
         </div>
-        <div className="bg-surface p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-border">
-          <p className="text-[10px] sm:text-xs font-black text-[#ADC6FF] uppercase tracking-wide mb-1">Expectancy</p>
-          <h3 className={`text-xl sm:text-2xl font-black tracking-tighter ${expectancy >= 0 ? 'text-[#4EDEA3]' : 'text-[#FFB4AB]'}`}>
+        <div className="bg-surface p-4 sm:p-5 rounded-2xl sm:rounded-2xl border border-border">
+          <p className="text-xs sm:text-xs font-black text-info uppercase tracking-wide mb-1">Expectancy</p>
+          <h3 className={`text-xl sm:text-2xl font-black tracking-tighter ${expectancy >= 0 ? 'text-gain' : 'text-loss'}`}>
             {formatMoney(expectancy)}
           </h3>
         </div>
-        <div className="bg-surface p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-border flex flex-col justify-between">
-          <p className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide mb-1">Max Streaks</p>
+        <div className="bg-surface p-4 sm:p-5 rounded-2xl sm:rounded-2xl border border-border flex flex-col justify-between">
+          <p className="text-xs sm:text-xs font-black text-gray-500 uppercase tracking-wide mb-1">Max Streaks</p>
           <div className="flex gap-4">
             <div>
-              <p className="text-[9px] text-gray-500 font-bold uppercase">WIN</p>
-              <h3 className="text-lg font-black text-[#4EDEA3]">{maxWinStreak}</h3>
+              <p className="text-xs text-gray-500 font-bold uppercase">WIN</p>
+              <h3 className="text-lg font-black text-gain">{maxWinStreak}</h3>
             </div>
             <div>
-              <p className="text-[9px] text-gray-500 font-bold uppercase">LOSS</p>
-              <h3 className="text-lg font-black text-[#FFB4AB]">{maxLossStreak}</h3>
+              <p className="text-xs text-gray-500 font-bold uppercase">LOSS</p>
+              <h3 className="text-lg font-black text-loss">{maxLossStreak}</h3>
             </div>
           </div>
         </div>
       </div>
 
       {/* Heatmap Section */}
-      <div className="bg-surface p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-border">
+      <div className="bg-surface p-4 sm:p-6 rounded-2xl sm:rounded-2xl border border-border">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Activity size={14} className="text-[#ADC6FF]" />
+            <Activity size={14} className="text-info" />
             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide">Activity Heat Map</h3>
-            <span className="text-[9px] text-gray-600 bg-white/5 px-2 py-0.5 rounded-full font-bold">
+            <span className="text-xs text-gray-600 bg-foreground/5 px-2 py-0.5 rounded-full font-bold">
               {format(heatmapDate, 'MMM yyyy')}
             </span>
           </div>
@@ -404,9 +404,9 @@ export default function TransactionsPage() {
                   key={offset}
                   onClick={() => setSelectedHeatmapMonth(offset)}
                   className={cn(
-                    "px-2 py-1 rounded-lg text-[10px] font-bold transition-all",
+                    "px-2 py-1 rounded-lg text-xs font-bold transition-all",
                     selectedHeatmapMonth === offset
-                      ? "bg-[#ADC6FF]/20 text-[#ADC6FF]"
+                      ? "bg-primary/20 text-primary"
                       : "text-gray-600 hover:text-gray-400"
                   )}
                 >
@@ -418,7 +418,7 @@ export default function TransactionsPage() {
         </div>
         <div className="grid grid-cols-7 gap-1 sm:gap-2">
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-            <div key={d} className="text-center text-[9px] sm:text-xs font-bold text-gray-500 uppercase">{d}</div>
+            <div key={d} className="text-center text-xs sm:text-xs font-bold text-gray-500 uppercase">{d}</div>
           ))}
           {Array.from({ length: firstDay }, (_, i) => (
             <div key={`empty-${i}`} className="aspect-square" />
@@ -431,29 +431,29 @@ export default function TransactionsPage() {
             const isProfit = (pl || 0) > 0;
             const isLoss = (pl || 0) < 0;
             const intensity = Math.min(1, count / 5);
-            
+
             return (
-              <div 
-                key={day} 
+              <div
+                key={day}
                 className={cn(
                   "aspect-square rounded-lg flex flex-col items-center justify-center relative group transition-all cursor-default",
-                  !hasData ? 'bg-white/[0.02]' :
-                  isProfit ? 'bg-[#4EDEA3]/20 text-[#4EDEA3]' :
-                  isLoss ? 'bg-[#FFB4AB]/20 text-[#FFB4AB]' :
-                  'bg-[#ADC6FF]/20 text-[#ADC6FF]'
+                  !hasData ? 'bg-foreground/[0.02]' :
+                    isProfit ? 'bg-gain/20 text-gain' :
+                      isLoss ? 'bg-loss/20 text-loss' :
+                        'bg-info/20 text-info'
                 )}
                 style={count > 0 ? { opacity: 0.4 + intensity * 0.6 } : {}}
               >
-                <span className="text-[9px] sm:text-xs font-bold opacity-60">{day}</span>
+                <span className="text-xs sm:text-xs font-bold opacity-60">{day}</span>
                 {hasData && (
-                  <span className="text-[7px] sm:text-[9px] font-black hidden sm:block">
-                    {pl !== undefined ? `${(pl || 0) > 0 ? '+' : ''}${Math.abs(pl || 0) >= 1000 ? `${((pl || 0)/1000).toFixed(1)}k` : (pl || 0).toFixed(0)}` : `${count}tx`}
+                  <span className="text-[7px] sm:text-xs font-black hidden sm:block">
+                    {pl !== undefined ? `${(pl || 0) > 0 ? '+' : ''}${Math.abs(pl || 0) >= 1000 ? `${((pl || 0) / 1000).toFixed(1)}k` : (pl || 0).toFixed(0)}` : `${count}tx`}
                   </span>
                 )}
                 {hasData && (
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 group-hover:opacity-100 bg-surface border border-border text-white text-[10px] px-2.5 py-1.5 rounded-xl whitespace-nowrap z-20 transition-opacity pointer-events-none shadow-xl">
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 group-hover:opacity-100 bg-surface border border-border text-foreground text-xs px-2.5 py-1.5 rounded-xl whitespace-nowrap z-20 transition-opacity pointer-events-none shadow-xl">
                     <p className="font-bold">{format(new Date(heatmapDate.getFullYear(), heatmapDate.getMonth(), day), 'MMM d')}</p>
-                    {pl !== undefined && <p className={cn("font-black", (pl || 0) >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>{(pl || 0) >= 0 ? '+' : ''}{formatMoney(pl || 0)}</p>}
+                    {pl !== undefined && <p className={cn("font-black", (pl || 0) >= 0 ? "text-gain" : "text-loss")}>{(pl || 0) >= 0 ? '+' : ''}{formatMoney(pl || 0)}</p>}
                     {count > 0 && <p className="text-gray-400">{count} transaction{count > 1 ? 's' : ''}</p>}
                   </div>
                 )}
@@ -463,17 +463,17 @@ export default function TransactionsPage() {
         </div>
         {/* Legend */}
         <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border">
-          <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-[#4EDEA3]/40" /><span className="text-[9px] text-gray-500 font-bold">Positive</span></div>
-          <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-[#FFB4AB]/40" /><span className="text-[9px] text-gray-500 font-bold">Negative</span></div>
-          <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-[#ADC6FF]/40" /><span className="text-[9px] text-gray-500 font-bold">Neutral/Trade</span></div>
+          <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-gain/40" /><span className="text-xs text-gray-500 font-bold">Positive</span></div>
+          <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-loss/40" /><span className="text-xs text-gray-500 font-bold">Negative</span></div>
+          <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-info/40" /><span className="text-xs text-gray-500 font-bold">Neutral/Trade</span></div>
         </div>
       </div>
 
       {/* 6-Month Category Spending Trends */}
       {categoryTrends.categories.length > 0 && (
-        <div className="bg-surface p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-border">
+        <div className="bg-surface p-4 sm:p-6 rounded-2xl sm:rounded-2xl border border-border">
           <div className="flex items-center gap-2 mb-4">
-            <BarChart3 size={14} className="text-[#E9C349]" />
+            <BarChart3 size={14} className="text-warning" />
             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide">6-Month Expense Trends by Category</h3>
           </div>
           <div className="space-y-4">
@@ -483,8 +483,8 @@ export default function TransactionsPage() {
               return (
                 <div key={cat}>
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">{cat}</span>
-                    <span className="text-[10px] font-black text-white">{formatMoney(total)} total</span>
+                    <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">{cat}</span>
+                    <span className="text-xs font-black text-foreground">{formatMoney(total)} total</span>
                   </div>
                   <div className="flex items-end gap-1 h-10">
                     {vals.map((v, i) => (
@@ -510,10 +510,10 @@ export default function TransactionsPage() {
               <div key={cat} className="p-2 rounded-xl" style={{ backgroundColor: `${color}10` }}>
                 <div className="flex items-center gap-1 mb-0.5">
                   <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
-                  <span className="text-[9px] font-black text-gray-400 uppercase truncate">{cat}</span>
+                  <span className="text-xs font-black text-gray-400 uppercase truncate">{cat}</span>
                 </div>
-                <p className="text-xs font-black text-white">{formatMoney(vals.reduce((s, v) => s + v, 0))}</p>
-                <p className="text-[8px] text-gray-600">
+                <p className="text-xs font-black text-foreground">{formatMoney(vals.reduce((s, v) => s + v, 0))}</p>
+                <p className="text-xs text-gray-600">
                   Avg {formatMoney(vals.filter(v => v > 0).length > 0 ? vals.reduce((s, v) => s + v, 0) / vals.filter(v => v > 0).length : 0)}/mo
                 </p>
               </div>
@@ -523,7 +523,7 @@ export default function TransactionsPage() {
       )}
 
       {/* Filters & Search */}
-      <div className="flex flex-col gap-3 sm:gap-4 items-stretch sm:items-center bg-surface p-3 sm:p-4 rounded-2xl sm:rounded-3xl border border-border">
+      <div className="flex flex-col gap-3 sm:gap-4 items-stretch sm:items-center bg-surface p-3 sm:p-4 rounded-2xl sm:rounded-2xl border border-border">
         <div className="relative w-full">
           <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
           <input
@@ -531,7 +531,7 @@ export default function TransactionsPage() {
             placeholder={t("searchTransactions") || "Search Ledger..."}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-background border-none rounded-xl sm:rounded-2xl py-2.5 sm:py-3 pl-10 sm:pl-12 pr-4 text-sm text-white focus:ring-2 focus:ring-[#4EDEA3]/20 transition-all"
+            className="w-full bg-background border-none rounded-xl sm:rounded-2xl py-2.5 sm:py-3 pl-10 sm:pl-12 pr-4 text-sm text-foreground focus:ring-2 focus:ring-primary/20 transition-all"
           />
         </div>
         <div className="flex gap-2 w-full">
@@ -539,15 +539,14 @@ export default function TransactionsPage() {
             <button
               key={type}
               onClick={() => setFilterType(type)}
-              className={`flex-1 px-3 sm:px-6 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl text-xs font-bold uppercase tracking-wide transition-all ${
-                filterType === type
+              className={`flex-1 px-3 sm:px-6 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl text-xs font-bold uppercase tracking-wide transition-all ${filterType === type
                   ? type === 'trade'
-                    ? "bg-[#4EDEA3] text-[#0E0E0E]"
+                    ? "bg-primary text-primary-foreground"
                     : type === 'bucket'
-                      ? "bg-[#ADC6FF] text-[#0E0E0E]"
-                      : "bg-surface text-white border border-border"
-                  : "bg-background text-gray-500 hover:text-white"
-              }`}
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-surface text-foreground border border-border"
+                  : "bg-background text-gray-500 hover:text-foreground"
+                }`}
             >
               {type === 'all' ? t('all') : type === 'trade' ? 'Trades' : 'Buckets'}
             </button>
@@ -561,21 +560,21 @@ export default function TransactionsPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-border">
-                <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide">{t("date")}</th>
-                <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide">{t("asset")}</th>
-                <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide">{t("flow")}</th>
-                <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide hidden sm:table-cell">{t("sourceBucket")}</th>
-                <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide">{t("amount")}</th>
-                <th className="px-3 sm:px-6 py-3 sm:py-4 text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide text-right">{t("actions")}</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-xs font-black text-gray-500 uppercase tracking-wide">{t("date")}</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-xs font-black text-gray-500 uppercase tracking-wide">{t("asset")}</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-xs font-black text-gray-500 uppercase tracking-wide">{t("flow")}</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-xs font-black text-gray-500 uppercase tracking-wide hidden sm:table-cell">{t("sourceBucket")}</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-xs font-black text-gray-500 uppercase tracking-wide">{t("amount")}</th>
+                <th className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-xs font-black text-gray-500 uppercase tracking-wide text-right">{t("actions")}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5">
+            <tbody className="divide-y divide-foreground/5">
               {filteredTransactions.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-3 sm:px-6 py-12 sm:py-16 text-center">
                     <div className="flex flex-col items-center gap-3 sm:gap-4 opacity-20">
-                      <FileText size={32} className="text-white" />
-                      <p className="text-xs text-white font-bold uppercase tracking-wide">{t("noTransactionsFound") || "No Ledgers Found"}</p>
+                      <FileText size={32} className="text-foreground" />
+                      <p className="text-xs text-foreground font-bold uppercase tracking-wide">{t("noTransactionsFound") || "No Ledgers Found"}</p>
                     </div>
                   </td>
                 </tr>
@@ -585,7 +584,7 @@ export default function TransactionsPage() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     key={txn.id}
-                    className="hover:bg-white/[0.02] transition-colors group cursor-pointer"
+                    className="hover:bg-foreground/[0.02] transition-colors group cursor-pointer"
                     onClick={() => {
                       if (txn.category === 'trade') {
                         const trade = trades.find(t => `trade-${t.id}` === txn.id);
@@ -595,50 +594,48 @@ export default function TransactionsPage() {
                   >
                     <td className="px-3 sm:px-6 py-3 sm:py-4">
                       <div className="flex flex-col">
-                        <span className="text-[10px] sm:text-xs text-gray-400 font-medium">
+                        <span className="text-xs sm:text-xs text-gray-400 font-medium">
                           {format(new Date(txn.date), 'MMM dd, yyyy')}
                         </span>
-                        <span className="text-[9px] text-gray-600">
+                        <span className="text-xs text-gray-600">
                           {format(new Date(txn.date), 'HH:mm')}
                         </span>
                       </div>
                     </td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4">
                       <div className="relative flex items-center gap-2 sm:gap-3">
-                        <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center ${
-                          txn.category === 'bucket' ? 'bg-[#ADC6FF]/10 text-[#ADC6FF]' :
-                          txn.category === 'cash' ? 'bg-[#E9C349]/10 text-[#E9C349]' :
-                          txn.type === 'SELL' ? 'bg-[#FFB4AB]/10 text-[#FFB4AB]' : 'bg-[#4EDEA3]/10 text-[#4EDEA3]'
-                        }`}>
+                        <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center ${txn.category === 'bucket' ? 'bg-info/10 text-info' :
+                            txn.category === 'cash' ? 'bg-warning/10 text-warning' :
+                              txn.type === 'SELL' ? 'bg-loss/10 text-loss' : 'bg-gain/10 text-gain'
+                          }`}>
                           {txn.category === 'bucket' ? <FileText size={12} /> :
-                           txn.category === 'cash' ? <AlertCircle size={12} /> :
-                           txn.type === 'SELL' ? <ArrowDownLeft size={12} /> : <ArrowUpRight size={12} />}
+                            txn.category === 'cash' ? <AlertCircle size={12} /> :
+                              txn.type === 'SELL' ? <ArrowDownLeft size={12} /> : <ArrowUpRight size={12} />}
                         </div>
                         <div className="flex flex-col min-w-0">
-                          <span className="text-xs font-bold text-white truncate">{txn.asset}</span>
-                          <span className="text-[9px] text-gray-500 uppercase">
+                          <span className="text-xs font-bold text-foreground truncate">{txn.asset}</span>
+                          <span className="text-xs text-gray-500 uppercase">
                             {txn.category === 'trade' ? 'Trade' : txn.category === 'bucket' ? 'Bucket' : 'Cash'}
                           </span>
                         </div>
                         {/* Trade icon at bottom-left — small asset initial badge */}
                         <div
-                          className="absolute -bottom-1 left-0 flex items-center justify-center rounded-md text-[8px] font-black leading-none select-none pointer-events-none"
+                          className="absolute -bottom-1 left-0 flex items-center justify-center rounded-md text-xs font-black leading-none select-none pointer-events-none"
                           style={{
                             width: '14px',
                             height: '14px',
                             backgroundColor:
                               txn.category === 'bucket' ? 'rgba(173,198,255,0.15)' :
-                              txn.category === 'cash' ? 'rgba(233,195,73,0.15)' :
-                              txn.type === 'SELL' ? 'rgba(255,180,171,0.15)' : 'rgba(78,222,163,0.15)',
+                                txn.category === 'cash' ? 'rgba(233,195,73,0.15)' :
+                                  txn.type === 'SELL' ? 'rgba(255,180,171,0.15)' : 'rgba(78,222,163,0.15)',
                             color:
                               txn.category === 'bucket' ? '#ADC6FF' :
-                              txn.category === 'cash' ? '#E9C349' :
-                              txn.type === 'SELL' ? '#FFB4AB' : '#4EDEA3',
-                            border: `1px solid ${
-                              txn.category === 'bucket' ? 'rgba(173,198,255,0.25)' :
-                              txn.category === 'cash' ? 'rgba(233,195,73,0.25)' :
-                              txn.type === 'SELL' ? 'rgba(255,180,171,0.25)' : 'rgba(78,222,163,0.25)'
-                            }`,
+                                txn.category === 'cash' ? '#E9C349' :
+                                  txn.type === 'SELL' ? '#FFB4AB' : '#4EDEA3',
+                            border: `1px solid ${txn.category === 'bucket' ? 'rgba(173,198,255,0.25)' :
+                                txn.category === 'cash' ? 'rgba(233,195,73,0.25)' :
+                                  txn.type === 'SELL' ? 'rgba(255,180,171,0.25)' : 'rgba(78,222,163,0.25)'
+                              }`,
                           }}
                           title={txn.asset}
                         >
@@ -650,15 +647,14 @@ export default function TransactionsPage() {
                       </div>
                     </td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wide ${
-                        txn.category === 'bucket' ? 'bg-[#ADC6FF]/10 text-[#ADC6FF]' :
-                        txn.category === 'cash' && txn.cashActivityType === 'INCOME' ? 'bg-[#4EDEA3]/10 text-[#4EDEA3]' :
-                        txn.category === 'cash' ? 'bg-[#FFB4AB]/10 text-[#FFB4AB]' :
-                        txn.type === 'BUY' ? 'bg-[#4EDEA3]/10 text-[#4EDEA3]' :
-                        txn.type === 'SELL' ? 'bg-[#FFB4AB]/10 text-[#FFB4AB]' :
-                        txn.type === 'IMPORT' ? 'bg-[#ADC6FF]/10 text-[#ADC6FF]' :
-                        'bg-white/10 text-white'
-                      }`}>
+                      <span className={`px-2 py-0.5 rounded-full text-xs sm:text-xs font-bold uppercase tracking-wide ${txn.category === 'bucket' ? 'bg-info/10 text-info' :
+                          txn.category === 'cash' && txn.cashActivityType === 'INCOME' ? 'bg-gain/10 text-gain' :
+                            txn.category === 'cash' ? 'bg-loss/10 text-loss' :
+                              txn.type === 'BUY' ? 'bg-gain/10 text-gain' :
+                                txn.type === 'SELL' ? 'bg-loss/10 text-loss' :
+                                  txn.type === 'IMPORT' ? 'bg-info/10 text-info' :
+                                    'bg-foreground/10 text-foreground'
+                        }`}>
                         {txn.bucketActivityType || txn.cashActivityType || txn.type}
                       </span>
                     </td>
@@ -673,13 +669,12 @@ export default function TransactionsPage() {
                       )}
                     </td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4">
-                      <span className={`text-sm sm:text-base font-black tracking-tighter ${
-                        txn.category === 'cash' && txn.cashActivityType === 'INCOME' ? 'text-[#4EDEA3]' :
-                        txn.category === 'cash' ? 'text-[#FFB4AB]' :
-                        txn.type === 'BUY' ? 'text-[#4EDEA3]' :
-                        txn.type === 'SELL' ? 'text-[#FFB4AB]' :
-                        'text-[#ADC6FF]'
-                      }`}>
+                      <span className={`text-sm sm:text-base font-black tracking-tighter ${txn.category === 'cash' && txn.cashActivityType === 'INCOME' ? 'text-gain' :
+                          txn.category === 'cash' ? 'text-loss' :
+                            txn.type === 'BUY' ? 'text-gain' :
+                              txn.type === 'SELL' ? 'text-loss' :
+                                'text-info'
+                        }`}>
                         {txn.type === 'BUY' || (txn.category === 'cash' && txn.cashActivityType === 'INCOME') ? '+' : '-'}
                         {formatMoney(txn.amount, txn.currency as any, txn.rateAtTime, txn.originalAmount)}
                       </span>
@@ -694,7 +689,7 @@ export default function TransactionsPage() {
                               if (trade) handleViewDetails(trade);
                             }
                           }}
-                          className="p-1.5 sm:p-2 text-gray-500 hover:text-[#ADC6FF] hover:bg-[#ADC6FF]/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                          className="p-1.5 sm:p-2 text-gray-500 hover:text-primary hover:bg-primary/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
                           title={t("transactionDetails") || "View Details"}
                         >
                           <FileText size={14} />
@@ -706,7 +701,7 @@ export default function TransactionsPage() {
                               const trade = trades.find(t => `trade-${t.id}` === txn.id);
                               if (trade) handleDeleteTrade(trade.id);
                             }}
-                            className="p-1.5 sm:p-2 text-gray-500 hover:text-[#FFB4AB] hover:bg-[#FFB4AB]/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                            className="p-1.5 sm:p-2 text-gray-500 hover:text-loss hover:bg-loss/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
                           >
                             <Trash2 size={14} />
                           </button>
@@ -734,15 +729,14 @@ export default function TransactionsPage() {
       {/* Notifications */}
       <AnimatePresence>
         {notification && (
-          <motion.div 
+          <motion.div
             initial={{ y: 50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 50, opacity: 0 }}
-            className={`fixed bottom-8 right-8 z-[100] flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl border ${
-              notification.type === 'success' 
-                ? "bg-background border-[#4EDEA3]/20 text-[#4EDEA3]" 
-                : "bg-background border-[#FFB4AB]/20 text-[#FFB4AB]"
-            }`}
+            className={`fixed bottom-8 right-8 z-[100] flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl border ${notification.type === 'success'
+                ? "bg-background border-gain/20 text-gain"
+                : "bg-background border-loss/20 text-loss"
+              }`}
           >
             {notification.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
             <span className="text-xs font-bold uppercase tracking-wide">{notification.message}</span>

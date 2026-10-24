@@ -1,8 +1,9 @@
 "use client";
 
 import { BUCKET_ICON_OPTIONS, resolveFinanceIcon } from "@/src/lib/finance-icons";
+import { GoalScenario } from "@/src/components/GoalScenario";
 import { FinanceIcon } from "@/src/components/FinanceIcon";
-import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Plus,
   ArrowDownToLine,
@@ -20,8 +21,6 @@ import {
   Info,
   Wallet,
   MoreHorizontal,
-  ChevronLeft,
-  ChevronRight,
   Banknote,
   PiggyBank,
   Check,
@@ -98,7 +97,7 @@ export default function BudgetPage() {
     if (!isFxCurrency(bucket.currency) || !Number.isFinite(amount)) return 'unresolved';
     const bCur = bucketCurrency(bucket) as "USD" | "THB";
     const targetCur = currency as "USD" | "THB";
-    
+
     if (bCur === targetCur) {
       return formatDisplay(amount, targetCur);
     } else {
@@ -113,7 +112,7 @@ export default function BudgetPage() {
     if (newCur === inputCurrency) return;
     if (editingBucket) { addToast('เปลี่ยนสกุล Bucket เดิมไม่ได้ ต้องบันทึกการแลกเงินจริง', 'error'); return; }
     setBucketForm(prev => ({ ...prev, targetAmount: '', currentAmount: '' }));
-    
+
     setInputCurrency(newCur);
   };
 
@@ -131,10 +130,10 @@ export default function BudgetPage() {
   const [isBucketModalOpen, setIsBucketModalOpen] = useState(false);
   const [bucketToDelete, setBucketToDelete] = useState<string | null>(null);
   const [editingBucket, setEditingBucket] = useState<string | null>(null);
-  
+
   const [selectedActivity, setSelectedActivity] = useState<any>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  
+
   const handleViewDetails = (activity: any) => {
     setSelectedActivity({
       id: activity.id,
@@ -185,34 +184,6 @@ export default function BudgetPage() {
   };
 
 
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
-  const [isCarouselHovered, setIsCarouselHovered] = useState(false);
-
-  const carouselRef = useRef<HTMLDivElement>(null);
-
-  const updateScrollState = useCallback(() => {
-    const el = carouselRef.current;
-    if (!el) return;
-    setCanScrollLeft(el.scrollLeft > 8);
-    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 8);
-  }, []);
-
-  useEffect(() => {
-    const el = carouselRef.current;
-    if (!el) return;
-    // Reset scroll to start so the first (leftmost) card is visible on mount
-    el.scrollLeft = 0;
-    updateScrollState();
-    el.addEventListener("scroll", updateScrollState, { passive: true });
-    const ro = new ResizeObserver(updateScrollState);
-    ro.observe(el);
-    return () => {
-      el.removeEventListener("scroll", updateScrollState);
-      ro.disconnect();
-    };
-  }, [updateScrollState, moneyBuckets]);
-
   const nativeTotal = useMemo(() => {
     try { return sumNativeMoney(moneyBuckets.map(b => ({ amount: b.currentAmount, currency: bucketCurrency(b) })), currency === 'THB' ? 'THB' : 'USD', String(exchangeRates.THB)); }
     catch { return null; }
@@ -222,16 +193,6 @@ export default function BudgetPage() {
 
   const canAddMoreBuckets = totalTargetPercent < 100;
   const remainingPercent = Math.max(0, 100 - totalTargetPercent);
-
-  const scrollCarousel = (direction: "left" | "right") => {
-    if (carouselRef.current) {
-      const scrollAmount = 400;
-      carouselRef.current.scrollBy({
-        left: direction === "left" ? -scrollAmount : scrollAmount,
-        behavior: "smooth",
-      });
-    }
-  };
 
   const incomeNum = parseFloat(incomeAmount) || 0;
   const incomePreview = moneyBuckets.map((b) => ({
@@ -357,7 +318,7 @@ export default function BudgetPage() {
     if (!transferModal) return;
     const { sourceBucketId, destinationBucketId, amount, currency: inputCur, note } = transferModal;
     const transferAmount = parseFloat(amount);
-    
+
     if (transferAmount <= 0 || isNaN(transferAmount)) return;
     if (sourceBucketId === destinationBucketId) {
       addToast(t("errorOccurred") || "Source and destination cannot be the same", "error");
@@ -366,7 +327,7 @@ export default function BudgetPage() {
 
     const sourceBucket = moneyBuckets.find(b => b.id === sourceBucketId);
     const destBucket = moneyBuckets.find(b => b.id === destinationBucketId);
-    
+
     if (!sourceBucket || !destBucket) return;
     if (!validateNativeBuckets([sourceBucket, destBucket], inputCur)) return;
 
@@ -445,7 +406,7 @@ export default function BudgetPage() {
     const otherBucketsPercent = totalTargetPercent - (editingBucket ? (moneyBuckets.find(b => b.id === editingBucket)?.targetPercent || 0) : 0);
     const maxAllowed = Math.max(1, 100 - otherBucketsPercent);
     const safePercent = Math.min(Math.max(1, Number(bucketForm.targetPercent) || 1), maxAllowed);
-    
+
     const targetAmount = Number(bucketForm.targetAmount) || 0;
     const currentAmount = Number(bucketForm.currentAmount) || 0;
 
@@ -482,23 +443,23 @@ export default function BudgetPage() {
     const bucket = moneyBuckets.find((b) => b.id === actionModal.id);
     if (!bucket) return;
     if (!validateNativeBuckets([bucket], actionCurrency)) return;
-    
+
     const targetCurrency = bucketCurrency(bucket) as "USD" | "THB";
     const bucketAmount = bucketNativeAmount({ original_amount: displayVal, currency: actionCurrency }, bucket.currency);
-    
+
     if (actionModal.type === "withdraw" && bucketAmount > bucket.currentAmount) {
       addToast(t("amountExceedsBalance"), "error");
       return;
     }
-    
+
     const newAmount =
       actionModal.type === "deposit"
         ? bucket.currentAmount + bucketAmount
         : Math.max(0, bucket.currentAmount - bucketAmount);
-        
+
     const now = new Date().toISOString();
     updateMoneyBucket(bucket.id, { currentAmount: newAmount });
-    
+
     addBucketActivity({
       bucketId: bucket.id,
       bucketName: bucket.name,
@@ -510,7 +471,7 @@ export default function BudgetPage() {
       rateAtTime: exchangeRates[actionCurrency] || 1,
       originalAmount: displayVal,
     });
-    
+
     // Add cash activity so Ledger acts as the Single Source of Truth
     const amtUSD = toUSD(displayVal, actionCurrency);
     addCashActivity({
@@ -524,7 +485,7 @@ export default function BudgetPage() {
       rateAtTime: exchangeRates[actionCurrency] || 1,
       originalAmount: displayVal,
     });
-    
+
     addToast(`${actionModal.type === "deposit" ? t("deposit") : t("withdraw")} ${formatDisplay(displayVal)} ${actionCurrency}`, "success");
     setActionModal(null);
     setActionAmount("");
@@ -554,15 +515,12 @@ export default function BudgetPage() {
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-4 sm:space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
       <style>{hideSpinnerStyle}</style>
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-          <span className="text-[#E9C349] uppercase tracking-wide text-xs font-black mb-1 block">
-            {t("moneyManagement")}
-          </span>
-          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tighter mb-1">{t("budgetPage")}</h1>
+          <h1 className="text-2xl sm:text-3xl font-black text-foreground tracking-tighter mb-1">{t("budgetPage")}</h1>
           <p className="text-gray-500 font-medium text-xs tracking-wide">ธนาคารกลางของคุณ · ใช้เงินจาก Bucket โอนเข้าบัญชีเงินสดของทุกพอร์ตลงทุนได้</p>
         </motion.div>
         <div className="flex gap-2 flex-wrap">
@@ -581,7 +539,7 @@ export default function BudgetPage() {
             className={cn(
               "px-4 py-2.5 rounded-2xl font-black text-xs uppercase tracking-wide transition-all flex items-center gap-2",
               canAddMoreBuckets
-                ? "bg-[#E9C349] text-[#241a00] hover:brightness-110"
+                ? "bg-primary text-primary-foreground hover:brightness-110"
                 : "bg-gray-600 text-gray-400 cursor-not-allowed"
             )}
           >
@@ -593,15 +551,14 @@ export default function BudgetPage() {
       </div>
 
       {/* Total Net Worth Card with Ring Chart */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-gradient-to-br from-[#1C1B1B] to-[#141414] rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-border relative overflow-hidden">
-        <div className="absolute -right-8 -top-8 w-32 h-32 bg-[#E9C349]/5 blur-3xl rounded-full" />
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-surface rounded-2xl sm:rounded-2xl p-4 sm:p-6 border border-border relative overflow-hidden">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between relative z-10 gap-4">
           <div className="flex-1">
             <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">{t("bucketTotal")}</span>
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white tracking-tighter">{nativeTotal ? nativeFormat(decimal(nativeTotal.amount), nativeTotal.currency) : 'unresolved'}</h2>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground tracking-tighter">{nativeTotal ? nativeFormat(decimal(nativeTotal.amount), nativeTotal.currency) : 'unresolved'}</h2>
             <div className="flex items-center gap-3 mt-1">
               <span className="text-xs font-bold text-gray-500">{moneyBuckets.length} {t("buckets")}</span>
-              <span className={cn("text-xs font-bold", totalTargetPercent === 100 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
+              <span className={cn("text-xs font-bold", totalTargetPercent === 100 ? "text-gain" : "text-loss")}>
                 {totalTargetPercent}% {t("total")}
               </span>
             </div>
@@ -650,7 +607,7 @@ export default function BudgetPage() {
             </div>
           )}
         </div>
-        <div className="h-2.5 sm:h-3 bg-white/5 rounded-full overflow-hidden flex mt-4">
+        <div className="h-2.5 sm:h-3 bg-foreground/5 rounded-full overflow-hidden flex mt-4">
           {moneyBuckets.map((b) => (
             <motion.div
               key={b.id}
@@ -666,38 +623,23 @@ export default function BudgetPage() {
           {moneyBuckets.map((b) => (
             <div key={b.id} className="flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full" style={{ backgroundColor: b.color }} />
-              <span className="text-[10px] font-bold text-gray-400">{t(b.name) || b.name} {b.targetPercent}%</span>
+              <span className="text-xs font-bold text-gray-400">{t(b.name) || b.name} {b.targetPercent}%</span>
             </div>
           ))}
         </div>
       </motion.div>
 
-      {/* Account Cards - Grouped Layout */}
-      <div
-        className="relative mb-6 max-w-full sm:mb-8"
-        onMouseEnter={() => setIsCarouselHovered(true)}
-        onMouseLeave={() => setIsCarouselHovered(false)}
-      >
-        {/* Edge fade shadows — only show when there's content hidden in that direction */}
-        {canScrollLeft && (
-          <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-20 z-10 bg-gradient-to-r from-black/40 to-transparent hidden sm:block" />
-        )}
-        {canScrollRight && (
-          <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-20 z-10 bg-gradient-to-l from-black/40 to-transparent hidden sm:block" />
-        )}
-
-        <div
-          ref={carouselRef}
-          className="flex max-w-full gap-4 overflow-x-auto overscroll-x-contain px-1 py-3 pb-5 scrollbar-none snap-x snap-mandatory sm:gap-6"
-        >
+      {/* Account cards wrap without horizontal scrolling. */}
+      <div className="mb-6 sm:mb-8">
+        <div className="ft-bucket-grid">
           {moneyBuckets.map((bucket) => {
-            const actualPct = (bucket.targetAmount && bucket.targetAmount > 0) 
-              ? (bucket.currentAmount / bucket.targetAmount) * 100 
+            const actualPct = (bucket.targetAmount && bucket.targetAmount > 0)
+              ? (bucket.currentAmount / bucket.targetAmount) * 100
               : (totalAllocated > 0 ? ((bucket.currentAmount / (exchangeRates[bucket.currency || 'USD'] || 1)) / totalAllocated) * 100 : 0);
-            
-            const textColor = '#f3f4f6';
-            const textColorMuted = '#a5adba';
-            if (!isFxCurrency(bucket.currency) || !Number.isFinite(bucket.currentAmount)) return <div key={bucket.id} className="rounded-2xl border border-white/10 p-5 text-gray-400">{bucket.name} · unresolved</div>;
+
+            const textColor = 'var(--ft-ink)';
+            const textColorMuted = 'var(--ft-muted)';
+            if (!isFxCurrency(bucket.currency) || !Number.isFinite(bucket.currentAmount)) return <div key={bucket.id} className="rounded-2xl border border-foreground/10 p-5 text-gray-400">{bucket.name} · unresolved</div>;
             const denomination = bucket.currency;
 
             return (
@@ -705,43 +647,32 @@ export default function BudgetPage() {
                 key={bucket.id}
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="group relative flex-shrink-0 snap-start w-[calc(100vw-2rem)] max-w-[20rem] sm:w-[19rem] sm:max-w-none"
-                style={{ willChange: "transform", minHeight: '19rem' }}
+                className="group relative min-w-0"
+                style={{ minHeight: '19rem' }}
               >
                 {/* ===== CREDIT CARD FACE ===== */}
                 <div
-                  className="relative w-full h-full min-h-[19rem] rounded-2xl sm:rounded-[1.5rem] border border-white/10 overflow-hidden shadow-xl transition-all duration-300"
+                  className="relative w-full h-full min-h-[19rem] rounded-2xl sm:rounded-[1.5rem] border border-foreground/10 overflow-hidden shadow-xl transition-all duration-300"
                   style={{
-                    background: `linear-gradient(145deg, ${bucket.color}30, #181b21 65%)`,
+                    background: "var(--ft-panel)",
                   }}
                 >
-                  {/* Decorative blobs */}
-                  <div className="absolute -top-8 -right-8 w-36 h-36 rounded-full opacity-20 blur-2xl" style={{ backgroundColor: 'white' }} />
-                  <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full opacity-10 blur-xl" style={{ backgroundColor: 'white' }} />
-                  {/* Subtle grid pattern */}
-                  <div
-                    className="absolute inset-0 opacity-[0.04]"
-                    style={{
-                      backgroundImage: `repeating-linear-gradient(45deg, white 0, white 1px, transparent 0, transparent 50%)`,
-                      backgroundSize: '10px 10px',
-                    }}
-                  />
-
                   {/* Card content */}
                   <div className="relative z-10 min-h-[19rem] h-full flex flex-col justify-between gap-4 p-4 sm:p-5">
                     {/* Top: name + icon badge */}
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-[0.6rem] font-black uppercase tracking-[0.2em] mb-0.5" style={{ color: textColorMuted }}>
-                          {bucket.targetPercent}% {language === "th" ? "จัดสรรรายได้" : "Income split"}
-                        </p>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 [overflow-wrap:anywhere]">
+
                         <h3 className="font-black text-sm sm:text-base tracking-tight leading-tight" style={{ color: textColor }}>
                           {t(bucket.name) || bucket.name}
                         </h3>
+                        <p className="text-xs font-black mt-1" style={{ color: textColorMuted }}>
+                          {bucket.targetPercent}% {language === "th" ? "จัดสรรรายได้" : "Income split"}
+                        </p>
                       </div>
                       <div
                         className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-xl shadow-lg flex-shrink-0"
-                        style={{ backgroundColor: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(8px)' }}
+                        style={{ backgroundColor: 'var(--ft-raised)' }}
                       >
                         <FinanceIcon name={bucket.icon} />
                       </div>
@@ -751,14 +682,14 @@ export default function BudgetPage() {
 
                     {/* Middle: amount + progress */}
                     <div className="space-y-1.5 mb-auto mt-2 sm:mt-4">
-                      <p className="text-[0.55rem] font-black uppercase tracking-[0.18em]" style={{ color: textColorMuted }}>
+                      <p className="text-xs font-black uppercase tracking-[0.18em]" style={{ color: textColorMuted }}>
                         {bucket.targetAmount && bucket.targetAmount > 0 ? t("savings") : t("currentAmount")}
                       </p>
                       <div className="flex flex-wrap items-baseline gap-x-2">
-                        <span className="text-2xl sm:text-3xl font-black tracking-tight tabular-nums" style={{ color: textColor }}>{formatBucketAmount(bucket, bucket.currentAmount)}</span>
+                        <span className="min-w-0 max-w-full [overflow-wrap:anywhere] text-2xl sm:text-3xl font-black tracking-tight tabular-nums" style={{ color: textColor }}>{formatBucketAmount(bucket, bucket.currentAmount)}</span>
                         {denomination !== currency && <span className="text-xs font-bold" style={{ color: textColorMuted }}>{nativeFormat(decimal(bucket.currentAmount), denomination)}</span>}
                       </div>
-                      <div className="flex items-center justify-between gap-2 text-[11px]" style={{ color: textColorMuted }}>
+                      <div className="flex items-center justify-between gap-2 text-xs" style={{ color: textColorMuted }}>
                         <span>{bucket.targetAmount && bucket.targetAmount > 0 ? `เป้าหมาย ${formatDisplay(bucket.targetAmount, denomination)}` : 'สัดส่วนเงินใน Bucket'}</span>
                         <span className="shrink-0 font-bold">{actualPct.toFixed(0)}%</span>
                       </div>
@@ -770,12 +701,13 @@ export default function BudgetPage() {
                       </div>
                     </div>
 
+                    {!!bucket.targetAmount && bucket.targetAmount > 0 && <GoalScenario target={bucket.targetAmount} current={bucket.currentAmount} format={n => formatDisplay(n, denomination)} />}
                     {/* Action buttons inside card */}
-                    <div className="mt-auto pt-3 border-t border-white/10 space-y-2.5">
+                    <div className="mt-auto pt-3 border-t border-foreground/10 space-y-2.5">
                       {(bucket.targetAmount && bucket.targetAmount > 0 && bucket.currentAmount > bucket.targetAmount) ? (
-                        <div 
-                          className="text-[9px] sm:text-[10px] font-bold px-2 py-1 rounded-lg inline-flex items-center gap-1 cursor-pointer transition-colors"
-                          style={{ backgroundColor: 'rgba(255,255,255,0.12)', color: textColor }}
+                        <div
+                          className="text-xs sm:text-xs font-bold px-2 py-1 rounded-lg inline-flex items-center gap-1 cursor-pointer transition-colors"
+                          style={{ backgroundColor: 'var(--ft-raised)', color: 'var(--ft-accent)' }}
                           onClick={(e) => {
                             e.stopPropagation();
                             openInvestmentTransfer(bucket.id);
@@ -785,67 +717,67 @@ export default function BudgetPage() {
                         </div>
                       ) : null}
 
-                        <div className="flex gap-1.5">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActionModal({ id: bucket.id, type: "deposit" });
-                              setActionAmount("");
-                              setActionNote("");
-                            }}
-                            className="flex-1 min-h-10 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5"
-                            style={{ backgroundColor: 'rgba(255,255,255,0.12)', color: textColor }}
-                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.22)')}
-                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.12)')}
-                          >
-                            <ArrowDownToLine size={11} />
-                            {t("deposit")}
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActionModal({ id: bucket.id, type: "withdraw" });
-                              setActionAmount("");
-                              setActionNote("");
-                            }}
-                            className="flex-1 min-h-10 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5"
-                            style={{ backgroundColor: 'rgba(255,255,255,0.12)', color: textColor }}
-                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.22)')}
-                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.12)')}
-                          >
-                            <ArrowUpFromLine size={11} />
-                            {t("withdraw")}
-                          </button>
-                        </div>
-                        <div className="flex gap-1.5">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openInvestmentTransfer(bucket.id);
-                            }}
-                            className="flex-1 min-h-10 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5"
-                            style={{ backgroundColor: 'rgba(255,255,255,0.12)', color: textColor }}
-                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.22)')}
-                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.12)')}
-                          >
-                            <Rocket size={11} />
-                            โอนไปพอร์ต
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setTransferModal({ sourceBucketId: bucket.id, destinationBucketId: "", amount: "", currency: currency as "USD" | "THB", note: "" });
-                            }}
-                            className="min-h-10 min-w-10 rounded-xl font-bold text-xs transition-all flex items-center justify-center"
-                            style={{ backgroundColor: 'rgba(255,255,255,0.12)', color: textColor }}
-                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.22)')}
-                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.12)')}
-                            title="โอนระหว่าง Bucket"
-                            aria-label="โอนระหว่าง Bucket"
-                          >
-                            <ArrowRightLeft size={11} />
-                          </button>
-                        </div>
+                      <div className="flex gap-1.5">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActionModal({ id: bucket.id, type: "deposit" });
+                            setActionAmount("");
+                            setActionNote("");
+                          }}
+                          className="flex-1 min-h-10 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5"
+                          style={{ backgroundColor: 'var(--ft-raised)', color: 'var(--ft-accent)' }}
+                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--ft-overlay)')}
+                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--ft-raised)')}
+                        >
+                          <ArrowDownToLine size={11} />
+                          {t("deposit")}
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActionModal({ id: bucket.id, type: "withdraw" });
+                            setActionAmount("");
+                            setActionNote("");
+                          }}
+                          className="flex-1 min-h-10 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5"
+                          style={{ backgroundColor: 'var(--ft-raised)', color: 'var(--ft-accent)' }}
+                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--ft-overlay)')}
+                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--ft-raised)')}
+                        >
+                          <ArrowUpFromLine size={11} />
+                          {t("withdraw")}
+                        </button>
+                      </div>
+                      <div className="flex gap-1.5">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openInvestmentTransfer(bucket.id);
+                          }}
+                          className="flex-1 min-h-10 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5"
+                          style={{ backgroundColor: 'var(--ft-raised)', color: 'var(--ft-accent)' }}
+                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--ft-overlay)')}
+                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--ft-raised)')}
+                        >
+                          <Rocket size={11} />
+                          โอนไปพอร์ต
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setTransferModal({ sourceBucketId: bucket.id, destinationBucketId: "", amount: "", currency: currency as "USD" | "THB", note: "" });
+                          }}
+                          className="min-h-10 min-w-10 rounded-xl font-bold text-xs transition-all flex items-center justify-center"
+                          style={{ backgroundColor: 'var(--ft-raised)', color: 'var(--ft-accent)' }}
+                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--ft-overlay)')}
+                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--ft-raised)')}
+                          title="โอนระหว่าง Bucket"
+                          aria-label="โอนระหว่าง Bucket"
+                        >
+                          <ArrowRightLeft size={11} />
+                        </button>
+                      </div>
                     </div>
 
                     {/* Deposit/Withdraw overlay */}
@@ -862,10 +794,10 @@ export default function BudgetPage() {
                         >
                           <div className="w-full max-w-[16rem] space-y-3">
                             <div className="flex items-center justify-between">
-                              <span className={cn("text-xs font-black uppercase tracking-widest", actionModal.type === 'deposit' ? 'text-[#4EDEA3]' : 'text-[#FFB4AB]')}>
+                              <span className={cn("text-xs font-black uppercase tracking-widest", actionModal.type === 'deposit' ? 'text-gain' : 'text-loss')}>
                                 {actionModal.type === 'deposit' ? t("deposit") : t("withdraw")}
                               </span>
-                              <button onClick={() => setActionModal(null)} className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/70 hover:text-white transition-colors">
+                              <button onClick={() => setActionModal(null)} className="w-7 h-7 rounded-full bg-foreground/10 hover:bg-foreground/20 flex items-center justify-center text-foreground/70 hover:text-foreground transition-colors">
                                 <X size={14} />
                               </button>
                             </div>
@@ -876,7 +808,7 @@ export default function BudgetPage() {
                               placeholder="Amount"
                               value={actionAmount}
                               onChange={(e) => setActionAmount(e.target.value)}
-                              className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-white/50 placeholder:text-white/30 transition-colors"
+                              className="w-full bg-foreground/10 border border-foreground/20 rounded-xl px-3 py-2.5 text-sm text-foreground focus:outline-none focus:border-foreground/50 placeholder:text-foreground/30 transition-colors"
                               autoFocus
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') { e.preventDefault(); handleActionSubmit(); }
@@ -890,9 +822,9 @@ export default function BudgetPage() {
                                 "w-full py-2.5 rounded-xl text-xs font-black uppercase tracking-wide transition-all",
                                 actionAmount && parseFloat(actionAmount) > 0
                                   ? actionModal.type === 'deposit'
-                                    ? "bg-[#4EDEA3] text-[#0E0E0E] hover:brightness-110 shadow-lg shadow-[#4EDEA3]/20"
-                                    : "bg-[#FFB4AB] text-[#0E0E0E] hover:brightness-110 shadow-lg shadow-[#FFB4AB]/20"
-                                  : "bg-white/10 text-white/30 cursor-not-allowed"
+                                    ? "bg-primary text-primary-foreground hover:brightness-110 shadow-lg shadow-[#4EDEA3]/20"
+                                    : "bg-loss text-primary-foreground hover:brightness-110 shadow-lg shadow-[#FFB4AB]/20"
+                                  : "bg-foreground/10 text-foreground/30 cursor-not-allowed"
                               )}
                             >
                               <Check size={14} className="inline mr-1" />
@@ -914,24 +846,24 @@ export default function BudgetPage() {
                         setInputCurrency(initialCurr);
                         const targetVal = bucket.targetAmount || 0;
                         const currentVal = bucket.currentAmount;
-                        setBucketForm({ 
-                          name: bucket.name, 
-                          targetPercent: bucket.targetPercent.toString(), 
+                        setBucketForm({
+                          name: bucket.name,
+                          targetPercent: bucket.targetPercent.toString(),
                           targetAmount: targetVal > 0 ? targetVal.toFixed(2) : "",
-                          currentAmount: currentVal > 0 ? currentVal.toFixed(2) : "0", 
-                          color: bucket.color, 
-                          icon: bucket.icon, 
-                          linkedToExpenses: bucket.linkedToExpenses || false 
+                          currentAmount: currentVal > 0 ? currentVal.toFixed(2) : "0",
+                          color: bucket.color,
+                          icon: bucket.icon,
+                          linkedToExpenses: bucket.linkedToExpenses || false
                         });
                         setIsBucketModalOpen(true);
                       }}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center bg-black/30 backdrop-blur-sm text-white hover:bg-black/50 transition-all"
+                      className="w-7 h-7 rounded-lg flex items-center justify-center bg-black/30 backdrop-blur-sm text-foreground hover:bg-black/50 transition-all"
                     >
                       <Pencil size={11} />
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); setBucketToDelete(bucket.id); }}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center bg-black/30 backdrop-blur-sm text-white hover:bg-[#FFB4AB]/60 transition-all"
+                      className="w-7 h-7 rounded-lg flex items-center justify-center bg-black/30 backdrop-blur-sm text-foreground hover:bg-loss/60 transition-all"
                     >
                       <Trash2 size={11} />
                     </button>
@@ -954,60 +886,29 @@ export default function BudgetPage() {
               setIsBucketModalOpen(true);
             }}
             className={cn(
-              "bg-background/50 p-4 sm:p-6 rounded-xl sm:rounded-2xl border border-dashed flex flex-col items-center justify-center min-h-[16rem] h-auto min-w-[240px] sm:min-w-[280px] flex-shrink-0 snap-start transition-all",
+              "bg-background/50 p-4 sm:p-6 rounded-xl sm:rounded-2xl border border-dashed flex flex-col items-center justify-center min-h-[16rem] h-auto min-w-0 transition-all",
               canAddMoreBuckets
-                ? "border-[#424754]/20 cursor-pointer group hover:border-[#ADC6FF]/40"
+                ? "border-border cursor-pointer group hover:border-primary/40"
                 : "border-gray-700 cursor-not-allowed opacity-50"
             )}
           >
-            <Plus className={cn("text-3xl sm:text-4xl mb-3 sm:mb-4 transition-colors", canAddMoreBuckets ? "text-[#8c909f]/30 group-hover:text-[#ADC6FF]/40" : "text-gray-700")} size={40} />
-            <span className={cn("text-[10px] sm:text-xs font-bold uppercase tracking-widest", canAddMoreBuckets ? "text-[#8c909f]" : "text-gray-600")}>
+            <Plus className={cn("text-3xl sm:text-4xl mb-3 sm:mb-4 transition-colors", canAddMoreBuckets ? "text-muted-foreground group-hover:text-primary/40" : "text-gray-700")} size={40} />
+            <span className={cn("text-xs sm:text-xs font-bold uppercase tracking-widest", canAddMoreBuckets ? "text-muted-foreground" : "text-gray-600")}>
               {canAddMoreBuckets ? t("addBucket") : `${t("target")} 100%`}
             </span>
           </div>
         </div>
-        {/* Scroll Buttons — Spotify style: float on sides, only appear on hover, only when scrollable */}
-        <AnimatePresence>
-          {canScrollLeft && (
-            <motion.button
-              key="scroll-left"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: isCarouselHovered ? 1 : 0, scale: isCarouselHovered ? 1 : 0.8 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              transition={{ duration: 0.18 }}
-              onClick={() => scrollCarousel("left")}
-              className="hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full items-center justify-center bg-[#1a1a1a]/95 border border-white/20 text-white shadow-xl hover:bg-white/20 hover:scale-110 active:scale-95 transition-all"
-            >
-              <ChevronLeft size={18} />
-            </motion.button>
-          )}
-        </AnimatePresence>
-        <AnimatePresence>
-          {canScrollRight && (
-            <motion.button
-              key="scroll-right"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: isCarouselHovered ? 1 : 0, scale: isCarouselHovered ? 1 : 0.8 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              transition={{ duration: 0.18 }}
-              onClick={() => scrollCarousel("right")}
-              className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full items-center justify-center bg-[#1a1a1a]/95 border border-white/20 text-white shadow-xl hover:bg-white/20 hover:scale-110 active:scale-95 transition-all"
-            >
-              <ChevronRight size={18} />
-            </motion.button>
-          )}
-        </AnimatePresence>
       </div>
 
       {/* Input Panels Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         {/* Income Distribution Panel */}
-        <div className="bg-surface rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-border">
+        <div className="bg-surface rounded-2xl sm:rounded-2xl p-4 sm:p-6 border border-border">
           <div className="flex items-center gap-2 mb-3 sm:mb-4">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-[#ADC6FF]/10 flex items-center justify-center text-[#ADC6FF]">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
               <DollarSign size={16} />
             </div>
-            <h3 className="text-sm font-bold text-white">{t("incomeDistribution")}</h3>
+            <h3 className="text-sm font-bold text-foreground">{t("incomeDistribution")}</h3>
           </div>
           <div className="space-y-3">
             <div className="relative">
@@ -1023,20 +924,20 @@ export default function BudgetPage() {
                   setIncomeAmount(val);
                   setShowIncomePreview(!!val && parseFloat(val) > 0);
                 }}
-                className="w-full bg-white/5 border border-border rounded-xl sm:rounded-2xl px-3 sm:px-4 py-3 pr-20 text-white text-sm outline-none focus:border-[#ADC6FF]/50 transition-all placeholder:text-gray-600"
+                className="w-full bg-foreground/5 border border-border rounded-xl sm:rounded-2xl px-3 sm:px-4 py-3 pr-20 text-foreground text-sm outline-none focus:border-primary/50 transition-all placeholder:text-gray-600"
               />
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 p-0.5 bg-white/5 rounded-lg border border-border">
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 p-0.5 bg-foreground/5 rounded-lg border border-border">
                 {(['USD', 'THB'] as const).map(cur => (
                   <button
                     key={cur}
                     type="button"
                     onClick={() => handleCurrencyChange(cur)}
                     className={cn(
-                      'px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wide transition-all',
+                      'px-1.5 py-0.5 rounded-md text-xs font-black uppercase tracking-wide transition-all',
                       inputCurrency === cur
                         ? cur === 'THB'
-                          ? 'bg-[#E9C349] text-[#241a00]'
-                          : 'bg-[#ADC6FF] text-[#00285d]'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-primary text-primary-foreground'
                         : 'text-gray-500 hover:text-gray-300'
                     )}
                   >
@@ -1053,15 +954,15 @@ export default function BudgetPage() {
                   exit={{ opacity: 0, height: 0 }}
                   className="overflow-hidden"
                 >
-                  <div className="bg-white/5 rounded-2xl p-3 space-y-2">
-                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">{t("previewDistribution")}</span>
+                  <div className="bg-foreground/5 rounded-2xl p-3 space-y-2">
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">{t("previewDistribution")}</span>
                     {incomePreview.map((b) => (
                       <div key={b.id} className="flex justify-between items-center">
                         <div className="flex items-center gap-2">
                           <span className="text-sm"><FinanceIcon name={b.icon} /></span>
                           <span className="text-xs font-bold text-gray-400">{t(b.name) || b.name}</span>
                         </div>
-                        <span className="text-xs font-black text-white">+{formatDisplay(b.split)}</span>
+                        <span className="text-xs font-black text-foreground">+{formatDisplay(b.split)}</span>
                       </div>
                     ))}
                   </div>
@@ -1073,7 +974,7 @@ export default function BudgetPage() {
               disabled={incomeNum <= 0}
               className={cn(
                 "w-full py-2.5 sm:py-3 rounded-xl sm:rounded-2xl font-black text-xs uppercase tracking-wide transition-all",
-                incomeNum > 0 ? "bg-[#ADC6FF] text-[#00285d] hover:brightness-110 active:scale-95" : "bg-white/5 text-gray-600 cursor-not-allowed"
+                incomeNum > 0 ? "bg-primary text-primary-foreground hover:brightness-110 active:scale-95" : "bg-foreground/5 text-gray-600 cursor-not-allowed"
               )}
             >
               {t("distributeNow")}
@@ -1082,12 +983,12 @@ export default function BudgetPage() {
         </div>
 
         {/* Add Profit Panel */}
-        <div className="bg-surface rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-border">
+        <div className="bg-surface rounded-2xl sm:rounded-2xl p-4 sm:p-6 border border-border">
           <div className="flex items-center gap-2 mb-3 sm:mb-4">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-[#4EDEA3]/10 flex items-center justify-center text-[#4EDEA3]">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-gain/10 flex items-center justify-center text-gain">
               <TrendingUp size={16} />
             </div>
-            <h3 className="text-sm font-bold text-white">{t("addProfit")}</h3>
+            <h3 className="text-sm font-bold text-foreground">{t("addProfit")}</h3>
           </div>
           <div className="space-y-3">
             <div className="relative">
@@ -1103,20 +1004,20 @@ export default function BudgetPage() {
                   setProfitAmount(val);
                   setShowProfitSuggestion(!!val && parseFloat(val) > 0);
                 }}
-                className="w-full bg-white/5 border border-border rounded-xl sm:rounded-2xl px-3 sm:px-4 py-3 pr-20 text-white text-sm outline-none focus:border-[#4EDEA3]/50 transition-all placeholder:text-gray-600"
+                className="w-full bg-foreground/5 border border-border rounded-xl sm:rounded-2xl px-3 sm:px-4 py-3 pr-20 text-foreground text-sm outline-none focus:border-primary/50 transition-all placeholder:text-gray-600"
               />
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 p-0.5 bg-white/5 rounded-lg border border-border">
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 p-0.5 bg-foreground/5 rounded-lg border border-border">
                 {(['USD', 'THB'] as const).map(cur => (
                   <button
                     key={cur}
                     type="button"
                     onClick={() => handleCurrencyChange(cur)}
                     className={cn(
-                      'px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wide transition-all',
+                      'px-1.5 py-0.5 rounded-md text-xs font-black uppercase tracking-wide transition-all',
                       inputCurrency === cur
                         ? cur === 'THB'
-                          ? 'bg-[#E9C349] text-[#241a00]'
-                          : 'bg-[#ADC6FF] text-[#00285d]'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-primary text-primary-foreground'
                         : 'text-gray-500 hover:text-gray-300'
                     )}
                   >
@@ -1133,26 +1034,26 @@ export default function BudgetPage() {
                   exit={{ opacity: 0, height: 0 }}
                   className="overflow-hidden"
                 >
-                  <div className="bg-[#4EDEA3]/5 rounded-2xl p-4 border border-[#4EDEA3]/10 space-y-3">
+                  <div className="bg-gain/5 rounded-2xl p-4 border border-gain/10 space-y-3">
                     <div className="flex items-center gap-2 mb-1">
-                      <Lightbulb size={14} className="text-[#E9C349]" />
-                      <span className="text-xs font-black text-[#E9C349] uppercase tracking-wide">{t("smartSuggestion")}</span>
+                      <Lightbulb size={14} className="text-warning" />
+                      <span className="text-xs font-black text-warning uppercase tracking-wide">{t("smartSuggestion")}</span>
                     </div>
-                    <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl">
-                      <ShieldCheck size={16} className="text-[#4EDEA3] shrink-0" />
+                    <div className="flex items-center gap-3 bg-foreground/5 p-3 rounded-xl">
+                      <ShieldCheck size={16} className="text-gain shrink-0" />
                       <div className="flex-1">
                         <p className="text-xs text-gray-400">{t("suggestSafeHaven")}</p>
-                        <p className="text-sm font-black text-[#4EDEA3]">+{formatDisplay(Math.floor(profitNum * 100 / 2) / 100)}</p>
+                        <p className="text-sm font-black text-gain">+{formatDisplay(Math.floor(profitNum * 100 / 2) / 100)}</p>
                       </div>
-                      <span className="text-[10px] font-bold text-gray-500">50%</span>
+                      <span className="text-xs font-bold text-gray-500">50%</span>
                     </div>
-                    <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl">
-                      <Rocket size={16} className="text-[#FF8B9A] shrink-0" />
+                    <div className="flex items-center gap-3 bg-foreground/5 p-3 rounded-xl">
+                      <Rocket size={16} className="text-gain shrink-0" />
                       <div className="flex-1">
                         <p className="text-xs text-gray-400">{t("suggestReinvest")}</p>
-                        <p className="text-sm font-black text-[#FF8B9A]">+{formatDisplay(profitNum - Math.floor(profitNum * 100 / 2) / 100)}</p>
+                        <p className="text-sm font-black text-gain">+{formatDisplay(profitNum - Math.floor(profitNum * 100 / 2) / 100)}</p>
                       </div>
-                      <span className="text-[10px] font-bold text-gray-500">50%</span>
+                      <span className="text-xs font-bold text-gray-500">50%</span>
                     </div>
                   </div>
                 </motion.div>
@@ -1163,7 +1064,7 @@ export default function BudgetPage() {
               disabled={profitNum <= 0}
               className={cn(
                 "w-full py-2.5 sm:py-3 rounded-xl sm:rounded-2xl font-black text-xs uppercase tracking-wide transition-all",
-                profitNum > 0 ? "bg-[#4EDEA3] text-[#00285d] hover:brightness-110 active:scale-95" : "bg-white/5 text-gray-600 cursor-not-allowed"
+                profitNum > 0 ? "bg-primary text-primary-foreground hover:brightness-110 active:scale-95" : "bg-foreground/5 text-gray-600 cursor-not-allowed"
               )}
             >
               {t("applyAdvice")}
@@ -1175,15 +1076,15 @@ export default function BudgetPage() {
       {/* Bottom Row: Action Log + Financial Advice */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
         {/* Action Log */}
-        <div className="lg:col-span-8 bg-surface rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-border">
+        <div className="lg:col-span-8 bg-surface rounded-2xl sm:rounded-2xl p-4 sm:p-6 border border-border">
           <div className="flex items-center gap-2 mb-4 sm:mb-5">
-            <History size={14} className="text-[#ADC6FF]" />
-            <h3 className="text-sm font-bold text-white">{t("actionLog")}</h3>
+            <History size={14} className="text-primary" />
+            <h3 className="text-sm font-bold text-foreground">{t("actionLog")}</h3>
           </div>
           {bucketActivities.length === 0 ? (
             <div className="py-8 sm:py-12 flex flex-col items-center gap-3 opacity-30">
-              <History size={24} className="text-white" />
-              <p className="text-xs text-white font-bold uppercase tracking-wide">{t("noActivityYet")}</p>
+              <History size={24} className="text-foreground" />
+              <p className="text-xs text-foreground font-bold uppercase tracking-wide">{t("noActivityYet")}</p>
             </div>
           ) : (
             <div className="space-y-2 sm:space-y-3 max-h-64 sm:max-h-80 overflow-y-auto pr-1 custom-scrollbar">
@@ -1192,7 +1093,7 @@ export default function BudgetPage() {
                   key={`${act.id}-${idx}`}
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
-                  className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 bg-white/[0.02] rounded-xl sm:rounded-2xl hover:bg-white/[0.04] transition-colors cursor-pointer"
+                  className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 bg-foreground/[0.02] rounded-xl sm:rounded-2xl hover:bg-foreground/[0.04] transition-colors cursor-pointer"
                   onClick={() => { setSelectedActivity(act); setShowDetailModal(true); }}
                 >
                   <div
@@ -1202,8 +1103,8 @@ export default function BudgetPage() {
                     {activityIcon(act.type)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold text-white truncate">{act.note || t(act.type)}</p>
-                    <p className="text-[10px] text-gray-500 mt-0.5">
+                    <p className="text-xs font-bold text-foreground truncate">{act.note || t(act.type)}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
                       {new Date(act.date).toLocaleDateString(language === "th" ? "th-TH" : "en-US", {
                         day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
                       })}
@@ -1222,22 +1123,22 @@ export default function BudgetPage() {
         </div>
 
         {/* Financial Advice Panel */}
-        <div className="lg:col-span-4 bg-surface rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-border flex flex-col">
+        <div className="lg:col-span-4 bg-surface rounded-2xl sm:rounded-2xl p-4 sm:p-6 border border-border flex flex-col">
           <div className="flex items-center gap-2 mb-3 sm:mb-5">
-            <Lightbulb size={14} className="text-[#E9C349]" />
-            <h3 className="text-sm font-bold text-white">{t("adviceTitle")}</h3>
+            <Lightbulb size={14} className="text-warning" />
+            <h3 className="text-sm font-bold text-foreground">{t("adviceTitle")}</h3>
           </div>
           <div className="space-y-2 sm:space-y-3 flex-1">
-            <div className="flex gap-2 sm:gap-3 p-2.5 sm:p-3 bg-[#ADC6FF]/5 rounded-xl sm:rounded-2xl border border-[#ADC6FF]/10">
-              <Info size={12} className="text-[#ADC6FF] shrink-0 mt-0.5" />
+            <div className="flex gap-2 sm:gap-3 p-2.5 sm:p-3 bg-primary/5 rounded-xl sm:rounded-2xl border border-primary/10">
+              <Info size={12} className="text-primary shrink-0 mt-0.5" />
               <p className="text-xs text-gray-400 leading-relaxed">{t("adviceDebt")}</p>
             </div>
-            <div className="flex gap-2 sm:gap-3 p-2.5 sm:p-3 bg-[#4EDEA3]/5 rounded-xl sm:rounded-2xl border border-[#4EDEA3]/10">
-              <CheckCircle2 size={12} className="text-[#4EDEA3] shrink-0 mt-0.5" />
+            <div className="flex gap-2 sm:gap-3 p-2.5 sm:p-3 bg-gain/5 rounded-xl sm:rounded-2xl border border-gain/10">
+              <CheckCircle2 size={12} className="text-gain shrink-0 mt-0.5" />
               <p className="text-xs text-gray-400 leading-relaxed">{t("advicePostDebt")}</p>
             </div>
-            <div className="flex gap-2 sm:gap-3 p-2.5 sm:p-3 bg-[#FFB4AB]/5 rounded-xl sm:rounded-2xl border border-[#FFB4AB]/10">
-              <ShieldCheck size={12} className="text-[#FFB4AB] shrink-0 mt-0.5" />
+            <div className="flex gap-2 sm:gap-3 p-2.5 sm:p-3 bg-loss/5 rounded-xl sm:rounded-2xl border border-loss/10">
+              <ShieldCheck size={12} className="text-loss shrink-0 mt-0.5" />
               <p className="text-xs text-gray-400 leading-relaxed">{t("adviceRisk")}</p>
             </div>
           </div>
@@ -1256,7 +1157,7 @@ export default function BudgetPage() {
               value={bucketForm.name}
               onChange={(e) => setBucketForm((prev) => ({ ...prev, name: e.target.value }))}
               placeholder={t("bucketName")}
-              className="w-full bg-white/5 border border-border rounded-2xl px-4 py-3 text-white text-sm outline-none focus:border-[#E9C349]/50 transition-all"
+              className="w-full bg-foreground/5 border border-border rounded-2xl px-4 py-3 text-foreground text-sm outline-none focus:border-primary/50 transition-all"
             />
           </div>
           <div className="space-y-2">
@@ -1269,7 +1170,7 @@ export default function BudgetPage() {
                   onClick={() => setBucketForm((prev) => ({ ...prev, icon }))}
                   className={cn(
                     "w-10 h-10 rounded-xl flex items-center justify-center text-lg border transition-all",
-                    resolveFinanceIcon(bucketForm.icon) === icon ? "bg-white/10 border-[#E9C349]/50 scale-110" : "bg-white/5 border-border hover:border-border"
+                    resolveFinanceIcon(bucketForm.icon) === icon ? "bg-foreground/10 border-primary/50 scale-110" : "bg-foreground/5 border-border hover:border-border"
                   )}
                 >
                   <FinanceIcon name={icon} size={20} />
@@ -1298,8 +1199,8 @@ export default function BudgetPage() {
                 );
               })}
             </div>
-            <div className="flex items-center gap-3 p-3 bg-white/[0.03] border border-border rounded-2xl">
-              <div className="w-10 h-10 rounded-xl border-2 border-white/20 shrink-0 shadow-inner" style={{ backgroundColor: bucketForm.color }} />
+            <div className="flex items-center gap-3 p-3 bg-foreground/[0.03] border border-border rounded-2xl">
+              <div className="w-10 h-10 rounded-xl border-2 border-foreground/20 shrink-0 shadow-inner" style={{ backgroundColor: bucketForm.color }} />
               <div className="flex-1 flex items-center gap-2">
                 <span className="text-gray-500 text-sm">#</span>
                 <input
@@ -1317,7 +1218,7 @@ export default function BudgetPage() {
                   maxLength={6}
                   className={cn(
                     "flex-1 bg-transparent text-sm font-mono uppercase focus:outline-none",
-                    usedColors.includes(bucketForm.color) && (editingBucket ? moneyBuckets.find(b => b.id === editingBucket)?.color !== bucketForm.color : true) ? "text-red-400" : "text-white"
+                    usedColors.includes(bucketForm.color) && (editingBucket ? moneyBuckets.find(b => b.id === editingBucket)?.color !== bucketForm.color : true) ? "text-red-400" : "text-foreground"
                   )}
                 />
               </div>
@@ -1326,10 +1227,10 @@ export default function BudgetPage() {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">Income Split %</label>
-              <span className="text-[10px] font-bold text-gray-500">
+              <span className="text-xs font-bold text-gray-500">
                 {t("currentTotal")}: {totalTargetPercent}%
                 {editingBucket && (
-                  <span className="text-[#4EDEA3]">{' '}({totalTargetPercent - (moneyBuckets.find(b => b.id === editingBucket)?.targetPercent || 0)}% / 100%)</span>
+                  <span className="text-gain">{' '}({totalTargetPercent - (moneyBuckets.find(b => b.id === editingBucket)?.targetPercent || 0)}% / 100%)</span>
                 )}
               </span>
             </div>
@@ -1341,7 +1242,7 @@ export default function BudgetPage() {
               return (
                 <>
                   <div className="flex items-center gap-3 relative">
-                    <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden relative cursor-pointer">
+                    <div className="flex-1 h-2 bg-foreground/10 rounded-full overflow-hidden relative cursor-pointer">
                       <div className="absolute inset-y-0 left-0 rounded-full transition-all duration-150" style={{ width: `${(clampedValue / maxAllowed) * 100}%`, backgroundColor: bucketForm.color }} />
                       <input
                         type="range"
@@ -1366,12 +1267,12 @@ export default function BudgetPage() {
                         setBucketForm((prev) => ({ ...prev, targetPercent: val.toString() }));
                       }}
                       placeholder="25"
-                      className="w-20 px-2 py-1.5 bg-white/5 border border-border rounded-lg text-white text-sm font-bold text-center focus:outline-none focus:border-[#ADC6FF]/50 placeholder:text-gray-600"
+                      className="w-20 px-2 py-1.5 bg-foreground/5 border border-border rounded-lg text-foreground text-sm font-bold text-center focus:outline-none focus:border-primary/50 placeholder:text-gray-600"
                     />
                     <span className="text-sm font-bold text-gray-500">%</span>
                   </div>
                   {maxAllowed <= 0 && (
-                    <p className="text-[10px] text-[#FFB4AB] font-bold">{t("exceeds100")} - {t("noRemainingPercent")}</p>
+                    <p className="text-xs text-loss font-bold">{t("exceeds100")} - {t("noRemainingPercent")}</p>
                   )}
                 </>
               );
@@ -1380,18 +1281,18 @@ export default function BudgetPage() {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">{t("targetAmount")}</label>
-              <div className="flex gap-1 p-0.5 bg-white/5 rounded-lg border border-border">
+              <div className="flex gap-1 p-0.5 bg-foreground/5 rounded-lg border border-border">
                 {(['USD', 'THB'] as const).map(cur => (
                   <button
                     key={cur}
                     type="button"
                     onClick={() => handleCurrencyChange(cur)}
                     className={cn(
-                      'px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wide transition-all',
+                      'px-2.5 py-1 rounded-md text-xs font-black uppercase tracking-wide transition-all',
                       inputCurrency === cur
                         ? cur === 'THB'
-                          ? 'bg-[#E9C349] text-[#241a00]'
-                          : 'bg-[#ADC6FF] text-[#00285d]'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-primary text-primary-foreground'
                         : 'text-gray-500 hover:text-gray-300'
                     )}
                   >
@@ -1411,11 +1312,11 @@ export default function BudgetPage() {
                 }}
                 onChange={(e) => setBucketForm((prev) => ({ ...prev, targetAmount: e.target.value }))}
                 placeholder="0.00"
-                className="w-full bg-white/5 border border-border rounded-2xl px-4 py-3 text-white text-sm outline-none focus:border-[#E9C349]/50 transition-all pr-12"
+                className="w-full bg-foreground/5 border border-border rounded-2xl px-4 py-3 text-foreground text-sm outline-none focus:border-primary/50 transition-all pr-12"
               />
               <span className={cn(
                 "absolute right-4 top-1/2 -translate-y-1/2 font-black text-xs uppercase opacity-90",
-                inputCurrency === 'THB' ? 'text-[#E9C349]' : 'text-[#ADC6FF]'
+                inputCurrency === 'THB' ? 'text-warning' : 'text-primary'
               )}>
                 {inputCurrency === 'THB' ? '฿' : '$'}
               </span>
@@ -1425,17 +1326,17 @@ export default function BudgetPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">{t("currentAmount")}</label>
-                <div className="flex gap-1 p-0.5 bg-white/5 rounded-lg border border-border opacity-50 pointer-events-none">
+                <div className="flex gap-1 p-0.5 bg-foreground/5 rounded-lg border border-border opacity-50 pointer-events-none">
                   {(['USD', 'THB'] as const).map(cur => (
                     <button
                       key={cur}
                       type="button"
                       className={cn(
-                        'px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wide transition-all',
+                        'px-2.5 py-1 rounded-md text-xs font-black uppercase tracking-wide transition-all',
                         inputCurrency === cur
                           ? cur === 'THB'
-                            ? 'bg-[#E9C349] text-[#241a00]'
-                            : 'bg-[#ADC6FF] text-[#00285d]'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-primary text-primary-foreground'
                           : 'text-gray-500'
                       )}
                     >
@@ -1451,11 +1352,11 @@ export default function BudgetPage() {
                   value={bucketForm.currentAmount}
                   onChange={(e) => setBucketForm((prev) => ({ ...prev, currentAmount: e.target.value }))}
                   placeholder="0.00"
-                  className="w-full bg-white/5 border border-border rounded-2xl px-4 py-3 text-white text-sm outline-none focus:border-[#E9C349]/50 transition-all pr-12"
+                  className="w-full bg-foreground/5 border border-border rounded-2xl px-4 py-3 text-foreground text-sm outline-none focus:border-primary/50 transition-all pr-12"
                 />
                 <span className={cn(
                   "absolute right-4 top-1/2 -translate-y-1/2 font-black text-xs uppercase opacity-90",
-                  inputCurrency === 'THB' ? 'text-[#E9C349]' : 'text-[#ADC6FF]'
+                  inputCurrency === 'THB' ? 'text-warning' : 'text-primary'
                 )}>
                   {inputCurrency === 'THB' ? '฿' : '$'}
                 </span>
@@ -1463,12 +1364,12 @@ export default function BudgetPage() {
             </div>
           )}
           <div className="flex gap-4 pt-2">
-            <button onClick={() => setIsBucketModalOpen(false)} className="flex-1 py-4 text-gray-500 font-bold text-sm hover:text-white transition-colors">
+            <button onClick={() => setIsBucketModalOpen(false)} className="flex-1 py-4 text-gray-500 font-bold text-sm hover:text-foreground transition-colors">
               {t("cancel")}
             </button>
             <button
               onClick={handleSaveBucket}
-              className="flex-1 py-4 bg-[#E9C349] text-[#241a00] rounded-full font-black text-sm uppercase tracking-tight hover:brightness-110 transition-all active:scale-95"
+              className="flex-1 py-4 bg-primary text-primary-foreground rounded-full font-black text-sm uppercase tracking-tight hover:brightness-110 transition-all active:scale-95"
             >
               {t("confirm")}
             </button>
@@ -1489,26 +1390,26 @@ export default function BudgetPage() {
             const sourceBucket = allMoneyBuckets.find(b => b.id === transferModal.sourceBucketId);
             return sourceBucket ? (
               <>
-                <div className="bg-white/5 rounded-2xl p-4 flex items-center justify-between">
+                <div className="bg-foreground/5 rounded-2xl p-4 flex items-center justify-between">
                   <div>
                     <p className="text-xs text-gray-400 font-bold mb-1 uppercase tracking-wider">{t("sourceBucket") || "From"}</p>
                     <div className="flex items-center gap-2">
                       <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs" style={{ backgroundColor: `${sourceBucket.color}20` }}>
                         <FinanceIcon name={sourceBucket.icon} />
                       </div>
-                      <span className="font-bold text-sm text-white">{t(sourceBucket.name) || sourceBucket.name}</span>
+                      <span className="font-bold text-sm text-foreground">{t(sourceBucket.name) || sourceBucket.name}</span>
                     </div>
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-gray-400 font-bold mb-1 uppercase tracking-wider">{t("balance") || "Balance"}</p>
-                    <span className="font-bold text-[#E9C349] text-sm">
+                    <span className="font-bold text-warning text-sm">
                       {formatBucketAmount(sourceBucket, sourceBucket.currentAmount)}
                     </span>
                   </div>
                 </div>
 
                 <div className="flex justify-center -my-3 relative z-10">
-                  <button 
+                  <button
                     onClick={() => {
                       if (!transferModal.destinationBucketId) return;
                       setTransferModal({
@@ -1517,7 +1418,7 @@ export default function BudgetPage() {
                         destinationBucketId: transferModal.sourceBucketId
                       });
                     }}
-                    className={"w-8 h-8 rounded-full bg-[#1a1a1a] border border-[#333] flex items-center justify-center transition-colors "}
+                    className={"w-8 h-8 rounded-full bg-surface border border-border flex items-center justify-center transition-colors "}
                     disabled={!transferModal.destinationBucketId}
                     title="Swap Source and Destination"
                   >
@@ -1526,31 +1427,31 @@ export default function BudgetPage() {
                 </div>
 
                 <div className="space-y-2 relative">
-                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest pl-1">{t("destinationBucket") || "To Destination"}</label>
+                  <label className="text-xs text-gray-500 font-bold uppercase tracking-widest pl-1">{t("destinationBucket") || "To Destination"}</label>
                   <div className="relative">
                     <button
                       onClick={() => setTransferDropdownOpen(!transferDropdownOpen)}
-                      className="w-full bg-[#1a1a1a] border border-[#333] hover:border-[#4EDEA3] text-sm font-medium text-white px-4 py-3.5 rounded-xl outline-none transition-colors text-left flex justify-between items-center"
+                      className="w-full bg-surface border border-border hover:border-primary text-sm font-medium text-foreground px-4 py-3.5 rounded-xl outline-none transition-colors text-left flex justify-between items-center"
                     >
-                      {transferModal.destinationBucketId 
+                      {transferModal.destinationBucketId
                         ? (() => {
-                            const db = allMoneyBuckets.find(b => b.id === transferModal.destinationBucketId);
-                            return db ? (
-                              <div className="flex items-center gap-2">
-                                <div className="w-5 h-5 rounded-full flex items-center justify-center text-[10px]" style={{ backgroundColor: `${db.color}20` }}>
-                                  <FinanceIcon name={db.icon} />
-                                </div>
-                                <span>{t(db.name) || db.name}</span>
+                          const db = allMoneyBuckets.find(b => b.id === transferModal.destinationBucketId);
+                          return db ? (
+                            <div className="flex items-center gap-2">
+                              <div className="w-5 h-5 rounded-full flex items-center justify-center text-xs" style={{ backgroundColor: `${db.color}20` }}>
+                                <FinanceIcon name={db.icon} />
                               </div>
-                            ) : t("selectBucket") || "Select Bucket";
-                          })()
+                              <span>{t(db.name) || db.name}</span>
+                            </div>
+                          ) : t("selectBucket") || "Select Bucket";
+                        })()
                         : <span className="text-gray-400">{t("selectBucket") || "Select Bucket"}</span>
                       }
-                      <span className="text-gray-500 text-[10px]">▼</span>
+                      <span className="text-gray-500 text-xs">▼</span>
                     </button>
-                    
+
                     {transferDropdownOpen && (
-                      <div className="absolute top-full left-0 mt-2 w-full bg-[#1a1a1a] border border-[#333] rounded-xl overflow-hidden z-[60] shadow-2xl">
+                      <div className="absolute top-full left-0 mt-2 w-full bg-surface border border-border rounded-xl overflow-hidden z-[60] shadow-2xl">
                         <div className="max-h-60 overflow-y-auto custom-scrollbar">
                           {allMoneyBuckets.filter(b => b.id !== sourceBucket.id).map(b => (
                             <button
@@ -1559,9 +1460,9 @@ export default function BudgetPage() {
                                 setTransferModal({ ...transferModal, destinationBucketId: b.id });
                                 setTransferDropdownOpen(false);
                               }}
-                              className="w-full text-left px-4 py-3 hover:bg-[#333] text-sm font-medium text-white transition-colors flex items-center gap-2"
+                              className="w-full text-left px-4 py-3 hover:bg-surface-2 text-sm font-medium text-foreground transition-colors flex items-center gap-2"
                             >
-                              <div className="w-5 h-5 rounded-full flex items-center justify-center text-[10px]" style={{ backgroundColor: `${b.color}20` }}>
+                              <div className="w-5 h-5 rounded-full flex items-center justify-center text-xs" style={{ backgroundColor: `${b.color}20` }}>
                                 <FinanceIcon name={b.icon} />
                               </div>
                               {t(b.name) || b.name}
@@ -1579,11 +1480,11 @@ export default function BudgetPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest pl-1">{t("amount") || "Amount"}</label>
+                  <label className="text-xs text-gray-500 font-bold uppercase tracking-widest pl-1">{t("amount") || "Amount"}</label>
                   <div className="relative flex gap-2">
                     <button
                       onClick={() => setTransferModal({ ...transferModal, currency: transferModal.currency === "USD" ? "THB" : "USD" })}
-                      className="shrink-0 bg-[#1a1a1a] border border-[#333] hover:border-[#4EDEA3] hover:text-[#4EDEA3] text-gray-400 font-bold px-4 py-3.5 rounded-xl transition-colors flex items-center justify-center min-w-[70px]"
+                      className="shrink-0 bg-surface border border-border hover:border-primary hover:text-primary text-gray-400 font-bold px-4 py-3.5 rounded-xl transition-colors flex items-center justify-center min-w-[70px]"
                     >
                       {transferModal.currency === "THB" ? "฿ THB" : "$ USD"}
                     </button>
@@ -1599,16 +1500,16 @@ export default function BudgetPage() {
                           setTransferModal({ ...transferModal, amount: val });
                         }}
                         placeholder="0.00"
-                        className="w-full bg-[#1a1a1a] border border-[#333] text-xl font-black text-white px-4 py-3.5 rounded-xl outline-none focus:border-[#4EDEA3] transition-colors"
+                        className="w-full bg-surface border border-border text-xl font-black text-foreground px-4 py-3.5 rounded-xl outline-none focus:border-primary transition-colors"
                       />
                       <button
                         onClick={() => {
-                          const maxAmount = transferModal.currency === bucketCurrency(sourceBucket) 
-                            ? sourceBucket.currentAmount 
+                          const maxAmount = transferModal.currency === bucketCurrency(sourceBucket)
+                            ? sourceBucket.currentAmount
                             : convertCurrency(sourceBucket.currentAmount, bucketCurrency(sourceBucket) as "USD" | "THB", transferModal.currency);
                           setTransferModal({ ...transferModal, amount: maxAmount.toString() });
                         }}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black uppercase tracking-wider text-[#4EDEA3] bg-[#4EDEA3]/10 hover:bg-[#4EDEA3]/20 px-2 py-1 rounded-md transition-colors"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-black uppercase tracking-wider text-primary bg-primary/10 hover:bg-primary/20 px-2 py-1 rounded-md transition-colors"
                       >
                         MAX
                       </button>
@@ -1617,24 +1518,24 @@ export default function BudgetPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest pl-1">{t("note") || "Note (Optional)"}</label>
+                  <label className="text-xs text-gray-500 font-bold uppercase tracking-widest pl-1">{t("note") || "Note (Optional)"}</label>
                   <input
                     type="text"
                     value={transferModal.note}
                     onChange={(e) => setTransferModal({ ...transferModal, note: e.target.value })}
                     placeholder={t("notePlaceholder") || "e.g. Savings"}
-                    className="w-full bg-[#1a1a1a] border border-[#333] text-sm font-medium text-white px-4 py-3.5 rounded-xl outline-none focus:border-[#4EDEA3] transition-colors"
+                    className="w-full bg-surface border border-border text-sm font-medium text-foreground px-4 py-3.5 rounded-xl outline-none focus:border-primary transition-colors"
                   />
                 </div>
 
                 <div className="flex gap-3 pt-2">
-                  <button onClick={() => setTransferModal(null)} className="flex-1 py-4 text-gray-500 font-bold text-sm hover:text-white transition-colors">
+                  <button onClick={() => setTransferModal(null)} className="flex-1 py-4 text-gray-500 font-bold text-sm hover:text-foreground transition-colors">
                     {t("cancel")}
                   </button>
-                  <button 
+                  <button
                     onClick={handleTransfer}
                     disabled={!transferModal.destinationBucketId || !transferModal.amount || parseFloat(transferModal.amount) <= 0 || parseFloat(transferModal.amount) > sourceBucket.currentAmount}
-                    className="flex-[2] bg-[#4EDEA3] text-[#00285d] font-black text-sm uppercase tracking-wider py-4 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none"
+                    className="flex-[2] bg-primary text-primary-foreground font-black text-sm uppercase tracking-wider py-4 rounded-xl hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none"
                   >
                     {t("transfer") || "Transfer Now"}
                   </button>

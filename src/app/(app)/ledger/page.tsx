@@ -554,7 +554,7 @@ export default function LedgerPage() {
 
   return (
     <div className="flex min-h-screen min-w-0 flex-col pb-24 lg:pb-8">
-      <div className="ft-ledger-content w-full max-w-[1440px] px-6 py-5">
+      <div className="ft-ledger-content w-full">
         <div className="ft-ledger-toolbar">
           <h1 className="text-2xl font-semibold">{language==='th'?'สมุดรายการ':'Ledger'}</h1>
           <label className="ft-ledger-search"><Search size={16}/><input type="search" value={query} onChange={e=>setQuery(e.target.value)} aria-label={language==='th'?'ค้นหารายการ':'Search transactions'} placeholder={language==='th'?'ค้นหารายการ':'Search transactions'}/></label>

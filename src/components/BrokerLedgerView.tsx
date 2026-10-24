@@ -32,12 +32,12 @@ interface Entry {
 }
 
 const LABELS: Record<Kind, { th: string; en: string; color: string }> = {
-  DEPOSIT: { th: "ฝากเงินเข้า", en: "Deposit", color: "text-[#4EDEA3]" },
-  WITHDRAW: { th: "ถอนเงินออก", en: "Withdraw", color: "text-[#FFB4AB]" },
-  ADJUSTMENT: { th: "ปรับยอด", en: "Adjustment", color: "text-[#ADC6FF]" },
-  BUY: { th: "ซื้อ", en: "Buy", color: "text-[#FFB4AB]" },
-  SELL: { th: "ขาย", en: "Sell", color: "text-[#4EDEA3]" },
-  DIVIDEND: { th: "ปันผล", en: "Dividend", color: "text-[#E9C349]" },
+  DEPOSIT: { th: "ฝากเงินเข้า", en: "Deposit", color: "text-gain" },
+  WITHDRAW: { th: "ถอนเงินออก", en: "Withdraw", color: "text-loss" },
+  ADJUSTMENT: { th: "ปรับยอด", en: "Adjustment", color: "text-info" },
+  BUY: { th: "ซื้อ", en: "Buy", color: "text-loss" },
+  SELL: { th: "ขาย", en: "Sell", color: "text-gain" },
+  DIVIDEND: { th: "ปันผล", en: "Dividend", color: "text-warning" },
 };
 
 // Converts an amount between currencies, going through USD as the base.
@@ -251,14 +251,14 @@ export function BrokerLedgerView({
     cn(
       "flex-shrink-0 flex flex-col text-left px-4 py-2.5 rounded-2xl border transition-all",
       active
-        ? "bg-white text-background font-black border-white"
-        : "bg-surface/50 border-white/5 text-gray-400 font-bold hover:bg-white/5"
+        ? "bg-white text-background font-black border-foreground"
+        : "bg-surface border-foreground/5 text-gray-400 font-bold hover:bg-foreground/5"
     );
 
   return (
     <div className={cn("flex min-w-0 flex-col", symbol ? "overflow-hidden rounded-2xl border border-border" : "min-h-screen pb-24 lg:pb-8")}>
       {/* ─── Header ─────────────────────────────────────────────── */}
-      <div className={cn("bg-gradient-to-b from-[#1C1B1B] to-background border-b border-border", !symbol && "sticky top-16 z-40")}>
+      <div className={cn("bg-surface border-b border-border", !symbol && "sticky top-16 z-40")}>
         <div className="flex min-w-0 items-center justify-between p-3 sm:p-4">
           <DateRangeBar value={dateRange} onChange={setDateRange} className="min-w-0 flex-1" />
         </div>
@@ -268,12 +268,12 @@ export function BrokerLedgerView({
           <div className="flex max-w-full items-center gap-2 overflow-x-auto no-scrollbar pb-2">
             <button onClick={() => setAccountFilter("all")} className={chipClass(accountFilter === "all")}>
               <span className="text-sm">{portfolio.name}</span>
-              <span className="text-[10px] leading-none mt-1 opacity-70">{formatMoney(totalBalanceUSD)}</span>
+              <span className="text-xs leading-none mt-1 opacity-70">{formatMoney(totalBalanceUSD)}</span>
             </button>
             {accounts.map(a => (
               <button key={a.id} onClick={() => setAccountFilter(a.id)} className={chipClass(accountFilter === a.id)}>
                 <span className="text-sm">{a.name}</span>
-                <span className="text-[10px] leading-none mt-1 opacity-70">
+                <span className="text-xs leading-none mt-1 opacity-70">
                   {fmt(balanceOf(a.id), a.currency as Cur)}
                 </span>
               </button>
@@ -282,24 +282,24 @@ export function BrokerLedgerView({
 
           {/* IN / OUT / NET */}
           <div className="grid grid-cols-3 gap-2 sm:gap-3 mt-3">
-            <div className="min-w-0 bg-surface/50 border border-border rounded-xl px-2.5 py-3 sm:px-4 sm:py-4">
-              <p className="text-[8px] sm:text-[10px] text-gray-500 uppercase font-bold tracking-wide truncate">IN</p>
-              <div className="mt-1.5 whitespace-nowrap text-sm sm:text-xl font-black tabular-nums text-[#4EDEA3]">
+            <div className="min-w-0 bg-surface border border-border rounded-xl px-2.5 py-3 sm:px-4 sm:py-4">
+              <p className="text-xs sm:text-xs text-gray-500 uppercase font-bold tracking-wide truncate">IN</p>
+              <div className="mt-1.5 whitespace-nowrap text-sm sm:text-xl font-black tabular-nums text-gain">
                 {formatNativeTotals(records, 'inc')}
               </div>
             </div>
-            <div className="min-w-0 bg-surface/50 border border-border rounded-xl px-2.5 py-3 sm:px-4 sm:py-4">
-              <p className="text-[8px] sm:text-[10px] text-gray-500 uppercase font-bold tracking-wide truncate">OUT</p>
-              <div className="mt-1.5 whitespace-nowrap text-sm sm:text-xl font-black tabular-nums text-[#FFB4AB]">
+            <div className="min-w-0 bg-surface border border-border rounded-xl px-2.5 py-3 sm:px-4 sm:py-4">
+              <p className="text-xs sm:text-xs text-gray-500 uppercase font-bold tracking-wide truncate">OUT</p>
+              <div className="mt-1.5 whitespace-nowrap text-sm sm:text-xl font-black tabular-nums text-loss">
                 {formatNativeTotals(records, 'exp')}
               </div>
             </div>
-            <div className="min-w-0 bg-surface/50 border border-border rounded-xl px-2.5 py-3 sm:px-4 sm:py-4">
-              <p className="text-[8px] sm:text-[10px] text-gray-500 uppercase font-bold tracking-wide truncate">NET</p>
+            <div className="min-w-0 bg-surface border border-border rounded-xl px-2.5 py-3 sm:px-4 sm:py-4">
+              <p className="text-xs sm:text-xs text-gray-500 uppercase font-bold tracking-wide truncate">NET</p>
               <div
                 className={cn(
                   "mt-1.5 whitespace-nowrap text-sm sm:text-xl font-black tabular-nums",
-                  !netNegative ? "text-white" : "text-[#FFB4AB]"
+                  !netNegative ? "text-foreground" : "text-loss"
                 )}
               >
                 {formatNativeTotals(records, 'net')}
@@ -309,13 +309,13 @@ export function BrokerLedgerView({
         </div>
 
         {/* Type filter */}
-        <div className="px-3 sm:px-4 pb-4 border-t border-white/5 pt-3">
+        <div className="px-3 sm:px-4 pb-4 border-t border-foreground/5 pt-3">
           <div className="flex gap-2 overflow-x-auto no-scrollbar">
             <button
               onClick={() => setKindFilter("all")}
               className={cn(
                 "px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap",
-                kindFilter === "all" ? "bg-white text-background" : "bg-white/5 text-gray-400"
+                kindFilter === "all" ? "bg-white text-background" : "bg-foreground/5 text-gray-400"
               )}
             >
               ทั้งหมด
@@ -324,7 +324,7 @@ export function BrokerLedgerView({
               onClick={() => setKindFilter("cash")}
               className={cn(
                 "px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5",
-                kindFilter === "cash" ? "bg-[#ADC6FF] text-[#00285d]" : "bg-[#ADC6FF]/10 text-[#ADC6FF]"
+                kindFilter === "cash" ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary"
               )}
             >
               <Wallet size={14} /> โอนเข้า-ออก
@@ -333,7 +333,7 @@ export function BrokerLedgerView({
               onClick={() => setKindFilter("trade")}
               className={cn(
                 "px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5",
-                kindFilter === "trade" ? "bg-[#E9C349] text-[#00285d]" : "bg-[#E9C349]/10 text-[#E9C349]"
+                kindFilter === "trade" ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary"
               )}
             >
               <TrendingUp size={14} /> ซื้อ-ขาย/ปันผล
@@ -343,11 +343,11 @@ export function BrokerLedgerView({
       </div>
 
       {/* ─── Records ────────────────────────────────────────────── */}
-      <div className="flex-1 max-w-3xl w-full mx-auto p-4 sm:p-6 space-y-6">
+      <div className="flex-1 w-full py-4 space-y-6">
         {records.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4 text-3xl"><FinanceIcon name="receipt" size={26} /></div>
-            <h3 className="text-lg font-bold text-white mb-2">ยังไม่มีรายการ</h3>
+            <div className="w-16 h-16 rounded-full bg-foreground/5 flex items-center justify-center mb-4 text-3xl"><FinanceIcon name="receipt" size={26} /></div>
+            <h3 className="text-lg font-bold text-foreground mb-2">ยังไม่มีรายการ</h3>
             <p className="text-sm text-gray-500 max-w-[250px]">
               โอนเงินเข้าพอร์ตหรือบันทึกการซื้อขายเพื่อให้รายการแสดงที่นี่
             </p>
@@ -366,20 +366,20 @@ export function BrokerLedgerView({
             return (
               <div key={key}>
                 <div className="flex items-center justify-between gap-4 mb-3 pl-1">
-                  <h3 className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wider">
+                  <h3 className="text-xs sm:text-xs font-black text-gray-500 uppercase tracking-wider">
                     {dateLabel}
                   </h3>
                   <span
                     className={cn(
                       "text-xs font-black tabular-nums",
-                      !dayNegative ? "text-[#4EDEA3]" : "text-[#FFB4AB]"
+                      !dayNegative ? "text-gain" : "text-loss"
                     )}
                   >
                     {formatNativeTotals(items, 'net')}
                   </span>
                 </div>
 
-                <div className="bg-surface/50 border border-border rounded-2xl overflow-hidden">
+                <div className="bg-surface border border-border rounded-2xl overflow-hidden">
                   {items.map((e, idx) => {
                     const meta = LABELS[e.kind];
                     const label = language === "th" ? meta.th : meta.en;
@@ -401,30 +401,30 @@ export function BrokerLedgerView({
                       >
                         <div
                           className={cn(
-                            "w-9 h-9 rounded-full bg-white/5 flex items-center justify-center flex-shrink-0",
+                            "w-9 h-9 rounded-full bg-foreground/5 flex items-center justify-center flex-shrink-0",
                             meta.color
                           )}
                         >
                           <Icon size={16} />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-bold text-white truncate">{title}</p>
-                          <p className="text-[11px] text-gray-500">
+                          <p className="text-sm font-bold text-foreground truncate">{title}</p>
+                          <p className="text-xs text-gray-500">
                             {time}
                             {acc ? ` · ${acc}` : ""}
                           </p>
-                          {e.note && <p className="mt-1 break-words text-[11px] leading-relaxed text-gray-400">{e.note.replace(/\s*\[funding:[^\]]+\]/g, '')}</p>}
+                          {e.note && <p className="mt-1 break-words text-xs leading-relaxed text-gray-400">{e.note.replace(/\s*\[funding:[^\]]+\]/g, '')}</p>}
                         </div>
                         <div
                           className={cn(
                             "text-sm font-black tabular-nums whitespace-nowrap",
-                            e.signed >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]"
+                            e.signed >= 0 ? "text-gain" : "text-loss"
                           )}
                         >
                           {e.signed >= 0 ? "+" : "-"}
                           {fmt(e.amount, e.cur)}
                         </div>
-                        {!e.trade && (e.kind === 'DEPOSIT' || e.kind === 'WITHDRAW' || e.kind === 'ADJUSTMENT') && <button type="button" disabled={isMutatingTrade} aria-label="ลบรายการฝากถอน" className="ml-2 rounded-lg p-2 text-[#FFB4AB] disabled:opacity-40" onClick={async () => {
+                        {!e.trade && (e.kind === 'DEPOSIT' || e.kind === 'WITHDRAW' || e.kind === 'ADJUSTMENT') && <button type="button" disabled={isMutatingTrade} aria-label="ลบรายการฝากถอน" className="ml-2 rounded-lg p-2 text-loss disabled:opacity-40" onClick={async () => {
                           if (!window.confirm('ลบรายการนี้และย้อนยอดเงินที่เกี่ยวข้องทั้งสองฝั่งหรือไม่?')) return;
                           setIsMutatingTrade(true);
                           try { await deleteBrokerCashMovement(e.id); } finally { setIsMutatingTrade(false); }
@@ -434,7 +434,7 @@ export function BrokerLedgerView({
                             <button
                               type="button"
                               onClick={() => startEditingTrade(e.trade!)}
-                              className="rounded-lg p-2 text-gray-400 transition hover:bg-white/10 hover:text-white"
+                              className="rounded-lg p-2 text-gray-400 transition hover:bg-foreground/10 hover:text-foreground"
                               aria-label={language === "th" ? "แก้ไขรายการซื้อขาย" : "Edit trade"}
                               title={language === "th" ? "แก้ไขรายการซื้อขาย" : "Edit trade"}
                             >
@@ -444,7 +444,7 @@ export function BrokerLedgerView({
                               type="button"
                               disabled={isMutatingTrade || Boolean(tradeDeletionReason(e.trade!, trades, language))}
                               onClick={() => deleteTrade(e.trade!)}
-                              className="rounded-lg p-2 text-[#FFB4AB] transition hover:bg-[#FFB4AB]/10 disabled:cursor-not-allowed disabled:opacity-40"
+                              className="rounded-lg p-2 text-loss transition hover:bg-loss/10 disabled:cursor-not-allowed disabled:opacity-40"
                               aria-label={language === "th" ? "ลบรายการซื้อขาย" : "Delete trade"}
                               title={tradeDeletionReason(e.trade!, trades, language) || (language === "th" ? "ลบรายการซื้อขาย" : "Delete trade")}
                             >
@@ -467,15 +467,15 @@ export function BrokerLedgerView({
           <section role="dialog" aria-modal="true" aria-labelledby="broker-trade-edit-title" className="w-full max-w-md rounded-2xl border border-border bg-surface p-5 shadow-2xl">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-wider text-[#ADC6FF]">Broker ledger</p>
-                <h2 id="broker-trade-edit-title" className="mt-1 text-lg font-black text-white">
+                <p className="text-xs font-black uppercase tracking-wider text-info">Broker ledger</p>
+                <h2 id="broker-trade-edit-title" className="mt-1 text-lg font-black text-foreground">
                   {language === "th" ? "แก้ไขรายการซื้อขาย" : "Edit trade"}
                 </h2>
               </div>
               <button
                 type="button"
                 onClick={() => !isMutatingTrade && setEditingTrade(null)}
-                className="rounded-xl p-2 text-gray-400 hover:bg-white/10 hover:text-white"
+                className="rounded-xl p-2 text-gray-400 hover:bg-foreground/10 hover:text-foreground"
                 aria-label={language === "th" ? "ปิด" : "Close"}
               >
                 <X size={18} />
@@ -485,25 +485,25 @@ export function BrokerLedgerView({
             <div className="space-y-4">
               <label className="block">
                 <span className="mb-1.5 block text-xs font-bold text-gray-400">{language === "th" ? "สัญลักษณ์" : "Symbol"}</span>
-                <input value={editSymbol} onChange={event => setEditSymbol(event.target.value.toUpperCase())} className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm font-bold text-white outline-none focus:border-[#ADC6FF]" />
+                <input value={editSymbol} onChange={event => setEditSymbol(event.target.value.toUpperCase())} className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm font-bold text-foreground outline-none focus:border-primary" />
               </label>
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
                   <span className="mb-1.5 block text-xs font-bold text-gray-400">{language === "th" ? "จำนวนหุ้น" : "Quantity"}</span>
-                  <input type="number" min="0" step="any" value={editQuantity} onChange={event => setEditQuantity(event.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm font-bold text-white outline-none focus:border-[#ADC6FF]" />
+                  <input type="number" min="0" step="any" value={editQuantity} onChange={event => setEditQuantity(event.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm font-bold text-foreground outline-none focus:border-primary" />
                 </label>
                 <label className="block">
                   <span className="mb-1.5 block text-xs font-bold text-gray-400">
                     {language === "th" ? `ราคาต่อหน่วย ณ วันที่ซื้อขาย (${editingTrade.currency})` : `Execution price (${editingTrade.currency})`}
                   </span>
-                  <input type="number" min="0" step="any" value={editPrice} onChange={event => setEditPrice(event.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm font-bold text-white outline-none focus:border-[#ADC6FF]" />
+                  <input type="number" min="0" step="any" value={editPrice} onChange={event => setEditPrice(event.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm font-bold text-foreground outline-none focus:border-primary" />
                 </label>
               </div>
               <label className="block">
                 <span className="mb-1.5 block text-xs font-bold text-gray-400">{language === "th" ? "วันและเวลาที่ซื้อขาย" : "Trade date and time"}</span>
-                <input type="datetime-local" value={editDate} onChange={event => setEditDate(event.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm font-bold text-white outline-none focus:border-[#ADC6FF]" />
+                <input type="datetime-local" value={editDate} onChange={event => setEditDate(event.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm font-bold text-foreground outline-none focus:border-primary" />
               </label>
-              <p className="rounded-xl border border-[#ADC6FF]/15 bg-[#ADC6FF]/5 px-3 py-2 text-xs leading-relaxed text-gray-400">
+              <p className="rounded-xl border border-info/15 bg-info/5 px-3 py-2 text-xs leading-relaxed text-gray-400">
                 {language === "th"
                   ? "การแก้ไขจะอัปเดตรายการเงินสดของโบรกตามจำนวนและราคาที่บันทึก ไม่ใช่ราคาตลาดปัจจุบัน"
                   : "Saving updates the linked brokerage cash movement using this execution quantity and price, not the current market price."}
@@ -511,10 +511,10 @@ export function BrokerLedgerView({
             </div>
 
             <div className="mt-6 flex gap-3">
-              <button type="button" disabled={isMutatingTrade} onClick={() => setEditingTrade(null)} className="rounded-xl border border-border px-4 py-3 text-sm font-bold text-gray-300 hover:bg-white/5 disabled:opacity-50">
+              <button type="button" disabled={isMutatingTrade} onClick={() => setEditingTrade(null)} className="rounded-xl border border-border px-4 py-3 text-sm font-bold text-gray-300 hover:bg-foreground/5 disabled:opacity-50">
                 {language === "th" ? "ยกเลิก" : "Cancel"}
               </button>
-              <button type="button" disabled={isMutatingTrade} onClick={saveTradeEdit} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#4EDEA3] px-4 py-3 text-sm font-black text-[#00285d] hover:brightness-105 disabled:cursor-wait disabled:opacity-60">
+              <button type="button" disabled={isMutatingTrade} onClick={saveTradeEdit} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-black text-primary-foreground hover:brightness-105 disabled:cursor-wait disabled:opacity-60">
                 {isMutatingTrade ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
                 {language === "th" ? "บันทึกการแก้ไข" : "Save changes"}
               </button>

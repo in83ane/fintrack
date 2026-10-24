@@ -2,7 +2,7 @@
 
 import { FinanceIcon } from "@/src/components/FinanceIcon";
 import React, { useState, useMemo, useRef, useCallback } from "react";
-import { TrendingUp, TrendingDown, Plus, Briefcase, Wallet, BarChart3, ArrowUpRight, ArrowDownLeft, Download, Upload, FileSpreadsheet, CheckCircle2, CircleAlert } from "lucide-react";
+import { TrendingUp, TrendingDown, Plus, Briefcase, Wallet, BarChart3, ArrowUpRight, ArrowDownLeft, Download, Upload, FileSpreadsheet, CheckCircle2, CircleAlert, ChevronDown, Star } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/src/lib/utils";
 import { useApp } from "@/src/context/AppContext";
@@ -19,8 +19,8 @@ import { useRouter } from "next/navigation";
 
 function TopMoverLogo({ symbol }: { symbol: string }) {
   const [failed, setFailed] = useState(false);
-  return <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-white/[0.04]" aria-hidden="true">
-    {failed ? <span className="text-[10px] font-bold text-[#ADC6FF]">{symbol.slice(0, 2)}</span> : (
+  return <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-foreground/10 bg-foreground/[0.04]" aria-hidden="true">
+    {failed ? <span className="text-xs font-bold text-info">{symbol.slice(0, 2)}</span> : (
       <img src={`https://assets.parqet.com/logos/symbol/${encodeURIComponent(symbol)}?format=png`} alt="" width={32} height={32} loading="lazy" onError={() => setFailed(true)} className="h-full w-full object-contain p-1" />
     )}
   </span>;
@@ -140,7 +140,7 @@ function parseStockImport(buffer: ArrayBuffer): { rows: StockImportRow[]; errors
   return { rows, errors };
 }
 
-const SPARKLINE_PADDING = { top: 8, right: 16, bottom: 24, left: 50 };
+const SPARKLINE_PADDING = { top: 16, right: 24, bottom: 32, left: 82 };
 
 function NetWorthSparkline({ data, formatMoney, t }: { data: NetWorthPoint[]; formatMoney: (n: number) => string; t: (k: string) => string }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -209,7 +209,7 @@ function NetWorthSparkline({ data, formatMoney, t }: { data: NetWorthPoint[]; fo
     setHoveredIndex(Math.max(0, Math.min(idx, data.length - 1)));
   }, [data.length, W]);
 
-  const color = isPositive ? "#4EDEA3" : "#FFB4AB";
+  const color = "var(--ft-accent)";
   const hov = hoveredIndex != null ? data[hoveredIndex] : null;
 
   if (data.length < 2) {
@@ -221,12 +221,14 @@ function NetWorthSparkline({ data, formatMoney, t }: { data: NetWorthPoint[]; fo
   }
 
   return (
-    <div ref={containerRef} className="w-full h-full relative">
+    <div ref={containerRef} className="ft-chart w-full h-full relative">
       <svg
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
         className="w-full h-full cursor-crosshair"
-        onMouseMove={handleMouseMove}
+        role="img" aria-label="Net worth history. Use left and right arrow keys to explore values." tabIndex={0}
+        onKeyDown={e => { if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); setHoveredIndex(i => Math.max(0, Math.min(data.length - 1, (i ?? 0) + (e.key === "ArrowRight" ? 1 : -1)))); } }}
+        onPointerMove={handleMouseMove}
         onMouseLeave={() => setHoveredIndex(null)}
         style={{ overflow: 'visible' }}
       >
@@ -238,19 +240,19 @@ function NetWorthSparkline({ data, formatMoney, t }: { data: NetWorthPoint[]; fo
         </defs>
         {yTicks.map((v, i) => (
           <g key={i}>
-            <line x1={SPARKLINE_PADDING.left} y1={cy(v)} x2={W - SPARKLINE_PADDING.right} y2={cy(v)} stroke="rgba(255,255,255,0.04)" strokeWidth={1} />
-            <text x={SPARKLINE_PADDING.left - 6} y={cy(v) + 3} textAnchor="end" fill="#6B7280" fontSize={9} fontWeight={500}>
+            <line x1={SPARKLINE_PADDING.left} y1={cy(v)} x2={W - SPARKLINE_PADDING.right} y2={cy(v)} stroke="var(--ft-line)" strokeWidth={1} />
+            <text x={SPARKLINE_PADDING.left - 6} y={cy(v) + 3} textAnchor="end" fill="var(--ft-muted)" fontSize={12} fontWeight={500}>
               {formatMoney(v).replace(/[฿$]\s*/, '')}
             </text>
           </g>
         ))}
         {xTicks.map((d, i) => (
-          <text key={i} x={cx(d.index)} y={H - 6} textAnchor="middle" fill="#6B7280" fontSize={9} fontWeight={500}>
+          <text key={i} x={cx(d.index)} y={H - 6} textAnchor="middle" fill="var(--ft-muted)" fontSize={12} fontWeight={500}>
             {d.date}
           </text>
         ))}
         <path d={areaD} fill="url(#nw-grad)" />
-        <path d={pathD} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+        <path data-line pathLength={1} d={pathD} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
         {hov && hoveredIndex !== null && (
           <g>
             <line x1={cx(hoveredIndex)} y1={SPARKLINE_PADDING.top} x2={cx(hoveredIndex)} y2={H - SPARKLINE_PADDING.bottom} stroke="rgba(173,198,255,0.25)" strokeWidth={1} strokeDasharray="3,3" />
@@ -265,10 +267,10 @@ function NetWorthSparkline({ data, formatMoney, t }: { data: NetWorthPoint[]; fo
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="absolute top-1 left-1/2 -translate-x-1/2 bg-[#1e1e1e]/95 backdrop-blur-sm border border-border rounded-xl px-3 py-1.5 shadow-xl pointer-events-none z-10"
+            className="absolute top-1 left-1/2 -translate-x-1/2 bg-overlay border border-border rounded-xl px-3 py-1.5 shadow-xl pointer-events-none z-10"
           >
-            <div className="text-[10px] text-gray-400">{hov.date}</div>
-            <div className="text-sm font-bold text-white">{formatMoney(hov.value)}</div>
+            <div className="text-xs text-gray-400">{hov.date}</div>
+            <div className="text-sm font-bold text-foreground">{formatMoney(hov.value)}</div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -287,7 +289,7 @@ export default function DashboardPage() {
     totalInvested, totalUnrealizedPL, totalRealizedPL, totalDividends,
     fetchAssetMarketData, addAsset, addTrade,
     netWorthHistory, addToast, activePortfolio, activePortfolioId, isAllPortfolios,
-    portfolios, createPortfolio, selectPortfolio,
+    portfolios, createPortfolio, selectPortfolio, userProfile,
   } = useApp();
   const router = useRouter();
   const [isAddAssetOpen, setIsAddAssetOpen] = useState(false);
@@ -626,340 +628,229 @@ export default function DashboardPage() {
   const selectedBrokerLabel = isAllPortfolios ? (language === 'th' ? 'ทุกพอร์ต' : 'All portfolios') : activePortfolio?.name;
 
   // ─── FAB ──────────────────────────────────────────────────────────────
-  const [fabOpen, setFabOpen] = useState(false);
+  const [range, setRange] = useState('ALL');
+  const rangeDays: Record<string, number> = { '1D': 1, '1W': 7, '1M': 30, '3M': 90, '1Y': 365 };
+  const chartData = useMemo(() => {
+    if (range === 'ALL') return netWorthHistory;
+    const cutoff = Date.now() - rangeDays[range] * 86400000;
+    return netWorthHistory.filter(point => { const date = Date.parse(point.date); return Number.isFinite(date) && date >= cutoff; });
+  }, [range, netWorthHistory]);
+  const allocation = useMemo(() => {
+    const groups = new Map<string, number>();
+    assets.filter(asset => asset.is_active !== false).forEach(asset => groups.set(asset.symbol, (groups.get(asset.symbol) || 0) + asset.valueUSD));
+    return [...groups].sort((a,b) => b[1] - a[1]);
+  }, [assets]);
+  const allocationTotal = allocation.reduce((sum, entry) => sum + entry[1], 0);
+  const hour = new Date().getHours();
+  const greeting = language === 'th' ? (hour < 12 ? 'สวัสดีตอนเช้า' : hour < 18 ? 'สวัสดีตอนบ่าย' : 'สวัสดีตอนเย็น') : (hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening');
+  const addMenu = useRef<HTMLDetailsElement>(null);
+  const closeAddMenu = () => { if (addMenu.current) addMenu.current.open = false; };
+  React.useEffect(() => { const close = (e: PointerEvent) => { if (!addMenu.current?.contains(e.target as Node)) closeAddMenu(); }; const escape = (e: KeyboardEvent) => { if (e.key === 'Escape') closeAddMenu(); }; document.addEventListener('pointerdown', close); document.addEventListener('keydown', escape); return () => { document.removeEventListener('pointerdown', close); document.removeEventListener('keydown', escape); }; }, []);
 
   return (
-    <div className="relative isolate min-h-[calc(100dvh-4rem)] overflow-hidden py-7 sm:py-8 pb-24">
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[34rem] bg-[radial-gradient(ellipse_at_42%_0%,rgba(22,138,108,0.14),transparent_63%),radial-gradient(ellipse_at_88%_12%,rgba(91,105,184,0.13),transparent_52%)]" />
-      <div className="relative z-10 mx-auto w-full max-w-7xl space-y-5 px-4 sm:px-6 lg:px-8">
-
-      {/* ─── Greeting ─────────────────────────────────────────────────── */}
-      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#4EDEA3]">{selectedBrokerLabel}</p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
-              {language === 'th' ? 'ภาพรวมการลงทุน' : 'Investment overview'}
-            </h1>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-gray-400">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#4EDEA3]" />
-            {language === 'th' ? 'อัปเดตตามพอร์ตที่เลือก' : 'Shown for the selected portfolio'}
-          </div>
+    <div className="ft-dashboard pb-24">
+      <div className="space-y-6">
+        <header className="flex items-start justify-between gap-4">
+          <div><h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">{greeting}{userProfile?.initials ? `, ${userProfile.initials}` : ''}.</h1>
+            <p className="mt-2 text-sm text-muted">{selectedBrokerLabel} · {language === 'th' ? 'ภาพรวมสินทรัพย์และกิจกรรมของคุณ' : 'Your wealth and activity, in perspective.'}</p></div>
+          <details ref={addMenu} className="relative z-20 shrink-0"><summary className="ft-button ft-primary list-none [&::-webkit-details-marker]:hidden"><Plus size={17}/>{language === 'th' ? 'เพิ่ม' : 'Add'}<ChevronDown size={15}/></summary>
+            <div className="ft-menu absolute right-0 top-full mt-2">
+              <button onClick={() => {closeAddMenu();setIsAddAssetOpen(true);}}><Briefcase size={17}/>{t('addAsset')}</button>
+              <button onClick={() => {closeAddMenu();router.push('/trade/plan');}}><TrendingUp size={17}/>{language === 'th' ? 'วางแผนซื้อขาย' : 'Trade'}</button>
+              <button onClick={() => {closeAddMenu();router.push('/budget');}}><Wallet size={17}/>{language === 'th' ? 'จัดสรรเงิน' : 'Distribute'}</button>
+              <button onClick={() => {closeAddMenu();setIsImportOpen(true);}}><FileSpreadsheet size={17}/>{language === 'th' ? 'นำเข้า Excel' : 'Import Excel'}</button>
+            </div>
+          </details>
+        </header>
+        <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,2.2fr)_minmax(260px,1fr)]">
+          <section className="ft-panel min-w-0 overflow-hidden">
+            <div className="ft-hero-summary flex flex-wrap items-end justify-between gap-5 px-5 py-6 sm:px-7">
+              <div><h2 className="text-sm font-medium">{t('totalNetWorth')}</h2><p className="ft-number mt-2 text-4xl sm:text-5xl font-semibold" data-private><AnimatedNumber value={currentNetWorth} formatter={formatMoney}/></p></div>
+              <span className="text-sm font-medium">{currency}</span>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5 sm:px-7">
+              <p className="flex items-center gap-2 text-sm"><span className={netWorthReturnPct >= 0 ? 'text-gain' : 'text-loss'}>{netWorthReturnPct >= 0 ? '+' : '−'}{Math.abs(netWorthReturnPct).toFixed(1)}%</span><span className="text-muted">{language === 'th' ? 'ผลตอบแทนสะสม' : 'Total return'}</span></p>
+              <div className="ft-range flex gap-1 rounded-full bg-surface-2 p-1" role="group" aria-label="Chart range">{['1D','1W','1M','3M','1Y','ALL'].map(value => <button key={value} aria-pressed={range===value} className="relative rounded-full px-2.5 py-1.5 text-xs" onClick={() => setRange(value)}>{range===value && <motion.span layoutId="chart-range" className="absolute inset-0 rounded-full bg-primary" transition={{type:'spring',stiffness:400,damping:34}}/>}<span className={range===value ? 'relative text-primary-foreground' : 'relative text-muted'}>{value}</span></button>)}</div>
+            </div>
+            <div className="h-60 min-w-0 px-3 pt-6 sm:px-5"><NetWorthSparkline data={chartData} formatMoney={formatMoney} t={t}/></div>
+            <p className="px-5 pb-4 text-xs text-muted sm:px-7">{language === 'th' ? 'มูลค่าตามประวัติที่บันทึก · ' : 'Recorded portfolio history · '}1 USD = {Number.isFinite(exchangeRates[currency]) ? exchangeRates[currency].toLocaleString('en-US',{maximumFractionDigits:4}) : '—'} {currency}</p>
+          </section>
+          <aside className="ft-panel flex flex-col p-5 sm:p-6">
+            <div className="flex items-center justify-between gap-3"><h2 className="text-base font-semibold">{language === 'th' ? 'สัดส่วนการลงทุน' : 'Investment Mix'}</h2><span className="text-xs text-muted">{activePositions} {language === 'th' ? 'สินทรัพย์' : 'assets'}</span></div>
+            {allocationTotal > 0 ? <><div className="mt-7 flex h-3 overflow-hidden rounded-full" aria-label="Holdings allocation">{allocation.map(([name,value],i)=><div key={name} title={`${name}: ${(value/allocationTotal*100).toFixed(1)}%`} style={{width:`${value/allocationTotal*100}%`,background:`var(--ft-series-${i%4})`}}/>)}</div><div className="mt-6 space-y-5">{allocation.map(([name,value],i)=><div key={name}><div className="flex justify-between gap-3 text-sm"><span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full" style={{background:`var(--ft-series-${i%4})`}}/>{name}</span><span className="tabular-nums">{(value/allocationTotal*100).toFixed(1)}%</span></div><p className="mt-1 pl-4 text-xs text-muted" data-private>{formatMoney(value)}</p></div>)}</div></> : <div className="flex-1 py-7"><Briefcase size={26} className="mb-4 text-primary"/><p className="text-sm font-medium">{language === 'th' ? 'ยังไม่มีสินทรัพย์ลงทุน' : 'Your investment mix starts here'}</p><p className="mt-2 text-sm leading-6 text-muted">{language === 'th' ? 'เพิ่มสินทรัพย์จากเมนูด้านบนเพื่อดูสัดส่วนพอร์ต' : 'Add an investment using the menu above to see how your holdings are distributed.'}</p></div>}
+            <div className="mt-auto border-t border-border pt-5"><div className="flex items-center justify-between gap-3 text-sm"><span className="text-muted">{language === 'th' ? 'ยอดใน Bucket' : 'Bucket balance'}</span><span className="font-semibold" data-private>{formatMoney(totalBucketValue)}</span></div><button className="mt-4 flex items-center gap-2 text-sm text-primary" onClick={()=>router.push('/portfolio')}>{language === 'th' ? 'ดูพอร์ตลงทุน' : 'View Portfolio'}<ArrowUpRight size={16}/></button></div>
+          </aside>
         </div>
-        <p className="mt-1 text-xs text-gray-500">
-          {language === 'th' ? 'เพิ่มสินทรัพย์ทีละรายการ หรือนำเข้าจากไฟล์ Excel ได้ในไม่กี่ขั้นตอน' : 'Add investments one at a time or import an Excel file in a few steps.'}
-        </p>
-      </motion.div>
+        {/* ─── Main Grid: P/L Metrics + Cashflow + Top Movers ─────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
 
-      {/* ─── Empty State ──────────────────────────────────────────────── */}
-      {isEmpty && (
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-[#172522] via-[#151a19] to-[#171827] p-6 sm:p-8">
-          <div className="pointer-events-none absolute -right-12 -top-16 h-56 w-56 rounded-full bg-[#4EDEA3]/10 blur-3xl" />
-          <div className="relative grid gap-5 sm:grid-cols-[1fr_auto] sm:items-end">
-            <div>
-              <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl border border-[#4EDEA3]/20 bg-[#4EDEA3]/10 text-[#4EDEA3]"><Briefcase size={20} /></div>
-              <h2 className="text-xl font-bold text-white">{language === 'th' ? 'เริ่มติดตามพอร์ตของคุณ' : 'Start tracking your portfolio'}</h2>
-              <p className="mt-1 max-w-xl text-sm leading-6 text-gray-400">{language === 'th' ? 'เลือกโบรกเกอร์ก่อน แล้วเพิ่มสินทรัพย์เองหรือนำเข้าหลายรายการจาก Excel ได้ทันที' : 'Choose a broker first, then add an investment manually or import multiple rows from Excel.'}</p>
-            </div>
-            <div className="flex flex-col gap-2 sm:min-w-56">
-              <button onClick={() => setIsImportOpen(true)} className="flex items-center justify-center gap-2 rounded-xl bg-[#4EDEA3] px-4 py-3 text-sm font-bold text-[#062c25] transition hover:brightness-110"><FileSpreadsheet size={17} />{language === 'th' ? 'นำเข้าจาก Excel' : 'Import from Excel'}</button>
-              <button onClick={() => setIsAddAssetOpen(true)} className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-white transition hover:bg-white/10"><Plus size={17} />{language === 'th' ? 'เพิ่มทีละรายการ' : 'Add one investment'}</button>
-            </div>
-          </div>
-        </motion.div>
-      )}
-
-      {/* ─── Quick Stats (4 cards) ─────────────────────────────────── */}
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: language === 'th' ? 'สินทรัพย์' : 'Assets', value: activePositions.toString(), icon: <Briefcase size={16} />, color: '#ADC6FF', onClick: () => router.push('/portfolio') },
-          { label: language === 'th' ? 'กำไร/ขาดทุน' : "P/L", value: `${totalUnrealizedPL >= 0 ? '+' : ''}${formatMoney(totalUnrealizedPL)}`, icon: <BarChart3 size={16} />, color: totalUnrealizedPL >= 0 ? '#4EDEA3' : '#FFB4AB', onClick: () => router.push('/portfolio') },
-          { label: language === 'th' ? 'เงินในกระเป๋า' : 'Buckets', value: formatMoney(totalBucketValue), icon: <Wallet size={16} />, color: '#E9C349', onClick: () => router.push('/budget') },
-          { label: language === 'th' ? 'เดือนนี้' : 'This Month', value: `${monthNet >= 0 ? '+' : ''}${formatEntryMoney(monthNet)}`, icon: <TrendingUp size={16} />, color: monthNet >= 0 ? '#4EDEA3' : '#FFB4AB', onClick: () => router.push('/cashflow') },
-        ].map((stat, i) => (
-          <motion.button key={i} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={stat.onClick}
-            className="bg-surface/50 backdrop-blur-xl rounded-2xl p-4 border border-border text-left hover:border-white/10 transition-all group">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${stat.color}15`, color: stat.color }}>{stat.icon}</div>
-            </div>
-            <div className="text-lg font-bold text-white tracking-tight truncate">{stat.value}</div>
-            <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">{stat.label}</div>
-          </motion.button>
-        ))}
-      </motion.div>
-
-      {/* ─── Net Worth Hero + Chart ───────────────────────────────── */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="bg-surface/50 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-4 sm:p-6 relative overflow-hidden border border-border shadow-xl"
-      >
-        <div className="flex flex-col sm:flex-row justify-between items-start gap-3 mb-4 relative z-10">
-          <div className="space-y-1">
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{t("totalNetWorth")}</span>
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tighter text-white leading-none">
-              <AnimatedNumber value={currentNetWorth} formatter={(v) => formatMoney(v)} />
-            </h1>
-            <div className="flex items-center gap-2">
-              <div className={cn("flex items-center gap-1", getPnLColor(netWorthReturnPct))}>
-                {netWorthReturnPct >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                <span className="text-xs sm:text-sm font-bold">{formatPercent(netWorthReturnPct, 1)}</span>
-              </div>
-              <span className="text-gray-500 text-[10px] font-medium uppercase">
-                Rate: 1 USD = {Number.isFinite(exchangeRates[currency]) ? exchangeRates[currency].toLocaleString('en-US', { maximumFractionDigits: 4 }) : '—'} {currency}
-              </span>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => setIsAddAssetOpen(true)}
-              className="px-4 py-2 bg-white/5 text-[#ADC6FF] border border-[#ADC6FF]/30 rounded-xl font-black text-xs flex items-center gap-1.5 hover:bg-[#ADC6FF]/10 transition-all"
-            >
-              <Plus size={14} /> {t("addAsset") || "Add Asset"}
-            </button>
-            <button
-              onClick={() => router.push('/trade/plan')}
-              className="px-4 py-2 bg-[#4EDEA3]/10 text-[#4EDEA3] border border-[#4EDEA3]/30 rounded-xl font-black text-xs flex items-center gap-1.5 hover:bg-[#4EDEA3]/20 transition-all"
-            >
-              <TrendingUp size={14} /> {t("trade") || "Trade"}
-            </button>
-            <button
-              onClick={() => router.push('/budget')}
-              className="px-4 py-2 bg-[#E9C349]/10 text-[#E9C349] border border-[#E9C349]/30 rounded-xl font-black text-xs flex items-center gap-1.5 hover:bg-[#E9C349]/20 transition-all"
-            >
-              <Wallet size={14} /> {t("distribute") || "Distribute"}
-            </button>
-            <button
-              onClick={() => setIsImportOpen(true)}
-              className="px-4 py-2 bg-white/5 text-gray-300 border border-border rounded-xl font-black text-xs flex items-center gap-1.5 hover:bg-white/10 transition-all"
-            >
-              <FileSpreadsheet size={14} /> {language === 'th' ? 'นำเข้า Excel' : 'Import Excel'}
-            </button>
-          </div>
-        </div>
-        <div className="h-40 sm:h-44 min-w-0" style={{ minHeight: 160 }}>
-          <NetWorthSparkline data={netWorthHistory} formatMoney={formatMoney} t={t} />
-        </div>
-      </motion.div>
-
-      {/* ─── Main Grid: P/L Metrics + Cashflow + Top Movers ─────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-
-        {/* P/L Summary (compact 6 metrics) */}
-        <div className="lg:col-span-5 grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {[
-            { label: t("totalInvested"), value: formatMoney(totalInvested), color: '#ADC6FF' },
-            { label: t("unrealizedPL"), value: formatPnL(totalUnrealizedPL, formatMoney), color: totalUnrealizedPL >= 0 ? '#4EDEA3' : '#FFB4AB' },
-            { label: t("realizedPL"), value: formatPnL(totalRealizedPL, formatMoney), color: totalRealizedPL >= 0 ? '#4EDEA3' : '#FFB4AB' },
-            { label: t("dividends"), value: formatMoney(totalDividends), color: '#E9C349' },
-            { label: 'Max DD', value: `-${maxDrawdown.toFixed(1)}%`, color: '#FFB4AB' },
-            { label: 'PF', value: profitFactor === Number.POSITIVE_INFINITY ? '∞' : profitFactor.toFixed(2), color: profitFactor >= 1.5 ? '#4EDEA3' : '#9CA3AF' },
-          ].map((m, i) => (
-            <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 + i * 0.03 }}
-              className="bg-surface/50 p-3 sm:p-4 rounded-2xl border border-border">
-              <p className="text-[9px] font-bold uppercase tracking-wide mb-1" style={{ color: m.color }}>{m.label}</p>
-              <h3 className="text-sm sm:text-lg font-bold text-white tracking-tight truncate">{m.value}</h3>
-            </motion.div>
-          ))}
-        </div>
-
-        {/* Cashflow + Recent */}
-        <div className="lg:col-span-4 bg-surface/50 rounded-2xl border border-border p-4 flex flex-col">
-          <div className="flex justify-between items-center mb-3">
-            <div>
-              <span className="text-[10px] text-[#ADC6FF] uppercase tracking-wide font-bold">{t("cashflowOverview")}</span>
-              <h3 className="text-sm font-bold text-white">{t("netCashflow")}</h3>
-            </div>
-            <button onClick={() => setIsAddCashflowOpen(true)}
-              className="w-7 h-7 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors">
-              <Plus size={12} className="text-[#ADC6FF]" />
-            </button>
-          </div>
-
-          <h2 className={cn("text-2xl font-bold tracking-tight mb-3", monthNet >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
-            {monthNet >= 0 ? "+" : "-"}{formatEntryMoney(monthNet)}
-          </h2>
-
-          <div className="grid grid-cols-2 gap-2 mb-4">
-            <div className="flex items-center gap-2 bg-white/5 px-3 py-2 rounded-xl">
-              <div className="w-1.5 h-1.5 rounded-full bg-[#4EDEA3]" />
-              <span className="text-[10px] text-gray-400 font-bold">{t("income")}</span>
-              <span className="text-xs text-white font-bold ml-auto">{formatEntryMoney(monthIncome)}</span>
-            </div>
-            <div className="flex items-center gap-2 bg-white/5 px-3 py-2 rounded-xl">
-              <div className="w-1.5 h-1.5 rounded-full bg-[#FFB4AB]" />
-              <span className="text-[10px] text-gray-400 font-bold">{t("expense")}</span>
-              <span className="text-xs text-white font-bold ml-auto">{formatEntryMoney(monthExpense)}</span>
-            </div>
-          </div>
-
-          {/* Recent Activities */}
-          <div className="flex-1 space-y-1.5 overflow-y-auto">
-            {recentActivities.map((act, idx) => {
-              const isIncome = act.type === 'INCOME';
-              return (
-                <div key={`${act.id}-${idx}`} className="flex items-center justify-between text-xs px-2 py-1.5 rounded-lg hover:bg-white/5 transition-colors">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className={cn("w-5 h-5 rounded-lg flex items-center justify-center flex-shrink-0",
-                      isIncome ? "bg-[#4EDEA3]/10" : "bg-[#FFB4AB]/10"
-                    )}>
-                      {isIncome ? <ArrowDownLeft size={10} className="text-[#4EDEA3]" /> : <ArrowUpRight size={10} className="text-[#FFB4AB]" />}
-                    </div>
-                    <span className="text-white font-bold truncate">{act.category}</span>
-                  </div>
-                  <span className={cn("font-bold flex-shrink-0 ml-2", isIncome ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
-                    {isIncome ? "+" : "-"}{formatEntryMoney(act.amount)}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-
-          <button onClick={() => router.push('/ledger')}
-            className="w-full mt-3 py-2 rounded-xl border border-border text-[10px] font-bold uppercase tracking-wide text-gray-400 hover:bg-white/5 transition-all text-center">
-            {language === 'th' ? 'ดูทั้งหมด' : 'View All'} →
-          </button>
-        </div>
-
-        {/* Top Movers */}
-        <div className="lg:col-span-3 bg-surface/50 rounded-2xl border border-border p-4 flex flex-col">
-          <div className="mb-3 flex flex-wrap gap-2 text-[10px] font-bold">
-            <button type="button" aria-pressed={!showFavorites} onClick={() => setShowFavorites(false)} className={cn('rounded-lg px-2 py-2', !showFavorites ? 'bg-white/10 text-white' : 'text-gray-500')}>Top Movers · 1D</button>
-            <button type="button" aria-pressed={showFavorites} onClick={() => setShowFavorites(true)} className={cn('rounded-lg px-2 py-2', showFavorites ? 'bg-amber-300/10 text-amber-300' : 'text-gray-500')}>★ Favorites ({assets.filter(a => a.is_active !== false && a.isFavorite).length})</button>
-          </div>
-          <div className="space-y-2 flex-1 max-h-96 overflow-y-auto">
-            {topMovers.length === 0 && (
-              <div className="flex-1 flex items-center justify-center py-8 text-gray-500 text-xs">{showFavorites ? 'กด ★ ที่ Portfolio เพื่อติดตามสินทรัพย์' : 'ยังไม่มีราคาเปลี่ยนแปลง 1 วัน'}</div>
-            )}
-            {topMovers.map(a => (
-              <button key={`${a.portfolioId}:${a.symbol}`} onClick={() => router.push(`/portfolio`)}
-                className="w-full flex items-center justify-between gap-3 p-3 text-left rounded-xl bg-white/[0.02] hover:bg-white/[0.06] transition-all border border-transparent hover:border-border">
-                <div className="flex min-w-0 flex-1 items-center gap-2">
-                  <TopMoverLogo key={a.symbol} symbol={a.symbol} />
-                  <div className="min-w-0 text-left">
-                    <span className="text-xs font-bold text-white block truncate">{a.symbol}</span>
-                    <span className="text-[9px] text-gray-500 truncate block" title={a.name}>{a.name}</span>
-                  </div>
-                </div>
-                <div className="shrink-0 whitespace-nowrap text-right tabular-nums">
-                  <span className="text-xs font-bold text-white block">{formatMoney(a.valueUSD)}</span>
-                  <span className={cn("text-[10px] font-bold", Math.abs(marketQuotes[a.symbol]?.dayChangePercent ?? 0) < 0.005 ? 'text-gray-400' : (marketQuotes[a.symbol]?.dayChangePercent ?? 0) > 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
-                    {marketQuotes[a.symbol]?.dayChangePercent == null ? '—' : `${(marketQuotes[a.symbol].dayChangePercent ?? 0) >= 0.005 ? '+' : ''}${Math.abs(marketQuotes[a.symbol].dayChangePercent ?? 0) < 0.005 ? '0.00' : marketQuotes[a.symbol].dayChangePercent!.toFixed(2)}%`} · 1D
-                  </span>
-                </div>
-              </button>
+          {/* P/L Summary (compact 6 metrics) */}
+          <div className="ft-stat-strip lg:col-span-12 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-0 border-y border-border py-2">
+            {[
+              { label: t("totalInvested"), value: formatMoney(totalInvested), color: '#ADC6FF' },
+              { label: t("unrealizedPL"), value: formatPnL(totalUnrealizedPL, formatMoney), color: totalUnrealizedPL >= 0 ? '#4EDEA3' : '#FFB4AB' },
+              { label: t("realizedPL"), value: formatPnL(totalRealizedPL, formatMoney), color: totalRealizedPL >= 0 ? '#4EDEA3' : '#FFB4AB' },
+              { label: t("dividends"), value: formatMoney(totalDividends), color: '#E9C349' },
+              { label: 'Max DD', value: `-${maxDrawdown.toFixed(1)}%`, color: '#FFB4AB' },
+              { label: 'PF', value: profitFactor === Number.POSITIVE_INFINITY ? '∞' : profitFactor.toFixed(2), color: profitFactor >= 1.5 ? '#4EDEA3' : '#9CA3AF' },
+            ].map((m, i) => (
+              <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 + i * 0.03 }}
+                className="px-4 py-4">
+                <p className="text-xs font-medium text-muted mb-2">{m.label}</p>
+                <h3 className="text-base sm:text-lg font-semibold ft-number truncate" data-private>{m.value}</h3>
+              </motion.div>
             ))}
           </div>
-          <button onClick={() => router.push('/portfolio')}
-            className="w-full mt-3 py-2 rounded-xl border border-border text-[10px] font-bold uppercase tracking-wide text-gray-400 hover:bg-white/5 transition-all text-center">
-            {t("portfolio")} →
-          </button>
-        </div>
-      </div>
 
-      {/* ─── FAB ──────────────────────────────────────────────────── */}
-      <div className="hidden sm:flex fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-50 flex-col items-end gap-2">
-        <AnimatePresence>
-          {fabOpen && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.8, y: 10 }}
-              transition={{ duration: 0.18 }}
-              className="flex flex-col gap-2 items-end"
-            >
-              {[
-                { label: language === 'th' ? 'บันทึกรายได้' : 'Log Income', bg: '#4EDEA3', icon: 'wallet', onClick: () => { setIsAddCashflowOpen(true); setFabOpen(false); } },
-                { label: language === 'th' ? 'บันทึกรายจ่าย' : 'Log Expense', bg: '#FFB4AB', icon: 'expense', onClick: () => { setIsAddCashflowOpen(true); setFabOpen(false); } },
-                { label: language === 'th' ? 'เพิ่มสินทรัพย์' : 'Add Asset', bg: '#ADC6FF', icon: 'investment', onClick: () => { setIsAddAssetOpen(true); setFabOpen(false); } },
-                { label: language === 'th' ? 'เทรด' : 'Trade', bg: '#E9C349', icon: 'lightning', onClick: () => { router.push('/trade/plan'); setFabOpen(false); } },
-              ].map((action, i) => (
-                <motion.button
-                  key={action.label}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  transition={{ delay: i * 0.04 }}
-                  onClick={action.onClick}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-full shadow-xl text-[#0E0E0E] text-xs font-bold tracking-wide hover:brightness-110 active:scale-95 transition-all"
-                  style={{ backgroundColor: action.bg }}
-                >
-                  <span><FinanceIcon name={action.icon} size={16} /></span>
-                  <span>{action.label}</span>
-                </motion.button>
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
-        <motion.button
-          onClick={() => setFabOpen(v => !v)}
-          whileHover={{ scale: 1.08 }}
-          whileTap={{ scale: 0.93 }}
-          className="w-14 h-14 rounded-full bg-[#ADC6FF] text-[#00285d] shadow-2xl shadow-[#ADC6FF]/30 flex items-center justify-center transition-all"
-        >
-          <motion.span animate={{ rotate: fabOpen ? 45 : 0 }} transition={{ duration: 0.2 }} className="text-2xl font-bold leading-none">
-            +
-          </motion.span>
-        </motion.button>
-      </div>
+          {/* Cashflow + Recent */}
+          <div className="lg:col-span-7 bg-surface rounded-2xl border border-border p-4 flex flex-col">
+            <div className="flex justify-between items-center mb-3">
+              <div>
+                <p className="text-sm text-muted">{t("cashflowOverview")}</p>
+                <h3 className="text-sm font-bold text-foreground">{t("netCashflow")}</h3>
+              </div>
+              <button aria-label={language === "th" ? "เพิ่มรายการเงินสด" : "Add cash entry"} onClick={() => setIsAddCashflowOpen(true)}
+                className="w-7 h-7 rounded-full bg-foreground/5 flex items-center justify-center hover:bg-foreground/10 transition-colors">
+                <Plus size={12} className="text-info" />
+              </button>
+            </div>
 
-      {/* ─── Modals ──────────────────────────────────────────────── */}
-      <AddAssetModal variant="portfolio" isOpen={isAddAssetOpen} onClose={() => setIsAddAssetOpen(false)} />
-            <AddCashflowModal isOpen={isAddCashflowOpen} onClose={() => setIsAddCashflowOpen(false)} />
+            <h2 className={cn("text-2xl font-bold tracking-tight mb-3", monthNet >= 0 ? "text-gain" : "text-loss")}>
+              {monthNet >= 0 ? "+" : "-"}{formatEntryMoney(monthNet)}
+            </h2>
 
-      <Modal isOpen={isImportOpen} onClose={() => { setIsImportOpen(false); resetImport(); }} title={language === 'th' ? 'นำเข้าหุ้นจาก Excel' : 'Import investments from Excel'}>
-        <p className="mb-3 text-xs text-gray-400">นำเข้าข้อมูลจากภายนอก: รายการซื้อในไฟล์บันทึกเป็นสินทรัพย์ที่ถืออยู่แล้ว โดยไม่ตัดเงินจากกระเป๋า</p>
-        <div className="space-y-5">
-          <div className="rounded-2xl border border-border bg-white/[0.03] p-4">
-            <div className="flex items-start gap-3">
-              <div className="mt-0.5 rounded-xl bg-[#4EDEA3]/10 p-2 text-[#4EDEA3]"><FileSpreadsheet size={18} /></div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-bold text-white">{language === 'th' ? 'เริ่มจากไฟล์ตัวอย่าง' : 'Start with the template'}</p>
-                <p className="mt-1 text-xs leading-5 text-gray-400">{language === 'th' ? 'ไฟล์จะใส่รายชื่อพอร์ตของคุณในช่อง Broker เป็น dropdown เลือกพอร์ตเดิมได้ทันที หรือพิมพ์ชื่อใหม่เพื่อให้ระบบสร้างพอร์ตตอนนำเข้า' : 'The Broker dropdown includes your existing portfolios. Select one to import into it, or type a new name to create a portfolio during import.'}</p>
-                <button type="button" onClick={downloadImportTemplate} disabled={isTemplateDownloading} className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-[#4EDEA3] hover:text-white disabled:cursor-wait disabled:opacity-60"><Download size={14} />{isTemplateDownloading ? (language === 'th' ? 'กำลังสร้างไฟล์…' : 'Preparing file…') : (language === 'th' ? 'ดาวน์โหลดไฟล์ตัวอย่าง' : 'Download starter file')}</button>
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              <div className="flex items-center gap-2 bg-foreground/5 px-3 py-2 rounded-xl">
+                <div className="w-1.5 h-1.5 rounded-full bg-gain" />
+                <span className="text-xs text-gray-400 font-bold">{t("income")}</span>
+                <span className="text-xs text-foreground font-bold ml-auto">{formatEntryMoney(monthIncome)}</span>
+              </div>
+              <div className="flex items-center gap-2 bg-foreground/5 px-3 py-2 rounded-xl">
+                <div className="w-1.5 h-1.5 rounded-full bg-loss" />
+                <span className="text-xs text-gray-400 font-bold">{t("expense")}</span>
+                <span className="text-xs text-foreground font-bold ml-auto">{formatEntryMoney(monthExpense)}</span>
               </div>
             </div>
-          </div>
 
-          <div className="rounded-2xl border border-[#4EDEA3]/20 bg-[#4EDEA3]/5 p-3 text-xs text-gray-300">
-            {language === 'th'
-              ? 'ระบบจับคู่ชื่อ Broker ในไฟล์กับพอร์ตที่มีอยู่โดยไม่สนตัวพิมพ์เล็กใหญ่ หากไม่พบชื่อที่ตรงกัน ระบบจะสร้างพอร์ตลงทุนใหม่พร้อมบัญชีเงินสด THB และ USD ให้'
-              : 'Broker names are matched to existing portfolios without case sensitivity. A name that is not found creates a new investment portfolio with THB and USD cash accounts.'}
-          </div>
-
-          <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border px-5 py-7 text-center transition hover:border-[#4EDEA3]/40 hover:bg-[#4EDEA3]/5">
-            <Upload size={25} className="text-gray-500" />
-            <span className="text-sm font-bold text-white">{language === 'th' ? 'เลือกไฟล์ Excel เพื่อพรีวิว' : 'Choose an Excel file to preview'}</span>
-            <span className="text-[11px] text-gray-500">XLSX, XLSM, XLS</span>
-            <input type="file" accept={IMPORT_FILE_TYPES} onChange={handleStockFile} className="hidden" />
-          </label>
-
-          {importFileName && (
-            <div className="rounded-xl border border-border bg-black/10 p-3">
-              <div className="flex items-center gap-2 text-xs font-semibold text-white"><FileSpreadsheet size={15} className="text-[#4EDEA3]" />{importFileName}</div>
-              {importRows.length > 0 && <div className="mt-3 overflow-hidden rounded-lg border border-white/5">
-                <div className="grid grid-cols-[1fr_.85fr_.65fr_.85fr_.65fr_1fr] gap-2 bg-white/[0.04] px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-gray-500"><span>Ticker</span><span>Action</span><span>Qty</span><span>Price</span><span>Currency</span><span>Broker</span></div>
-                {importRows.slice(0, 4).map(row => <div key={`${row.row}-${row.symbol}`} className="grid grid-cols-[1fr_.85fr_.65fr_.85fr_.65fr_1fr] gap-2 border-t border-white/5 px-3 py-2 text-xs text-gray-300"><span className="font-bold text-white">{row.symbol}</span><span>{row.type}</span><span>{row.shares.toLocaleString()}</span><span>{row.price.toLocaleString()}</span><span>{row.currency}</span><span className={row.broker ? 'truncate text-gray-300' : 'text-[#E9C349]'}>{row.broker || (activePortfolio?.kind === 'trading' ? activePortfolio.name : 'ต้องระบุ')}</span></div>)}
-              </div>}
-              {importRows.length > 4 && <p className="mt-2 text-[11px] text-gray-500">{language === 'th' ? `และอีก ${importRows.length - 4} รายการ` : `and ${importRows.length - 4} more`}</p>}
+            {/* Recent Activities */}
+            <div className="flex-1 space-y-1.5 overflow-y-auto">
+              {recentActivities.map((act, idx) => {
+                const isIncome = act.type === 'INCOME';
+                return (
+                  <div key={`${act.id}-${idx}`} className="flex items-center justify-between text-xs px-2 py-1.5 rounded-lg hover:bg-foreground/5 transition-colors">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className={cn("w-5 h-5 rounded-lg flex items-center justify-center flex-shrink-0",
+                        isIncome ? "bg-gain/10" : "bg-loss/10"
+                      )}>
+                        {isIncome ? <ArrowDownLeft size={10} className="text-gain" /> : <ArrowUpRight size={10} className="text-loss" />}
+                      </div>
+                      <span className="text-foreground font-bold truncate">{act.category}</span>
+                    </div>
+                    <span className={cn("font-bold flex-shrink-0 ml-2", isIncome ? "text-gain" : "text-loss")}>
+                      {isIncome ? "+" : "-"}{formatEntryMoney(act.amount)}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
-          )}
 
-          {importErrors.length > 0 && <div className="rounded-xl border border-[#FFB4AB]/20 bg-[#FFB4AB]/5 p-3 text-xs text-[#FFB4AB]"><div className="flex items-center gap-1.5 font-bold"><CircleAlert size={14} />{language === 'th' ? 'รายการที่ข้าม' : 'Rows skipped'}</div><ul className="mt-1.5 space-y-1 text-[11px]">{importErrors.slice(0, 3).map(error => <li key={error}>{error}</li>)}</ul></div>}
-
-          {importStatus.type !== 'idle' && <div className={cn("flex items-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-semibold", importStatus.type === 'success' ? 'border-[#4EDEA3]/20 bg-[#4EDEA3]/5 text-[#4EDEA3]' : importStatus.type === 'error' ? 'border-[#FFB4AB]/20 bg-[#FFB4AB]/5 text-[#FFB4AB]' : 'border-border bg-white/[0.03] text-gray-300')}>
-            {importStatus.type === 'success' && <CheckCircle2 size={15} />}{importStatus.message}
-          </div>}
-
-          <div className="flex gap-3 pt-1">
-            <button onClick={() => { setIsImportOpen(false); resetImport(); }} className="flex-1 rounded-xl border border-border px-4 py-3 text-sm font-bold text-gray-300 transition hover:bg-white/5">{language === 'th' ? 'ยกเลิก' : 'Cancel'}</button>
-            <button onClick={importStocks} disabled={importRows.length === 0 || importStatus.type === 'importing'} className="flex-[1.5] rounded-xl bg-[#4EDEA3] px-4 py-3 text-sm font-bold text-[#062c25] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40">{importStatus.type === 'importing' ? (language === 'th' ? 'กำลังนำเข้า…' : 'Importing…') : (language === 'th' ? `ยืนยัน ${importRows.length || ''} รายการ` : `Import ${importRows.length || ''} items`)}</button>
+            <button onClick={() => router.push('/ledger')}
+              className="w-full mt-3 py-2 rounded-xl border border-border text-xs font-bold uppercase tracking-wide text-gray-400 hover:bg-foreground/5 transition-all text-center">
+              {language === 'th' ? 'ดูทั้งหมด' : 'View All'} →
+            </button>
           </div>
-          <p className="text-center text-[10px] leading-4 text-gray-600">{language === 'th' ? 'ไฟล์ XLSM จะอ่านเฉพาะข้อมูลในชีตและจะไม่เรียกใช้ macro' : 'XLSM files are read as worksheet data only; macros are never run.'}</p>
+
+          {/* Top Movers */}
+          <div className="lg:col-span-5 bg-surface rounded-2xl border border-border p-4 flex flex-col">
+            <div className="mb-3 flex flex-wrap gap-2 text-xs font-bold">
+              <button type="button" aria-pressed={!showFavorites} onClick={() => setShowFavorites(false)} className={cn('rounded-lg px-2 py-2', !showFavorites ? 'bg-foreground/10 text-foreground' : 'text-gray-500')}>Top Movers · 1D</button>
+              <button type="button" aria-pressed={showFavorites} onClick={() => setShowFavorites(true)} className={cn('rounded-lg px-2 py-2', showFavorites ? 'bg-amber-300/10 text-amber-300' : 'text-gray-500')}>★ Favorites ({assets.filter(a => a.is_active !== false && a.isFavorite).length})</button>
+            </div>
+            <div className="space-y-2 flex-1 max-h-96 overflow-y-auto">
+              {topMovers.length === 0 && (
+                <div className="flex-1 flex items-center justify-center py-8 text-gray-500 text-xs">{showFavorites ? 'กด ★ ที่ Portfolio เพื่อติดตามสินทรัพย์' : 'ยังไม่มีราคาเปลี่ยนแปลง 1 วัน'}</div>
+              )}
+              {topMovers.map(a => (
+                <button key={`${a.portfolioId}:${a.symbol}`} onClick={() => router.push(`/portfolio`)}
+                  className="w-full flex items-center justify-between gap-3 p-3 text-left rounded-xl bg-foreground/[0.02] hover:bg-foreground/[0.06] transition-all border border-transparent hover:border-border">
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
+                    <TopMoverLogo key={a.symbol} symbol={a.symbol} />
+                    <div className="min-w-0 text-left">
+                      <span className="text-xs font-bold text-foreground block truncate">{a.symbol}</span>
+                      <span className="text-xs text-gray-500 truncate block" title={a.name}>{a.name}</span>
+                    </div>
+                  </div>
+                  <div className="shrink-0 whitespace-nowrap text-right tabular-nums">
+                    <span className="text-xs font-bold text-foreground block">{formatMoney(a.valueUSD)}</span>
+                    <span className={cn("text-xs font-bold", Math.abs(marketQuotes[a.symbol]?.dayChangePercent ?? 0) < 0.005 ? 'text-gray-400' : (marketQuotes[a.symbol]?.dayChangePercent ?? 0) > 0 ? "text-gain" : "text-loss")}>
+                      {marketQuotes[a.symbol]?.dayChangePercent == null ? '—' : `${(marketQuotes[a.symbol].dayChangePercent ?? 0) >= 0.005 ? '+' : ''}${Math.abs(marketQuotes[a.symbol].dayChangePercent ?? 0) < 0.005 ? '0.00' : marketQuotes[a.symbol].dayChangePercent!.toFixed(2)}%`} · 1D
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+            <button onClick={() => router.push('/portfolio')}
+              className="w-full mt-3 py-2 rounded-xl border border-border text-xs font-bold uppercase tracking-wide text-gray-400 hover:bg-foreground/5 transition-all text-center">
+              {t("portfolio")} →
+            </button>
+          </div>
         </div>
-      </Modal>
+
+        {/* ─── Modals ──────────────────────────────────────────────── */}
+        <AddAssetModal variant="portfolio" isOpen={isAddAssetOpen} onClose={() => setIsAddAssetOpen(false)} />
+        <AddCashflowModal isOpen={isAddCashflowOpen} onClose={() => setIsAddCashflowOpen(false)} />
+
+        <Modal isOpen={isImportOpen} onClose={() => { setIsImportOpen(false); resetImport(); }} title={language === 'th' ? 'นำเข้าหุ้นจาก Excel' : 'Import investments from Excel'}>
+          <p className="mb-3 text-xs text-gray-400">นำเข้าข้อมูลจากภายนอก: รายการซื้อในไฟล์บันทึกเป็นสินทรัพย์ที่ถืออยู่แล้ว โดยไม่ตัดเงินจากกระเป๋า</p>
+          <div className="space-y-5">
+            <div className="rounded-2xl border border-border bg-foreground/[0.03] p-4">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 rounded-xl bg-gain/10 p-2 text-gain"><FileSpreadsheet size={18} /></div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold text-foreground">{language === 'th' ? 'เริ่มจากไฟล์ตัวอย่าง' : 'Start with the template'}</p>
+                  <p className="mt-1 text-xs leading-5 text-gray-400">{language === 'th' ? 'ไฟล์จะใส่รายชื่อพอร์ตของคุณในช่อง Broker เป็น dropdown เลือกพอร์ตเดิมได้ทันที หรือพิมพ์ชื่อใหม่เพื่อให้ระบบสร้างพอร์ตตอนนำเข้า' : 'The Broker dropdown includes your existing portfolios. Select one to import into it, or type a new name to create a portfolio during import.'}</p>
+                  <button type="button" onClick={downloadImportTemplate} disabled={isTemplateDownloading} className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:text-foreground disabled:cursor-wait disabled:opacity-60"><Download size={14} />{isTemplateDownloading ? (language === 'th' ? 'กำลังสร้างไฟล์…' : 'Preparing file…') : (language === 'th' ? 'ดาวน์โหลดไฟล์ตัวอย่าง' : 'Download starter file')}</button>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-gain/20 bg-gain/5 p-3 text-xs text-gray-300">
+              {language === 'th'
+                ? 'ระบบจับคู่ชื่อ Broker ในไฟล์กับพอร์ตที่มีอยู่โดยไม่สนตัวพิมพ์เล็กใหญ่ หากไม่พบชื่อที่ตรงกัน ระบบจะสร้างพอร์ตลงทุนใหม่พร้อมบัญชีเงินสด THB และ USD ให้'
+                : 'Broker names are matched to existing portfolios without case sensitivity. A name that is not found creates a new investment portfolio with THB and USD cash accounts.'}
+            </div>
+
+            <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border px-5 py-7 text-center transition hover:border-gain/40 hover:bg-gain/5">
+              <Upload size={25} className="text-gray-500" />
+              <span className="text-sm font-bold text-foreground">{language === 'th' ? 'เลือกไฟล์ Excel เพื่อพรีวิว' : 'Choose an Excel file to preview'}</span>
+              <span className="text-xs text-gray-500">XLSX, XLSM, XLS</span>
+              <input type="file" accept={IMPORT_FILE_TYPES} onChange={handleStockFile} className="hidden" />
+            </label>
+
+            {importFileName && (
+              <div className="rounded-xl border border-border bg-black/10 p-3">
+                <div className="flex items-center gap-2 text-xs font-semibold text-foreground"><FileSpreadsheet size={15} className="text-gain" />{importFileName}</div>
+                {importRows.length > 0 && <div className="mt-3 overflow-hidden rounded-lg border border-foreground/5">
+                  <div className="grid grid-cols-[1fr_.85fr_.65fr_.85fr_.65fr_1fr] gap-2 bg-foreground/[0.04] px-3 py-2 text-xs font-bold uppercase tracking-wide text-gray-500"><span>Ticker</span><span>Action</span><span>Qty</span><span>Price</span><span>Currency</span><span>Broker</span></div>
+                  {importRows.slice(0, 4).map(row => <div key={`${row.row}-${row.symbol}`} className="grid grid-cols-[1fr_.85fr_.65fr_.85fr_.65fr_1fr] gap-2 border-t border-foreground/5 px-3 py-2 text-xs text-gray-300"><span className="font-bold text-foreground">{row.symbol}</span><span>{row.type}</span><span>{row.shares.toLocaleString()}</span><span>{row.price.toLocaleString()}</span><span>{row.currency}</span><span className={row.broker ? 'truncate text-gray-300' : 'text-warning'}>{row.broker || (activePortfolio?.kind === 'trading' ? activePortfolio.name : 'ต้องระบุ')}</span></div>)}
+                </div>}
+                {importRows.length > 4 && <p className="mt-2 text-xs text-gray-500">{language === 'th' ? `และอีก ${importRows.length - 4} รายการ` : `and ${importRows.length - 4} more`}</p>}
+              </div>
+            )}
+
+            {importErrors.length > 0 && <div className="rounded-xl border border-loss/20 bg-loss/5 p-3 text-xs text-loss"><div className="flex items-center gap-1.5 font-bold"><CircleAlert size={14} />{language === 'th' ? 'รายการที่ข้าม' : 'Rows skipped'}</div><ul className="mt-1.5 space-y-1 text-xs">{importErrors.slice(0, 3).map(error => <li key={error}>{error}</li>)}</ul></div>}
+
+            {importStatus.type !== 'idle' && <div className={cn("flex items-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-semibold", importStatus.type === 'success' ? 'border-gain/20 bg-gain/5 text-gain' : importStatus.type === 'error' ? 'border-loss/20 bg-loss/5 text-loss' : 'border-border bg-foreground/[0.03] text-gray-300')}>
+              {importStatus.type === 'success' && <CheckCircle2 size={15} />}{importStatus.message}
+            </div>}
+
+            <div className="flex gap-3 pt-1">
+              <button onClick={() => { setIsImportOpen(false); resetImport(); }} className="flex-1 rounded-xl border border-border px-4 py-3 text-sm font-bold text-gray-300 transition hover:bg-foreground/5">{language === 'th' ? 'ยกเลิก' : 'Cancel'}</button>
+              <button onClick={importStocks} disabled={importRows.length === 0 || importStatus.type === 'importing'} className="flex-[1.5] rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40">{importStatus.type === 'importing' ? (language === 'th' ? 'กำลังนำเข้า…' : 'Importing…') : (language === 'th' ? `ยืนยัน ${importRows.length || ''} รายการ` : `Import ${importRows.length || ''} items`)}</button>
+            </div>
+            <p className="text-center text-xs leading-4 text-gray-600">{language === 'th' ? 'ไฟล์ XLSM จะอ่านเฉพาะข้อมูลในชีตและจะไม่เรียกใช้ macro' : 'XLSM files are read as worksheet data only; macros are never run.'}</p>
+          </div>
+        </Modal>
       </div>
     </div>
   );

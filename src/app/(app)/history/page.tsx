@@ -1,5 +1,8 @@
 "use client";
 
+import { DensityToggle } from "@/src/components/InterfaceControls";
+import { downloadRows } from "@/src/components/LedgerTable";
+import { SkeletonTable } from "@/src/components/SkeletonLoader";
 import React, { useEffect, useMemo, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, CircleAlert, Loader2, ScrollText } from "lucide-react";
 import { useApp } from "@/src/context/AppContext";
@@ -18,9 +21,10 @@ function eventTone(event: HistoryEvent) {
 }
 
 export default function HistoryPage() {
-  const { activePortfolioId } = useApp();
+  const { activePortfolioId, language } = useApp();
   // History amounts are recorded USD; never use the global display-currency rate.
   const formatMoney = (amount: number) => formatFxMoney(decimal(amount), 'USD');
+  const [typeFilter, setTypeFilter] = useState("all");
   const [month, setMonth] = useState(() => monthStart(new Date()));
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [events, setEvents] = useState<HistoryEvent[]>([]);
@@ -59,8 +63,8 @@ export default function HistoryPage() {
   }, [events]);
   const visibleEvents = useMemo(() => {
     const current = selectedDay ? eventsByDay.get(selectedDay) || [] : events;
-    return [...current].sort((a, b) => b.occurred_at.localeCompare(a.occurred_at));
-  }, [events, eventsByDay, selectedDay]);
+    return [...current].filter(event => typeFilter === "all" || event.transaction_type === typeFilter).sort((a, b) => b.occurred_at.localeCompare(a.occurred_at));
+  }, [events, eventsByDay, selectedDay, typeFilter]);
   const summary = useMemo(() => {
     const created = events.filter(event => event.action === "CREATED");
     return {
@@ -75,28 +79,29 @@ export default function HistoryPage() {
   const leadingCells = (month.getDay() + 6) % 7;
   const monthLabel = month.toLocaleDateString(undefined, { month: "long", year: "numeric" });
 
-  return <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
-    <div><h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3"><span className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center"><ScrollText className="text-primary" size={23} /></span>Trade History</h1><p className="text-sm text-muted-foreground mt-1">Append-only ledger of trade executions and corrections.</p></div>
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  return <div className="space-y-6">
+    <div><h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3"><span className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center"><ScrollText className="text-primary" size={23} /></span>Trade History</h1><p className="text-sm text-muted-foreground mt-1">Append-only ledger of trade executions and corrections.</p></div>
+    <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex items-center gap-3"><label className="text-sm text-muted" htmlFor="history-type">{language === 'th' ? 'ประเภท' : 'Event Type'}</label><select id="history-type" className="rounded-lg border border-border bg-surface px-3 py-2 text-sm" value={typeFilter} onChange={e=>setTypeFilter(e.target.value)}><option value="all">{language === 'th' ? 'ทั้งหมด' : 'All Events'}</option>{[...new Set(events.map(e=>e.transaction_type))].map(type=><option key={type}>{type}</option>)}</select></div><div className="flex gap-3"><DensityToggle/><button className="ft-button ft-secondary" disabled={!visibleEvents.length} onClick={()=>downloadRows([['Date','Type','Symbol','Amount (recorded USD)'],...visibleEvents.map(event=>[event.occurred_at,event.transaction_type,event.asset_symbol,event.net_amount])],'fintrack-history.csv')}>{language === 'th' ? 'ส่งออก' : 'Export'}</button></div></div>
+    <div className="grid grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)] gap-6">
       <section className="space-y-5">
-        <div className="bg-surface/50 border border-border rounded-2xl p-5 backdrop-blur-xl">
-          <div className="flex justify-between items-center mb-5"><h2 className="font-semibold text-white">{monthLabel}</h2><div className="flex gap-1"><button aria-label="Previous month" onClick={() => { setMonth(value => new Date(value.getFullYear(), value.getMonth() - 1, 1)); setSelectedDay(null); }} className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground"><ChevronLeft size={18} /></button><button aria-label="Next month" onClick={() => { setMonth(value => new Date(value.getFullYear(), value.getMonth() + 1, 1)); setSelectedDay(null); }} className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground"><ChevronRight size={18} /></button></div></div>
+        <div className="bg-surface border border-border rounded-2xl p-5 ">
+          <div className="flex justify-between items-center mb-5"><h2 className="font-semibold text-foreground">{monthLabel}</h2><div className="flex gap-1"><button aria-label="Previous month" onClick={() => { setMonth(value => new Date(value.getFullYear(), value.getMonth() - 1, 1)); setSelectedDay(null); }} className="p-1.5 rounded-lg hover:bg-foreground/10 text-muted-foreground"><ChevronLeft size={18} /></button><button aria-label="Next month" onClick={() => { setMonth(value => new Date(value.getFullYear(), value.getMonth() + 1, 1)); setSelectedDay(null); }} className="p-1.5 rounded-lg hover:bg-foreground/10 text-muted-foreground"><ChevronRight size={18} /></button></div></div>
           <div className="grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground mb-2">{["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].map(day => <span key={day}>{day}</span>)}</div>
           <div className="grid grid-cols-7 gap-1">{Array.from({ length: leadingCells }).map((_, index) => <span key={`empty-${index}`} />)}{Array.from({ length: daysInMonth }, (_, index) => {
             const date = new Date(month.getFullYear(), month.getMonth(), index + 1); const key = dateKey(date); const items = eventsByDay.get(key) || []; const dayNet = items.filter(event => event.action === "CREATED").reduce((total, event) => total + number(event.net_amount), 0);
-            return <button key={key} onClick={() => setSelectedDay(key === selectedDay ? null : key)} className={cn("aspect-square rounded-lg flex flex-col items-center justify-center text-xs transition-colors", selectedDay === key ? "ring-2 ring-primary bg-white/10 text-white" : "hover:bg-white/5 text-muted-foreground", items.length > 0 && "text-white")}><span>{index + 1}</span>{items.length > 0 && <span className={cn("text-[9px] font-bold", dayNet >= 0 ? "text-emerald-300" : "text-red-300")}>{dayNet >= 0 ? "+" : ""}{Math.round(dayNet)}</span>}</button>;
+            return <button key={key} onClick={() => setSelectedDay(key === selectedDay ? null : key)} className={cn("aspect-square rounded-lg flex flex-col items-center justify-center text-xs transition-colors", selectedDay === key ? "ring-2 ring-primary bg-foreground/10 text-foreground" : "hover:bg-foreground/5 text-muted-foreground", items.length > 0 && "text-foreground")}><span>{index + 1}</span>{items.length > 0 && <span className={cn("text-xs font-bold", dayNet >= 0 ? "text-emerald-300" : "text-red-300")}>{dayNet >= 0 ? "+" : ""}{Math.round(dayNet)}</span>}</button>;
           })}</div>
         </div>
-        <div className="bg-surface/50 border border-border rounded-2xl p-5 space-y-3 text-sm"><h2 className="font-semibold text-white">Monthly trade summary</h2><Summary label="Ledger events" value={String(summary.entries)} /><Summary label="Trade executions" value={String(summary.trades)} /><Summary label="Net trade cash flow" value={formatMoney(summary.netFlow)} tone={summary.netFlow >= 0 ? "good" : "bad"} /><Summary label="Stored realized P&L" value={formatMoney(summary.realized)} tone={summary.realized >= 0 ? "good" : "bad"} /></div>
+        <div className="bg-surface border border-border rounded-2xl p-5 space-y-3 text-sm"><h2 className="font-semibold text-foreground">Monthly trade summary</h2><Summary label="Ledger events" value={String(summary.entries)} /><Summary label="Trade executions" value={String(summary.trades)} /><Summary label="Net trade cash flow" value={formatMoney(summary.netFlow)} tone={summary.netFlow >= 0 ? "good" : "bad"} /><Summary label="Stored realized P&L" value={formatMoney(summary.realized)} tone={summary.realized >= 0 ? "good" : "bad"} /></div>
       </section>
-      <section className="lg:col-span-2 bg-surface/50 border border-border rounded-2xl backdrop-blur-xl overflow-hidden min-h-[420px]">
-        <div className="p-5 border-b border-border flex items-center justify-between"><div><h2 className="font-semibold text-white">{selectedDay ? new Date(`${selectedDay}T00:00:00`).toLocaleDateString() : "All events"}</h2><p className="text-xs text-muted-foreground mt-1">Events cannot be altered; corrections are recorded as new audit entries.</p></div>{loading && <Loader2 className="animate-spin text-primary" size={20} />}</div>
-        {error ? <div className="p-10 text-center text-muted-foreground"><CircleAlert className="mx-auto mb-3 text-amber-300" /><p>{error}</p></div> : !loading && visibleEvents.length === 0 ? <div className="p-12 text-center text-muted-foreground"><CalendarDays className="mx-auto mb-3" /><p>No history events for this period.</p></div> : <div className="divide-y divide-border">{visibleEvents.map(event => <article key={event.id} className="p-4 sm:p-5 flex gap-3 hover:bg-white/[0.02]"><span className={cn("mt-0.5 px-2 py-1 h-fit rounded text-[10px] font-bold uppercase", eventTone(event))}>{event.action === "CREATED" ? event.transaction_type : event.action}</span><div className="min-w-0 flex-1"><div className="flex justify-between gap-3"><p className="font-medium text-white truncate">{event.asset_symbol || event.category || event.transaction_type}</p><p className={cn("font-semibold tabular-nums whitespace-nowrap", number(event.net_amount) >= 0 ? "text-emerald-300" : "text-red-300")}>{number(event.net_amount) >= 0 ? "+" : ""}{formatHistoricalStock(number(event.net_amount), event.asset_symbol, event.exchange_rate)}</p></div><p className="text-xs text-muted-foreground mt-1">{new Date(event.occurred_at).toLocaleString()} · {event.source_table.replace("_", " ")}{event.quantity ? ` · ${number(event.quantity)} units @ ${formatHistoricalStock(number(event.price), event.asset_symbol, event.exchange_rate)}` : ""}{number(event.fees) ? ` · fees ${formatHistoricalStock(number(event.fees), event.asset_symbol, event.exchange_rate)}` : ""}</p>{event.note && <p className="text-xs text-muted-foreground mt-1 truncate">{event.note}</p>}</div></article>)}</div>}
+      <section className="bg-surface border border-border rounded-2xl  overflow-hidden min-h-[420px]">
+        <div className="p-5 border-b border-border flex items-center justify-between"><div><h2 className="font-semibold text-foreground">{selectedDay ? new Date(`${selectedDay}T00:00:00`).toLocaleDateString() : "All events"}</h2><p className="text-xs text-muted-foreground mt-1">Events cannot be altered; corrections are recorded as new audit entries.</p></div>{loading && <Loader2 className="animate-spin text-primary" size={20} />}</div>
+        {loading ? <div className="p-5"><SkeletonTable rows={6}/></div> : error ? <div className="p-10 text-center text-muted-foreground"><CircleAlert className="mx-auto mb-3 text-amber-300" /><p>{error}</p></div> : !loading && visibleEvents.length === 0 ? <div className="p-12 text-center text-muted-foreground"><CalendarDays className="mx-auto mb-3" /><p>No history events for this period.</p></div> : <div className="ft-history-events divide-y divide-border">{visibleEvents.map(event => <article key={event.id} className="p-4 sm:p-5 flex gap-3 hover:bg-foreground/[0.02]"><span className={cn("mt-0.5 px-2 py-1 h-fit rounded text-xs font-bold uppercase", eventTone(event))}>{event.action === "CREATED" ? event.transaction_type : event.action}</span><div className="min-w-0 flex-1"><div className="flex justify-between gap-3"><p className="font-medium text-foreground truncate">{event.asset_symbol || event.category || event.transaction_type}</p><p className={cn("font-semibold tabular-nums whitespace-nowrap", number(event.net_amount) >= 0 ? "text-emerald-300" : "text-red-300")}>{number(event.net_amount) >= 0 ? "+" : ""}{formatHistoricalStock(number(event.net_amount), event.asset_symbol, event.exchange_rate)}</p></div><p className="text-xs text-muted-foreground mt-1">{new Date(event.occurred_at).toLocaleString()} · {event.source_table.replace("_", " ")}{event.quantity ? ` · ${number(event.quantity)} units @ ${formatHistoricalStock(number(event.price), event.asset_symbol, event.exchange_rate)}` : ""}{number(event.fees) ? ` · fees ${formatHistoricalStock(number(event.fees), event.asset_symbol, event.exchange_rate)}` : ""}</p>{event.note && <p className="text-xs text-muted-foreground mt-1 truncate">{event.note}</p>}</div></article>)}</div>}
       </section>
     </div>
   </div>;
 }
 
 function Summary({ label, value, tone }: { label: string; value: string; tone?: "good" | "bad" }) {
-  return <div className="flex items-center justify-between"><span className="text-muted-foreground">{label}</span><span className={cn("font-semibold tabular-nums", tone === "good" && "text-emerald-300", tone === "bad" && "text-red-300", !tone && "text-white")}>{value}</span></div>;
+  return <div className="flex items-center justify-between"><span className="text-muted-foreground">{label}</span><span className={cn("font-semibold tabular-nums", tone === "good" && "text-emerald-300", tone === "bad" && "text-red-300", !tone && "text-foreground")}>{value}</span></div>;
 }

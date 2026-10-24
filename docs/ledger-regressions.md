@@ -33,3 +33,7 @@ Added all eight requested key variants to both existing locale dictionaries and 
 ## 6. Settings navigation
 Added 500ms ease-out scrolling with measured top-bar offset, IntersectionObserver scrollspy, a shared-layout active pill, brief arrival tint, replaceState hashes and initial deep-link handling. Reduced motion skips scrolling animation, pulse and pill movement. User wheel/touch interrupts smooth scrolling. TypeScript passes; visual and keyboard browser checks pending access.
 
+
+## 7. Shared page container
+The App Router template now owns one left-aligned 1440px maximum page frame with clamp(24px,3vw,48px) inline padding. Removed competing route-level centered widths/padding, including broker Ledger. Settings uses 220px/minmax(0,1fr),40px gap and960px content maximum, stacking on mobile. No route or dataset changes. TypeScript pass; viewport screenshots pending access.
+

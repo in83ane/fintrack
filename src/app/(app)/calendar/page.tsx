@@ -31,7 +31,7 @@ export default function CalendarPage() {
   // Calculate daily P/L (FX-based, stored in USD)
   const dailyStats = useMemo(() => {
     const stats: Record<string, { profit: number; count: number; trades: Trade[] }> = {};
-    
+
     trades.forEach(trade => {
       // Completely exclude IMPORT trades from calendar
       if (trade.type === "IMPORT") return;
@@ -39,9 +39,9 @@ export default function CalendarPage() {
       if (!stats[trade.date]) {
         stats[trade.date] = { profit: 0, count: 0, trades: [] };
       }
-      
+
       const currentRate = exchangeRates[currency] || 1;
-      
+
       // Only calculate profit for SELL and DIVIDEND. BUY is just an investment, not a realized P/L event.
       if (trade.type === "SELL" || trade.type === "DIVIDEND") {
         const fxGainUSD = trade.amountUSD * (currentRate - (trade.rateAtTime || 1)) / currentRate;
@@ -50,18 +50,18 @@ export default function CalendarPage() {
         const baseProfit = trade.type === "DIVIDEND" ? trade.amountUSD : 0;
         stats[trade.date].profit += baseProfit + fxGainUSD;
       }
-      
+
       stats[trade.date].count += 1;
       stats[trade.date].trades.push(trade);
     });
-    
+
     return stats;
   }, [trades, currency, exchangeRates]);
 
   // Calendar logic
   const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
   const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay();
-  
+
   const calendarDays = [];
   // Padding for start of month
   for (let i = 0; i < firstDayOfMonth; i++) {
@@ -108,14 +108,14 @@ export default function CalendarPage() {
     filteredTrades.forEach(trade => {
       if (trade.type === "IMPORT") return;
       if (!stats[trade.date]) stats[trade.date] = { profit: 0, count: 0, trades: [] };
-      
+
       const currentRate = exchangeRates[currency] || 1;
       if (trade.type === "SELL" || trade.type === "DIVIDEND") {
         const fxGainUSD = trade.amountUSD * (currentRate - (trade.rateAtTime || 1)) / currentRate;
         const baseProfit = trade.type === "DIVIDEND" ? trade.amountUSD : 0;
         stats[trade.date].profit += baseProfit + fxGainUSD;
       }
-      
+
       stats[trade.date].count += 1;
       stats[trade.date].trades.push(trade);
     });
@@ -139,33 +139,33 @@ export default function CalendarPage() {
 
   // Computed Monthly Overview Stats
   const { monthlyWinRate, maxDrawdown, netFintrackProfit } = useMemo(() => {
-     let winDays = 0;
-     let totalTradeDays = 0;
-     let netProfit = 0;
-     let peak = 0;
-     let maxDD = 0;
-     let runningProfit = 0;
-     
-     const currentMonthPrefix = `${year}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`;
-     
-     Object.entries(filteredDailyStats).forEach(([dateStr, stat]) => {
-       if (dateStr.startsWith(currentMonthPrefix)) {
-         totalTradeDays++;
-         if (stat.profit >= 0) winDays++;
-         netProfit += stat.profit;
-         
-         runningProfit += stat.profit;
-         if (runningProfit > peak) peak = runningProfit;
-         const drawdown = peak > 0 ? (peak - runningProfit) / peak * 100 : 0;
-         if (drawdown > maxDD) maxDD = drawdown;
-       }
-     });
+    let winDays = 0;
+    let totalTradeDays = 0;
+    let netProfit = 0;
+    let peak = 0;
+    let maxDD = 0;
+    let runningProfit = 0;
 
-     return {
-       monthlyWinRate: totalTradeDays > 0 ? (winDays / totalTradeDays) * 100 : 0,
-       maxDrawdown: -maxDD,
-       netFintrackProfit: netProfit
-     };
+    const currentMonthPrefix = `${year}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`;
+
+    Object.entries(filteredDailyStats).forEach(([dateStr, stat]) => {
+      if (dateStr.startsWith(currentMonthPrefix)) {
+        totalTradeDays++;
+        if (stat.profit >= 0) winDays++;
+        netProfit += stat.profit;
+
+        runningProfit += stat.profit;
+        if (runningProfit > peak) peak = runningProfit;
+        const drawdown = peak > 0 ? (peak - runningProfit) / peak * 100 : 0;
+        if (drawdown > maxDD) maxDD = drawdown;
+      }
+    });
+
+    return {
+      monthlyWinRate: totalTradeDays > 0 ? (winDays / totalTradeDays) * 100 : 0,
+      maxDrawdown: -maxDD,
+      netFintrackProfit: netProfit
+    };
   }, [filteredDailyStats, currentMonth, year]);
 
   const monthlyCalendarSummary = useMemo(() => {
@@ -232,39 +232,39 @@ export default function CalendarPage() {
 
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-[1440px] mx-auto space-y-5 sm:space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       {/* Header Section */}
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div className="space-y-1">
-            <p className="text-[10px] font-black uppercase tracking-wide text-[#4EDEA3]">{t("performanceAudit")}</p>
-            <h1 className="text-2xl sm:text-3xl font-black text-white leading-none">Trading Calendar</h1>
+            <p className="text-xs font-black uppercase tracking-wide text-gain">{t("performanceAudit")}</p>
+            <h1 className="text-2xl sm:text-3xl font-black text-foreground leading-none">Trading Calendar</h1>
             <p className="text-xs sm:text-sm text-gray-500">Daily realized P/L and completed trade activity</p>
           </div>
           <div className="flex items-center self-start bg-surface border border-border rounded-xl p-1 sm:self-auto">
             <button
               onClick={prevMonth}
-              className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-[#ADC6FF] transition-all"
+              className="p-2 hover:bg-foreground/10 rounded-lg text-gray-400 hover:text-primary transition-all"
             >
               <ChevronLeft size={18} />
             </button>
 
-            <h2 className="text-sm sm:text-base font-black text-white leading-none w-36 sm:w-48 text-center select-none">
+            <h2 className="text-sm sm:text-base font-black text-foreground leading-none w-36 sm:w-48 text-center select-none">
               {monthName} <span className="text-gray-400 ml-1">{year}</span>
             </h2>
 
             <button
               onClick={nextMonth}
-              className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-[#ADC6FF] transition-all"
+              className="p-2 hover:bg-foreground/10 rounded-lg text-gray-400 hover:text-primary transition-all"
             >
               <ChevronRight size={18} />
             </button>
 
-            <div className="w-[1px] h-6 bg-white/10 mx-1" />
+            <div className="w-[1px] h-6 bg-foreground/10 mx-1" />
 
             <button
               onClick={() => setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1))}
-              className="px-3 py-1.5 mr-0.5 bg-white/5 hover:bg-white/10 rounded-lg text-xs font-bold text-white transition-all select-none"
+              className="px-3 py-1.5 mr-0.5 bg-foreground/5 hover:bg-foreground/10 rounded-lg text-xs font-bold text-foreground transition-all select-none"
             >
               {t("today")}
             </button>
@@ -273,20 +273,20 @@ export default function CalendarPage() {
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="bg-surface p-4 rounded-xl border border-border min-w-0">
-            <span className="text-[10px] uppercase tracking-wide text-gray-500 font-bold block mb-2">This month</span>
-            <span className={cn("block truncate text-lg sm:text-xl font-black tabular-nums", netFintrackProfit >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>{netFintrackProfit >= 0 ? "+" : ""}{formatMoney(netFintrackProfit)}</span>
+            <span className="text-xs uppercase tracking-wide text-gray-500 font-bold block mb-2">This month</span>
+            <span className={cn("block truncate text-lg sm:text-xl font-black tabular-nums", netFintrackProfit >= 0 ? "text-gain" : "text-loss")}>{netFintrackProfit >= 0 ? "+" : ""}{formatMoney(netFintrackProfit)}</span>
           </div>
           <div className="bg-surface p-4 rounded-xl border border-border">
-            <span className="text-[10px] uppercase tracking-wide text-gray-500 font-bold block mb-2">Trading days</span>
-            <span className="text-xl font-black text-white tabular-nums">{monthlyCalendarSummary.tradingDays}</span>
+            <span className="text-xs uppercase tracking-wide text-gray-500 font-bold block mb-2">Trading days</span>
+            <span className="text-xl font-black text-foreground tabular-nums">{monthlyCalendarSummary.tradingDays}</span>
           </div>
           <div className="bg-surface p-4 rounded-xl border border-border">
-            <span className="text-[10px] uppercase tracking-wide text-gray-500 font-bold block mb-2">Profitable days</span>
-            <span className="text-xl font-black text-[#4EDEA3] tabular-nums">{monthlyCalendarSummary.profitableDays}</span>
+            <span className="text-xs uppercase tracking-wide text-gray-500 font-bold block mb-2">Profitable days</span>
+            <span className="text-xl font-black text-gain tabular-nums">{monthlyCalendarSummary.profitableDays}</span>
           </div>
           <div className="bg-surface p-4 rounded-xl border border-border">
-            <span className="text-[10px] uppercase tracking-wide text-gray-500 font-bold block mb-2">Losing days</span>
-            <span className="text-xl font-black text-[#FFB4AB] tabular-nums">{monthlyCalendarSummary.losingDays}</span>
+            <span className="text-xs uppercase tracking-wide text-gray-500 font-bold block mb-2">Losing days</span>
+            <span className="text-xl font-black text-loss tabular-nums">{monthlyCalendarSummary.losingDays}</span>
           </div>
         </div>
       </div>
@@ -296,156 +296,156 @@ export default function CalendarPage() {
         <div className="lg:col-span-8 space-y-6 sm:space-y-8">
           {/* Calendar Grid */}
           <div className="bg-surface rounded-2xl overflow-hidden border border-border shadow-xl">
-          <div className="grid grid-cols-7 border-b border-border">
-            {currentDayNames.map((day, idx) => (
-              <div key={idx} className="py-3 text-center text-[10px] uppercase tracking-wide text-gray-500 font-black border-r border-border last:border-r-0">
-                {day}
-              </div>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-7">
-            {calendarDays.map((day, idx) => {
-              if (day === null) {
-                return <div key={`empty-${idx}`} className="aspect-[4/3] border-r border-b border-border" />;
-              }
-
-              const dateStr = `${year}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-              const stats = filteredDailyStats[dateStr];
-              const isProfit = stats && stats.profit >= 0;
-              const isLoss = stats && stats.profit < 0;
-
-              // Gradient intensity: stronger color for bigger P/L
-              const intensity = stats ? Math.min(Math.abs(stats.profit) / maxAbsPL, 1) : 0;
-              const bgOpacity = stats ? (0.08 + intensity * 0.25).toFixed(2) : '0';
-
-              const isBottomLeft = idx === Math.floor((calendarDays.length - 1) / 7) * 7;
-              const isBottomRight = idx === calendarDays.length - 1 && idx % 7 === 6;
-
-              return (
-                <div
-                  key={day}
-                  onClick={() => setSelectedDate(dateStr)}
-                  className={cn(
-                    "min-h-[72px] sm:min-h-[88px] p-2 sm:p-3 border-r border-b border-border flex flex-col items-center justify-center gap-0.5 sm:gap-1 cursor-pointer transition-all group relative",
-                    isBottomLeft && "rounded-bl-2xl",
-                    isBottomRight && "rounded-br-2xl",
-                    !stats && "hover:bg-white/5",
-                    selectedDate === dateStr && "ring-2 ring-inset ring-[#ADC6FF] z-10"
-                  )}
-                  style={stats ? {
-                    backgroundColor: isProfit
-                      ? `rgba(78, 222, 163, ${bgOpacity})`
-                      : `rgba(255, 180, 171, ${bgOpacity})`
-                  } : undefined}
-                >
-                  <span className="absolute top-2 left-2.5 sm:left-3 text-[10px] sm:text-xs font-bold text-gray-500">{day}</span>
-                  {stats && (
-                    <>
-                      <span className={cn(
-                        "text-[10px] sm:text-sm font-black",
-                        isProfit ? "text-[#4EDEA3]" : "text-[#FFB4AB]"
-                      )}>
-                        {isProfit ? "+" : ""}{formatMoney(stats.profit)}
-                      </span>
-                      <span className="text-[7px] sm:text-[8px] text-gray-500 font-bold uppercase tracking-wide">
-                        {stats.count} {t("tradesCount")}
-                      </span>
-                    </>
-                  )}
+            <div className="grid grid-cols-7 border-b border-border">
+              {currentDayNames.map((day, idx) => (
+                <div key={idx} className="py-3 text-center text-xs uppercase tracking-wide text-gray-500 font-black border-r border-border last:border-r-0">
+                  {day}
                 </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Tag Filter + Equity Curve */}
-        <div className="space-y-4">
-          {/* Tag Filter Pills */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <Tag size={14} className="text-gray-500" />
-            {TRADE_TAGS.map(tag => (
-              <button
-                key={tag.key}
-                onClick={() => setSelectedTag(tag.key)}
-                className={cn(
-                  "px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-bold transition-all border",
-                  selectedTag === tag.key
-                    ? "bg-[#ADC6FF] text-[#00285d] border-[#ADC6FF]"
-                    : "bg-white/5 text-gray-400 border-border hover:text-white hover:border-white/20"
-                )}
-              >
-                {t(tag.labelKey)}
-              </button>
-            ))}
-          </div>
-
-          {/* Monthly Equity Curve */}
-          <div className="bg-surface rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-border shadow-xl">
-            <div className="flex justify-between items-center mb-3">
-              <span className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wide">{t("equityCurve")} — {t("cumulativePL")}</span>
-              <span className={cn("text-xs sm:text-sm font-black", equityCurveData[equityCurveData.length - 1]?.cumPL >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
-                {equityCurveData[equityCurveData.length - 1]?.cumPL >= 0 ? "+" : ""}{formatMoney(equityCurveData[equityCurveData.length - 1]?.cumPL || 0)}
-              </span>
+              ))}
             </div>
-            {(() => {
-              const values = equityCurveData.map(d => d.cumPL);
-              const min = Math.min(...values, 0);
-              const max = Math.max(...values, 0);
-              const range = max - min || 1;
-              const W = 400, H = 80, PAD = 4;
-              const points = values.map((v, i) => {
-                const x = PAD + (i / Math.max(values.length - 1, 1)) * (W - PAD * 2);
-                const y = PAD + (1 - (v - min) / range) * (H - PAD * 2);
-                return `${x.toFixed(1)},${y.toFixed(1)}`;
-              });
-              const zeroY = PAD + (1 - (0 - min) / range) * (H - PAD * 2);
-              const pathD = `M ${points.join(" L ")}`;
-              const areaD = `${pathD} L ${(PAD + (W - PAD * 2)).toFixed(1)},${zeroY.toFixed(1)} L ${PAD},${zeroY.toFixed(1)} Z`;
-              const isPositive = values[values.length - 1] >= 0;
-              const color = isPositive ? "#4EDEA3" : "#FFB4AB";
 
-              return (
-                <div className="h-20">
-                  <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full" preserveAspectRatio="none">
-                    <defs>
-                      <linearGradient id="cal-eq-grad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={color} stopOpacity={0.25} />
-                        <stop offset="100%" stopColor={color} stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <line x1={PAD} y1={zeroY} x2={W - PAD} y2={zeroY} stroke="rgba(255,255,255,0.08)" strokeWidth={1} strokeDasharray="4,4" />
-                    <path d={areaD} fill="url(#cal-eq-grad)" />
-                    <path d={pathD} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" />
-                  </svg>
-                </div>
-              );
-            })()}
+            <div className="grid grid-cols-7">
+              {calendarDays.map((day, idx) => {
+                if (day === null) {
+                  return <div key={`empty-${idx}`} className="aspect-[4/3] border-r border-b border-border" />;
+                }
+
+                const dateStr = `${year}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const stats = filteredDailyStats[dateStr];
+                const isProfit = stats && stats.profit >= 0;
+                const isLoss = stats && stats.profit < 0;
+
+                // Gradient intensity: stronger color for bigger P/L
+                const intensity = stats ? Math.min(Math.abs(stats.profit) / maxAbsPL, 1) : 0;
+                const bgOpacity = stats ? (0.08 + intensity * 0.25).toFixed(2) : '0';
+
+                const isBottomLeft = idx === Math.floor((calendarDays.length - 1) / 7) * 7;
+                const isBottomRight = idx === calendarDays.length - 1 && idx % 7 === 6;
+
+                return (
+                  <div
+                    key={day}
+                    onClick={() => setSelectedDate(dateStr)}
+                    className={cn(
+                      "min-h-[72px] sm:min-h-[88px] p-2 sm:p-3 border-r border-b border-border flex flex-col items-center justify-center gap-0.5 sm:gap-1 cursor-pointer transition-all group relative",
+                      isBottomLeft && "rounded-bl-2xl",
+                      isBottomRight && "rounded-br-2xl",
+                      !stats && "hover:bg-foreground/5",
+                      selectedDate === dateStr && "ring-2 ring-inset ring-info z-10"
+                    )}
+                    style={stats ? {
+                      backgroundColor: isProfit
+                        ? `rgba(78, 222, 163, ${bgOpacity})`
+                        : `rgba(255, 180, 171, ${bgOpacity})`
+                    } : undefined}
+                  >
+                    <span className="absolute top-2 left-2.5 sm:left-3 text-xs sm:text-xs font-bold text-gray-500">{day}</span>
+                    {stats && (
+                      <>
+                        <span className={cn(
+                          "text-xs sm:text-sm font-black",
+                          isProfit ? "text-gain" : "text-loss"
+                        )}>
+                          {isProfit ? "+" : ""}{formatMoney(stats.profit)}
+                        </span>
+                        <span className="text-[7px] sm:text-xs text-gray-500 font-bold uppercase tracking-wide">
+                          {stats.count} {t("tradesCount")}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
+
+          {/* Tag Filter + Equity Curve */}
+          <div className="space-y-4">
+            {/* Tag Filter Pills */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <Tag size={14} className="text-gray-500" />
+              {TRADE_TAGS.map(tag => (
+                <button
+                  key={tag.key}
+                  onClick={() => setSelectedTag(tag.key)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full text-xs sm:text-xs font-bold transition-all border",
+                    selectedTag === tag.key
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-foreground/5 text-gray-400 border-border hover:text-foreground hover:border-foreground/20"
+                  )}
+                >
+                  {t(tag.labelKey)}
+                </button>
+              ))}
+            </div>
+
+            {/* Monthly Equity Curve */}
+            <div className="bg-surface rounded-2xl sm:rounded-2xl p-4 sm:p-6 border border-border shadow-xl">
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-xs sm:text-xs font-black text-gray-500 uppercase tracking-wide">{t("equityCurve")} — {t("cumulativePL")}</span>
+                <span className={cn("text-xs sm:text-sm font-black", equityCurveData[equityCurveData.length - 1]?.cumPL >= 0 ? "text-gain" : "text-loss")}>
+                  {equityCurveData[equityCurveData.length - 1]?.cumPL >= 0 ? "+" : ""}{formatMoney(equityCurveData[equityCurveData.length - 1]?.cumPL || 0)}
+                </span>
+              </div>
+              {(() => {
+                const values = equityCurveData.map(d => d.cumPL);
+                const min = Math.min(...values, 0);
+                const max = Math.max(...values, 0);
+                const range = max - min || 1;
+                const W = 400, H = 80, PAD = 4;
+                const points = values.map((v, i) => {
+                  const x = PAD + (i / Math.max(values.length - 1, 1)) * (W - PAD * 2);
+                  const y = PAD + (1 - (v - min) / range) * (H - PAD * 2);
+                  return `${x.toFixed(1)},${y.toFixed(1)}`;
+                });
+                const zeroY = PAD + (1 - (0 - min) / range) * (H - PAD * 2);
+                const pathD = `M ${points.join(" L ")}`;
+                const areaD = `${pathD} L ${(PAD + (W - PAD * 2)).toFixed(1)},${zeroY.toFixed(1)} L ${PAD},${zeroY.toFixed(1)} Z`;
+                const isPositive = values[values.length - 1] >= 0;
+                const color = isPositive ? "#4EDEA3" : "#FFB4AB";
+
+                return (
+                  <div className="h-20">
+                    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full" preserveAspectRatio="none">
+                      <defs>
+                        <linearGradient id="cal-eq-grad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={color} stopOpacity={0.25} />
+                          <stop offset="100%" stopColor={color} stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <line x1={PAD} y1={zeroY} x2={W - PAD} y2={zeroY} stroke="rgba(255,255,255,0.08)" strokeWidth={1} strokeDasharray="4,4" />
+                      <path d={areaD} fill="url(#cal-eq-grad)" />
+                      <path d={pathD} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
         </div>
 
         {/* Right Column: Audit Detail Sidebar */}
         <div className="lg:col-span-4 space-y-4 sm:space-y-6">
-          <div className="bg-surface rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-border shadow-xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-24 sm:w-32 h-24 sm:h-32 bg-[#4EDEA3]/5 blur-[60px] rounded-full -mr-12 sm:-mr-16 -mt-12 sm:-mt-16" />
+          <div className="bg-surface rounded-2xl sm:rounded-2xl p-4 sm:p-6 border border-border shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 sm:w-32 h-24 sm:h-32 bg-gain/5 blur-[60px] rounded-full -mr-12 sm:-mr-16 -mt-12 sm:-mt-16" />
 
             <div className="flex justify-between items-start mb-4 sm:mb-8 relative z-10">
               <div className="space-y-1">
-                <p className="text-[10px] sm:text-xs uppercase tracking-wide text-gray-500 font-black">{t("auditDetail")}</p>
-                <h3 className="text-lg sm:text-2xl font-black text-white tracking-tighter">
+                <p className="text-xs sm:text-xs uppercase tracking-wide text-gray-500 font-black">{t("auditDetail")}</p>
+                <h3 className="text-lg sm:text-2xl font-black text-foreground tracking-tighter">
                   {selectedDate
                     ? new Date(selectedDate).toLocaleDateString(locale, {
-                        month: 'short',
-                        day: '2-digit',
-                        year: 'numeric',
-                      })
+                      month: 'short',
+                      day: '2-digit',
+                      year: 'numeric',
+                    })
                     : t("selectDate")}
                 </h3>
               </div>
               {selectedDayStats && (
-                <div className="bg-[#4EDEA3]/10 border border-[#4EDEA3]/20 px-2 py-0.5 rounded-lg">
-                  <span className="text-[#4EDEA3] text-[10px] sm:text-xs font-black uppercase tracking-wider">{t("verified")}</span>
+                <div className="bg-gain/10 border border-gain/20 px-2 py-0.5 rounded-lg">
+                  <span className="text-gain text-xs sm:text-xs font-black uppercase tracking-wider">{t("verified")}</span>
                 </div>
               )}
             </div>
@@ -453,27 +453,27 @@ export default function CalendarPage() {
             <div className="space-y-2 sm:space-y-3 relative z-10">
               {selectedDayStats ? (
                 selectedDayStats.trades.map((trade, i) => (
-                  <div key={trade.id} className="group flex justify-between items-center p-3 sm:p-4 bg-background rounded-xl border border-border hover:border-[#ADC6FF]/30 hover:bg-white/5 transition-all cursor-pointer">
+                  <div key={trade.id} className="group flex justify-between items-center p-3 sm:p-4 bg-background rounded-xl border border-border hover:border-info/30 hover:bg-foreground/5 transition-all cursor-pointer">
                     <div className="flex items-center gap-2 sm:gap-4">
                       <div className={cn(
                         "w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center transition-all",
-                        trade.type === "BUY" ? "bg-[#4EDEA3]/10 text-[#4EDEA3]" : "bg-[#FFB4AB]/10 text-[#FFB4AB]"
+                        trade.type === "BUY" ? "bg-gain/10 text-gain" : "bg-loss/10 text-loss"
                       )}>
                         {trade.type === "BUY" ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
                       </div>
                       <div>
-                        <p className="text-xs sm:text-sm font-black text-white leading-tight">{trade.asset} {trade.type}</p>
-                        <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5 sm:mt-1 font-bold uppercase tracking-wide">{t("spotTrade")}</p>
+                        <p className="text-xs sm:text-sm font-black text-foreground leading-tight">{trade.asset} {trade.type}</p>
+                        <p className="text-xs sm:text-xs text-gray-500 mt-0.5 sm:mt-1 font-bold uppercase tracking-wide">{t("spotTrade")}</p>
                       </div>
                     </div>
                     <div className="text-right">
                       <span className={cn(
                         "text-xs sm:text-sm font-black block",
-                        trade.type === "BUY" ? "text-[#4EDEA3]" : "text-[#FFB4AB]"
+                        trade.type === "BUY" ? "text-gain" : "text-loss"
                       )}>
                         {formatMoney(trade.amountUSD)}
                       </span>
-                      <span className="text-[10px] text-gray-500 uppercase font-bold tracking-tighter">{t("finalized")}</span>
+                      <span className="text-xs text-gray-500 uppercase font-bold tracking-tighter">{t("finalized")}</span>
                     </div>
                   </div>
                 ))
@@ -486,7 +486,7 @@ export default function CalendarPage() {
 
             <button
               onClick={handleExportCSV}
-              className="w-full mt-4 sm:mt-8 py-3 sm:py-4 bg-[#ADC6FF] text-[#00285d] rounded-xl font-black text-xs uppercase tracking-wide hover:brightness-110 shadow-lg transition-all flex items-center justify-center gap-2"
+              className="w-full mt-4 sm:mt-8 py-3 sm:py-4 bg-primary text-primary-foreground rounded-xl font-black text-xs uppercase tracking-wide hover:brightness-110 shadow-lg transition-all flex items-center justify-center gap-2"
             >
               <span className="hidden sm:inline">{t("downloadFullLedger")}</span>
               <span className="sm:hidden">Export</span>
@@ -495,32 +495,32 @@ export default function CalendarPage() {
           </div>
 
           {/* Correlations */}
-          <div className="bg-surface rounded-2xl sm:rounded-3xl p-4 sm:p-8 border border-border shadow-xl">
-            <h4 className="text-[10px] sm:text-xs uppercase tracking-wide text-gray-500 font-black mb-4 sm:mb-8">{t("marketCorrelations")}</h4>
+          <div className="bg-surface rounded-2xl sm:rounded-2xl p-4 sm:p-8 border border-border shadow-xl">
+            <h4 className="text-xs sm:text-xs uppercase tracking-wide text-gray-500 font-black mb-4 sm:mb-8">{t("marketCorrelations")}</h4>
             <div className="space-y-4 sm:space-y-6">
               <div className="space-y-2 sm:space-y-3">
-                <div className="flex justify-between text-[10px] sm:text-xs font-black uppercase tracking-wide text-white">
+                <div className="flex justify-between text-xs sm:text-xs font-black uppercase tracking-wide text-foreground">
                   <span>{t("macroAlignment")}</span>
                   <span>{macroAlignment.toFixed(0)}%</span>
                 </div>
-                <div className="h-1.5 sm:h-2 bg-white/5 rounded-full overflow-hidden">
+                <div className="h-1.5 sm:h-2 bg-foreground/5 rounded-full overflow-hidden">
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${macroAlignment}%` }}
-                    className="h-full bg-[#ADC6FF] rounded-full"
+                    className="h-full bg-info rounded-full"
                   />
                 </div>
               </div>
               <div className="space-y-2 sm:space-y-3">
-                <div className="flex justify-between text-[10px] sm:text-xs font-black uppercase tracking-wide text-white">
+                <div className="flex justify-between text-xs sm:text-xs font-black uppercase tracking-wide text-foreground">
                   <span>{t("riskExposure")}</span>
                   <span>{riskExposure.toFixed(0)}%</span>
                 </div>
-                <div className="h-1.5 sm:h-2 bg-white/5 rounded-full overflow-hidden">
+                <div className="h-1.5 sm:h-2 bg-foreground/5 rounded-full overflow-hidden">
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${riskExposure}%` }}
-                    className="h-full bg-[#E9C349] rounded-full"
+                    className="h-full bg-warning rounded-full"
                   />
                 </div>
               </div>
