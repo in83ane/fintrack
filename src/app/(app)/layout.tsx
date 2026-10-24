@@ -4,7 +4,6 @@ import React, { useState } from "react";
 import { Sidebar } from "@/src/components/Sidebar";
 import { TopBar } from "@/src/components/TopBar";
 import { BottomNav } from "@/src/components/BottomNav";
-import { CommandPalette } from "@/src/components/CommandPalette";
 import { ErrorBoundary } from "@/src/components/ErrorBoundary";
 import { OfflineIndicator } from "@/src/components/OfflineIndicator";
 import { PriceAlertManager } from "@/src/components/PriceAlertManager";
@@ -46,7 +45,6 @@ export default function AppLayout({
       />
 
       <BottomNav />
-      <CommandPalette />
       <PriceAlertManager />
       <OfflineIndicator />
     </div>

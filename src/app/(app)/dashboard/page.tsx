@@ -211,6 +211,12 @@ function NetWorthSparkline({ data, formatMoney, t }: { data: NetWorthPoint[]; fo
 
   const color = isPositive ? "#4EDEA3" : "#FFB4AB";
   const hov = hoveredIndex != null ? data[hoveredIndex] : null;
+  const tooltipPosition = hov && hoveredIndex !== null
+    ? {
+        left: `${Math.min(88, Math.max(12, (cx(hoveredIndex) / W) * 100))}%`,
+        top: Math.min(H - 50, Math.max(4, cy(hov.value) - 52)),
+      }
+    : undefined;
 
   if (data.length < 2) {
     return (
@@ -265,7 +271,8 @@ function NetWorthSparkline({ data, formatMoney, t }: { data: NetWorthPoint[]; fo
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="absolute top-1 left-1/2 -translate-x-1/2 bg-[#1e1e1e]/95 backdrop-blur-sm border border-border rounded-xl px-3 py-1.5 shadow-xl pointer-events-none z-10"
+            style={{ ...tooltipPosition, translate: '-50% 0' }}
+            className="absolute bg-[#1e1e1e]/95 backdrop-blur-sm border border-border rounded-xl px-3 py-1.5 shadow-xl pointer-events-none z-10"
           >
             <div className="text-[10px] text-gray-400">{hov.date}</div>
             <div className="text-sm font-bold text-white">{formatMoney(hov.value)}</div>

@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Fix for Thai Baht symbol (฿ U+0E3F) rendering bug in Prompt font */
+/* Keep the Baht glyph stable across the dashboard's financial data. */
 @font-face {
   font-family: 'BahtFallback';
   src: local('Segoe UI'), local('Helvetica Neue'), local('Arial'), sans-serif;
@@ -8,8 +8,8 @@
 }
 
 @theme {
-  --font-sans: 'BahtFallback', var(--font-prompt), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-  --font-serif: var(--font-serif), ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-sans: 'BahtFallback', var(--font-ui), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
   
   /* Fix: Map "font-black" (900) down to a highly readable "bold" (700) globally */
   --font-weight-black: 700;
