@@ -747,8 +747,8 @@ export default function DashboardPage() {
       {/* ─── Main Grid: P/L Metrics + Cashflow + Top Movers ─────── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
 
-        {/* P/L Summary (compact 6 metrics) */}
-        <div className="lg:col-span-5 grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {/* P/L Summary */}
+        <div className="lg:col-span-12 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 overflow-hidden rounded-xl border border-border bg-surface/30">
           {[
             { label: t("totalInvested"), value: formatMoney(totalInvested), color: '#ADC6FF' },
             { label: t("unrealizedPL"), value: formatPnL(totalUnrealizedPL, formatMoney), color: totalUnrealizedPL >= 0 ? '#4EDEA3' : '#FFB4AB' },
@@ -758,15 +758,15 @@ export default function DashboardPage() {
             { label: 'PF', value: profitFactor === Number.POSITIVE_INFINITY ? '∞' : profitFactor.toFixed(2), color: profitFactor >= 1.5 ? '#4EDEA3' : '#9CA3AF' },
           ].map((m, i) => (
             <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 + i * 0.03 }}
-              className="bg-surface/50 p-3 sm:p-4 rounded-2xl border border-border">
-              <p className="text-[9px] font-bold uppercase tracking-wide mb-1" style={{ color: m.color }}>{m.label}</p>
-              <h3 className="text-sm sm:text-lg font-bold text-white tracking-tight truncate">{m.value}</h3>
+              className="min-w-0 border-b border-r border-border px-4 py-4 last:border-r-0 sm:px-5 lg:border-b-0">
+              <p className="mb-2 text-[10px] font-semibold tracking-wide text-gray-500">{m.label}</p>
+              <h3 className="truncate text-base font-bold tracking-tight sm:text-lg" style={{ color: m.color }}>{m.value}</h3>
             </motion.div>
           ))}
         </div>
 
         {/* Cashflow + Recent */}
-        <div className="lg:col-span-4 bg-surface/50 rounded-2xl border border-border p-4 flex flex-col">
+        <div className="lg:col-span-7 bg-surface/50 rounded-2xl border border-border p-4 flex flex-col">
           <div className="flex justify-between items-center mb-3">
             <div>
               <span className="text-[10px] text-[#ADC6FF] uppercase tracking-wide font-bold">{t("cashflowOverview")}</span>
@@ -824,7 +824,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Top Movers */}
-        <div className="lg:col-span-3 bg-surface/50 rounded-2xl border border-border p-4 flex flex-col">
+        <div className="lg:col-span-5 bg-surface/50 rounded-2xl border border-border p-4 flex flex-col">
           <div className="mb-3 flex flex-wrap gap-2 text-[10px] font-bold">
             <button type="button" aria-pressed={!showFavorites} onClick={() => setShowFavorites(false)} className={cn('rounded-lg px-2 py-2', !showFavorites ? 'bg-white/10 text-white' : 'text-gray-500')}>Top Movers · 1D</button>
             <button type="button" aria-pressed={showFavorites} onClick={() => setShowFavorites(true)} className={cn('rounded-lg px-2 py-2', showFavorites ? 'bg-amber-300/10 text-amber-300' : 'text-gray-500')}>★ Favorites ({assets.filter(a => a.is_active !== false && a.isFavorite).length})</button>
