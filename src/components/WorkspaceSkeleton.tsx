@@ -1,0 +1,5 @@
+"use client";
+import React from "react";
+import {usePathname} from "next/navigation";
+import {Skeleton} from "./SkeletonLoader";
+export function WorkspaceSkeleton(){const path=usePathname();const dashboard=path.startsWith('/dashboard');return <div className="mx-auto max-w-[1440px] space-y-6 px-4 py-7 sm:px-6 lg:px-8" role="status" aria-label="Loading workspace"><div className="flex justify-between"><div className="space-y-3"><Skeleton className="h-9 w-56"/><Skeleton className="h-5 w-72 max-w-[70vw]"/></div><Skeleton className="h-11 w-24"/></div>{dashboard?<><div className="grid gap-5 xl:grid-cols-[minmax(0,2.2fr)_minmax(260px,1fr)]"><Skeleton className="h-[430px]"/><Skeleton className="h-[430px]"/></div><Skeleton className="h-24"/><div className="grid gap-5 lg:grid-cols-[7fr_5fr]"><Skeleton className="h-64"/><Skeleton className="h-64"/></div></>:<><Skeleton className="h-12"/><Skeleton className="h-56"/><div className="space-y-1">{Array.from({length:6},(_,i)=><Skeleton key={i} className="h-14 rounded-none"/>)}</div></>}<span className="sr-only">Loading…</span></div>;}

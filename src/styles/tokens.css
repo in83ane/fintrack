@@ -258,3 +258,7 @@ html.light-mode {--ft-control-line:oklch(60% .016 255);}
 .ft-amount-input:focus {border-color:var(--ft-control-line);}
 .ft-ledger-search {border-color:var(--ft-control-line);}
 .ft-ledger-search input:focus-visible {outline:none;}
+
+.ft-rail .rail-brand,.ft-rail .rail-account,.ft-rail .rail-footer,.ft-rail .rail-pin {flex-shrink:0;}
+.ft-rail nav {min-height:0;}
+.ft-bucket-grid :is(button,a) {min-width:0;}

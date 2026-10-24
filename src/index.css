@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./styles/tokens.css";
 
 /* Fix for Thai Baht symbol (฿ U+0E3F) rendering bug in Prompt font */
 @font-face {
@@ -8,27 +9,17 @@
 }
 
 @theme {
-  --font-sans: 'BahtFallback', var(--font-prompt), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  --font-sans: 'BahtFallback', var(--font-anuphan), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
   --font-serif: var(--font-serif), ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
-  
+
   /* Fix: Map "font-black" (900) down to a highly readable "bold" (700) globally */
   --font-weight-black: 700;
-  
+
   /* Fix: Prevent "tracking-tighter" and "tracking-tight" from squishing Thai letters together */
   --tracking-tighter: 0em;
   --tracking-tight: 0em;
 
-  /* PortHub Theme Colors */
-  --color-background: #0f1115; /* Darker than #181c22 for deeper look */
-  --color-foreground: #ffffff;
-  --color-primary: #10b981; /* Emerald 500 */
-  --color-primary-foreground: #022c22;
-  --color-surface: rgba(255, 255, 255, 0.03);
-  --color-surface-2: rgba(255, 255, 255, 0.06);
-  --color-border: rgba(255, 255, 255, 0.08);
-  --color-muted: #9ca3af;
-  --color-muted-foreground: #6b7280;
-  --color-emerald-300: #6ee7b7;
+
 }
 
 
@@ -39,7 +30,7 @@ body {
   line-height: 1.6;
   /* Prevent layout shift when scrollbar appears/disappears (e.g. modals, expanding panels) */
   scrollbar-gutter: stable;
-  
+
   /* Apply Base Theme */
   background-color: var(--color-background);
   color: var(--color-foreground);
@@ -80,6 +71,7 @@ html[lang="en"] body {
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }
+
 .scrollbar-none {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -88,7 +80,7 @@ html[lang="en"] body {
 /* Emoji safety net: explicit font stack for any element that displays emoji or symbols */
 .emoji-text {
   font-family: 'EmojiOverride', 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji',
-               'Twemoji Mozilla', 'Segoe UI Symbol', sans-serif !important;
+    'Twemoji Mozilla', 'Segoe UI Symbol', sans-serif !important;
 }
 
 .scrollbar-none {
@@ -100,69 +92,124 @@ html[lang="en"] body {
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
 }
+
 .custom-scrollbar::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.02);
   border-radius: 3px;
 }
+
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 3px;
   transition: background 0.2s ease;
 }
+
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.2);
 }
+
 .custom-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.1) rgba(255, 255, 255, 0.02);
 }
 
 /* User Requested Status Glow Animations */
-@keyframes status-glow-red { 0%, 100% { background-color: #ffffff; } 50% { background-color: #fef2f2; } }
-@keyframes status-glow-orange { 0%, 100% { background-color: #ffffff; } 50% { background-color: #fffbeb; } }
-.glow-overdue { animation: status-glow-red 2s infinite ease-in-out; }
-.glow-inprogress { animation: status-glow-orange 2.5s infinite ease-in-out; }
+@keyframes status-glow-red {
 
-/* Light Mode Implementation using Semantic Inversion */
-html.light-mode {
-  filter: invert(1) hue-rotate(180deg);
-  background-color: white;
+  0%,
+  100% {
+    background-color: #ffffff;
+  }
+
+  50% {
+    background-color: #fef2f2;
+  }
 }
 
-html.light-mode img,
-html.light-mode video {
-  filter: invert(1) hue-rotate(180deg);
+@keyframes status-glow-orange {
+
+  0%,
+  100% {
+    background-color: #ffffff;
+  }
+
+  50% {
+    background-color: #fffbeb;
+  }
+}
+
+.glow-overdue {
+  animation: status-glow-red 2s infinite ease-in-out;
+}
+
+.glow-inprogress {
+  animation: status-glow-orange 2.5s infinite ease-in-out;
 }
 
 /* Wiggle animation for notification bell (#24) */
 @keyframes wiggle {
-  0%, 100% { transform: rotate(0deg); }
-  15% { transform: rotate(14deg); }
-  30% { transform: rotate(-12deg); }
-  45% { transform: rotate(8deg); }
-  60% { transform: rotate(-6deg); }
-  75% { transform: rotate(3deg); }
+
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+
+  15% {
+    transform: rotate(14deg);
+  }
+
+  30% {
+    transform: rotate(-12deg);
+  }
+
+  45% {
+    transform: rotate(8deg);
+  }
+
+  60% {
+    transform: rotate(-6deg);
+  }
+
+  75% {
+    transform: rotate(3deg);
+  }
 }
 
 /* Toast progress bar shrink animation (#30) */
 @keyframes shrink {
-  from { width: 100%; }
-  to { width: 0%; }
+  from {
+    width: 100%;
+  }
+
+  to {
+    width: 0%;
+  }
 }
 
 /* Touch-friendly targets (#35) */
 @media (pointer: coarse) {
-  button, a, [role="button"], input[type="checkbox"], input[type="radio"] {
+
+  button,
+  a,
+  [role="button"],
+  input[type="checkbox"],
+  input[type="radio"] {
     min-height: 44px;
     min-width: 44px;
   }
-  
-  input[type="text"], input[type="number"], input[type="email"], 
-  input[type="password"], input[type="search"], select, textarea {
+
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  select,
+  textarea {
     min-height: 48px;
-    font-size: 16px; /* Prevents iOS zoom on focus */
+    font-size: 16px;
+    /* Prevents iOS zoom on focus */
   }
-  
+
   /* Larger tap targets for table action buttons */
   table button {
     min-height: 36px;
@@ -174,6 +221,7 @@ html.light-mode video {
 input[type="number"] {
   -moz-appearance: textfield;
 }
+
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;

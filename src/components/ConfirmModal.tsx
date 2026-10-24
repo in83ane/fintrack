@@ -31,7 +31,7 @@ export function ConfirmModal({
         <div className="flex justify-end gap-3 pt-4 border-t border-border">
           <button
             onClick={onClose}
-            className="px-6 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl font-black text-xs uppercase tracking-wide transition-colors"
+            className="px-6 py-3 bg-foreground/5 hover:bg-foreground/10 text-foreground rounded-xl font-black text-xs uppercase tracking-wide transition-colors"
           >
             {cancelText}
           </button>
@@ -42,8 +42,8 @@ export function ConfirmModal({
             }}
             className={`px-6 py-3 rounded-xl font-black text-xs uppercase tracking-wide transition-colors ${
               isDanger
-                ? "bg-[#FFB4AB] text-[#1C1B1B] hover:brightness-110"
-                : "bg-[#ADC6FF] text-[#00285d] hover:brightness-110"
+                ? "bg-loss text-surface hover:brightness-110"
+                : "bg-primary text-primary-foreground hover:brightness-110"
             }`}
           >
             {confirmText}

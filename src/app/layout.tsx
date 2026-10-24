@@ -1,12 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Playfair_Display, Prompt } from "next/font/google";
+import { Anuphan } from "next/font/google";
 import "../index.css";
 import { AppProvider } from "@/src/context/AppContext";
 import { ErrorBoundary } from "@/src/components/ErrorBoundary";
+import { InterfaceProvider } from "@/src/components/InterfaceProvider";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
-const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-serif" });
-const prompt = Prompt({ subsets: ["latin", "thai"], weight: ["300", "400", "500", "600", "700", "800", "900"], variable: "--font-prompt" });
+const anuphan = Anuphan({ subsets: ["latin", "thai"], variable: "--font-anuphan", display: "swap" });
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -34,13 +33,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`dark ${inter.variable} ${playfair.variable} ${prompt.variable}`}>
+    <html lang="en" className={`dark ${anuphan.variable}`} suppressHydrationWarning>
       <head>
         <link rel="icon" href="/fintrack-icon.svg" type="image/svg+xml" />
       </head>
-      <body suppressHydrationWarning className={`${prompt.className} bg-[#131313] text-[#e5e2e1] min-h-screen min-w-0 antialiased`}>
+      <body suppressHydrationWarning className={`${anuphan.className} bg-background text-foreground min-h-screen min-w-0 antialiased`}>
         <AppProvider>
-          {children}
+          <InterfaceProvider>{children}</InterfaceProvider>
         </AppProvider>
       </body>
     </html>

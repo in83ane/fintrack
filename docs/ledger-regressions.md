@@ -41,3 +41,10 @@ The App Router template now owns one left-aligned 1440px maximum page frame with
 ## 8. Brand and neutral surfaces
 One --brand token defaults to oklch(0.68 0.15 265); primary surfaces/selected controls/navigation/focus/charts resolve through it. Light theme derives a darker accessible tone from the same hue/chroma, so changing that line also supports the requested teal/emerald alternatives. Hero surfaces are neutral with a thin brand line. Removed the purple appearance toggle and residual multicolour selected treatments; Income/Expense outlines and financial gain/loss remain semantic. Source-token contrast tests pass4.5:1 for principal text across four surfaces and all three brand options. Composited/hover/rendered contrast remains pending browser audit.
 
+
+## 9. Sidebar and Bucket
+Rail reserves72px at all times and expands fixed over content to232px, with12px inner padding, fixed icon x coordinates,80ms hover intent, opacity/translate label transitions, shared-layout pill, focus-within and persisted pin. Short screens reserve brand/footer height and scroll navigation. Bucket uses auto-fit/minmax with wrapping names/amounts; Deposit/Withdraw/Transfer remain in the card flow. Header and nav use the same Bucket translation.
+
+Bucket percentages are a display/meaning mismatch: stored targetPercent values are printed raw, while actual distribution and bar widths normalize them against the sum. Four1 values mean labels1%/total4%, but25% each of the distributed amount. No bucket formula or stored value changed. See bucket-percentage-observation.md.
+
+No current screenshot matrix could be captured: the browser tool remains disabled after the user offered to enable it. Desktop1440/mobile390, dark/light, collapsed/expanded and old-build screenshot comparisons remain unverified. Native mobile navigation uses a drawer rather than the desktop hover rail.
