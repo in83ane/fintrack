@@ -1,9 +1,89 @@
 "use client";
+
 import React from "react";
-import Link from "next/link";
-import {usePathname} from "next/navigation";
-import {LayoutDashboard,Briefcase,ReceiptText,PiggyBank,CalendarDays} from "lucide-react";
-import {motion} from "motion/react";
-import {useApp} from "@/src/context/AppContext";
-const items=[{path:'/dashboard',icon:LayoutDashboard,en:'Home',th:'ภาพรวม'},{path:'/portfolio',icon:Briefcase,en:'Portfolio',th:'พอร์ต'},{path:'/ledger',icon:ReceiptText,en:'Ledger',th:'รายการ'},{path:'/budget',icon:PiggyBank,en:'Bucket',th:'กระเป๋า'},{path:'/history',icon:CalendarDays,en:'History',th:'ประวัติ'}];
-export function BottomNav(){const pathname=usePathname();const {language}=useApp();return <nav aria-label={language==='th'?'เมนูหลัก':'Primary navigation'} className="fixed inset-x-3 bottom-3 z-50 mx-auto max-w-md rounded-2xl bg-overlay p-1.5 shadow-xl lg:hidden" style={{paddingBottom:'calc(6px + env(safe-area-inset-bottom))'}}><div className="flex">{items.map(item=>{const active=pathname.startsWith(item.path);return <Link key={item.path} href={item.path} aria-current={active?'page':undefined} className="relative flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl py-2">{active&&<motion.span layoutId="bottom-nav-pill" className="ft-nav-indicator" transition={{type:'spring',stiffness:400,damping:34}}/>}<item.icon size={19} className={active?'relative text-primary':'relative text-muted'}/><span className={`relative text-xs ${active?'font-semibold text-primary':'text-muted'}`}>{language==='th'?item.th:item.en}</span></Link>;})}</div></nav>;}
+import { usePathname, useRouter } from "next/navigation";
+import { LayoutDashboard, Briefcase, ReceiptText, PiggyBank, CalendarDays } from "lucide-react";
+import { cn } from "@/src/lib/utils";
+import { motion } from "motion/react";
+
+const NAV_ITEMS = [
+  { path: "/dashboard", icon: LayoutDashboard, label: "Home", color: "#4EDEA3" },
+  { path: "/portfolio", icon: Briefcase, label: "Portfolio", color: "#ADC6FF" },
+  { path: "/ledger", icon: ReceiptText, label: "Ledger", color: "#E9C349" },
+  { path: "/budget", icon: PiggyBank, label: "Bucket", color: "#FF8B9A" },
+  { path: "/history", icon: CalendarDays, label: "History", color: "#A78BFA" },
+];
+
+export function BottomNav() {
+  const pathname = usePathname();
+  const router = useRouter();
+
+  return (
+    <nav className="fixed bottom-0 left-0 right-0 z-50 lg:hidden pointer-events-none">
+      <div className="flex justify-center pb-3 px-3">
+        <motion.div
+          initial={{ y: 60, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ type: "spring", stiffness: 300, damping: 28, delay: 0.1 }}
+          className="pointer-events-auto flex items-center justify-around w-full max-w-md bg-[#111114]/95 backdrop-blur-2xl border border-white/[0.06] rounded-2xl px-1 py-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.6)]"
+          style={{ paddingBottom: `calc(0.375rem + env(safe-area-inset-bottom, 0px))` }}
+        >
+          {NAV_ITEMS.map((item) => {
+            const isActive = pathname?.startsWith(item.path);
+            const Icon = item.icon;
+
+            return (
+              <button
+                key={item.path}
+                id={`bottom-nav-${item.path.replace("/", "")}`}
+                onClick={() => router.push(item.path)}
+                className="relative flex flex-col items-center justify-center flex-1 py-1.5 group"
+              >
+                {/* Active indicator pill */}
+                {isActive && (
+                  <motion.div
+                    layoutId="bottom-nav-pill"
+                    className="absolute inset-x-2 inset-y-0 rounded-xl"
+                    style={{ backgroundColor: `${item.color}10` }}
+                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                  />
+                )}
+
+                {/* Active top dot */}
+                {isActive && (
+                  <motion.div
+                    layoutId="bottom-nav-dot"
+                    className="absolute -top-0.5 w-4 h-[2px] rounded-full"
+                    style={{ backgroundColor: item.color }}
+                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                  />
+                )}
+
+                {/* Icon */}
+                <div className="relative z-10">
+                  <Icon
+                    size={20}
+                    strokeWidth={isActive ? 2.2 : 1.5}
+                    className="transition-colors duration-200"
+                    style={{ color: isActive ? item.color : '#555' }}
+                  />
+                </div>
+
+                {/* Label */}
+                <span
+                  className={cn(
+                    "relative z-10 text-[9px] font-bold mt-0.5 tracking-wide transition-colors duration-200",
+                    isActive ? "opacity-100" : "opacity-40"
+                  )}
+                  style={{ color: isActive ? item.color : '#888' }}
+                >
+                  {item.label}
+                </span>
+              </button>
+            );
+          })}
+        </motion.div>
+      </div>
+    </nav>
+  );
+}

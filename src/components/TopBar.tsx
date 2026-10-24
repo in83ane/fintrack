@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import { InterfaceControls } from "./InterfaceControls";
 import { useFxRate } from '@/src/hooks/useFxRate';
 import { Bell, Globe, ChevronDown, Search, Menu, X, Plus, Check, Layers, Pencil } from "lucide-react";
 import { useApp, Language, Currency, AppNotification } from "@/src/context/AppContext";
@@ -27,11 +26,6 @@ export function TopBar() {
   const fx = useFxRate();
   const { language, setLanguage, currency, setCurrency, t, userProfile, notifications, markNotificationRead, clearNotifications, portfolios, activePortfolio, isAllPortfolios, selectPortfolio, createPortfolio, renamePortfolio } = useApp();
   const pathname = usePathname();
-  React.useEffect(()=>{
-    const bar=document.querySelector('.ft-topbar');if(!bar)return;
-    const measure=()=>document.documentElement.style.setProperty('--ft-topbar-height',`${bar.getBoundingClientRect().height}px`);
-    measure();const observer=new ResizeObserver(measure);observer.observe(bar);return()=>observer.disconnect();
-  },[]);
 
   // Separate Bucket (cash_management) from trading portfolios — Bucket should not be renamable
   const tradingPortfolios = React.useMemo(
@@ -122,7 +116,6 @@ export function TopBar() {
   const isDashboard = pathname === "/dashboard" || pathname === "/";
 
   const pageTitle = React.useMemo(() => {
-    if (pathname === "/budget") return t("budgetPage");
     const path = pathname.split("/").pop() || "dashboard";
     return t(path) || path.charAt(0).toUpperCase() + path.slice(1);
   }, [pathname, t]);
@@ -136,50 +129,65 @@ export function TopBar() {
 
   return (
     <>
-      <header className="ft-topbar sticky top-0 z-50 flex w-full min-w-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-surface/80 px-3 py-3  sm:px-4 lg:px-6 lg:py-3">
+      <header className="sticky top-0 z-50 flex w-full min-w-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-surface/80 px-3 py-3 backdrop-blur-md sm:px-4 lg:px-12 lg:py-4">
         <div className="flex min-w-0 shrink items-center gap-2 lg:gap-8">
-          <button
-            aria-label={language === "th" ? "เปิดเมนู" : "Open navigation"}
+          <button 
             onClick={() => setShowMobileMenu(true)}
-            className="lg:hidden shrink-0 rounded-xl p-2 text-gray-400 hover:bg-foreground/5 hover:text-foreground transition-colors"
+            className="lg:hidden shrink-0 rounded-xl p-2 text-gray-400 hover:bg-white/5 hover:text-white transition-colors"
           >
             <Menu size={24} />
           </button>
           {!pathname.startsWith('/trade') && (
-            <h2 className="text-sm font-bold tracking-wide text-foreground hidden md:block">
+            <h2 className="text-sm font-bold uppercase tracking-wide text-white hidden md:block">
               {pageTitle}
             </h2>
+          )}
+          {/* Breadcrumb Navigation */}
+          {pathname !== '/dashboard' && pathname !== '/' && (
+            <div className="hidden md:flex items-center gap-1.5 text-[10px] font-semibold text-gray-500">
+              <Link href="/dashboard" className="hover:text-white transition-colors">Home</Link>
+              {pathname.split('/').filter(Boolean).map((seg, i, arr) => (
+                <React.Fragment key={i}>
+                  <span className="text-gray-700">/</span>
+                  {i === arr.length - 1 ? (
+                    <span className="text-[#ADC6FF]">{decodeURIComponent(seg).replace(/\[|\]/g, '')}</span>
+                  ) : (
+                    <Link href={`/${arr.slice(0, i + 1).join('/')}`} className="hover:text-white transition-colors">{seg}</Link>
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
           )}
           <div id="topbar-price-portal" className="hidden items-center gap-3 xl:flex"></div>
         </div>
 
         <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5 sm:gap-3">
           {/* ⌘K Search Trigger */}
-          <div className="hidden 2xl:flex h-9 box-border items-center rounded-full bg-foreground/5 border border-border hover:border-primary/30 transition-all">
+          <div className="hidden md:flex h-9 box-border items-center rounded-full bg-white/5 border border-border hover:border-[#ADC6FF]/30 transition-all">
             <button
               onClick={() => { const e = new KeyboardEvent('keydown', { key: 'k', metaKey: true, ctrlKey: true, bubbles: true }); window.dispatchEvent(e); }}
               className="flex h-full items-center gap-2 px-3 leading-none cursor-pointer"
             >
               <Search size={12} className="text-gray-500" />
               <span className="text-xs text-gray-500">{t('searchPlaceholder')}</span>
-              <kbd className="text-xs font-bold text-gray-600 bg-foreground/5 px-1.5 py-0.5 rounded border border-border">⌘K</kbd>
+              <kbd className="text-[9px] font-bold text-gray-600 bg-white/5 px-1.5 py-0.5 rounded border border-border">⌘K</kbd>
             </button>
           </div>
 
-          <div className="relative hidden lg:block" ref={portfolioMenuRef}>
+          <div className="relative hidden xl:block" ref={portfolioMenuRef}>
             <div
               className={cn(
-                "box-border flex h-9 max-w-44 shrink-0 items-center rounded-full border border-border bg-foreground/5 hover:bg-foreground/10 transition-colors",
-                showPortfolioMenu && "border-primary/40 bg-foreground/10"
+                "box-border flex h-9 max-w-44 shrink-0 items-center rounded-full border border-border bg-white/5 hover:bg-white/10 transition-colors",
+                showPortfolioMenu && "border-[#ADC6FF]/40 bg-white/10"
               )}
             >
               <button
                 onClick={() => setShowPortfolioMenu(open => !open)}
-                className="flex h-full min-w-0 items-center gap-2 rounded-full px-3 text-xs font-bold leading-none text-foreground"
+                className="flex h-full min-w-0 items-center gap-2 rounded-full px-3 text-xs font-bold leading-none text-white"
                 aria-label="Choose investment portfolio"
               >
                 {isAllPortfolios ? (
-                  <Layers size={14} className="shrink-0 text-primary" />
+                  <Layers size={14} className="shrink-0 text-[#4EDEA3]" />
                 ) : (
                   <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: activePortfolio?.color || "#ADC6FF" }} />
                 )}
@@ -195,13 +203,13 @@ export function TopBar() {
                   exit={{ opacity: 0, y: 8 }}
                   className="absolute right-0 top-full z-[60] mt-2 w-64 overflow-hidden rounded-2xl border border-border bg-background p-2 shadow-2xl shadow-black/40"
                 >
-                  <p className="px-2 py-1 text-xs font-black uppercase tracking-wide text-gray-500">Investment portfolios</p>
+                  <p className="px-2 py-1 text-[10px] font-black uppercase tracking-wide text-gray-500">Investment portfolios</p>
                   <div className="max-h-48 space-y-0.5 overflow-y-auto py-1">
                     <button
                       onClick={() => { selectPortfolio(null); setShowPortfolioMenu(false); }}
                       className={cn(
                         "flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-xs font-bold transition-colors",
-                        isAllPortfolios ? "bg-primary/15 text-primary" : "text-gray-400 hover:bg-foreground/5 hover:text-foreground"
+                        isAllPortfolios ? "bg-[#4EDEA3]/15 text-[#4EDEA3]" : "text-gray-400 hover:bg-white/5 hover:text-white"
                       )}
                     >
                       <span className="flex items-center gap-2"><Layers size={14} /> All portfolios</span>
@@ -212,7 +220,7 @@ export function TopBar() {
                         onClick={() => { selectPortfolio(cashManagementPortfolio.id); setShowPortfolioMenu(false); }}
                         className={cn(
                           "flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-xs font-bold transition-colors",
-                          activePortfolio?.id === cashManagementPortfolio.id ? "bg-primary/15 text-primary" : "text-gray-400 hover:bg-foreground/5 hover:text-foreground"
+                          activePortfolio?.id === cashManagementPortfolio.id ? "bg-[#4EDEA3]/15 text-[#4EDEA3]" : "text-gray-400 hover:bg-white/5 hover:text-white"
                         )}
                       >
                         <span className="flex min-w-0 items-center gap-2">
@@ -223,7 +231,7 @@ export function TopBar() {
                       </button>
                     )}
                     {tradingPortfolios.map((portfolio) => (
-                      <div key={portfolio.id} className={cn("flex items-center gap-1 rounded-xl", activePortfolio?.id === portfolio.id && "bg-primary/15")}>
+                      <div key={portfolio.id} className={cn("flex items-center gap-1 rounded-xl", activePortfolio?.id === portfolio.id && "bg-[#ADC6FF]/15")}>
                         {editingPortfolioId === portfolio.id ? (
                           <form onSubmit={handleRenamePortfolio} className="flex min-w-0 flex-1 gap-1 p-1">
                             <input
@@ -231,9 +239,9 @@ export function TopBar() {
                               value={editingPortfolioName}
                               onChange={(event) => setEditingPortfolioName(event.target.value)}
                               maxLength={80}
-                              className="min-w-0 flex-1 rounded-lg border border-primary/40 bg-background px-2 py-1.5 text-xs text-foreground outline-none"
+                              className="min-w-0 flex-1 rounded-lg border border-[#ADC6FF]/40 bg-background px-2 py-1.5 text-xs text-white outline-none"
                             />
-                            <button type="submit" className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground" aria-label="Save portfolio name"><Check size={14} /></button>
+                            <button type="submit" className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#ADC6FF] text-[#00285d]" aria-label="Save portfolio name"><Check size={14} /></button>
                           </form>
                         ) : (
                           <>
@@ -241,7 +249,7 @@ export function TopBar() {
                               onClick={() => { selectPortfolio(portfolio.id); setShowPortfolioMenu(false); }}
                               className={cn(
                                 "flex min-w-0 flex-1 items-center justify-between rounded-xl px-3 py-2.5 text-left text-xs font-bold transition-colors",
-                                activePortfolio?.id === portfolio.id ? "text-primary" : "text-gray-400 hover:bg-foreground/5 hover:text-foreground"
+                                activePortfolio?.id === portfolio.id ? "text-[#ADC6FF]" : "text-gray-400 hover:bg-white/5 hover:text-white"
                               )}
                             >
                               <span className="flex min-w-0 items-center gap-2"><span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: portfolio.color }} /><span className="truncate">{portfolio.name}</span></span>
@@ -249,7 +257,7 @@ export function TopBar() {
                             </button>
                             <button
                               onClick={() => { setEditingPortfolioId(portfolio.id); setEditingPortfolioName(portfolio.name); }}
-                              className="mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-foreground/10 hover:text-foreground"
+                              className="mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-white/10 hover:text-white"
                               aria-label={`Rename ${portfolio.name}`}
                             ><Pencil size={13} /></button>
                           </>
@@ -263,12 +271,12 @@ export function TopBar() {
                       onChange={(event) => setPortfolioName(event.target.value)}
                       maxLength={80}
                       placeholder="New portfolio"
-                      className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 py-2 text-xs text-foreground outline-none placeholder:text-gray-600 focus:border-primary/60"
+                      className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 py-2 text-xs text-white outline-none placeholder:text-gray-600 focus:border-[#ADC6FF]/60"
                     />
                     <button
                       type="submit"
                       disabled={!portfolioName.trim() || isCreatingPortfolio}
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#ADC6FF] text-[#00285d] disabled:cursor-not-allowed disabled:opacity-40"
                       aria-label="Create portfolio"
                     >
                       <Plus size={16} />
@@ -283,17 +291,16 @@ export function TopBar() {
           <div className="relative" ref={langMenuRef}>
             <div
               className={cn(
-                "box-border flex h-9 shrink-0 items-center rounded-full border border-border bg-foreground/5 hover:bg-foreground/10 transition-all",
-                showLangMenu && "border-primary/40 bg-foreground/10"
+                "box-border flex h-9 shrink-0 items-center rounded-full border border-border bg-white/5 hover:bg-white/10 transition-all",
+                showLangMenu && "border-[#ADC6FF]/40 bg-white/10"
               )}
             >
               <button
-                aria-label={language === "th" ? "ภาษา" : "Language"}
                 onClick={() => setShowLangMenu(!showLangMenu)}
                 className="flex h-full items-center gap-1.5 rounded-full px-3 leading-none"
               >
-                <Globe size={13} className="shrink-0 text-primary" />
-                <span className="text-xs font-black uppercase tracking-wide text-foreground hidden sm:inline">
+                <Globe size={13} className="shrink-0 text-[#4EDEA3]" />
+                <span className="text-[10px] font-black uppercase tracking-wide text-white hidden sm:inline">
                   {languages.find(l => l.code === language)?.label}
                 </span>
                 <ChevronDown size={10} className={cn("text-gray-500 transition-transform", showLangMenu && "rotate-180")} />
@@ -316,11 +323,11 @@ export function TopBar() {
                         setShowLangMenu(false);
                       }}
                       className={cn(
-                        "w-full flex items-center gap-2.5 px-3 py-2 text-xs font-black uppercase tracking-wide transition-colors hover:bg-foreground/5",
-                        language === lang.code ? "text-primary" : "text-gray-400"
+                        "w-full flex items-center gap-2.5 px-3 py-2 text-xs font-black uppercase tracking-wide transition-colors hover:bg-white/5",
+                        language === lang.code ? "text-[#4EDEA3]" : "text-gray-400"
                       )}
                     >
-
+                      <span>{lang.flag}</span>
                       <span>{lang.label}</span>
                     </button>
                   ))}
@@ -329,16 +336,16 @@ export function TopBar() {
             </AnimatePresence>
           </div>
 
-          <div className="ft-fx-chip shrink-0 px-2 py-1 text-right" aria-live="polite" aria-label="USD THB exchange rate">
-            <div className="text-xs font-bold text-primary sm:text-xs">1 USD = {fx.rate ? Number(fx.rate).toLocaleString('en-US', { maximumFractionDigits: 4 }) : '—'} THB</div>
-            <div className="text-xs text-gray-500">
+          <div className="shrink-0 rounded-xl border border-border bg-white/5 px-2 py-1 text-right tabular-nums" aria-live="polite" aria-label="USD THB exchange rate">
+            <div className="text-[10px] font-bold text-[#ADC6FF] sm:text-xs">1 USD = {fx.rate ? Number(fx.rate).toLocaleString('en-US', { maximumFractionDigits: 4 }) : '—'} THB</div>
+            <div className="text-[9px] text-gray-500">
               {!fx.rate ? (language === 'th' ? 'รอข้อมูลเรท' : 'Rate unavailable') : fx.mode === 'manual' ? 'Manual' : `${fx.stale ? (language === 'th' ? 'เรทเก่า · ' : 'Stale · ') : 'Auto · '}${fx.quote ? new Date(fx.quote.fetchedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' }) : ''} ICT`}
             </div>
           </div>
           {/* Currency Selector - Capsule Toggle */}
-          <div className="relative flex h-9 shrink-0 items-center rounded-full border border-border bg-foreground/5 p-1 box-border">
+          <div className="relative flex h-9 shrink-0 items-center rounded-full border border-border bg-white/5 p-1 box-border">
             <motion.div
-              className="absolute top-1 bottom-1 rounded-full bg-primary"
+              className="absolute top-1 bottom-1 rounded-full bg-[#4EDEA3]"
               animate={{ left: currencyHighlight.left, width: currencyHighlight.width }}
               transition={{ type: "spring", stiffness: 500, damping: 35 }}
             />
@@ -346,11 +353,10 @@ export function TopBar() {
               <button
                 key={curr}
                 ref={(el) => { currencyBtnRefs.current[curr] = el; }}
-                aria-pressed={currency === curr}
                 onClick={() => setCurrency(curr)}
                 className={cn(
-                  "relative z-10 flex h-full items-center justify-center rounded-full px-3 text-xs font-black uppercase tracking-wide transition-colors",
-                  currency === curr ? "text-primary-foreground" : "text-gray-500 hover:text-foreground"
+                  "relative z-10 flex h-full items-center justify-center rounded-full px-3 text-[10px] font-black uppercase tracking-wide transition-colors",
+                  currency === curr ? "text-[#00332b]" : "text-gray-500 hover:text-white"
                 )}
               >
                 {curr}
@@ -358,39 +364,37 @@ export function TopBar() {
             ))}
           </div>
 
-          <InterfaceControls />
           <div className="relative flex shrink-0 items-center gap-1.5 sm:gap-3">
             <div ref={notifMenuRef} className="flex items-center">
               <button
-                aria-label={t("notifications")} aria-expanded={showNotifMenu}
                 onClick={() => { setShowNotifMenu(!showNotifMenu); setShowProfileMenu(false); setShowLangMenu(false); }}
-                className="text-gray-400 hover:text-foreground transition-colors relative flex items-center h-full p-1"
+                className="text-gray-400 hover:text-white transition-colors relative flex items-center h-full p-1"
               >
-                <Bell size={18} aria-hidden="true" />
+                <Bell size={18} className={notifications.filter(n => !n.read).length > 0 ? 'animate-[wiggle_0.5s_ease-in-out]' : ''} />
                 {notifications.filter(n => !n.read).length > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 bg-primary text-primary-foreground rounded-full border-2 border-surface flex items-center justify-center">
-                    <span className="text-xs font-bold text-surface">{notifications.filter(n => !n.read).length}</span>
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 bg-[#FFB4AB] rounded-full border-2 border-[#1C1B1B] flex items-center justify-center animate-pulse">
+                    <span className="text-[8px] font-bold text-[#1C1B1B]">{notifications.filter(n => !n.read).length}</span>
                   </span>
                 )}
               </button>
-
+              
               <AnimatePresence>
                 {showNotifMenu && (
-                  <motion.div
+                  <motion.div 
                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    className="absolute top-full right-0 mt-4 w-80 max-w-[calc(100vw-24px)] bg-background border border-border rounded-2xl shadow-2xl shadow-black/40 overflow-hidden z-[60]"
+                    className="absolute top-full right-12 mt-4 w-80 bg-background border border-border rounded-2xl shadow-2xl shadow-black/40 overflow-hidden z-[60]"
                   >
                     <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-                      <span className="text-sm font-bold text-foreground uppercase tracking-wide">{t("notifications")}</span>
+                      <span className="text-sm font-bold text-white uppercase tracking-wide">{t("notifications")}</span>
                       {notifications.length > 0 && (
                         <div className="flex gap-2">
-                          <button onClick={() => { notifications.forEach(n => markNotificationRead(n.id)); }} className="text-xs font-bold text-primary hover:text-foreground transition-colors">
+                          <button onClick={() => { notifications.forEach(n => markNotificationRead(n.id)); }} className="text-[10px] font-bold text-[#ADC6FF] hover:text-white transition-colors">
                             {t("markAllRead")}
                           </button>
                           <span className="text-gray-600">·</span>
-                          <button onClick={clearNotifications} className="text-xs font-bold text-loss hover:text-foreground transition-colors">
+                          <button onClick={clearNotifications} className="text-[10px] font-bold text-[#FFB4AB] hover:text-white transition-colors">
                             {t("clearAll")}
                           </button>
                         </div>
@@ -415,18 +419,18 @@ export function TopBar() {
                               key={notif.id}
                               onClick={() => markNotificationRead(notif.id)}
                               className={cn(
-                                "px-4 py-3 border-b border-border cursor-pointer transition-all hover:bg-foreground/5",
-                                !notif.read && "bg-foreground/[0.02]"
+                                "px-4 py-3 border-b border-border cursor-pointer transition-all hover:bg-white/5",
+                                !notif.read && "bg-white/[0.02]"
                               )}
                             >
                               <div className="flex items-start gap-3">
                                 <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ backgroundColor: color }} />
                                 <div className="flex-1 min-w-0">
-                                  <p className="text-xs font-bold text-foreground truncate">{notif.title}</p>
-                                  <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">{notif.message}</p>
-                                  <p className="text-xs text-gray-600 mt-1 font-medium">{formatTimeAgo(notif.time, t)}</p>
+                                  <p className="text-xs font-bold text-white truncate">{notif.title}</p>
+                                  <p className="text-[10px] text-gray-400 mt-0.5 line-clamp-2">{notif.message}</p>
+                                  <p className="text-[9px] text-gray-600 mt-1 font-medium">{formatTimeAgo(notif.time, t)}</p>
                                 </div>
-                                {!notif.read && <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2 flex-shrink-0" />}
+                                {!notif.read && <div className="w-1.5 h-1.5 rounded-full bg-[#ADC6FF] mt-2 flex-shrink-0" />}
                               </div>
                             </div>
                           );
@@ -441,49 +445,49 @@ export function TopBar() {
             <div ref={profileMenuRef}>
               <div
                 onClick={() => { setShowProfileMenu(!showProfileMenu); setShowNotifMenu(false); setShowLangMenu(false); }}
-                className="w-8 h-8 rounded-full border border-primary/20 overflow-hidden bg-foreground/5 flex items-center justify-center relative group cursor-pointer"
+                className="w-8 h-8 rounded-full border border-[#ADC6FF]/20 overflow-hidden bg-white/5 flex items-center justify-center relative group cursor-pointer"
               >
                 {userProfile ? (
-                  <img
-                    src={userProfile.avatarUrl}
-                    alt={userProfile.email}
-                    className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                      if (e.currentTarget.nextElementSibling) {
-                        (e.currentTarget.nextElementSibling as HTMLElement).style.display = 'flex';
-                      }
-                    }}
-                  />
+                   <img 
+                   src={userProfile.avatarUrl} 
+                   alt={userProfile.email} 
+                   className="w-full h-full object-cover"
+                   referrerPolicy="no-referrer"
+                   onError={(e) => {
+                     e.currentTarget.style.display = 'none';
+                     if (e.currentTarget.nextElementSibling) {
+                       (e.currentTarget.nextElementSibling as HTMLElement).style.display = 'flex';
+                     }
+                   }}
+                 />
                 ) : null}
-                <div className="absolute inset-0 items-center justify-center text-xs font-black text-primary hidden">
-                  {userProfile?.initials || "US"}
+                <div className="absolute inset-0 items-center justify-center text-xs font-black text-[#ADC6FF] hidden">
+                   {userProfile?.initials || "US"}
                 </div>
               </div>
 
               <AnimatePresence>
                 {showProfileMenu && (
-                  <motion.div
+                  <motion.div 
                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
                     className="absolute top-full right-0 mt-4 w-56 bg-background border border-border rounded-2xl shadow-2xl shadow-black/40 overflow-hidden py-1 z-[60]"
                   >
                     <div className="px-4 py-3 border-b border-border mb-1">
-                      <p className="text-sm font-bold text-foreground truncate">{userProfile?.email || "User"}</p>
-                      <p className="text-xs text-primary mt-0.5 font-medium">{t("premiumTier") || "Premium Plan"}</p>
+                      <p className="text-sm font-bold text-white truncate">{userProfile?.email || "User"}</p>
+                      <p className="text-xs text-[#4EDEA3] mt-0.5 font-medium">{t("premiumTier") || "Premium Plan"}</p>
                     </div>
-
-                    <Link href="/settings" onClick={() => setShowProfileMenu(false)} className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-gray-400 hover:text-foreground hover:bg-foreground/5 transition-colors">
+                    
+                    <Link href="/settings" onClick={() => setShowProfileMenu(false)} className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
                       <User size={14} /> {t("myProfile")}
                     </Link>
-                    <Link href="/settings" onClick={() => setShowProfileMenu(false)} className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-gray-400 hover:text-foreground hover:bg-foreground/5 transition-colors">
+                    <Link href="/settings" onClick={() => setShowProfileMenu(false)} className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
                       <Settings size={14} /> {t("settings")}
                     </Link>
-
+                    
                     <div className="border-t border-border mt-1 pt-1">
-                      <button
+                      <button 
                         onClick={async () => {
                           const keysToRemove = [
                             "fintrack-assets", "fintrack-trades", "fintrack-allocations",
@@ -493,13 +497,13 @@ export function TopBar() {
                           Object.keys(localStorage)
                             .filter(key => key.startsWith("dca_draft_"))
                             .forEach(key => localStorage.removeItem(key));
-
+                          
                           const { supabase } = await import('@/src/lib/supabase');
                           await supabase.auth.signOut();
                           await logoutAction();
                           window.location.href = "/login";
                         }}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-loss hover:bg-foreground/5 transition-colors"
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-[#FFB4AB] hover:bg-white/5 transition-colors"
                       >
                         <LogOut size={14} /> {t("logout")}
                       </button>
@@ -516,14 +520,14 @@ export function TopBar() {
       <AnimatePresence>
         {showMobileMenu && (
           <div className="fixed inset-0 z-[100] lg:hidden">
-            <motion.div
+            <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowMobileMenu(false)}
               className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             />
-            <motion.div
+            <motion.div 
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
@@ -531,7 +535,7 @@ export function TopBar() {
               className="absolute left-0 top-0 bottom-0 w-72 bg-background shadow-2xl"
             >
               <div className="flex justify-end p-4">
-                <button onClick={() => setShowMobileMenu(false)} className="p-2 text-gray-400 hover:text-foreground">
+                <button onClick={() => setShowMobileMenu(false)} className="p-2 text-gray-400 hover:text-white">
                   <X size={24} />
                 </button>
               </div>

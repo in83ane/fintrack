@@ -1,7 +1,5 @@
 "use client";
 
-import { WorkspaceSkeleton } from "@/src/components/WorkspaceSkeleton";
-import { DensityToggle } from "@/src/components/InterfaceControls";
 import React, { useState, useMemo, useEffect, useCallback, useContext, createContext } from "react";
 import { createPortal } from 'react-dom';
 import {
@@ -151,7 +149,7 @@ interface MoveInput {
 const STORAGE_KEY = "fintrack.multibroker.v1";
 const DEFAULT_RATE = Number.NaN; // Unavailable until the shared FX quote is loaded.
 
-const ACCENT = "var(--ft-accent)";
+const ACCENT = "#4EDEA3";
 const GAIN = "#4EDEA3";
 const LOSS = "#FFB4AB";
 
@@ -705,10 +703,10 @@ function usePortfolioStore() {
 // ─── UI primitives ───────────────────────────────────────────────────────────
 
 const INPUT =
-  "w-full bg-foreground/5 border border-foreground/10 rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-gray-600 focus:outline-none focus:border-gain/50 transition-colors [color-scheme:dark]";
+  "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-[#4EDEA3]/50 transition-colors [color-scheme:dark]";
 
 const PRIMARY_BTN =
-  "rounded-xl bg-gain text-primary-foreground font-bold text-sm py-3 px-5 hover:brightness-110 transition disabled:bg-foreground/5 disabled:text-gray-600 disabled:cursor-not-allowed";
+  "rounded-xl bg-[#4EDEA3] text-[#002114] font-bold text-sm py-3 px-5 hover:brightness-110 transition disabled:bg-white/5 disabled:text-gray-600 disabled:cursor-not-allowed";
 
 function cleanNum(v: string, maxDec: number): string {
   let out = v.replace(/[^0-9.]/g, "");
@@ -765,20 +763,20 @@ function Sheet({ title, onClose, children, wide = false, footer }: { title: stri
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={cn("flex w-full max-h-[min(85dvh,760px)] flex-col overflow-hidden bg-surface border border-foreground/10 rounded-2xl shadow-2xl", wide ? "sm:max-w-[640px]" : "sm:max-w-md")}
+        className={cn("flex w-full max-h-[min(85dvh,760px)] flex-col overflow-hidden bg-[#1C1B1B] border border-white/10 rounded-2xl shadow-2xl", wide ? "sm:max-w-[640px]" : "sm:max-w-md")}
       >
-        <div className="flex shrink-0 items-center justify-between border-b border-foreground/10 px-5 py-3">
-          <h3 className="text-base font-bold text-foreground">{title}</h3>
+        <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-5 py-3">
+          <h3 className="text-base font-bold text-white">{title}</h3>
           <button
             onClick={onClose}
             aria-label="ปิด"
-            className="w-8 h-8 rounded-full bg-foreground/5 text-gray-400 hover:text-foreground hover:bg-foreground/10 flex items-center justify-center transition-colors"
+            className="w-8 h-8 rounded-full bg-white/5 text-gray-400 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors"
           >
             <X size={16} />
           </button>
         </div>
         <div className="min-h-0 overflow-y-auto overscroll-contain custom-scrollbar p-4 sm:p-5">{children}</div>
-        {footer && <div className="shrink-0 border-t border-foreground/10 px-5 py-3">{footer}</div>}
+        {footer && <div className="shrink-0 border-t border-white/10 px-5 py-3">{footer}</div>}
       </motion.div>
     </motion.div>, document.body
   );
@@ -796,7 +794,7 @@ function CurrencyToggle({ value, onChange }: { value: Cur; onChange: (c: Cur) =>
           onClick={() => onChange(c)}
           className={cn(
             "px-3 py-1.5 rounded-md text-xs font-bold transition-colors",
-            value === c ? "bg-primary text-primary-foreground" : "text-gray-400 hover:text-foreground"
+            value === c ? "bg-[#4EDEA3] text-[#002114]" : "text-gray-400 hover:text-white"
           )}
         >
           {c}
@@ -827,8 +825,8 @@ function AccountCurrencyPicker({ value, onChange, locked = false }: { value: Cur
             className={cn(
               "flex min-w-0 items-center gap-2.5 rounded-xl border p-3 text-left transition-all",
               selected
-                ? "border-foreground/35 bg-foreground/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
-                : "border-foreground/10 bg-black/20 text-gray-500 hover:border-foreground/20 hover:bg-foreground/[0.04]",
+                ? "border-white/35 bg-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+                : "border-white/10 bg-black/20 text-gray-500 hover:border-white/20 hover:bg-white/[0.04]",
               locked && "cursor-default"
             )}
             style={selected ? { borderColor: `${option.accent}88` } : undefined}
@@ -840,8 +838,8 @@ function AccountCurrencyPicker({ value, onChange, locked = false }: { value: Cur
               {option.symbol}
             </span>
             <span className="min-w-0">
-              <span className="block text-sm font-bold text-foreground">{option.value}</span>
-              <span className="block truncate text-xs text-gray-500">{option.desc}</span>
+              <span className="block text-sm font-bold text-white">{option.value}</span>
+              <span className="block truncate text-[10px] text-gray-500">{option.desc}</span>
             </span>
           </button>
         );
@@ -877,13 +875,13 @@ function ChoiceCard({
       onClick={onClick}
       className={cn(
         "text-left rounded-xl border p-3 transition-colors disabled:opacity-40 disabled:cursor-not-allowed",
-        active ? "bg-foreground/[0.06]" : "bg-foreground/[0.02] border-foreground/10 hover:bg-foreground/5"
+        active ? "bg-white/[0.06]" : "bg-white/[0.02] border-white/10 hover:bg-white/5"
       )}
-      style={active ? { borderColor: `color-mix(in oklch,${tone} 60%,transparent)` } : undefined}
+      style={active ? { borderColor: `${tone}99` } : undefined}
     >
       <Icon size={16} style={{ color: active ? tone : "#9ca3af" }} />
-      <div className="text-sm font-bold text-foreground mt-2">{title}</div>
-      <div className="text-xs text-gray-500 leading-snug mt-0.5">{desc}</div>
+      <div className="text-sm font-bold text-white mt-2">{title}</div>
+      <div className="text-[11px] text-gray-500 leading-snug mt-0.5">{desc}</div>
     </button>
   );
 }
@@ -958,8 +956,8 @@ function MoveSheet({
     // Funding from bucket: money moves within the app, total doesn't change
     if (bucketFunding || bucketWithdrawal) return { label: "ยอดรวมของคุณ", value: "ย้ายภายในแอป · เงินยังอยู่ในบัญชีปลายทาง", tone: "text-gray-400" };
     return mode === "deposit"
-      ? { label: "ยอดรวมของคุณ", value: `เพิ่มขึ้น ${text(amount, cur)}`, tone: "text-gain" }
-      : { label: "ยอดรวมของคุณ", value: `ลดลง ${text(amount, cur)} · นำเงินออกจากระบบ`, tone: "text-loss" };
+      ? { label: "ยอดรวมของคุณ", value: `เพิ่มขึ้น ${text(amount, cur)}`, tone: "text-[#4EDEA3]" }
+      : { label: "ยอดรวมของคุณ", value: `ลดลง ${text(amount, cur)} · นำเงินออกจากระบบ`, tone: "text-[#FFB4AB]" };
   })();
 
   const submit = async () => {
@@ -999,7 +997,7 @@ function MoveSheet({
             onClick={() => changeMode(m)}
             className={cn(
               "py-2.5 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-colors",
-              mode === m ? "bg-foreground/10 text-foreground" : "text-gray-500 hover:text-gray-300"
+              mode === m ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"
             )}
           >
             {m === "deposit" ? <ArrowDownToLine size={15} /> : <ArrowUpFromLine size={15} />}
@@ -1030,10 +1028,10 @@ function MoveSheet({
         <div className="mb-4">
           <Label>แหล่งเงิน</Label>
           <div className="grid grid-cols-2 gap-2" role="radiogroup">
-            <button type="button" role="radio" aria-checked={depositSource === "external"} onClick={() => setDepositSource("external")} className={cn("rounded-xl border px-3 py-3 text-left text-sm font-bold transition-colors", depositSource === "external" ? "border-primary/50 bg-primary/[0.08] text-foreground" : "border-foreground/10 bg-foreground/[0.02] text-gray-400 hover:bg-foreground/5")}>จากภายนอก<span className="mt-1 block text-xs font-normal text-gray-500">เงินใหม่เข้าพอร์ต</span></button>
-            <button type="button" role="radio" aria-checked={depositSource === "bucket"} disabled={buckets.length === 0} onClick={() => setDepositSource("bucket")} className={cn("rounded-xl border px-3 py-3 text-left text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40", depositSource === "bucket" ? "border-primary/50 bg-primary/[0.08] text-foreground" : "border-foreground/10 bg-foreground/[0.02] text-gray-400 hover:bg-foreground/5")}>จาก Bucket<span className="mt-1 block text-xs font-normal text-gray-500">ย้ายเงินที่มีอยู่แล้ว</span></button>
+            <button type="button" role="radio" aria-checked={depositSource === "external"} onClick={() => setDepositSource("external")} className={cn("rounded-xl border px-3 py-3 text-left text-sm font-bold transition-colors", depositSource === "external" ? "border-[#4EDEA3]/50 bg-[#4EDEA3]/[0.08] text-white" : "border-white/10 bg-white/[0.02] text-gray-400 hover:bg-white/5")}>จากภายนอก<span className="mt-1 block text-[10px] font-normal text-gray-500">เงินใหม่เข้าพอร์ต</span></button>
+            <button type="button" role="radio" aria-checked={depositSource === "bucket"} disabled={buckets.length === 0} onClick={() => setDepositSource("bucket")} className={cn("rounded-xl border px-3 py-3 text-left text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40", depositSource === "bucket" ? "border-[#ADC6FF]/50 bg-[#ADC6FF]/[0.08] text-white" : "border-white/10 bg-white/[0.02] text-gray-400 hover:bg-white/5")}>จาก Bucket<span className="mt-1 block text-[10px] font-normal text-gray-500">ย้ายเงินที่มีอยู่แล้ว</span></button>
           </div>
-          {depositSource === "bucket" && <div className="mt-2 space-y-2"><CustomSelect value={bucketId} onChange={setBucketId} placeholder="เลือก Bucket" items={buckets.map((bucket) => ({ value: bucket.id, label: `${bucket.name} · ${nf(bucket.currentAmount)} ${bucket.currency || "USD"}` }))} /><p className="text-xs leading-relaxed text-gray-500">ขั้นตอนถัดไปจะให้กรอกยอดโอน และเลือกยอดรับจริงหรืออัตราแลกเปลี่ยน</p></div>}
+          {depositSource === "bucket" && <div className="mt-2 space-y-2"><CustomSelect value={bucketId} onChange={setBucketId} placeholder="เลือก Bucket" items={buckets.map((bucket) => ({ value: bucket.id, label: `${bucket.name} · ${nf(bucket.currentAmount)} ${bucket.currency || "USD"}` }))} /><p className="text-[11px] leading-relaxed text-gray-500">ขั้นตอนถัดไปจะให้กรอกยอดโอน และเลือกยอดรับจริงหรืออัตราแลกเปลี่ยน</p></div>}
         </div>
       )}
 
@@ -1045,8 +1043,8 @@ function MoveSheet({
         ]} />
         {bucketWithdrawal && <>
           <CustomSelect value={bucketId} onChange={setBucketId} placeholder="เลือก Bucket ปลายทาง" items={buckets.filter(bucket => ['USD', 'THB'].includes(bucket.currency || 'USD')).map(bucket => ({ value: bucket.id, label: `${bucket.name} (${bucket.currency || 'USD'})` }))} />
-          {destinationBucket?.currency !== cur && <label className="block text-xs text-gray-400">อัตราแลกเปลี่ยน ณ วันที่โอน · 1 USD = THB<input type="number" step="any" min="0" value={withdrawRate} onChange={event => setWithdrawRate(event.target.value)} className="mt-2 w-full rounded-xl border border-foreground/10 bg-foreground/5 p-3 text-foreground" /></label>}
-          {destinationBucket && amount > 0 && rate > 0 && <p className="text-xs text-gain">Bucket จะได้รับ {text(Math.round(amount / (cur === 'USD' ? 1 : rate) * (destinationBucket.currency === 'USD' ? 1 : rate) * 100) / 100, (destinationBucket.currency || 'USD') as Cur)}</p>}
+          {destinationBucket?.currency !== cur && <label className="block text-xs text-gray-400">อัตราแลกเปลี่ยน ณ วันที่โอน · 1 USD = THB<input type="number" step="any" min="0" value={withdrawRate} onChange={event => setWithdrawRate(event.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 p-3 text-white" /></label>}
+          {destinationBucket && amount > 0 && rate > 0 && <p className="text-xs text-[#4EDEA3]">Bucket จะได้รับ {text(Math.round(amount / (cur === 'USD' ? 1 : rate) * (destinationBucket.currency === 'USD' ? 1 : rate) * 100) / 100, (destinationBucket.currency || 'USD') as Cur)}</p>}
         </>}
       </div>}
       {!bucketFunding && <div className="mb-4">
@@ -1056,7 +1054,7 @@ function MoveSheet({
               <button
                 type="button"
                 onClick={() => setAmountStr(maxInCur > 0 ? maxInCur.toFixed(2) : "")}
-                className="text-xs font-semibold text-primary hover:underline"
+                className="text-[11px] font-semibold text-[#4EDEA3] hover:underline"
               >
                 ถอนทั้งหมด {text(maxInCur, cur)}
               </button>
@@ -1065,28 +1063,28 @@ function MoveSheet({
         >
           จำนวนเงิน
         </Label>
-        <div className="flex items-center gap-2 rounded-xl bg-foreground/5 border border-foreground/10 pl-4 pr-2 focus-within:border-gain/50 transition-colors">
+        <div className="flex items-center gap-2 rounded-xl bg-white/5 border border-white/10 pl-4 pr-2 focus-within:border-[#4EDEA3]/50 transition-colors">
           <input
             inputMode="decimal"
             value={amountStr}
             onChange={(e) => setAmountStr(cleanNum(e.target.value, 2))}
             placeholder="0.00"
             aria-label={`จำนวนเงิน (${cur})`}
-            className="flex-1 min-w-0 bg-transparent py-3.5 text-2xl font-bold text-foreground tabular-nums placeholder:text-gray-700 focus:outline-none"
+            className="flex-1 min-w-0 bg-transparent py-3.5 text-2xl font-bold text-white tabular-nums placeholder:text-gray-700 focus:outline-none"
           />
           <span className="text-sm font-bold text-gray-400">{cur}</span>
         </div>
-        <p className="mt-1.5 text-xs text-gray-500">รายการนี้ใช้สกุลเงินเดียวกับบัญชีที่เลือก</p>
+        <p className="mt-1.5 text-[11px] text-gray-500">รายการนี้ใช้สกุลเงินเดียวกับบัญชีที่เลือก</p>
       </div>}
 
-      <div className="mb-4 rounded-xl border border-foreground/10 px-3.5 py-3 text-xs leading-relaxed text-gray-400">{bucketWithdrawal ? 'หักเงินสดโบรกและเพิ่ม Bucket พร้อมกัน ไม่ใช่รายได้ใหม่' : bucketFunding ? 'เงินจะถูกหักจาก Bucket และเพิ่มในบัญชีเงินสดนี้พร้อมกัน' : mode === 'withdraw' ? 'เงินออกนอกบัญชีที่ติดตามในแอป ยอดทรัพย์สินจึงลดลง' : 'เงินใหม่จากภายนอก เพิ่มยอดเงินสดในโบรก'}</div>
+      <div className="mb-4 rounded-xl border border-white/10 px-3.5 py-3 text-[11px] leading-relaxed text-gray-400">{bucketWithdrawal ? 'หักเงินสดโบรกและเพิ่ม Bucket พร้อมกัน ไม่ใช่รายได้ใหม่' : bucketFunding ? 'เงินจะถูกหักจาก Bucket และเพิ่มในบัญชีเงินสดนี้พร้อมกัน' : mode === 'withdraw' ? 'เงินออกนอกบัญชีที่ติดตามในแอป ยอดทรัพย์สินจึงลดลง' : 'เงินใหม่จากภายนอก เพิ่มยอดเงินสดในโบรก'}</div>
 
       {/* สรุปก่อนยืนยัน — hide when bucketFunding since amount is entered in the next modal */}
       {account && amount > 0 && !plan.error && !bucketFunding && (
-        <div className="rounded-xl bg-black/30 border border-foreground/5 p-3 mb-4 space-y-1.5 text-xs">
+        <div className="rounded-xl bg-black/30 border border-white/5 p-3 mb-4 space-y-1.5 text-xs">
           <div className="flex justify-between">
             <span className="text-gray-500">ยอด {account.name} หลังทำรายการ</span>
-            <span className="text-foreground font-semibold tabular-nums">
+            <span className="text-white font-semibold tabular-nums">
               {text(account.balance + sign * plan.accountAmount, account.currency)}
             </span>
           </div>
@@ -1100,7 +1098,7 @@ function MoveSheet({
       )}
 
       {showError && (
-        <p className="flex items-center gap-1.5 text-xs text-loss mb-3" role="alert">
+        <p className="flex items-center gap-1.5 text-xs text-[#FFB4AB] mb-3" role="alert">
           <AlertTriangle size={13} /> {plan.error}
         </p>
       )}
@@ -1207,22 +1205,22 @@ function HoldingModal({
     if (!valid || isSaving) return;
     setIsSaving(true);
     try {
-      const saved = await onSave({
-        id: holding?.id ?? uid(),
-        brokerId,
-        market,
-        symbol: symbol.trim().toUpperCase(),
-        name: name.trim() || quoteName,
-        shares: sharesN,
-        avgCost: costN,
-        executionFee: Number(executionFee),
-        entryMode,
-        fundingAccountId: entryMode === 'BUY' ? fundingAccountId : undefined,
-        executionFx: Number(executionFx),
-        price: priceN,
-        currency,
-      }, !holding);
-      if (saved) onClose();
+    const saved = await onSave({
+      id: holding?.id ?? uid(),
+      brokerId,
+      market,
+      symbol: symbol.trim().toUpperCase(),
+      name: name.trim() || quoteName,
+      shares: sharesN,
+      avgCost: costN,
+      executionFee: Number(executionFee),
+      entryMode,
+      fundingAccountId: entryMode === 'BUY' ? fundingAccountId : undefined,
+      executionFx: Number(executionFx),
+      price: priceN,
+      currency,
+    }, !holding);
+    if (saved) onClose();
     } finally { setIsSaving(false); }
   };
 
@@ -1239,8 +1237,8 @@ function HoldingModal({
             className={cn(
               "rounded-xl border px-4 text-sm font-bold flex items-center gap-2 transition-colors",
               confirmDelete
-                ? "bg-loss/20 border-loss/50 text-loss"
-                : "border-foreground/10 text-gray-400 hover:text-loss"
+                ? "bg-[#FFB4AB]/20 border-[#FFB4AB]/50 text-[#FFB4AB]"
+                : "border-white/10 text-gray-400 hover:text-[#FFB4AB]"
             )}
           >
             <Trash2 size={14} />
@@ -1263,15 +1261,15 @@ function HoldingModal({
               className={cn(
                 "px-3 py-1.5 rounded-full text-xs font-bold border transition-colors",
                 market === m
-                  ? "border-foreground/60 bg-foreground/10 text-foreground"
-                  : "border-foreground/10 text-gray-400 hover:text-foreground"
+                  ? "border-white/60 bg-white/10 text-white"
+                  : "border-white/10 text-gray-400 hover:text-white"
               )}
             >
               {MARKET_LABEL[m]}
             </button>
           ))}
         </div>
-        <p className="mt-2 text-xs text-gray-500">ภายหลังสามารถลากสินทรัพย์นี้ไปไว้ในหัวข้ออื่นของโบรกเกอร์เดียวกันได้</p>
+        <p className="mt-2 text-[11px] text-gray-500">ภายหลังสามารถลากสินทรัพย์นี้ไปไว้ในหัวข้ออื่นของโบรกเกอร์เดียวกันได้</p>
       </div>
 
       <div className="mb-4">
@@ -1327,15 +1325,15 @@ function HoldingModal({
         </div>
         <div>
           <Label>ราคาตลาดล่าสุด ({currency})</Label>
-          <div className={cn(INPUT, "flex items-center justify-between cursor-default", quoteState === 'unavailable' && "border-loss/40")}>
-            <span className={cn("tabular-nums", quoteState === 'ready' ? "text-foreground" : "text-gray-500")}>
+          <div className={cn(INPUT, "flex items-center justify-between cursor-default", quoteState === 'unavailable' && "border-[#FFB4AB]/40")}>
+            <span className={cn("tabular-nums", quoteState === 'ready' ? "text-white" : "text-gray-500")}>
               {quoteState === 'loading' ? 'กำลังดึงราคา…' : quoteState === 'ready' ? marketPrice?.toLocaleString(undefined, { maximumFractionDigits: 4 }) : 'ไม่พบราคาตลาด'}
             </span>
-            <span className="text-xs font-black text-gain">MARKET</span>
+            <span className="text-[10px] font-black text-[#4EDEA3]">MARKET</span>
           </div>
         </div>
       </div>
-      <p className="text-xs text-gray-500 mb-4">
+      <p className="text-[11px] text-gray-500 mb-4">
         ราคาตลาดอัปเดตอัตโนมัติทุก 30 วินาที ไม่ต้องกดบันทึกเพื่ออัปเดตราคา ข้อมูลอาจล่าช้าตามผู้ให้บริการ
       </p>
       <div className="mb-4 grid grid-cols-2 gap-3">
@@ -1400,11 +1398,11 @@ function BrokerModal({
         </div>
       </div>
       {!broker && (
-        <p className="text-xs text-gray-500 mb-4">
+        <p className="text-[11px] text-gray-500 mb-4">
           ระบบจะสร้างบัญชีเงินสดมาตรฐาน THB และ USD ให้อัตโนมัติ เพื่อให้ยอดเงินและประวัติการโอนตรงกัน
         </p>
       )}
-      {broker && deleteBlockedReason && <p className="text-xs text-gray-500 mb-4">ลบโบรกนี้ไม่ได้: {deleteBlockedReason}</p>}
+      {broker && deleteBlockedReason && <p className="text-[11px] text-gray-500 mb-4">ลบโบรกนี้ไม่ได้: {deleteBlockedReason}</p>}
       <div className="flex gap-3">
         {broker && onDelete && !deleteBlockedReason && (
           <button
@@ -1416,8 +1414,8 @@ function BrokerModal({
             className={cn(
               "rounded-xl border px-4 text-sm font-bold flex items-center gap-2 transition-colors",
               confirmDelete
-                ? "bg-loss/20 border-loss/50 text-loss"
-                : "border-foreground/10 text-gray-400 hover:text-loss"
+                ? "bg-[#FFB4AB]/20 border-[#FFB4AB]/50 text-[#FFB4AB]"
+                : "border-white/10 text-gray-400 hover:text-[#FFB4AB]"
             )}
           >
             <Trash2 size={14} />
@@ -1483,13 +1481,13 @@ function AccountModal({
                   className={cn(
                     "flex w-full items-center gap-3 rounded-xl border px-3.5 py-3 text-left transition-all",
                     selected
-                      ? "border-primary/60 bg-primary/10 text-foreground"
-                      : "border-foreground/10 bg-black/20 text-gray-400 hover:border-foreground/20 hover:bg-foreground/[0.04] hover:text-foreground"
+                      ? "border-[#ADC6FF]/60 bg-[#ADC6FF]/10 text-white"
+                      : "border-white/10 bg-black/20 text-gray-400 hover:border-white/20 hover:bg-white/[0.04] hover:text-white"
                   )}
                 >
                   <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: broker.color }} />
                   <span className="min-w-0 flex-1 truncate text-sm font-bold">{broker.name}</span>
-                  {selected && <Check size={16} className="shrink-0 text-info" />}
+                  {selected && <Check size={16} className="shrink-0 text-[#ADC6FF]" />}
                 </button>
               );
             })}
@@ -1511,16 +1509,16 @@ function AccountModal({
         {account ? (
           <>
             <AccountCurrencyPicker value={account.currency} locked />
-            <p className="mt-2 text-xs text-gray-500">สกุลเงินของบัญชีที่สร้างแล้วเปลี่ยนไม่ได้</p>
+            <p className="mt-2 text-[11px] text-gray-500">สกุลเงินของบัญชีที่สร้างแล้วเปลี่ยนไม่ได้</p>
           </>
         ) : (
           <>
             <AccountCurrencyPicker value={cur} onChange={setCur} />
-            <p className="mt-2 text-xs text-gray-500">ยอดเงินในบัญชีนี้จะเก็บเป็นสกุลเงินที่เลือก</p>
+            <p className="mt-2 text-[11px] text-gray-500">ยอดเงินในบัญชีนี้จะเก็บเป็นสกุลเงินที่เลือก</p>
           </>
         )}
       </div>
-      {account && deleteBlockedReason && <p className="text-xs text-gray-500 mb-4">ลบบัญชีนี้ไม่ได้: {deleteBlockedReason}</p>}
+      {account && deleteBlockedReason && <p className="text-[11px] text-gray-500 mb-4">ลบบัญชีนี้ไม่ได้: {deleteBlockedReason}</p>}
       <div className="flex gap-3">
         {account && !deleteBlockedReason && (
           <button
@@ -1532,8 +1530,8 @@ function AccountModal({
             className={cn(
               "rounded-xl border px-4 text-sm font-bold flex items-center gap-2 transition-colors",
               confirmDelete
-                ? "bg-loss/20 border-loss/50 text-loss"
-                : "border-foreground/10 text-gray-400 hover:text-loss"
+                ? "bg-[#FFB4AB]/20 border-[#FFB4AB]/50 text-[#FFB4AB]"
+                : "border-white/10 text-gray-400 hover:text-[#FFB4AB]"
             )}
           >
             <Trash2 size={14} />
@@ -1574,7 +1572,7 @@ function BucketModal({ onSave, onClose }: { onSave: (name: string, cur: Cur) => 
         <Label>สกุลเงิน</Label>
         <CurrencyToggle value={cur} onChange={setCur} />
       </div>
-      <p className="text-xs text-gray-500 mb-4">
+      <p className="text-[11px] text-gray-500 mb-4">
         Bucket คือที่พักเงินนอกโบรกเกอร์ ที่ยังนับรวมในยอดทั้งหมดของคุณ
       </p>
       <button
@@ -1635,7 +1633,7 @@ function RateEditor({
             }
           }}
           aria-label="อัตราแลกเปลี่ยน THB ต่อ 1 USD"
-          className="w-20 bg-black/40 border border-foreground/20 rounded px-1.5 py-0.5 text-foreground tabular-nums focus:outline-none focus:border-primary/60"
+          className="w-20 bg-black/40 border border-white/20 rounded px-1.5 py-0.5 text-white tabular-nums focus:outline-none focus:border-[#4EDEA3]/60"
         />
         THB
       </span>
@@ -1649,17 +1647,17 @@ function RateEditor({
           setVal(rate === null ? '' : String(rate));
           setEditing(true);
         }}
-        className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-foreground transition-colors"
+        className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors"
         title="แก้อัตราแลกเปลี่ยน (คลิกเพื่อแก้ไข)"
       >
         1 USD = {rate === null || !Number.isFinite(rate) ? '—' : rate.toLocaleString('en-US', { maximumFractionDigits: 4 })} THB
         <Pencil size={11} className="text-gray-500" />
       </button>
-      <span className="text-xs px-1.5 py-0.5 rounded bg-gain/15 text-gain font-semibold">{isCustom ? 'Manual' : 'Auto'}</span>
+      <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#4EDEA3]/15 text-[#4EDEA3] font-semibold">{isCustom ? 'Manual' : 'Auto'}</span>
       {isCustom && onResetAuto && (
         <button
           onClick={onResetAuto}
-          className="text-xs px-1.5 py-0.5 rounded bg-primary/15 text-primary hover:bg-primary/25 font-semibold transition-colors"
+          className="text-[10px] px-1.5 py-0.5 rounded bg-[#4EDEA3]/15 text-[#4EDEA3] hover:bg-[#4EDEA3]/25 font-semibold transition-colors"
           title="รีเซ็ตเป็น Auto (ดึงจาก API)"
         >
           กลับเป็น Auto
@@ -1768,8 +1766,8 @@ function SummaryCard({
 
   return (
     <section
-      className="relative rounded-2xl border border-foreground/[0.1] overflow-hidden shadow-[0_16px_48px_-28px_rgba(0,0,0,0.65)]"
-      style={{ background: "var(--ft-panel)" }}
+      className="relative rounded-2xl border border-white/[0.1] overflow-hidden shadow-[0_16px_48px_-28px_rgba(0,0,0,0.65)]"
+      style={{ background: "radial-gradient(ellipse at 95% 0%, rgba(78,222,163,0.1), transparent 62%), linear-gradient(135deg, #222827, #181b1e 70%)" }}
     >
       <div aria-hidden className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-[#9ECBB5]/60 to-transparent" />
 
@@ -1787,7 +1785,7 @@ function SummaryCard({
                 "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
                 isFilterCustomized
                   ? "border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
-                  : "border-foreground/10 bg-foreground/[0.04] text-gray-300 hover:text-foreground hover:bg-foreground/[0.08]"
+                  : "border-white/10 bg-white/[0.04] text-gray-300 hover:text-white hover:bg-white/[0.08]"
               )}
               title="ตั้งค่าตัวกรองยอดรวม (เลือกซ่อน/แสดง Bucket, เงินสด, หรือตลาดสินทรัพย์)"
             >
@@ -1810,20 +1808,20 @@ function SummaryCard({
             value={0}
             exactValue={total}
             cur={display}
-            className="block text-4xl sm:text-5xl font-semibold tracking-tight text-foreground"
+            className="block text-4xl sm:text-5xl font-semibold tracking-tight text-white"
             decimalClass="text-[0.5em] text-gray-300"
             curClass="text-[0.38em] text-gray-400"
           />
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="text-sm text-gray-300 tabular-nums">≈ {text(fx.rate ? alternate.total : null, other)}</span>
-            <span className="w-1 h-1 rounded-full bg-foreground/20" />
+            <span className="w-1 h-1 rounded-full bg-white/20" />
             <RateEditor rate={fx.rate ? Number(fx.rate) : null} onChange={value => fx.setManual(String(value))} isCustom={fx.mode === 'manual'} onResetAuto={fx.resetAuto} />
-            <span className="text-xs text-gray-500" aria-live="polite">
+            <span className="text-[10px] text-gray-500" aria-live="polite">
               {!fx.rate ? 'ไม่มีข้อมูลเรท' : fx.mode === 'auto' && fx.quote ? `${fx.stale ? 'เรทเก่า · ' : ''}ข้อมูล ณ เวลา  ${new Date(fx.quote.fetchedAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}` : ''}
             </span>
           </div>
           <div className="mt-1.5 text-sm text-gray-500">
-            {isCash ? `${accountCount} บัญชี` : <>ต้นทุนรวม {text(cost, display)}{display === 'THB' && <span className="ml-2 text-xs">คำนวณที่เรทปัจจุบัน</span>}</>}
+            {isCash ? `${accountCount} บัญชี` : <>ต้นทุนรวม {text(cost, display)}{display === 'THB' && <span className="ml-2 text-[10px]">คำนวณที่เรทปัจจุบัน</span>}</>}
           </div>
 
           {excludedFilterLabels.length > 0 && (
@@ -1836,7 +1834,7 @@ function SummaryCard({
                 <button
                   type="button"
                   onClick={onOpenFilter}
-                  className="shrink-0 font-semibold underline hover:text-foreground transition-colors"
+                  className="shrink-0 font-semibold underline hover:text-white transition-colors"
                 >
                   แก้ไข
                 </button>
@@ -1854,7 +1852,7 @@ function SummaryCard({
                 <button
                   type="button"
                   onClick={onResetFilter}
-                  className="shrink-0 font-semibold underline hover:text-foreground transition-colors"
+                  className="shrink-0 font-semibold underline hover:text-white transition-colors"
                 >
                   แสดงทั้งหมด
                 </button>
@@ -1866,8 +1864,8 @@ function SummaryCard({
       </div>
 
       {!isCash && (
-        <div className="flex flex-wrap items-center justify-between gap-3 px-5 sm:px-7 py-4 border-t border-foreground/[0.08]">
-          <span className="text-sm text-gray-400">กำไร / ขาดทุนที่ยังไม่ขาย{display === 'THB' && <span className="ml-2 text-xs">คำนวณที่เรทปัจจุบัน</span>}</span>
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 sm:px-7 py-4 border-t border-white/[0.08]">
+          <span className="text-sm text-gray-400">กำไร / ขาดทุนที่ยังไม่ขาย{display === 'THB' && <span className="ml-2 text-[10px]">คำนวณที่เรทปัจจุบัน</span>}</span>
           <span className="flex items-center gap-1.5 text-sm sm:text-base font-bold tabular-nums" style={{ color: tone }}>
             {!flat && (up ? <TrendingUp size={16} /> : <TrendingDown size={16} />)}
             {profit ? formatAmount(profitPct).replace('-', '') : '—'}% ({text(profit, display, true)})
@@ -1896,20 +1894,20 @@ function AccountCard({
 
   return (
     <div
-      className="flex flex-col rounded-2xl border border-foreground/[0.08] p-5 transition-colors hover:border-foreground/15"
-      style={{ background: "var(--ft-panel)" }}
+      className="flex flex-col rounded-2xl border border-white/[0.08] p-5 transition-colors hover:border-white/15"
+      style={{ background: `radial-gradient(ellipse at 0% 0%, ${tone}16, transparent 75%), #181b1e` }}
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2.5 min-w-0">
           <div
-            className="w-9 h-9 shrink-0 rounded-lg bg-foreground/5 text-gray-300 flex items-center justify-center text-base font-medium"
+            className="w-9 h-9 shrink-0 rounded-lg bg-white/5 text-gray-300 flex items-center justify-center text-base font-medium"
             style={{ backgroundColor: `${tone}12`, color: tone }}
           >
             {symbolOf(account.currency)}
           </div>
           <div className="min-w-0">
-            <div className="font-bold text-foreground truncate">{account.name}</div>
-            <div className="text-xs text-gray-500 tabular-nums">
+            <div className="font-bold text-white truncate">{account.name}</div>
+            <div className="text-[11px] text-gray-500 tabular-nums">
               {account.currency} · สัดส่วน {nf(weight)}%
             </div>
           </div>
@@ -1920,7 +1918,7 @@ function AccountCard({
         <Money
           value={account.balance}
           cur={account.currency}
-          className="block text-3xl font-semibold tracking-tight text-foreground"
+          className="block text-3xl font-semibold tracking-tight text-white"
           decimalClass="text-[0.55em] text-gray-300"
           curClass="text-[0.4em] text-gray-400"
         />
@@ -1930,14 +1928,14 @@ function AccountCard({
       <div className="mt-auto grid grid-cols-2 gap-2">
         <button
           onClick={() => onMove("deposit", account.id)}
-          className="flex items-center justify-center gap-1.5 rounded-lg bg-foreground/[0.06] text-gray-200 text-sm font-medium py-2.5 transition-colors hover:bg-foreground/10"
+          className="flex items-center justify-center gap-1.5 rounded-lg bg-white/[0.06] text-gray-200 text-sm font-medium py-2.5 transition-colors hover:bg-white/10"
         >
           <ArrowDownToLine size={14} />
           ฝาก
         </button>
         <button
           onClick={() => onMove("withdraw", account.id)}
-          className="flex items-center justify-center gap-1.5 rounded-lg border border-foreground/10 text-gray-300 text-sm font-medium py-2.5 hover:bg-foreground/5 transition-colors"
+          className="flex items-center justify-center gap-1.5 rounded-lg border border-white/10 text-gray-300 text-sm font-medium py-2.5 hover:bg-white/5 transition-colors"
         >
           <ArrowUpFromLine size={14} />
           ถอน
@@ -1951,9 +1949,9 @@ function AddAccountCard({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="min-h-[170px] rounded-2xl border border-dashed border-foreground/15 text-gray-500 hover:text-foreground hover:border-foreground/30 hover:bg-foreground/[0.02] flex flex-col items-center justify-center gap-2 text-sm font-bold transition-colors"
+      className="min-h-[170px] rounded-2xl border border-dashed border-white/15 text-gray-500 hover:text-white hover:border-white/30 hover:bg-white/[0.02] flex flex-col items-center justify-center gap-2 text-sm font-bold transition-colors"
     >
-      <span className="w-9 h-9 rounded-full bg-foreground/5 flex items-center justify-center">
+      <span className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center">
         <Plus size={16} />
       </span>
       เพิ่มบัญชีเงินสด
@@ -1989,7 +1987,7 @@ function HoldingRow({
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center gap-3 py-4 text-left hover:bg-foreground/[0.03] transition-colors px-1 rounded-lg"
+      className="w-full flex items-center gap-3 py-4 text-left hover:bg-white/[0.03] transition-colors px-1 rounded-lg"
       aria-label={`แก้ไข ${holding.symbol}`}
     >
       <div
@@ -1999,7 +1997,7 @@ function HoldingRow({
         {holding.symbol.slice(0, 2)}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="font-bold text-foreground truncate">{holding.symbol}</div>
+        <div className="font-bold text-white truncate">{holding.symbol}</div>
         <div className="flex items-center gap-1.5 text-xs text-gray-500 min-w-0">
           <PieChart size={11} className="shrink-0" />
           <span className="tabular-nums">{nf(weight)}%</span>
@@ -2012,8 +2010,8 @@ function HoldingRow({
         </div>
       </div>
       <div className="text-right shrink-0">
-        <Money value={value} cur={holding.currency} className="text-base font-bold text-foreground" decimalClass="" curClass="text-xs text-gray-400" />
-        <div className="text-xs text-gray-500 tabular-nums">
+        <Money value={value} cur={holding.currency} className="text-base font-bold text-white" decimalClass="" curClass="text-[11px] text-gray-400" />
+        <div className="text-[11px] text-gray-500 tabular-nums">
           ≈ {text(convert(value, holding.currency, other, rate), other)}
         </div>
       </div>
@@ -2022,7 +2020,7 @@ function HoldingRow({
           {!flat && (up ? <TrendingUp size={13} /> : <TrendingDown size={13} />)}
           {nf(Math.abs(pct))}%
         </div>
-        <div className="text-xs">({text(profit, holding.currency, true)})</div>
+        <div className="text-[11px]">({text(profit, holding.currency, true)})</div>
       </div>
     </button>
   );
@@ -2044,7 +2042,7 @@ function HoldingGroupModal({
   return (
     <Sheet title="เพิ่มหัวข้อสินทรัพย์" onClose={onClose}>
       <div className="mb-4"><Label>โบรกเกอร์</Label><CustomSelect value={brokerId} onChange={setBrokerId} items={brokers.map((broker) => ({ value: broker.id, label: broker.name }))} /></div>
-      <div className="mb-5"><Label>ชื่อหัวข้อ</Label><input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="เช่น หุ้นปันผล, ETF ระยะยาว" className={INPUT} /><p className="mt-2 text-xs leading-relaxed text-gray-500">หัวข้อนี้แยกเฉพาะโบรกเกอร์ที่เลือก และสามารถใส่สินทรัพย์เดิมได้โดยไม่ทำให้ยอดรวมซ้ำ</p></div>
+      <div className="mb-5"><Label>ชื่อหัวข้อ</Label><input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="เช่น หุ้นปันผล, ETF ระยะยาว" className={INPUT} /><p className="mt-2 text-[11px] leading-relaxed text-gray-500">หัวข้อนี้แยกเฉพาะโบรกเกอร์ที่เลือก และสามารถใส่สินทรัพย์เดิมได้โดยไม่ทำให้ยอดรวมซ้ำ</p></div>
       <button type="button" disabled={!brokerId || !name.trim()} onClick={() => { onSave(brokerId, name); onClose(); }} className={cn(PRIMARY_BTN, "w-full")}>เพิ่มหัวข้อ</button>
     </Sheet>
   );
@@ -2055,7 +2053,7 @@ function HoldingSortHeader({ field, sort, onSort, children, align = 'right' }: {
 }) {
   const active = sort.startsWith(`${field}-`);
   return <th scope="col" aria-sort={active ? (sort.endsWith('asc') ? 'ascending' : 'descending') : 'none'} className={cn('px-3 py-3 font-semibold', align === 'left' ? 'text-left min-w-[220px]' : 'text-right')}>
-    <button type="button" onClick={() => onSort(toggleHoldingSort(sort, field))} className={cn('inline-flex items-center gap-1.5 rounded py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary hover:text-foreground', active ? 'text-primary' : 'text-gray-400')}>
+    <button type="button" onClick={() => onSort(toggleHoldingSort(sort, field))} className={cn('inline-flex items-center gap-1.5 rounded py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#ADC6FF] hover:text-white', active ? 'text-[#ADC6FF]' : 'text-gray-400')}>
       {children}<span aria-hidden="true" className="whitespace-nowrap">{active ? (field === 'name' ? (sort.endsWith('asc') ? 'A → Z' : 'Z → A') : (sort.endsWith('asc') ? '↑' : '↓')) : '↕'}</span>
     </button>
   </th>;
@@ -2101,24 +2099,24 @@ function HoldingGroupBoard({
       onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; setDragOver(true); }}
       onDragLeave={() => setDragOver(false)}
       onDrop={(event) => { event.preventDefault(); setDragOver(false); const holdingId = event.dataTransfer.getData("text/plain"); if (holdingId) onDropHolding(holdingId); }}
-      className={cn("min-w-0 rounded-2xl border p-4 transition-colors", dragOver ? "border-gain/70" : "border-foreground/[0.08]")}
-      style={{ background: "var(--ft-panel)" }}
+      className={cn("min-w-0 rounded-2xl border p-4 transition-colors", dragOver ? "border-[#4EDEA3]/70" : "border-white/[0.08]")}
+      style={{ background: `linear-gradient(145deg, ${color}${dragOver ? "20" : "0a"}, transparent 65%), #181b1e` }}
     >
       <div className="mb-3 flex items-center gap-2">
         <span className="h-4 w-0.5 rounded-full" style={{ background: color }} />
-        <div className="min-w-0 flex-1"><h3 className="truncate text-sm font-semibold text-foreground">{group.name}</h3>{brokerName && <p className="mt-0.5 text-xs text-gray-500">{brokerName}</p>}</div>
-        {!group.isDefault && <button type="button" onClick={onDeleteGroup} aria-label={`ลบหัวข้อ ${group.name}`} className="rounded-lg p-1 text-gray-500 hover:bg-foreground/5 hover:text-loss"><X size={14} /></button>}
+        <div className="min-w-0 flex-1"><h3 className="truncate text-sm font-semibold text-white">{group.name}</h3>{brokerName && <p className="mt-0.5 text-xs text-gray-500">{brokerName}</p>}</div>
+        {!group.isDefault && <button type="button" onClick={onDeleteGroup} aria-label={`ลบหัวข้อ ${group.name}`} className="rounded-lg p-1 text-gray-500 hover:bg-white/5 hover:text-[#FFB4AB]"><X size={14} /></button>}
         <span className="text-xs tabular-nums text-gray-400">{holdings.length}</span>
-        <button type="button" onClick={() => setChoosing(value => !value)} aria-expanded={choosing} className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-xs text-primary hover:bg-primary/10">{choosing ? 'ซ่อนตัวเลือกสินทรัพย์' : '+ เพิ่ม / นำสินทรัพย์กลับ'}</button>
+        <button type="button" onClick={() => setChoosing(value => !value)} aria-expanded={choosing} className="rounded-lg border border-[#4EDEA3]/25 bg-[#4EDEA3]/5 px-3 py-2 text-xs text-[#4EDEA3] hover:bg-[#4EDEA3]/10">{choosing ? 'ซ่อนตัวเลือกสินทรัพย์' : '+ เพิ่ม / นำสินทรัพย์กลับ'}</button>
       </div>
-      {choosing && <div className="mb-4 rounded-xl border border-foreground/10 bg-black/20 p-3">
-        <input value={query} onChange={event => setQuery(event.target.value)} placeholder="ค้นหา symbol ในโบรกนี้" aria-label={`ค้นหาสินทรัพย์สำหรับ ${group.name}`} className="mb-3 w-full rounded-lg border border-foreground/10 bg-black/20 px-3 py-2 text-sm text-foreground" />
+      {choosing && <div className="mb-4 rounded-xl border border-white/10 bg-black/20 p-3">
+        <input value={query} onChange={event => setQuery(event.target.value)} placeholder="ค้นหา symbol ในโบรกนี้" aria-label={`ค้นหาสินทรัพย์สำหรับ ${group.name}`} className="mb-3 w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white" />
         <p className="mb-2 text-xs text-gray-400">สินทรัพย์ที่มีอยู่ในโบรกนี้แต่ยังไม่อยู่ในหัวข้อนี้ รวมรายการที่เคยเอาออก · กดที่หุ้นเพื่อนำกลับมาแสดง ไม่ซื้อเพิ่มและไม่หักเงิน</p>
-        <div className="flex max-h-40 flex-wrap gap-2 overflow-y-auto">{candidates.map(item => <button key={item.id} type="button" draggable onDragStart={event => { event.dataTransfer.effectAllowed = 'copy'; event.dataTransfer.setData('text/plain', item.id); }} onClick={() => onDropHolding(item.id)} className="flex items-center gap-2 rounded-lg border border-foreground/10 px-3 py-2 text-sm text-foreground hover:border-primary/50"><AssetLogo symbol={item.symbol} /><span>{item.symbol}</span><Plus size={14} /></button>)}{candidates.length === 0 && <p className="text-xs text-gray-400">ไม่มีสินทรัพย์ที่ยังไม่อยู่ในหัวข้อนี้ตรงกับคำค้น</p>}</div>
+        <div className="flex max-h-40 flex-wrap gap-2 overflow-y-auto">{candidates.map(item => <button key={item.id} type="button" draggable onDragStart={event => { event.dataTransfer.effectAllowed = 'copy'; event.dataTransfer.setData('text/plain', item.id); }} onClick={() => onDropHolding(item.id)} className="flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-sm text-white hover:border-[#4EDEA3]/50"><AssetLogo symbol={item.symbol} /><span>{item.symbol}</span><Plus size={14} /></button>)}{candidates.length === 0 && <p className="text-xs text-gray-400">ไม่มีสินทรัพย์ที่ยังไม่อยู่ในหัวข้อนี้ตรงกับคำค้น</p>}</div>
       </div>}
-      {holdings.length === 0 ? <button type="button" onClick={() => setChoosing(true)} className="flex min-h-24 w-full items-center justify-center gap-2 rounded-lg border border-dashed border-foreground/15 px-3 text-xs text-gray-400 hover:border-primary/50 hover:text-primary"><Plus size={14} strokeWidth={1.5} />เพิ่ม / นำสินทรัพย์กลับเข้าหัวข้อนี้</button> : <div className="overflow-x-auto rounded-xl" tabIndex={0} aria-label={`ตารางสินทรัพย์ ${group.name}`}>
+      {holdings.length === 0 ? <button type="button" onClick={() => setChoosing(true)} className="flex min-h-24 w-full items-center justify-center gap-2 rounded-lg border border-dashed border-white/15 px-3 text-xs text-gray-400 hover:border-[#4EDEA3]/50 hover:text-[#4EDEA3]"><Plus size={14} strokeWidth={1.5} />เพิ่ม / นำสินทรัพย์กลับเข้าหัวข้อนี้</button> : <div className="overflow-x-auto rounded-xl" tabIndex={0} aria-label={`ตารางสินทรัพย์ ${group.name}`}>
         <table className="w-full min-w-[1000px] text-left text-sm">
-          <thead className="border-b border-foreground/[0.08] text-xs uppercase tracking-wide text-gray-500">
+          <thead className="border-b border-white/[0.08] text-[10px] uppercase tracking-wide text-gray-500">
             <tr>
               <HoldingSortHeader field="name" sort={sort} onSort={onSort} align="left">Asset / Symbol</HoldingSortHeader>
               <th scope="col" className="px-3 py-3 font-semibold">Price / Avg Cost</th>
@@ -2130,7 +2128,7 @@ function HoldingGroupBoard({
               <th scope="col" className="w-20 px-2 py-3"><span className="sr-only">จัดการสินทรัพย์</span></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-foreground/5">
+          <tbody className="divide-y divide-white/5">
             {visibleRows.length === 0 && <tr><td colSpan={8} className="p-8 text-center text-gray-400">ไม่พบสินทรัพย์ตรงกับคำค้น</td></tr>}
             {orderHoldings(visibleRows, sort, favoritesFirst).map((holding, index, rows) => <HoldingTableRow key={holding.id} holding={holding} color={color} total={total} rate={rate} groupName={group.name} onEdit={() => onEditHolding(holding)} onRemove={() => onRemoveHolding(holding.id)} onFavorite={() => onFavorite(holding)} onReorder={sort === 'custom' ? onReorder : undefined} onMoveUp={sort === 'custom' && index > 0 ? () => onReorder(holding.id, rows[index - 1].id) : undefined} />)}
           </tbody>
@@ -2154,28 +2152,28 @@ function HoldingTableRow({ holding: h, color, total, rate, groupName, onEdit, on
   const totalReturn = unrealized + realized + (h.dividends || 0);
   const invested = h.investedCost ?? cost;
   const percent = (amount: number, basis: number) => hidden ? MASK : basis > 0 ? `${amount > 0 ? '+' : ''}${nf(amount / basis * 100)}%` : '—';
-  const profitColor = (amount: number) => moneyDisplaySign(amount) > 0 ? 'text-gain' : moneyDisplaySign(amount) < 0 ? 'text-loss' : 'text-gray-400';
-  return <tr draggable onDragStart={event => { event.dataTransfer.effectAllowed = 'copyMove'; event.dataTransfer.setData('text/plain', h.id); if (onReorder) event.dataTransfer.setData('application/x-fintrack-order', h.id); }} onDragOver={event => { if (onReorder && event.dataTransfer.types.includes('application/x-fintrack-order')) { event.preventDefault(); event.stopPropagation(); event.dataTransfer.dropEffect = 'move'; } }} onDrop={event => { const source = event.dataTransfer.getData('application/x-fintrack-order'); if (source && onReorder) { event.preventDefault(); event.stopPropagation(); onReorder(source, h.id); } }} className="group transition-colors hover:bg-foreground/[0.025]">
+  const profitColor = (amount: number) => moneyDisplaySign(amount) > 0 ? 'text-[#4EDEA3]' : moneyDisplaySign(amount) < 0 ? 'text-[#FFB4AB]' : 'text-gray-400';
+  return <tr draggable onDragStart={event => { event.dataTransfer.effectAllowed = 'copyMove'; event.dataTransfer.setData('text/plain', h.id); if (onReorder) event.dataTransfer.setData('application/x-fintrack-order', h.id); }} onDragOver={event => { if (onReorder && event.dataTransfer.types.includes('application/x-fintrack-order')) { event.preventDefault(); event.stopPropagation(); event.dataTransfer.dropEffect = 'move'; } }} onDrop={event => { const source = event.dataTransfer.getData('application/x-fintrack-order'); if (source && onReorder) { event.preventDefault(); event.stopPropagation(); onReorder(source, h.id); } }} className="group transition-colors hover:bg-white/[0.025]">
     <td className="px-3 py-5">
       <div className="flex items-center gap-2">
-        {onReorder && <span draggable onDragStart={event => { event.stopPropagation(); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('application/x-fintrack-order', h.id); }} title={`ลากจัดลำดับ ${h.symbol}`} className="shrink-0 cursor-grab rounded p-1 text-info active:cursor-grabbing"><GripVertical size={16} /></span>}
-        <button type="button" onClick={onFavorite} aria-label={`Favorite ${h.symbol}`} aria-pressed={!!h.isFavorite} className="shrink-0 rounded p-1 text-amber-300 hover:bg-foreground/10"><Star size={15} fill={h.isFavorite ? 'currentColor' : 'none'} /></button>
-        <button type="button" onClick={onEdit} className="flex items-center gap-3 text-left" aria-label={`แก้ไข ${h.symbol}`}>
-          <AssetLogo symbol={h.symbol} color={color} size="sm" />
-          <span><span className="block max-w-[190px] truncate font-semibold text-foreground" title={h.name}>{h.name || h.symbol}</span><span className="mt-1 block text-xs text-gray-400">{hidden ? MASK : h.shares.toLocaleString(undefined, { maximumFractionDigits: 6 })} หน่วย · {h.symbol}</span><span className="mt-1 block text-xs text-gray-500">{hidden ? MASK : nf(total > 0 ? convert(value, h.currency, 'THB', rate) / total * 100 : 0)}% ของสินทรัพย์</span></span>
-        </button>
+      {onReorder && <span draggable onDragStart={event => { event.stopPropagation(); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('application/x-fintrack-order', h.id); }} title={`ลากจัดลำดับ ${h.symbol}`} className="shrink-0 cursor-grab rounded p-1 text-[#ADC6FF] active:cursor-grabbing"><GripVertical size={16} /></span>}
+      <button type="button" onClick={onFavorite} aria-label={`Favorite ${h.symbol}`} aria-pressed={!!h.isFavorite} className="shrink-0 rounded p-1 text-amber-300 hover:bg-white/10"><Star size={15} fill={h.isFavorite ? 'currentColor' : 'none'} /></button>
+      <button type="button" onClick={onEdit} className="flex items-center gap-3 text-left" aria-label={`แก้ไข ${h.symbol}`}>
+        <AssetLogo symbol={h.symbol} color={color} size="sm" />
+        <span><span className="block max-w-[190px] truncate font-semibold text-white" title={h.name}>{h.name || h.symbol}</span><span className="mt-1 block text-xs text-gray-400">{hidden ? MASK : h.shares.toLocaleString(undefined, { maximumFractionDigits: 6 })} หน่วย · {h.symbol}</span><span className="mt-1 block text-[10px] text-gray-500">{hidden ? MASK : nf(total > 0 ? convert(value, h.currency, 'THB', rate) / total * 100 : 0)}% ของสินทรัพย์</span></span>
+      </button>
       </div>
     </td>
-    <td className="px-3 py-5 tabular-nums"><span className="block font-semibold text-foreground">{text(h.price, h.currency)}</span><span className="mt-1.5 block whitespace-nowrap text-xs text-gray-400">Avg {text(h.avgCost, h.currency)}</span></td>
-    <td className="px-3 py-5 text-right tabular-nums"><span className="block whitespace-nowrap text-base font-bold text-foreground">{text(value, h.currency)}</span><span className="mt-1.5 block whitespace-nowrap text-xs font-normal text-gray-400">≈ {text(convert(value, h.currency, h.currency === 'USD' ? 'THB' : 'USD', rate), h.currency === 'USD' ? 'THB' : 'USD')}</span></td>
+    <td className="px-3 py-5 tabular-nums"><span className="block font-semibold text-white">{text(h.price, h.currency)}</span><span className="mt-1.5 block whitespace-nowrap text-[11px] text-gray-400">Avg {text(h.avgCost, h.currency)}</span></td>
+    <td className="px-3 py-5 text-right tabular-nums"><span className="block whitespace-nowrap text-base font-bold text-white">{text(value, h.currency)}</span><span className="mt-1.5 block whitespace-nowrap text-[11px] font-normal text-gray-400">≈ {text(convert(value, h.currency, h.currency === 'USD' ? 'THB' : 'USD', rate), h.currency === 'USD' ? 'THB' : 'USD')}</span></td>
     <td className={cn('px-3 py-5 text-right tabular-nums whitespace-nowrap', profitColor(h.dayChangePercent ?? 0))} title="ราคาล่าสุดเทียบราคาปิดวันซื้อขายก่อนหน้า × จำนวนหุ้นที่ถือปัจจุบัน ไม่รวมผลจากการซื้อขายระหว่างวัน">
-      <span className={cn('inline-block rounded-md px-2 py-1 font-bold', !hidden && moneyDisplaySign(h.dayChangePercent ?? 0) > 0 ? 'bg-gain/10' : !hidden && moneyDisplaySign(h.dayChangePercent ?? 0) < 0 ? 'bg-loss/10' : 'bg-foreground/5')}>{hidden ? MASK : h.dayChangePercent == null ? '—' : `${moneyDisplaySign(h.dayChangePercent) > 0 ? '+' : ''}${nf(moneyDisplaySign(h.dayChangePercent) === 0 ? 0 : h.dayChangePercent)}%`}</span>
-      <span className="mt-1.5 block text-xs">{h.dayChange == null ? '—' : text(h.dayChange * h.shares, h.currency, true)}</span>
+      <span className={cn('inline-block rounded-md px-2 py-1 font-bold', !hidden && moneyDisplaySign(h.dayChangePercent ?? 0) > 0 ? 'bg-[#4EDEA3]/10' : !hidden && moneyDisplaySign(h.dayChangePercent ?? 0) < 0 ? 'bg-[#FFB4AB]/10' : 'bg-white/5')}>{hidden ? MASK : h.dayChangePercent == null ? '—' : `${moneyDisplaySign(h.dayChangePercent) > 0 ? '+' : ''}${nf(moneyDisplaySign(h.dayChangePercent) === 0 ? 0 : h.dayChangePercent)}%`}</span>
+      <span className="mt-1.5 block text-[11px]">{h.dayChange == null ? '—' : text(h.dayChange * h.shares, h.currency, true)}</span>
     </td>
-    <td className={cn('px-3 py-5 text-right tabular-nums', profitColor(unrealized))}><span className="block font-semibold">{percent(unrealized, cost)}</span><span className="mt-1.5 block whitespace-nowrap text-xs">{text(unrealized, h.currency, true)}</span></td>
-    <td className={cn('px-3 py-5 text-right tabular-nums', profitColor(realized))}><span className="block whitespace-nowrap font-semibold">{text(realized, h.currency, true)}</span><span className="mt-1.5 block text-xs text-gray-500">กำไรที่ขายแล้ว</span></td>
-    <td className={cn('px-3 py-5 text-right tabular-nums', profitColor(totalReturn))} title={`รวมปันผล ${text(h.dividends || 0, h.currency)}`}><span className="block font-semibold">{percent(totalReturn, invested)}</span><span className="mt-1.5 block whitespace-nowrap text-xs">{text(totalReturn, h.currency, true)}</span></td>
-    <td className="px-2 py-5"><div className="flex items-center">{onMoveUp && <button type="button" onClick={onMoveUp} aria-label={`เลื่อน ${h.symbol} ขึ้น`} className="rounded-lg p-2 text-gray-400 hover:bg-foreground/5">↑</button>}<button type="button" onClick={onEdit} aria-label={`แก้ไข ${h.symbol}`} className="rounded-lg p-2 text-gray-500 hover:bg-foreground/5 hover:text-foreground"><Pencil size={14} /></button><button type="button" onClick={onRemove} aria-label={`เอา ${h.symbol} ออกจาก ${groupName}`} title="เอาออกจากหัวข้อนี้เท่านั้น ไม่ลบหุ้น" className="rounded-lg p-2 text-gray-500 hover:bg-foreground/5 hover:text-loss"><X size={14} /></button></div></td>
+    <td className={cn('px-3 py-5 text-right tabular-nums', profitColor(unrealized))}><span className="block font-semibold">{percent(unrealized, cost)}</span><span className="mt-1.5 block whitespace-nowrap text-[11px]">{text(unrealized, h.currency, true)}</span></td>
+    <td className={cn('px-3 py-5 text-right tabular-nums', profitColor(realized))}><span className="block whitespace-nowrap font-semibold">{text(realized, h.currency, true)}</span><span className="mt-1.5 block text-[11px] text-gray-500">กำไรที่ขายแล้ว</span></td>
+    <td className={cn('px-3 py-5 text-right tabular-nums', profitColor(totalReturn))} title={`รวมปันผล ${text(h.dividends || 0, h.currency)}`}><span className="block font-semibold">{percent(totalReturn, invested)}</span><span className="mt-1.5 block whitespace-nowrap text-[11px]">{text(totalReturn, h.currency, true)}</span></td>
+    <td className="px-2 py-5"><div className="flex items-center">{onMoveUp && <button type="button" onClick={onMoveUp} aria-label={`เลื่อน ${h.symbol} ขึ้น`} className="rounded-lg p-2 text-gray-400 hover:bg-white/5">↑</button>}<button type="button" onClick={onEdit} aria-label={`แก้ไข ${h.symbol}`} className="rounded-lg p-2 text-gray-500 hover:bg-white/5 hover:text-white"><Pencil size={14} /></button><button type="button" onClick={onRemove} aria-label={`เอา ${h.symbol} ออกจาก ${groupName}`} title="เอาออกจากหัวข้อนี้เท่านั้น ไม่ลบหุ้น" className="rounded-lg p-2 text-gray-500 hover:bg-white/5 hover:text-[#FFB4AB]"><X size={14} /></button></div></td>
   </tr>;
 }
 
@@ -2183,10 +2181,10 @@ function AssetLogo({ symbol, color = "#ADC6FF", size = "md" }: { symbol: string;
   const [failed, setFailed] = useState(false);
   const dimensions = size === "sm" ? "h-8 w-8 rounded-lg" : "h-10 w-10 rounded-xl";
   if (failed) {
-    return <span className={cn("flex shrink-0 items-center justify-center border border-foreground/10 bg-foreground/[0.04] text-xs font-black", dimensions)} style={{ color }}>{symbol.slice(0, 2)}</span>;
+    return <span className={cn("flex shrink-0 items-center justify-center border border-white/10 bg-white/[0.04] text-[10px] font-black", dimensions)} style={{ color }}>{symbol.slice(0, 2)}</span>;
   }
   return (
-    <span className={cn("flex shrink-0 items-center justify-center overflow-hidden border border-foreground/10 bg-foreground/[0.04]", dimensions)}>
+    <span className={cn("flex shrink-0 items-center justify-center overflow-hidden border border-white/10 bg-white/[0.04]", dimensions)}>
       <img
         src={`https://assets.parqet.com/logos/symbol/${encodeURIComponent(symbol)}?format=png`}
         alt=""
@@ -2212,8 +2210,8 @@ function HoldingTray({
 }) {
   const [dragOverBrokerId, setDragOverBrokerId] = useState<string | null>(null);
   return (
-    <section className="rounded-2xl border border-foreground/[0.08] bg-surface p-5">
-      <div className="mb-2 flex items-center justify-between gap-2"><h2 className="text-sm font-semibold text-foreground">สินทรัพย์ทั้งหมด</h2><span className="text-xs tabular-nums text-gray-400">{holdings.length}</span></div>
+    <section className="rounded-2xl border border-white/[0.08] bg-gradient-to-b from-[#1d2329] to-[#171a1e] p-5">
+      <div className="mb-2 flex items-center justify-between gap-2"><h2 className="text-sm font-semibold text-white">สินทรัพย์ทั้งหมด</h2><span className="text-xs tabular-nums text-gray-400">{holdings.length}</span></div>
       <p className="mb-5 text-xs leading-relaxed text-gray-400">ลากเพื่อเพิ่มลงในหัวข้อ</p>
       {holdings.length === 0 ? <p className="rounded-xl bg-black/20 px-3 py-4 text-center text-sm text-gray-600">ยังไม่มีสินทรัพย์</p> : <div className="space-y-3 max-h-[460px] overflow-y-auto pr-1">
         {brokers.map((broker) => {
@@ -2223,15 +2221,15 @@ function HoldingTray({
             onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; setDragOverBrokerId(broker.id); }}
             onDragLeave={() => setDragOverBrokerId((current) => current === broker.id ? null : current)}
             onDrop={(event) => { event.preventDefault(); setDragOverBrokerId(null); const holdingId = event.dataTransfer.getData("text/plain"); if (holdingId) onMoveHolding(holdingId, broker.id); }}
-            className={cn("rounded-xl border p-2 transition-colors", dragOverBrokerId === broker.id ? "border-gain/70 bg-gain/5" : "border-transparent")}
-          ><p className="mb-1.5 flex items-center gap-2 text-xs font-bold text-gray-500"><span className="h-2 w-2 rounded-full" style={{ background: broker.color }} />{broker.name}<span className="ml-auto text-xs font-medium text-gray-600">วางเพื่อย้ายพอร์ต</span></p><div className="space-y-1.5">
-              {items.map((holding) => <button key={holding.id} draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = "copy"; event.dataTransfer.setData("text/plain", holding.id); }} onClick={() => onEdit(holding)} className="flex w-full cursor-grab items-center gap-3 rounded-lg border border-transparent px-2 py-3 text-left transition-colors hover:border-foreground/10 hover:bg-foreground/[0.04] active:cursor-grabbing">
-                <AssetLogo symbol={holding.symbol} color={broker.color} size="sm" />
-                <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-foreground">{holding.symbol}</span><span className="mt-0.5 block text-xs text-gray-500">{placementCounts.get(holding.id) || 0} หัวข้อ</span></span>
-                <GripVertical size={16} strokeWidth={1.5} className="shrink-0 text-gray-500" />
-              </button>)}
-              {!items.length && <div className="flex min-h-12 items-center justify-center rounded-lg border border-dashed border-foreground/[0.08] px-2 text-xs text-gray-600">ลากสินทรัพย์มาวางที่นี่</div>}
-            </div></div>;
+            className={cn("rounded-xl border p-2 transition-colors", dragOverBrokerId === broker.id ? "border-[#4EDEA3]/70 bg-[#4EDEA3]/5" : "border-transparent")}
+          ><p className="mb-1.5 flex items-center gap-2 text-[11px] font-bold text-gray-500"><span className="h-2 w-2 rounded-full" style={{ background: broker.color }} />{broker.name}<span className="ml-auto text-[10px] font-medium text-gray-600">วางเพื่อย้ายพอร์ต</span></p><div className="space-y-1.5">
+            {items.map((holding) => <button key={holding.id} draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = "copy"; event.dataTransfer.setData("text/plain", holding.id); }} onClick={() => onEdit(holding)} className="flex w-full cursor-grab items-center gap-3 rounded-lg border border-transparent px-2 py-3 text-left transition-colors hover:border-white/10 hover:bg-white/[0.04] active:cursor-grabbing">
+              <AssetLogo symbol={holding.symbol} color={broker.color} size="sm" />
+              <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-white">{holding.symbol}</span><span className="mt-0.5 block text-xs text-gray-500">{placementCounts.get(holding.id) || 0} หัวข้อ</span></span>
+              <GripVertical size={16} strokeWidth={1.5} className="shrink-0 text-gray-500" />
+            </button>)}
+            {!items.length && <div className="flex min-h-12 items-center justify-center rounded-lg border border-dashed border-white/[0.08] px-2 text-[10px] text-gray-600">ลากสินทรัพย์มาวางที่นี่</div>}
+          </div></div>;
         })}
       </div>}
     </section>
@@ -2259,19 +2257,19 @@ function BucketsCard({ buckets, onAdd }: { buckets: Bucket[]; onAdd: () => void 
     return sum ? formatFxMoney(decimal(sum.amount), target) : 'unresolved';
   };
   return (
-    <section className="rounded-2xl bg-surface-2 border border-foreground/[0.07] p-5">
+    <section className="rounded-3xl bg-[#1c1c1c] border border-white/[0.07] p-5">
       <div className="flex items-center gap-3 mb-4">
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "color-mix(in oklch,var(--ft-accent) 12%,transparent)", color: ACCENT }}>
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: `${ACCENT}20`, color: ACCENT }}>
           <PiggyBank size={18} />
         </div>
         <div className="min-w-0 flex-1">
-          <h2 className="font-bold text-foreground leading-tight">Bucket</h2>
-          <p className="text-xs text-gray-500 leading-snug">เงินพักนอกโบรกเกอร์ ยังนับในยอดรวม</p>
+          <h2 className="font-bold text-white leading-tight">Bucket</h2>
+          <p className="text-[11px] text-gray-500 leading-snug">เงินพักนอกโบรกเกอร์ ยังนับในยอดรวม</p>
         </div>
         <button
           onClick={onAdd}
           aria-label="เพิ่ม Bucket"
-          className="w-8 h-8 rounded-full bg-foreground/5 hover:bg-foreground/10 text-gray-300 flex items-center justify-center transition-colors"
+          className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-gray-300 flex items-center justify-center transition-colors"
         >
           <Plus size={14} />
         </button>
@@ -2289,7 +2287,7 @@ function BucketsCard({ buckets, onAdd }: { buckets: Bucket[]; onAdd: () => void 
                 {symbolOf(b.currency)}
               </span>
               <span className="flex-1 text-sm text-gray-200 truncate">{b.name}</span>
-              <span className="text-sm font-bold text-foreground">{isFxCurrency(b.currency) && b.currency !== target && Number.isFinite(b.balance) && <span className="mr-2 text-xs text-gray-500">{formatFxMoney(decimal(b.balance), b.currency)}</span>}{display(b)}</span>
+              <span className="text-sm font-bold text-white">{isFxCurrency(b.currency) && b.currency !== target && Number.isFinite(b.balance) && <span className="mr-2 text-[11px] text-gray-500">{formatFxMoney(decimal(b.balance), b.currency)}</span>}{display(b)}</span>
             </li>
           ))}
         </ul>
@@ -2301,17 +2299,17 @@ function BucketsCard({ buckets, onAdd }: { buckets: Bucket[]; onAdd: () => void 
 function LedgerCard({ entries, state, onStart }: { entries: LedgerEntry[]; state: PortfolioState; onStart: () => void }) {
   const text = useMoneyText();
   return (
-    <section className="rounded-2xl bg-surface-2 border border-foreground/[0.07] p-5">
-      <h2 className="font-bold text-foreground flex items-center gap-2 mb-4">
+    <section className="rounded-3xl bg-[#1c1c1c] border border-white/[0.07] p-5">
+      <h2 className="font-bold text-white flex items-center gap-2 mb-4">
         <ArrowRightLeft size={16} style={{ color: ACCENT }} /> รายการฝาก/ถอนล่าสุด
       </h2>
       {entries.length === 0 ? (
         <div className="flex flex-col items-center text-center py-6">
-          <div className="w-12 h-12 rounded-2xl bg-foreground/5 flex items-center justify-center mb-3 text-gray-500">
+          <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center mb-3 text-gray-500">
             <ArrowRightLeft size={20} />
           </div>
           <p className="text-sm text-gray-500 mb-4 leading-relaxed">ยังไม่มีรายการ<br />เริ่มจากฝากเงินเข้าบัญชีเงินสด</p>
-          <button onClick={onStart} className="rounded-full border border-foreground/10 hover:bg-foreground/5 text-sm font-bold text-foreground px-5 py-2 transition-colors">
+          <button onClick={onStart} className="rounded-full border border-white/10 hover:bg-white/5 text-sm font-bold text-white px-5 py-2 transition-colors">
             ฝากเงิน
           </button>
         </div>
@@ -2326,10 +2324,10 @@ function LedgerCard({ entries, state, onStart }: { entries: LedgerEntry[]; state
               e.kind === "deposit_external"
                 ? "จากนอกแอป"
                 : e.kind === "withdraw_external"
-                  ? "ออกนอกแอป"
-                  : e.kind === "deposit_bucket"
-                    ? `จาก ${bucketName}`
-                    : `ไป ${bucketName}`;
+                ? "ออกนอกแอป"
+                : e.kind === "deposit_bucket"
+                ? `จาก ${bucketName}`
+                : `ไป ${bucketName}`;
             const color = e.kind === "withdraw_external" ? LOSS : e.kind === "deposit_external" ? GAIN : "#e5e7eb";
             return (
               <li key={e.id} className="flex items-start gap-3">
@@ -2337,16 +2335,16 @@ function LedgerCard({ entries, state, onStart }: { entries: LedgerEntry[]; state
                   {isDeposit ? <ArrowDownToLine size={15} /> : <ArrowUpFromLine size={15} />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold text-foreground truncate">
+                  <div className="text-sm font-semibold text-white truncate">
                     {KIND_META[e.kind].title} · {acc?.name ?? "บัญชี"}
                   </div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-[11px] text-gray-500">
                     {where} · {thaiDateTime(e.ts, false)}
                   </div>
                   <span
                     className={cn(
-                      "inline-block mt-1 text-xs font-bold px-1.5 py-0.5 rounded",
-                      counted ? "bg-foreground/5 text-gray-400" : "bg-loss/15 text-loss"
+                      "inline-block mt-1 text-[10px] font-bold px-1.5 py-0.5 rounded",
+                      counted ? "bg-white/5 text-gray-400" : "bg-[#FFB4AB]/15 text-[#FFB4AB]"
                     )}
                   >
                     {counted ? "นับในยอดรวม" : "ไม่นับในยอดรวม"}
@@ -2357,7 +2355,7 @@ function LedgerCard({ entries, state, onStart }: { entries: LedgerEntry[]; state
                     {text(isDeposit ? e.inputAmount : -e.inputAmount, e.inputCurrency, true)}
                   </div>
                   {e.inputCurrency !== e.accountCurrency && (
-                    <div className="text-xs text-gray-500">→ {text(e.accountAmount, e.accountCurrency)}</div>
+                    <div className="text-[10px] text-gray-500">→ {text(e.accountAmount, e.accountCurrency)}</div>
                   )}
                 </div>
               </li>
@@ -2655,7 +2653,7 @@ export default function PortfolioPage() {
         const allocation = position.asset?.allocation;
         const market: Market = allocation === 'Gold' ? 'GOLD'
           : allocation === 'Funds' ? 'FUND'
-            : position.asset?.currency === 'THB' ? 'TH' : 'US';
+          : position.asset?.currency === 'THB' ? 'TH' : 'US';
         const holdingCurrency: Cur = 'USD';
         const preferences = position.asset || assets.find(asset => asset.symbol.toUpperCase() === position.symbol)?.portfolioPreferences?.[position.portfolioId];
         const avgCostUsd = position.shares > 0 ? position.cost / position.shares : 0;
@@ -2792,13 +2790,13 @@ export default function PortfolioPage() {
     const buckets = allowBucket && broker === "all" ? state.buckets : [];
     const holdings = showHoldings
       ? state.holdings.filter((h) => {
-        if (!inBroker(h.brokerId)) return false;
-        if (tab === "all") {
-          if (!filterSettings.includeMarkets[h.market]) return false;
-          return true;
-        }
-        return h.market === tab;
-      })
+          if (!inBroker(h.brokerId)) return false;
+          if (tab === "all") {
+            if (!filterSettings.includeMarkets[h.market]) return false;
+            return true;
+          }
+          return h.market === tab;
+        })
       : [];
 
     const cashTotal = accounts.reduce((s, a) => s + toD(a.balance, a.currency), 0);
@@ -2814,8 +2812,8 @@ export default function PortfolioPage() {
       sort === "name"
         ? a.symbol.localeCompare(b.symbol)
         : sort === "profit"
-          ? pctOf(b) - pctOf(a)
-          : toD(holdingValue(b), b.currency) - toD(holdingValue(a), a.currency)
+        ? pctOf(b) - pctOf(a)
+        : toD(holdingValue(b), b.currency) - toD(holdingValue(a), a.currency)
     );
 
     // สัดส่วนในวงแหวน เปลี่ยนตามแท็บที่เปิดอยู่
@@ -2899,8 +2897,8 @@ export default function PortfolioPage() {
     state.brokers.forEach((b) => {
       try {
         const items = [
-          ...(filterSettings.includeCash ? state.accounts.filter(a => a.brokerId === b.id).map(a => ({ amount: a.balance, currency: a.currency })) : []),
-          ...state.holdings.filter(h => h.brokerId === b.id && filterSettings.includeMarkets[h.market]).map(h => ({ amount: holdingValue(h), currency: h.currency })),
+          ...(filterSettings.includeCash ? state.accounts.filter(a => a.brokerId === b.id).map(a => ({amount:a.balance,currency:a.currency})) : []),
+          ...state.holdings.filter(h => h.brokerId === b.id && filterSettings.includeMarkets[h.market]).map(h => ({amount:holdingValue(h),currency:h.currency})),
         ];
         const total = sumNativeMoney(items, D, String(rate));
         map.set(b.id, total ? Number(decimal(total.amount).toFixed(12)) : Number.NaN);
@@ -2913,9 +2911,9 @@ export default function PortfolioPage() {
     try {
       const included = (id: string) => !filterSettings.excludedBrokerIds.includes(id);
       const items = [
-        ...(filterSettings.includeCash ? state.accounts.filter(a => included(a.brokerId)).map(a => ({ amount: a.balance, currency: a.currency })) : []),
-        ...state.holdings.filter(h => included(h.brokerId) && filterSettings.includeMarkets[h.market]).map(h => ({ amount: holdingValue(h), currency: h.currency })),
-        ...(filterSettings.includeBucket ? state.buckets.map(b => ({ amount: b.balance, currency: b.currency })) : []),
+        ...(filterSettings.includeCash ? state.accounts.filter(a => included(a.brokerId)).map(a => ({amount:a.balance,currency:a.currency})) : []),
+        ...state.holdings.filter(h => included(h.brokerId) && filterSettings.includeMarkets[h.market]).map(h => ({amount:holdingValue(h),currency:h.currency})),
+        ...(filterSettings.includeBucket ? state.buckets.map(b => ({amount:b.balance,currency:b.currency})) : []),
       ];
       const total = sumNativeMoney(items, D, String(rate));
       return total ? Number(decimal(total.amount).toFixed(12)) : Number.NaN;
@@ -2982,7 +2980,6 @@ export default function PortfolioPage() {
   };
 
   const openAddHolding = () => setHoldingModal({});
-  React.useEffect(() => { const open = () => setHoldingModal({}); window.addEventListener("fintrack:add-asset", open); return () => window.removeEventListener("fintrack:add-asset", open); }, []);
   const saveHoldingToPortfolio = useCallback(async (holding: Holding, isNew: boolean) => {
     if (!isNew) return false;
     const account = [...allBrokerageAccounts, ...effectiveBrokerageAccounts].find(item => item.id === holding.fundingAccountId && item.portfolioId === holding.brokerId && item.kind === 'cash' && item.currency === holding.currency);
@@ -2995,21 +2992,21 @@ export default function PortfolioPage() {
     // One transaction owns the lot and cash debit. Never publish a local
     // holding before the server has accepted the purchase.
     const saved = await addTrade({
-      asset: holding.symbol,
-      type: holding.entryMode ?? 'IMPORT',
-      amountUSD: importedCostUsd,
-      fees: (holding.executionFee || 0) / rateAtTime,
-      fxRateTHB: holding.executionFx,
-      date: new Date().toISOString(),
-      rateAtTime,
-      currency: holding.currency,
-      shares: holding.shares,
-      pricePerUnit: holding.avgCost / rateAtTime,
-      originalAmount: holding.avgCost * holding.shares + (holding.executionFee || 0),
-      brokerageAccountId: holding.entryMode === 'BUY' ? account?.id : undefined,
-      portfolioId: holding.brokerId,
-      tag: 'Added from Portfolio',
-    });
+        asset: holding.symbol,
+        type: holding.entryMode ?? 'IMPORT',
+        amountUSD: importedCostUsd,
+        fees: (holding.executionFee || 0) / rateAtTime,
+        fxRateTHB: holding.executionFx,
+        date: new Date().toISOString(),
+        rateAtTime,
+        currency: holding.currency,
+        shares: holding.shares,
+        pricePerUnit: holding.avgCost / rateAtTime,
+        originalAmount: holding.avgCost * holding.shares + (holding.executionFee || 0),
+        brokerageAccountId: holding.entryMode === 'BUY' ? account?.id : undefined,
+        portfolioId: holding.brokerId,
+        tag: 'Added from Portfolio',
+      });
     if (saved) saveHolding(holding);
     return saved;
   }, [addTrade, addToast, allBrokerageAccounts, effectiveBrokerageAccounts, exchangeRates.THB, saveHolding]);
@@ -3021,43 +3018,42 @@ export default function PortfolioPage() {
   const marketTab: Market | null = tab === "US" || tab === "TH" || tab === "GOLD" || tab === "FUND" ? tab : null;
 
   if (!ready) {
-    return <WorkspaceSkeleton/>;
+    return <div className="min-h-[60vh] flex items-center justify-center text-sm text-gray-600">กำลังโหลดพอร์ต…</div>;
   }
 
   const chipBase =
     "shrink-0 flex items-center gap-2 rounded-lg border px-3.5 py-2 text-sm font-medium transition-colors";
-  const chipOn = "border-foreground/20 bg-foreground/[0.08] text-foreground";
-  const chipOff = "border-transparent text-gray-400 hover:text-foreground hover:bg-foreground/[0.04]";
+  const chipOn = "border-white/20 bg-white/[0.08] text-white";
+  const chipOff = "border-transparent text-gray-400 hover:text-white hover:bg-white/[0.04]";
 
   return (
     <HideContext.Provider value={hide}>
       <div className="relative isolate min-h-[calc(100dvh-4rem)] w-full pt-8 pb-24">
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[520px]" style={{ background: "radial-gradient(ellipse at 35% 0%, rgba(78,222,163,0.1), transparent 65%), radial-gradient(ellipse at 95% 12%, rgba(139,108,255,0.07), transparent 55%)" }} />
-        <div className="w-full space-y-7">
+        <div className="max-w-7xl mx-auto w-full space-y-7 px-4 sm:px-6">
           {/* หัวเรื่อง */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl leading-tight font-semibold tracking-tight text-foreground">พอร์ตลงทุน</h1>
+              <h1 className="text-2xl leading-tight font-semibold tracking-tight text-white">พอร์ตลงทุน</h1>
               <button
                 onClick={() => setHide((h) => !h)}
                 aria-label={hide ? "แสดงยอดเงิน" : "ซ่อนยอดเงิน"}
                 aria-pressed={hide}
-                className="w-9 h-9 rounded-full text-gray-300 hover:text-foreground hover:bg-foreground/10 flex items-center justify-center transition-colors"
+                className="w-9 h-9 rounded-full text-gray-300 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors"
               >
                 {hide ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <DensityToggle />
+            <div className="flex gap-2">
               <button
                 onClick={() => openMove("deposit")}
-                className="flex items-center gap-2 rounded-lg border border-foreground/10 text-gray-300 font-medium text-sm px-4 py-2.5 hover:bg-foreground/5 transition-colors"
+                className="flex items-center gap-2 rounded-lg border border-white/10 text-gray-300 font-medium text-sm px-4 py-2.5 hover:bg-white/5 transition-colors"
               >
                 <ArrowRightLeft size={15} /> ฝาก / ถอน
               </button>
               <button
                 onClick={openAddHolding}
-                className="flex items-center gap-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm px-4 py-2.5 hover:bg-[#CEEBDC] transition-colors"
+                className="flex items-center gap-2 rounded-lg bg-[#B8DECA] text-[#14261C] font-semibold text-sm px-4 py-2.5 hover:bg-[#CEEBDC] transition-colors"
               >
                 <Plus size={15} /> เพิ่มสินทรัพย์
               </button>
@@ -3070,7 +3066,7 @@ export default function PortfolioPage() {
               <button
                 role="tab"
                 aria-selected={broker === "all"}
-                onClick={() => { setBroker("all"); selectPortfolio(null); }}
+                  onClick={() => { setBroker("all"); selectPortfolio(null); }}
                 className={cn(chipBase, broker === "all" ? chipOn : chipOff)}
               >
                 <Layers size={14} /> ทุกโบรกเกอร์
@@ -3095,20 +3091,20 @@ export default function PortfolioPage() {
               ))}
               <button
                 onClick={() => setBrokerModal({})}
-                className="shrink-0 flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium text-gray-400 hover:text-foreground hover:bg-foreground/5 transition-colors"
+                className="shrink-0 flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
               >
                 <Plus size={14} /> เพิ่มโบรก
               </button>
             </div>
 
-            <div className="flex items-center gap-5 overflow-x-auto border-b border-foreground/[0.08]" role="tablist" aria-label="ประเภทสินทรัพย์">
+            <div className="flex items-center gap-5 overflow-x-auto border-b border-white/[0.08]" role="tablist" aria-label="ประเภทสินทรัพย์">
               <button
                 role="tab"
                 aria-selected={tab === "all"}
                 onClick={() => setTab("all")}
                 className={cn(
                   "shrink-0 border-b-2 px-1 py-3 text-sm font-medium transition-colors",
-                  tab === "all" ? "border-primary text-foreground" : "border-transparent text-gray-400 hover:text-foreground"
+                  tab === "all" ? "border-[#BBD2C5] text-white" : "border-transparent text-gray-400 hover:text-white"
                 )}
               >
                 ทั้งหมด
@@ -3121,7 +3117,7 @@ export default function PortfolioPage() {
                   onClick={() => setTab(t.key)}
                   className={cn(
                     "shrink-0 border-b-2 px-1 py-3 text-sm font-medium transition-colors",
-                    tab === t.key ? "border-primary text-foreground" : "border-transparent text-gray-400 hover:text-foreground"
+                    tab === t.key ? "border-[#BBD2C5] text-white" : "border-transparent text-gray-400 hover:text-white"
                   )}
                 >
                   {t.label}
@@ -3139,7 +3135,7 @@ export default function PortfolioPage() {
                 </p>
                 <div className="flex items-center gap-3">
                   {isFilterCustomized && (
-                    <button type="button" onClick={handleResetFilter} className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-foreground">
+                    <button type="button" onClick={handleResetFilter} className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-white">
                       <RotateCcw size={13} /> แสดงทั้งหมด
                     </button>
                   )}
@@ -3150,12 +3146,12 @@ export default function PortfolioPage() {
                       "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
                       isFilterCustomized
                         ? "border-amber-400/30 bg-amber-400/10 text-amber-200 hover:bg-amber-400/15"
-                        : "border-foreground/10 bg-foreground/[0.04] text-gray-300 hover:bg-foreground/[0.08] hover:text-foreground"
+                        : "border-white/10 bg-white/[0.04] text-gray-300 hover:bg-white/[0.08] hover:text-white"
                     )}
                   >
                     <SlidersHorizontal size={13} />
                     เลือกสิ่งที่นับรวม
-                    {isFilterCustomized && <span className="rounded bg-amber-300/15 px-1.5 py-0.5 text-xs">{excludedFilterLabels.length}</span>}
+                    {isFilterCustomized && <span className="rounded bg-amber-300/15 px-1.5 py-0.5 text-[10px]">{excludedFilterLabels.length}</span>}
                   </button>
                 </div>
               </div>
@@ -3166,27 +3162,27 @@ export default function PortfolioPage() {
             {/* คอลัมน์หลัก */}
             <div className="flex min-w-0 flex-col gap-6">
               <div className="min-w-0 lg:col-start-1">
-                <SummaryCard
-                  isCash={tab === "cash"}
-                  dateLabel={now ? thaiDateTime(now) : ""}
-                  items={valuationItems}
-                  accountCount={view.accounts.length + view.buckets.length}
-                  isFilterCustomized={isFilterCustomized}
-                  excludedFilterLabels={excludedFilterLabels}
-                  onOpenFilter={() => setFilterModalOpen(true)}
-                  onResetFilter={handleResetFilter}
-                />
+              <SummaryCard
+                isCash={tab === "cash"}
+                dateLabel={now ? thaiDateTime(now) : ""}
+                items={valuationItems}
+                accountCount={view.accounts.length + view.buckets.length}
+                isFilterCustomized={isFilterCustomized}
+                excludedFilterLabels={excludedFilterLabels}
+                onOpenFilter={() => setFilterModalOpen(true)}
+                onResetFilter={handleResetFilter}
+              />
               </div>
 
               {showCash && (
                 <section className="order-2 min-w-0 space-y-5">
-                  <h2 className="text-base font-semibold text-foreground">บัญชีเงินสด</h2>
+                  <h2 className="text-base font-semibold text-white">บัญชีเงินสด</h2>
                   {groups.map((g) => (
                     <div key={g.broker.id}>
                       <div className="flex items-center justify-between gap-3 mb-3">
                         <div className="flex items-center gap-2 min-w-0">
                           <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: g.broker.color }} />
-                          <span className="font-bold text-foreground truncate">{g.broker.name}</span>
+                          <span className="font-bold text-white truncate">{g.broker.name}</span>
                           <span className="text-xs text-gray-500 tabular-nums">
                             {hide ? MASK : `${symbolOf(D)}${nf(g.total)}`}
                           </span>
@@ -3194,7 +3190,7 @@ export default function PortfolioPage() {
                         <button
                           onClick={() => setBrokerModal({ broker: g.broker })}
                           aria-label={`แก้ไขโบรก ${g.broker.name}`}
-                          className="w-8 h-8 rounded-full text-gray-500 hover:text-foreground hover:bg-foreground/10 flex items-center justify-center transition-colors"
+                          className="w-8 h-8 rounded-full text-gray-500 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors"
                         >
                           <Pencil size={14} />
                         </button>
@@ -3221,21 +3217,21 @@ export default function PortfolioPage() {
               {showHoldings && (
                 <section className="order-1 min-w-0 space-y-3">
                   <div className="flex flex-wrap items-center gap-3 text-xs text-gray-300">
-                    <button type="button" aria-pressed={favoritesFirst} onClick={() => setFavoritesFirst(value => !value)} className={cn('flex items-center gap-2 rounded-lg border px-3 py-2.5 transition-colors', favoritesFirst ? 'border-amber-300/30 bg-amber-300/10 text-amber-200' : 'border-foreground/10 hover:bg-foreground/5')}><Star size={15} fill={favoritesFirst ? 'currentColor' : 'none'} />รายการโปรดขึ้นก่อน</button>
-                    <button type="button" aria-pressed={tableSort === 'custom'} title="ลากจัดลำดับเอง หรือคลิกหัวตารางเพื่อเรียงตามคอลัมน์" onClick={() => setTableSort(current => current === 'custom' ? 'value-desc' : 'custom')} className={cn('flex items-center gap-1.5 rounded-lg border px-3 py-2.5', tableSort === 'custom' ? 'border-primary/30 bg-primary/10 text-primary' : 'border-foreground/10 text-gray-400 hover:bg-foreground/5')}><GripVertical size={14} />Custom</button>
+                    <button type="button" aria-pressed={favoritesFirst} onClick={() => setFavoritesFirst(value => !value)} className={cn('flex items-center gap-2 rounded-lg border px-3 py-2.5 transition-colors', favoritesFirst ? 'border-amber-300/30 bg-amber-300/10 text-amber-200' : 'border-white/10 hover:bg-white/5')}><Star size={15} fill={favoritesFirst ? 'currentColor' : 'none'} />รายการโปรดขึ้นก่อน</button>
+                    <button type="button" aria-pressed={tableSort === 'custom'} title="ลากจัดลำดับเอง หรือคลิกหัวตารางเพื่อเรียงตามคอลัมน์" onClick={() => setTableSort(current => current === 'custom' ? 'value-desc' : 'custom')} className={cn('flex items-center gap-1.5 rounded-lg border px-3 py-2.5', tableSort === 'custom' ? 'border-[#ADC6FF]/30 bg-[#ADC6FF]/10 text-[#ADC6FF]' : 'border-white/10 text-gray-400 hover:bg-white/5')}><GripVertical size={14} />Custom</button>
                     <div className="relative min-w-[160px] flex-1">
-                      <input type="search" aria-label="ค้นหาสินทรัพย์ในตาราง" placeholder="ค้นหาชื่อ / Symbol…" value={holdingSearch} onChange={event => setHoldingSearch(event.target.value)} className="w-full rounded-lg border border-foreground/10 bg-black/20 px-3 py-2.5 text-foreground placeholder:text-gray-500 focus:border-primary focus:outline-none" />
+                      <input type="search" aria-label="ค้นหาสินทรัพย์ในตาราง" placeholder="ค้นหาชื่อ / Symbol…" value={holdingSearch} onChange={event => setHoldingSearch(event.target.value)} className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-white placeholder:text-gray-500 focus:border-[#ADC6FF] focus:outline-none" />
                     </div>
-                    <button onClick={() => setHoldingGroupModal(true)} className="flex items-center gap-1.5 rounded-lg border border-foreground/10 px-3 py-2.5 text-xs font-medium text-gray-300 hover:bg-foreground/5"><Plus size={14} /> เพิ่มหัวข้อ</button>
-                    <p className="w-full text-xs text-gray-500">1 วัน: เทียบราคาปิดวันซื้อขายก่อนหน้า · ยอดเปลี่ยนแปลงตามจำนวนหุ้นปัจจุบัน · ไม่มีราคาแสดง —</p>
-                    {tableSort === 'custom' && <p className="w-full text-xs text-gray-400">ลากแถวไปวางเหนือแถวที่ต้องการ หรือกด ↑ · ปิด Favorite ขึ้นก่อน หากต้องการจัดทุกแถวอย่างอิสระ</p>}
+                    <button onClick={() => setHoldingGroupModal(true)} className="flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2.5 text-xs font-medium text-gray-300 hover:bg-white/5"><Plus size={14} /> เพิ่มหัวข้อ</button>
+                    <p className="w-full text-[11px] text-gray-500">1 วัน: เทียบราคาปิดวันซื้อขายก่อนหน้า · ยอดเปลี่ยนแปลงตามจำนวนหุ้นปัจจุบัน · ไม่มีราคาแสดง —</p>
+                    {tableSort === 'custom' && <p className="w-full text-[11px] text-gray-400">ลากแถวไปวางเหนือแถวที่ต้องการ หรือกด ↑ · ปิด Favorite ขึ้นก่อน หากต้องการจัดทุกแถวอย่างอิสระ</p>}
                   </div>
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div><h2 className="text-base font-semibold text-foreground">หัวข้อสินทรัพย์</h2><p className="mt-1 text-xs text-gray-400">จัดได้หลายหัวข้อ มูลค่ารวมนับครั้งเดียว</p></div>
+                    <div><h2 className="text-base font-semibold text-white">หัวข้อสินทรัพย์</h2><p className="mt-1 text-xs text-gray-400">จัดได้หลายหัวข้อ มูลค่ารวมนับครั้งเดียว</p></div>
                   </div>
-                  {duplicatePlacements.length > 0 && <details className="rounded-xl border border-foreground/10 bg-foreground/[0.02] px-4 py-3">
+                  {duplicatePlacements.length > 0 && <details className="rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3">
                     <summary className="cursor-pointer text-xs text-gray-300">อยู่หลายหัวข้อ {duplicatePlacements.length} รายการ · ดูรายละเอียด</summary>
-                    <div className="flex items-start gap-2"><AlertTriangle size={16} className="mt-0.5 shrink-0 text-[#E8B84A]" /><div className="min-w-0"><p className="text-sm font-bold text-[#F6D783]">มีสินทรัพย์อยู่มากกว่าหนึ่งหัวข้อ</p><p className="mt-1 text-xs leading-relaxed text-gray-400">นี่เป็นการจัดกลุ่มเท่านั้น จึงไม่ต้องลบจำนวนหน่วย และยอดรวมจะนับสินทรัพย์จริงเพียงครั้งเดียว</p><div className="mt-3 space-y-2">{duplicatePlacements.map(({ holding, groups: placedGroups }) => <div key={holding.id} className="flex flex-wrap items-center gap-2 text-xs"><span className="font-bold text-foreground">{holding.symbol}</span><span className="text-gray-500">อยู่ใน</span>{placedGroups.map((group, index) => <span key={group.id} className="inline-flex items-center gap-1 rounded-lg bg-black/20 px-2 py-1 text-gray-300">{group.name}{index > 0 && <button type="button" onClick={() => removeHoldingFromGroup(holding.id, group.id)} className="text-gray-500 hover:text-loss" aria-label={`เอา ${holding.symbol} ออกจาก ${group.name}`}><X size={12} /></button>}</span>)}</div>)}</div></div></div>
+                    <div className="flex items-start gap-2"><AlertTriangle size={16} className="mt-0.5 shrink-0 text-[#E8B84A]" /><div className="min-w-0"><p className="text-sm font-bold text-[#F6D783]">มีสินทรัพย์อยู่มากกว่าหนึ่งหัวข้อ</p><p className="mt-1 text-[11px] leading-relaxed text-gray-400">นี่เป็นการจัดกลุ่มเท่านั้น จึงไม่ต้องลบจำนวนหน่วย และยอดรวมจะนับสินทรัพย์จริงเพียงครั้งเดียว</p><div className="mt-3 space-y-2">{duplicatePlacements.map(({ holding, groups: placedGroups }) => <div key={holding.id} className="flex flex-wrap items-center gap-2 text-xs"><span className="font-bold text-white">{holding.symbol}</span><span className="text-gray-500">อยู่ใน</span>{placedGroups.map((group, index) => <span key={group.id} className="inline-flex items-center gap-1 rounded-lg bg-black/20 px-2 py-1 text-gray-300">{group.name}{index > 0 && <button type="button" onClick={() => removeHoldingFromGroup(holding.id, group.id)} className="text-gray-500 hover:text-[#FFB4AB]" aria-label={`เอา ${holding.symbol} ออกจาก ${group.name}`}><X size={12} /></button>}</span>)}</div>)}</div></div></div>
                   </details>}
                   {trayHoldings.length === 0 ? <EmptyHoldings onAdd={openAddHolding} /> : <div className="space-y-4">
                     {visibleHoldingGroups.map((group) => <HoldingGroupBoard key={group.id} group={group} sort={tableSort} onSort={setTableSort} search={holdingSearch} favoritesFirst={favoritesFirst} onFavorite={changeFavorite} onReorder={reorderHolding} availableHoldings={trayHoldings} brokerName={broker === "all" ? brokerById.get(group.brokerId)?.name : undefined} holdings={holdingsByGroup.get(group.id) || []} total={trayHoldingTotalTHB} rate={rate} onDropHolding={(holdingId) => {
@@ -3306,16 +3302,16 @@ export default function PortfolioPage() {
           {pendingRemoval && (
             <Sheet title={pendingRemoval.holdingId ? 'ยืนยันเอาสินทรัพย์ออกจากหัวข้อ' : 'ยืนยันลบหัวข้อ'} onClose={() => setPendingRemoval(null)} footer={
               <div className="flex justify-end gap-3">
-                <button type="button" autoFocus onClick={() => setPendingRemoval(null)} className="rounded-xl border border-foreground/15 px-5 py-3 text-sm text-foreground hover:bg-foreground/5">ยกเลิก</button>
+                <button type="button" autoFocus onClick={() => setPendingRemoval(null)} className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white hover:bg-white/5">ยกเลิก</button>
                 <button type="button" onClick={() => {
                   if (pendingRemoval.holdingId) confirmRemoveHoldingFromGroup(pendingRemoval.holdingId, pendingRemoval.groupId);
                   else confirmRemoveHoldingGroup(pendingRemoval.groupId);
                   setToast('เอาออกจากหัวข้อแล้ว หุ้นยังอยู่ในพอร์ต · นำกลับได้ที่ “เพิ่ม / นำสินทรัพย์กลับ”');
                   setPendingRemoval(null);
-                }} className="rounded-xl bg-loss/15 px-5 py-3 text-sm font-semibold text-loss hover:bg-loss/25">{pendingRemoval.holdingId ? 'ยืนยันเอาออกจากหัวข้อ' : 'ยืนยันลบหัวข้อ'}</button>
+                }} className="rounded-xl bg-[#FFB4AB]/15 px-5 py-3 text-sm font-semibold text-[#FFB4AB] hover:bg-[#FFB4AB]/25">{pendingRemoval.holdingId ? 'ยืนยันเอาออกจากหัวข้อ' : 'ยืนยันลบหัวข้อ'}</button>
               </div>
             }>
-              <p className="text-sm leading-relaxed text-foreground">{pendingRemoval.holdingId ? `ต้องการเอา ${pendingRemoval.symbol} ออกจากหัวข้อ “${pendingRemoval.groupName}” ใช่ไหม?` : `ต้องการลบหัวข้อ “${pendingRemoval.groupName}” ใช่ไหม?`}</p>
+              <p className="text-sm leading-relaxed text-white">{pendingRemoval.holdingId ? `ต้องการเอา ${pendingRemoval.symbol} ออกจากหัวข้อ “${pendingRemoval.groupName}” ใช่ไหม?` : `ต้องการลบหัวข้อ “${pendingRemoval.groupName}” ใช่ไหม?`}</p>
               <p className="mt-3 text-sm leading-relaxed text-gray-400">การทำรายการนี้เปลี่ยนเฉพาะการจัดหัวข้อ ไม่ลบหุ้น จำนวนหน่วย เงินสด หรือประวัติซื้อขาย และไม่เปลี่ยนมูลค่ารวมพอร์ต</p>
               <p className="mt-3 text-xs leading-relaxed text-gray-400">นำกลับมาแสดงได้ด้วยปุ่ม “เพิ่ม / นำสินทรัพย์กลับ” มุมขวาของหัวข้อ แล้วกดเลือกหุ้น หากลบหัวข้อไปแล้ว ให้เพิ่มหัวข้อใหม่ก่อน</p>
             </Sheet>
@@ -3369,7 +3365,7 @@ export default function PortfolioPage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 20 }}
               role="status"
-              className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] max-w-[90vw] flex items-center gap-2 rounded-full bg-surface-2 border border-foreground/10 px-5 py-3 text-sm text-foreground shadow-2xl"
+              className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] max-w-[90vw] flex items-center gap-2 rounded-full bg-[#2a2a2a] border border-white/10 px-5 py-3 text-sm text-white shadow-2xl"
             >
               <Check size={15} style={{ color: ACCENT }} className="shrink-0" />
               <span>{toast}</span>

@@ -113,7 +113,7 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [dropdownLeft, setDropdownLeft] = useState(0);
-
+  
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const monthBtnRef = useRef<HTMLButtonElement>(null);
@@ -158,12 +158,12 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
       const btnRect = btnRef.current.getBoundingClientRect();
       const contRect = containerRef.current.getBoundingClientRect();
       let left = btnRect.left - contRect.left;
-
+      
       // ป้องกันไม่ให้ Dropdown ทะลุขอบจอฝั่งขวา
       if (btnRect.left + dropdownWidth > window.innerWidth - 16) {
         left = window.innerWidth - contRect.left - dropdownWidth - 16;
       }
-
+      
       setDropdownLeft(Math.max(0, left)); // ไม่ให้ติดลบจนตกขอบซ้าย
     }
   };
@@ -205,12 +205,12 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
 
   return (
     <div className={cn("relative w-full", className)} ref={containerRef}>
-
-      <div
+      
+      <div 
         ref={scrollContainerRef}
         className="flex max-w-full items-center gap-2 overflow-x-auto overscroll-x-contain scrollbar-none pb-1"
       >
-        <div className="flex shrink-0 items-center gap-0.5 rounded-xl border border-border bg-foreground/5 p-1">
+        <div className="flex shrink-0 items-center gap-0.5 rounded-xl border border-border bg-white/5 p-1">
           {PRESETS.map((preset) => (
             <button
               key={preset.id}
@@ -222,7 +222,7 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
               className={cn(
                 "px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap",
                 value.mode === preset.id
-                  ? "bg-primary/20 text-primary"
+                  ? "bg-[#ADC6FF]/20 text-[#ADC6FF]"
                   : "text-gray-500 hover:text-gray-300"
               )}
             >
@@ -231,7 +231,7 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
           ))}
         </div>
 
-        <div className="flex shrink-0 items-center gap-1 rounded-xl border border-border bg-foreground/[0.03] p-1">
+        <div className="flex shrink-0 items-center gap-1 rounded-xl border border-border bg-white/[0.03] p-1">
           {recentMonths.map((m) => (
             <button
               key={`${m.year}-${m.month}`}
@@ -241,10 +241,10 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
                 setShowCustom(false);
               }}
               className={cn(
-                "rounded-lg px-2.5 py-1.5 text-xs font-black uppercase tracking-wide transition-all whitespace-nowrap",
+                "rounded-lg px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wide transition-all whitespace-nowrap",
                 value.mode === "month" && value.year === m.year && value.month === m.month
-                  ? "bg-primary/20 text-primary"
-                  : "text-gray-500 hover:bg-foreground/5 hover:text-gray-300"
+                  ? "bg-[#ADC6FF]/20 text-[#ADC6FF]"
+                  : "text-gray-500 hover:bg-white/5 hover:text-gray-300"
               )}
             >
               {format(new Date(m.year, m.month, 1), "MMM yy")}
@@ -258,8 +258,8 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
           className={cn(
             "shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all",
             value.mode === "month"
-              ? "bg-primary/20 text-primary border-primary/30"
-              : "bg-foreground/5 text-gray-500 border-border hover:text-gray-300"
+              ? "bg-[#ADC6FF]/20 text-[#ADC6FF] border-[#ADC6FF]/30"
+              : "bg-white/5 text-gray-500 border-border hover:text-gray-300"
           )}
         >
           <Calendar size={12} />
@@ -273,8 +273,8 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
           className={cn(
             "shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all",
             value.mode === "custom"
-              ? "bg-primary/20 text-primary border-primary/30"
-              : "bg-foreground/5 text-gray-500 border-border hover:text-gray-300"
+              ? "bg-[#4EDEA3]/20 text-[#4EDEA3] border-[#4EDEA3]/30"
+              : "bg-white/5 text-gray-500 border-border hover:text-gray-300"
           )}
         >
           <Calendar size={12} />
@@ -285,7 +285,7 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
         {activeBadge && (
           <button
             onClick={() => onChange({ mode: "all" })}
-            className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-foreground/5 border border-border text-xs font-bold text-gray-400 hover:text-foreground hover:border-foreground/20 transition-all"
+            className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/5 border border-border text-[10px] font-bold text-gray-400 hover:text-white hover:border-white/20 transition-all"
           >
             <span>{activeBadge}</span>
             <X size={10} />
@@ -300,10 +300,10 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
             style={{ left: dropdownLeft }}
-            className="absolute top-full mt-2 w-48 bg-surface border border-border rounded-2xl shadow-2xl z-50 overflow-hidden"
+            className="absolute top-full mt-2 w-48 bg-[#1a1a1a] border border-border rounded-2xl shadow-2xl z-50 overflow-hidden"
           >
             <div className="p-2 max-h-64 overflow-y-auto space-y-0.5">
-              <p className="px-3 pb-1 pt-1 text-xs font-black uppercase tracking-wide text-gray-600">All months</p>
+              <p className="px-3 pb-1 pt-1 text-[10px] font-black uppercase tracking-wide text-gray-600">All months</p>
               {months.slice(2).map((m) => (
                 <button
                   key={`${m.year}-${m.month}`}
@@ -311,8 +311,8 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
                   className={cn(
                     "w-full text-left px-3 py-2 rounded-lg text-xs font-bold transition-all",
                     value.mode === "month" && value.year === m.year && value.month === m.month
-                      ? "bg-primary/20 text-primary"
-                      : "text-gray-400 hover:bg-foreground/5 hover:text-foreground"
+                      ? "bg-[#ADC6FF]/20 text-[#ADC6FF]"
+                      : "text-gray-400 hover:bg-white/5 hover:text-white"
                   )}
                 >
                   {m.label}
@@ -330,27 +330,27 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
             style={{ left: dropdownLeft }}
-            className="absolute top-full mt-2 w-[280px] sm:w-72 bg-surface border border-border rounded-2xl shadow-2xl z-50 p-4 space-y-3"
+            className="absolute top-full mt-2 w-[280px] sm:w-72 bg-[#1a1a1a] border border-border rounded-2xl shadow-2xl z-50 p-4 space-y-3"
           >
-            <p className="text-xs font-black text-gray-500 uppercase tracking-wide">Custom Range</p>
+            <p className="text-[10px] font-black text-gray-500 uppercase tracking-wide">Custom Range</p>
             <div className="space-y-2">
               <div>
-                <label className="text-xs text-gray-500 font-bold uppercase mb-1 block">From</label>
+                <label className="text-[10px] text-gray-500 font-bold uppercase mb-1 block">From</label>
                 <div className="relative">
                   <input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={10}
-                    placeholder="YYYY-MM-DD"
-                    value={selectedCustomFrom}
-                    onChange={(e) => setCustomFrom(normalizeDateInput(e.target.value))}
-                    className="w-full bg-foreground/5 border border-border rounded-xl px-3 py-2 pr-9 text-foreground text-xs font-bold focus:outline-none focus:border-primary/50 transition-all"
-                  />
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={10}
+                  placeholder="YYYY-MM-DD"
+                  value={selectedCustomFrom}
+                  onChange={(e) => setCustomFrom(normalizeDateInput(e.target.value))}
+                  className="w-full bg-white/5 border border-border rounded-xl px-3 py-2 pr-9 text-white text-xs font-bold focus:outline-none focus:border-[#4EDEA3]/50 transition-all"
+                />
                   <button
                     type="button"
                     aria-label="Choose start date from calendar"
                     onClick={() => customFromPickerRef.current?.showPicker?.()}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-gray-500 hover:bg-foreground/5 hover:text-foreground"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-gray-500 hover:bg-white/5 hover:text-white"
                   >
                     <Calendar size={14} />
                   </button>
@@ -365,22 +365,22 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
                 </div>
               </div>
               <div>
-                <label className="text-xs text-gray-500 font-bold uppercase mb-1 block">To</label>
+                <label className="text-[10px] text-gray-500 font-bold uppercase mb-1 block">To</label>
                 <div className="relative">
                   <input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={10}
-                    placeholder="YYYY-MM-DD"
-                    value={selectedCustomTo}
-                    onChange={(e) => setCustomTo(normalizeDateInput(e.target.value))}
-                    className="w-full bg-foreground/5 border border-border rounded-xl px-3 py-2 pr-9 text-foreground text-xs font-bold focus:outline-none focus:border-primary/50 transition-all"
-                  />
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={10}
+                  placeholder="YYYY-MM-DD"
+                  value={selectedCustomTo}
+                  onChange={(e) => setCustomTo(normalizeDateInput(e.target.value))}
+                  className="w-full bg-white/5 border border-border rounded-xl px-3 py-2 pr-9 text-white text-xs font-bold focus:outline-none focus:border-[#4EDEA3]/50 transition-all"
+                />
                   <button
                     type="button"
                     aria-label="Choose end date from calendar"
                     onClick={() => customToPickerRef.current?.showPicker?.()}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-gray-500 hover:bg-foreground/5 hover:text-foreground"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-gray-500 hover:bg-white/5 hover:text-white"
                   >
                     <Calendar size={14} />
                   </button>
@@ -397,9 +397,9 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
               </div>
             </div>
             {hasInvalidCustomDate ? (
-              <p className="text-xs font-bold text-loss">Use a valid date in YYYY-MM-DD format.</p>
+              <p className="text-[10px] font-bold text-[#FFB4AB]">Use a valid date in YYYY-MM-DD format.</p>
             ) : hasInvalidCustomRange && (
-              <p className="text-xs font-bold text-loss">End date must be on or after the start date.</p>
+              <p className="text-[10px] font-bold text-[#FFB4AB]">End date must be on or after the start date.</p>
             )}
             <button
               onClick={() => {
@@ -413,7 +413,7 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
                 }
               }}
               disabled={!selectedCustomFrom || !selectedCustomTo || hasInvalidCustomDate || hasInvalidCustomRange}
-              className="w-full py-2 bg-primary text-primary-foreground rounded-xl font-black text-xs uppercase tracking-wide hover:brightness-110 transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+              className="w-full py-2 bg-[#4EDEA3] text-[#0E0E0E] rounded-xl font-black text-xs uppercase tracking-wide hover:brightness-110 transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Apply
             </button>

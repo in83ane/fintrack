@@ -78,10 +78,10 @@ export function CustomSelect({
         disabled={disabled}
         onClick={() => setIsOpen((prev) => !prev)}
         className={cn(
-          "w-full flex items-center justify-between gap-2 px-3 py-2.5 text-sm font-bold text-foreground",
-          "bg-foreground/5 border border-foreground/10 rounded-xl hover:bg-foreground/10 transition-colors focus:outline-none focus:border-primary/50",
-          isOpen && "border-primary/50 bg-foreground/10",
-          disabled && "cursor-not-allowed opacity-50 hover:bg-foreground/5"
+          "w-full flex items-center justify-between gap-2 px-3 py-2.5 text-sm font-bold text-white",
+          "bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors focus:outline-none focus:border-[#4EDEA3]/50",
+          isOpen && "border-[#4EDEA3]/50 bg-white/10",
+          disabled && "cursor-not-allowed opacity-50 hover:bg-white/5"
         )}
       >
         <span className="truncate">
@@ -103,7 +103,7 @@ export function CustomSelect({
             transition={{ duration: 0.15, ease: "easeOut" }}
             className={cn(
               "absolute z-50 mt-1 min-w-full max-h-60 overflow-y-auto rounded-xl",
-              "bg-surface border border-foreground/10 shadow-xl custom-scrollbar",
+              "bg-[#1C1B1B] border border-white/10 shadow-xl custom-scrollbar",
               dropdownAlign === "right" ? "right-0" : "left-0"
             )}
             style={{
@@ -117,7 +117,7 @@ export function CustomSelect({
                   // Render Group
                   return (
                     <div key={item.label + index} className="mb-1">
-                      <div className="px-2.5 py-1.5 text-xs font-black uppercase tracking-wider text-gray-500 select-none">
+                      <div className="px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-gray-500 select-none">
                         {item.label}
                       </div>
                       {item.options.map((opt) => (
@@ -175,8 +175,8 @@ function OptionItem({
         option.disabled
           ? "opacity-50 cursor-not-allowed"
           : isSelected
-            ? "bg-primary/10 text-primary font-bold"
-            : "text-foreground hover:bg-foreground/10"
+          ? "bg-[#4EDEA3]/10 text-[#4EDEA3] font-bold"
+          : "text-white hover:bg-white/10"
       )}
     >
       <span className="truncate">{option.label}</span>

@@ -91,7 +91,7 @@ export default function TerminalPage() {
 }
 
 function TerminalContent() {
-  const { language, assets, marketQuotes, formatMoney } = useApp();
+  const { language } = useApp();
   const router = useRouter();
   const searchParams = useSearchParams();
   const mounted = useMounted();
@@ -196,12 +196,12 @@ function TerminalContent() {
         {mounted && <TickerTapeWidget />}
       </div>
 
-      <div className="pt-5 pb-4">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 pt-5 pb-4">
         {/* ─── Header ──────────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">
-              {language === "th" ? "เทอร์มินัล" : "Terminal"}
+            <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+              Trader Hub
             </h1>
             <p className="text-xs text-gray-500 mt-0.5">
               TradingView toolkit — charts, calendar, screener, heatmap, and more
@@ -210,14 +210,14 @@ function TerminalContent() {
           <div className="hidden sm:flex items-center gap-1 bg-surface rounded-xl p-1 border border-border">
             <Link
               href="/portfolio"
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold text-gray-400 hover:text-foreground hover:bg-foreground/5 transition-all"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold text-gray-400 hover:text-white hover:bg-white/5 transition-all"
             >
               <Briefcase size={14} />
               Portfolio
             </Link>
             <Link
               href="/history"
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold text-gray-400 hover:text-foreground hover:bg-foreground/5 transition-all"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold text-gray-400 hover:text-white hover:bg-white/5 transition-all"
             >
               <Calendar size={14} />
               Calendar
@@ -230,41 +230,39 @@ function TerminalContent() {
             {/* ═══════════════════════════════════════════════════════════════
                 ROW 1 — Advanced Chart
                 ═══════════════════════════════════════════════════════════════ */}
-            <div className="ft-terminal-grid grid gap-4 xl:grid-cols-[200px_minmax(0,1fr)_220px]">
-              <aside className="ft-panel p-4"><h2 className="text-sm font-semibold">{language === 'th' ? 'สินทรัพย์ที่ติดตาม' : 'Watchlist'}</h2><p className="mt-1 text-xs text-muted">{language === 'th' ? 'จากสินทรัพย์ในพอร์ต' : 'From your holdings'}</p><div className="mt-4 flex gap-2 overflow-auto xl:block xl:space-y-2">{assets.length ? assets.filter(a=>a.is_active!==false).map(asset=><button key={`${asset.portfolioId}:${asset.symbol}`} className={`w-full shrink-0 rounded-lg p-3 text-left text-sm ${symbol===asset.symbol?'bg-primary/15 text-primary':'hover:bg-surface-2'}`} onClick={()=>{setSymbol(asset.symbol);setSearchInput(asset.symbol);}}><span className="font-semibold">{asset.symbol}</span><span className="mt-1 block text-xs text-muted">{marketQuotes[asset.symbol]?.dayChangePercent == null ? '—' : `${(marketQuotes[asset.symbol].dayChangePercent || 0)>=0?'+':''}${marketQuotes[asset.symbol].dayChangePercent?.toFixed(2)}%`}</span></button>):<p className="py-5 text-sm text-muted">{language === 'th' ? 'เพิ่มสินทรัพย์ใน Portfolio เพื่อดูที่นี่' : 'Add holdings in Portfolio to see them here.'}</p>}</div></aside>
-              <div className="bg-surface rounded-2xl border border-border overflow-hidden flex flex-col h-[560px] min-w-0">
-              <div className="px-4 pt-3 pb-2 flex flex-wrap gap-3 items-center justify-between border-b border-border shrink-0">
+            <div className="bg-surface rounded-2xl border border-border overflow-hidden flex flex-col h-[650px]">
+              <div className="px-4 pt-3 pb-2 flex items-center justify-between border-b border-border shrink-0">
                 <div>
                   <div className="flex items-center gap-2">
                     <FinanceIcon name="chart" size={16} className="text-primary" />
-                    <h2 className="text-sm font-bold text-foreground">Advanced chart</h2>
+                    <h2 className="text-sm font-bold text-white">Advanced chart</h2>
                   </div>
-                  <p className="text-xs text-gray-500 mt-0.5 ml-5">
+                  <p className="text-[11px] text-gray-500 mt-0.5 ml-5">
                     ค้นหาหุ้นด้านบนเพื่อใช้หุ้นเดียวกันกับหน้า Trade
                   </p>
                 </div>
                 
                 <div className="flex items-center gap-3">
                   {/* Timeframe Dropdown */}
-                  <select aria-label="Chart interval"
+                  <select
                     value={interval}
                     onChange={(e) => setInterval(e.target.value)}
-                    className="bg-surface-2 border border-border rounded-lg px-3 py-1.5 text-xs font-bold text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all cursor-pointer appearance-none"
+                    className="bg-surface-2 border border-border rounded-lg px-3 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all cursor-pointer appearance-none"
                     style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', paddingRight: '28px' }}
                   >
                     <optgroup label="Minutes" className="bg-gray-900 text-gray-400">
-                      <option value="1" className="text-foreground">1m</option>
-                      <option value="5" className="text-foreground">5m</option>
-                      <option value="15" className="text-foreground">15m</option>
-                      <option value="30" className="text-foreground">30m</option>
+                      <option value="1" className="text-white">1m</option>
+                      <option value="5" className="text-white">5m</option>
+                      <option value="15" className="text-white">15m</option>
+                      <option value="30" className="text-white">30m</option>
                     </optgroup>
                     <optgroup label="Hours" className="bg-gray-900 text-gray-400">
-                      <option value="60" className="text-foreground">1h</option>
-                      <option value="240" className="text-foreground">4h</option>
+                      <option value="60" className="text-white">1h</option>
+                      <option value="240" className="text-white">4h</option>
                     </optgroup>
                     <optgroup label="Days" className="bg-gray-900 text-gray-400">
-                      <option value="D" className="text-foreground">1D</option>
-                      <option value="W" className="text-foreground">1W</option>
+                      <option value="D" className="text-white">1D</option>
+                      <option value="W" className="text-white">1W</option>
                     </optgroup>
                   </select>
 
@@ -277,13 +275,13 @@ function TerminalContent() {
                       type="text"
                       value={searchInput}
                       onChange={(e) => setSearchInput(e.target.value.toUpperCase())}
-                      className="bg-surface-2 border border-border rounded-lg pl-7 pr-3 py-1.5 text-xs font-bold text-foreground uppercase focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary w-[140px] transition-all"
-                      aria-label="Search symbol" placeholder="Search Symbol"
+                      className="bg-surface-2 border border-border rounded-lg pl-7 pr-3 py-1.5 text-xs font-bold text-white uppercase focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary w-[140px] transition-all"
+                      placeholder="Search Symbol"
                     />
                   </form>
                   <button
                     onClick={openTradePlan}
-                    className="hidden sm:flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-black text-primary transition-all hover:bg-primary/20"
+                    className="hidden sm:flex items-center gap-1.5 rounded-lg border border-[#ADC6FF]/30 bg-[#ADC6FF]/10 px-3 py-1.5 text-xs font-black text-[#ADC6FF] transition-all hover:bg-[#ADC6FF]/20"
                   >
                     <Target size={14} /> Trade
                   </button>
@@ -296,8 +294,6 @@ function TerminalContent() {
               </div>
             </div>
 
-              <aside className="ft-panel flex flex-col p-5"><h2 className="text-sm font-semibold">{language === 'th' ? 'เตรียมรายการซื้อขาย' : 'Trade Workspace'}</h2><p className="mt-6 text-2xl font-semibold text-primary">{symbol}</p><p className="mt-3 text-sm leading-6 text-muted">{language === 'th' ? 'เลือกโบรกเกอร์ กำหนดขนาด และตรวจสอบค่าธรรมเนียมในหน้าวางแผนก่อนยืนยัน' : 'Choose your broker, set the size and review costs in the trade planner before confirming.'}</p><button onClick={openTradePlan} className="ft-button ft-primary mt-6"><Target size={16}/>{language === 'th' ? 'เปิดแผนซื้อขาย' : 'Plan Trade'}</button><p className="mt-auto pt-6 text-xs leading-5 text-muted">{language === 'th' ? 'ราคาและความล่าช้าแสดงโดยผู้ให้บริการกราฟ' : 'Price timing and delays are shown by the chart provider.'}</p></aside>
-            </div>
             {/* ═══════════════════════════════════════════════════════════════
                 PANELS — Collapsible sections (Analysis + Market Data + Heatmap)
                 ═══════════════════════════════════════════════════════════════ */}
@@ -323,7 +319,7 @@ function TerminalContent() {
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
                         isOpen
                           ? "bg-primary/15 border-primary/40 text-primary"
-                          : "bg-surface-2 border-border text-gray-400 hover:text-foreground hover:border-border/80"
+                          : "bg-surface-2 border-border text-gray-400 hover:text-white hover:border-border/80"
                       }`}
                     >
                       <Icon size={12} />
@@ -370,10 +366,10 @@ function TerminalContent() {
                   <div className={`${openPanels.has("overview") ? "lg:col-span-7" : ""} bg-surface rounded-2xl border border-border overflow-hidden flex flex-col`}>
                     <div className="px-4 pt-3 pb-2 border-b border-border flex items-center justify-between">
                       <div>
-                        <h2 className="text-sm font-bold text-foreground">Economic calendar</h2>
-                        <p className="text-xs text-gray-500 mt-0.5">Upcoming high-impact events</p>
+                        <h2 className="text-sm font-bold text-white">Economic calendar</h2>
+                        <p className="text-[11px] text-gray-500 mt-0.5">Upcoming high-impact events</p>
                       </div>
-                      <button onClick={() => togglePanel("calendar")} className="p-1 rounded-lg hover:bg-foreground/5 text-gray-500 hover:text-foreground transition-colors">
+                      <button onClick={() => togglePanel("calendar")} className="p-1 rounded-lg hover:bg-white/5 text-gray-500 hover:text-white transition-colors">
                         <X size={13} />
                       </button>
                     </div>
@@ -384,10 +380,10 @@ function TerminalContent() {
                   <div className={`${openPanels.has("calendar") ? "lg:col-span-5" : ""} bg-surface rounded-2xl border border-border overflow-hidden flex flex-col`}>
                     <div className="px-4 pt-3 pb-2 border-b border-border flex items-center justify-between">
                       <div>
-                        <h2 className="text-sm font-bold text-foreground">Market overview</h2>
-                        <p className="text-xs text-gray-500 mt-0.5">Forex, metals, indices, and crypto tabs</p>
+                        <h2 className="text-sm font-bold text-white">Market overview</h2>
+                        <p className="text-[11px] text-gray-500 mt-0.5">Forex, metals, indices, and crypto tabs</p>
                       </div>
-                      <button onClick={() => togglePanel("overview")} className="p-1 rounded-lg hover:bg-foreground/5 text-gray-500 hover:text-foreground transition-colors">
+                      <button onClick={() => togglePanel("overview")} className="p-1 rounded-lg hover:bg-white/5 text-gray-500 hover:text-white transition-colors">
                         <X size={13} />
                       </button>
                     </div>
@@ -407,10 +403,10 @@ function TerminalContent() {
                   <div className={`${openPanels.has("timeline") ? "lg:col-span-7" : ""} bg-surface rounded-2xl border border-border overflow-hidden flex flex-col`}>
                     <div className="px-4 pt-3 pb-2 border-b border-border flex items-center justify-between">
                       <div>
-                        <h2 className="text-sm font-bold text-foreground">Forex screener</h2>
-                        <p className="text-xs text-gray-500 mt-0.5">Filter pairs by technicals and overview</p>
+                        <h2 className="text-sm font-bold text-white">Forex screener</h2>
+                        <p className="text-[11px] text-gray-500 mt-0.5">Filter pairs by technicals and overview</p>
                       </div>
-                      <button onClick={() => togglePanel("screener")} className="p-1 rounded-lg hover:bg-foreground/5 text-gray-500 hover:text-foreground transition-colors">
+                      <button onClick={() => togglePanel("screener")} className="p-1 rounded-lg hover:bg-white/5 text-gray-500 hover:text-white transition-colors">
                         <X size={13} />
                       </button>
                     </div>
@@ -421,10 +417,10 @@ function TerminalContent() {
                   <div className={`${openPanels.has("screener") ? "lg:col-span-5" : ""} bg-surface rounded-2xl border border-border overflow-hidden flex flex-col`}>
                     <div className="px-4 pt-3 pb-2 border-b border-border flex items-center justify-between">
                       <div>
-                        <h2 className="text-sm font-bold text-foreground">Market timeline</h2>
-                        <p className="text-xs text-gray-500 mt-0.5">Ideas and headlines that move FX</p>
+                        <h2 className="text-sm font-bold text-white">Market timeline</h2>
+                        <p className="text-[11px] text-gray-500 mt-0.5">Ideas and headlines that move FX</p>
                       </div>
-                      <button onClick={() => togglePanel("timeline")} className="p-1 rounded-lg hover:bg-foreground/5 text-gray-500 hover:text-foreground transition-colors">
+                      <button onClick={() => togglePanel("timeline")} className="p-1 rounded-lg hover:bg-white/5 text-gray-500 hover:text-white transition-colors">
                         <X size={13} />
                       </button>
                     </div>
@@ -439,10 +435,10 @@ function TerminalContent() {
               <div className="bg-surface rounded-2xl border border-border overflow-hidden">
                 <div className="px-4 pt-3 pb-2 border-b border-border flex items-center justify-between">
                   <div>
-                    <h2 className="text-sm font-bold text-foreground">S&amp;P 500 Heatmap</h2>
-                    <p className="text-xs text-gray-500 mt-0.5">Market cap · grouped by sector · color by change%</p>
+                    <h2 className="text-sm font-bold text-white">S&amp;P 500 Heatmap</h2>
+                    <p className="text-[11px] text-gray-500 mt-0.5">Market cap · grouped by sector · color by change%</p>
                   </div>
-                  <button onClick={() => togglePanel("heatmap")} className="p-1 rounded-lg hover:bg-foreground/5 text-gray-500 hover:text-foreground transition-colors">
+                  <button onClick={() => togglePanel("heatmap")} className="p-1 rounded-lg hover:bg-white/5 text-gray-500 hover:text-white transition-colors">
                     <X size={13} />
                   </button>
                 </div>
@@ -469,7 +465,7 @@ function TerminalContent() {
 
       <button
         onClick={openTradePlan}
-        className="fixed bottom-20 right-4 z-40 flex items-center gap-2 rounded-full bg-primary px-4 py-3 text-xs font-black text-primary-foreground shadow-xl shadow-[#ADC6FF]/20 lg:hidden"
+        className="fixed bottom-20 right-4 z-40 flex items-center gap-2 rounded-full bg-[#ADC6FF] px-4 py-3 text-xs font-black text-[#00285d] shadow-xl shadow-[#ADC6FF]/20 lg:hidden"
       >
         <Target size={16} /> Trade
       </button>

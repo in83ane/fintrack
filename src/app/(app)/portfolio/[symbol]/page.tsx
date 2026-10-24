@@ -198,23 +198,23 @@ function DeleteConfirmModal({ assetName, assetSymbol, onConfirm, onCancel }: Del
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.92, y: 20 }}
         transition={{ type: "spring", stiffness: 320, damping: 30 }}
-        className="bg-surface border border-foreground/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl"
+        className="bg-[#1C1B1B] border border-white/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl"
       >
         <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2 text-loss">
+          <div className="flex items-center gap-2 text-[#FFB4AB]">
             <AlertTriangle size={18} />
             <span className="font-bold text-sm uppercase tracking-wide">ลบ Asset</span>
           </div>
-          <button onClick={onCancel} className="text-gray-500 hover:text-foreground transition-colors">
+          <button onClick={onCancel} className="text-gray-500 hover:text-white transition-colors">
             <X size={18} />
           </button>
         </div>
 
-        <p className="text-foreground font-semibold mb-1">
-          คุณแน่ใจว่าต้องการลบ <span className="text-loss">{assetName}</span>?
+        <p className="text-white font-semibold mb-1">
+          คุณแน่ใจว่าต้องการลบ <span className="text-[#FFB4AB]">{assetName}</span>?
         </p>
         <p className="text-gray-500 text-xs mb-5">
-          การกระทำนี้ไม่สามารถย้อนกลับได้ กรุณาพิมพ์ <span className="font-mono text-foreground bg-foreground/10 px-1.5 py-0.5 rounded">{required}</span> เพื่อยืนยัน
+          การกระทำนี้ไม่สามารถย้อนกลับได้ กรุณาพิมพ์ <span className="font-mono text-white bg-white/10 px-1.5 py-0.5 rounded">{required}</span> เพื่อยืนยัน
         </p>
 
         <input
@@ -222,14 +222,14 @@ function DeleteConfirmModal({ assetName, assetSymbol, onConfirm, onCancel }: Del
           value={confirmText}
           onChange={(e) => setConfirmText(e.target.value)}
           placeholder={`พิมพ์ ${required}`}
-          className="w-full bg-foreground/5 border border-foreground/10 rounded-xl px-4 py-3 text-foreground text-sm font-mono placeholder:text-gray-600 focus:outline-none focus:border-primary/50 transition-colors mb-4"
+          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm font-mono placeholder:text-gray-600 focus:outline-none focus:border-[#FFB4AB]/50 transition-colors mb-4"
           autoFocus
         />
 
         <div className="flex gap-3">
           <button
             onClick={onCancel}
-            className="flex-1 py-2.5 rounded-xl bg-foreground/5 text-gray-400 text-sm font-bold hover:bg-foreground/10 transition-all"
+            className="flex-1 py-2.5 rounded-xl bg-white/5 text-gray-400 text-sm font-bold hover:bg-white/10 transition-all"
           >
             ยกเลิก
           </button>
@@ -239,8 +239,8 @@ function DeleteConfirmModal({ assetName, assetSymbol, onConfirm, onCancel }: Del
             className={cn(
               "flex-1 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2",
               isValid
-                ? "bg-loss/20 border border-loss/40 text-loss hover:bg-loss/30"
-                : "bg-foreground/5 text-gray-600 cursor-not-allowed border border-transparent"
+                ? "bg-[#FFB4AB]/20 border border-[#FFB4AB]/40 text-[#FFB4AB] hover:bg-[#FFB4AB]/30"
+                : "bg-white/5 text-gray-600 cursor-not-allowed border border-transparent"
             )}
           >
             <Trash2 size={14} />
@@ -365,7 +365,7 @@ function SVGChart({ data, isPositive, period, hoveredIndex, onHover, language, s
     onHover(closest);
   }, [data.length, W, onHover]);
 
-  const strokeColor = "var(--ft-accent)";
+  const strokeColor = isPositive ? "#4EDEA3" : "#FFB4AB";
   const fillGradientId = `url(#gradient-${symbol}-${isPositive ? "pos" : "neg"})`;
 
   if (data.length < 2) {
@@ -390,14 +390,14 @@ function SVGChart({ data, isPositive, period, hoveredIndex, onHover, language, s
       >
         <defs>
           <linearGradient id={`gradient-${symbol}-pos`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--ft-accent)" stopOpacity={0.4} />
-            <stop offset="50%" stopColor="var(--ft-accent)" stopOpacity={0.1} />
-            <stop offset="100%" stopColor="var(--ft-accent)" stopOpacity={0} />
+            <stop offset="0%" stopColor="#4EDEA3" stopOpacity={0.4} />
+            <stop offset="50%" stopColor="#4EDEA3" stopOpacity={0.1} />
+            <stop offset="100%" stopColor="#4EDEA3" stopOpacity={0} />
           </linearGradient>
           <linearGradient id={`gradient-${symbol}-neg`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--ft-accent)" stopOpacity={0.4} />
-            <stop offset="50%" stopColor="var(--ft-accent)" stopOpacity={0.1} />
-            <stop offset="100%" stopColor="var(--ft-accent)" stopOpacity={0} />
+            <stop offset="0%" stopColor="#FFB4AB" stopOpacity={0.4} />
+            <stop offset="50%" stopColor="#FFB4AB" stopOpacity={0.1} />
+            <stop offset="100%" stopColor="#FFB4AB" stopOpacity={0} />
           </linearGradient>
           <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
@@ -457,18 +457,18 @@ function SVGChart({ data, isPositive, period, hoveredIndex, onHover, language, s
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
             transition={{ duration: 0.15 }}
-            className="absolute top-4 left-1/2 -translate-x-1/2 bg-[#2A2A2A]/95 backdrop-blur-sm border border-foreground/10 rounded-xl px-4 py-2 shadow-2xl pointer-events-none z-10"
+            className="absolute top-4 left-1/2 -translate-x-1/2 bg-[#2A2A2A]/95 backdrop-blur-sm border border-white/10 rounded-xl px-4 py-2 shadow-2xl pointer-events-none z-10"
             style={{ minWidth: '200px' }}
           >
             <div className="text-xs text-gray-400 mb-1">
               {language === "th" ? formatFullThaiDate(hov.time, period) : formatFullEnglishDate(hov.time, period)}
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-lg font-bold text-foreground">${hov.price.toFixed(2)}</span>
+              <span className="text-lg font-bold text-white">${hov.price.toFixed(2)}</span>
               <span className="text-xs text-gray-400">USD</span>
             </div>
             {hoveredIndex !== null && hoveredIndex > 0 && (
-              <div className={cn("text-xs mt-1 font-medium", hov.price >= data[0].price ? "text-gain" : "text-loss")}>
+              <div className={cn("text-xs mt-1 font-medium", hov.price >= data[0].price ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
                 {hov.price >= data[0].price ? "+" : ""}
                 {((hov.price - data[0].price) / data[0].price * 100).toFixed(2)}%
                 <span className="text-gray-500 ml-1">{t("fromStart")}</span>
@@ -639,8 +639,8 @@ function AssetRow({ asset, isEditMode, onDeleteRequest, formatMoney, t, language
       className={cn(
         "flex items-center gap-3 p-3 rounded-xl border transition-all duration-200",
         isEditMode
-          ? "bg-foreground/[0.03] border-foreground/10 cursor-grab active:cursor-grabbing"
-          : "bg-transparent border-transparent hover:bg-foreground/5"
+          ? "bg-white/[0.03] border-white/10 cursor-grab active:cursor-grabbing"
+          : "bg-transparent border-transparent hover:bg-white/5"
       )}
     >
       {/* Drag Handle */}
@@ -658,30 +658,30 @@ function AssetRow({ asset, isEditMode, onDeleteRequest, formatMoney, t, language
       </AnimatePresence>
 
       {/* Logo */}
-      <div className="w-9 h-9 rounded-xl bg-foreground/5 flex items-center justify-center border border-foreground/5 flex-shrink-0 overflow-hidden">
+      <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center border border-white/5 flex-shrink-0 overflow-hidden">
         <AssetLogo symbol={asset.symbol} name={asset.name} />
       </div>
 
       {/* Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-bold text-foreground truncate">{asset.symbol}</span>
+          <span className="text-sm font-bold text-white truncate">{asset.symbol}</span>
           <span className={cn(
-            "text-xs font-bold px-1.5 py-0.5 rounded-md",
-            isProfit ? "text-gain bg-gain/10" : "text-loss bg-loss/10"
+            "text-[10px] font-bold px-1.5 py-0.5 rounded-md",
+            isProfit ? "text-[#4EDEA3] bg-[#4EDEA3]/10" : "text-[#FFB4AB] bg-[#FFB4AB]/10"
           )}>
             {isProfit ? "+" : ""}{asset.change?.toFixed(2) ?? "0.00"}%
           </span>
         </div>
-        <span className="text-xs text-gray-500 truncate block">{asset.name}</span>
+        <span className="text-[11px] text-gray-500 truncate block">{asset.name}</span>
       </div>
 
       {/* Value */}
       <div className="text-right flex-shrink-0">
-        <div className="text-sm font-bold text-foreground">
+        <div className="text-sm font-bold text-white">
           {isThaiAsset ? formatMoney(asset.valueUSD, "THB", THB_RATE) : formatMoney(asset.valueUSD, "USD", 1)}
         </div>
-        <div className={cn("text-xs font-semibold", isProfit ? "text-gain" : "text-loss")}>
+        <div className={cn("text-[11px] font-semibold", isProfit ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
           {isProfit ? "+" : ""}{isThaiAsset ? formatMoney(profit, "THB", THB_RATE) : formatMoney(profit, "USD", 1)}
         </div>
       </div>
@@ -695,7 +695,7 @@ function AssetRow({ asset, isEditMode, onDeleteRequest, formatMoney, t, language
             exit={{ opacity: 0, scale: 0.7 }}
             transition={{ type: "spring", stiffness: 300, damping: 25 }}
             onClick={() => onDeleteRequest(asset)}
-            className="flex-shrink-0 w-7 h-7 rounded-lg bg-loss/10 border border-loss/20 text-loss/60 hover:text-loss hover:bg-loss/20 hover:border-loss/40 transition-all flex items-center justify-center"
+            className="flex-shrink-0 w-7 h-7 rounded-lg bg-[#FFB4AB]/10 border border-[#FFB4AB]/20 text-[#FFB4AB]/60 hover:text-[#FFB4AB] hover:bg-[#FFB4AB]/20 hover:border-[#FFB4AB]/40 transition-all flex items-center justify-center"
           >
             <Trash2 size={13} />
           </motion.button>
@@ -885,8 +885,8 @@ export default function AssetDetailPage() {
   // Show skeleton while Supabase is still loading assets (assets=[] on first render)
   if (!asset && assets.length === 0) {
     return (
-      <div className="h-[calc(100vh-64px)] flex flex-col items-center justify-center gap-4">
-        <Loader2 className="w-10 h-10 text-info animate-spin" />
+      <div className="p-6 lg:p-8 max-w-[1600px] mx-auto h-[calc(100vh-64px)] flex flex-col items-center justify-center gap-4">
+        <Loader2 className="w-10 h-10 text-[#ADC6FF] animate-spin" />
         <span className="text-gray-500 text-sm">{language === "th" ? "กำลังโหลดข้อมูล..." : "Loading asset..."}</span>
       </div>
     );
@@ -894,10 +894,10 @@ export default function AssetDetailPage() {
 
   if (!asset) {
     return (
-      <div className="w-full">
+      <div className="p-6 lg:p-8 max-w-7xl mx-auto">
         <div className="text-center py-20">
-          <h1 className="text-2xl font-bold text-foreground mb-4">{t("assetNotFound")}</h1>
-          <Link href="/portfolio" className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-full font-black text-sm hover:brightness-110 transition-all">
+          <h1 className="text-2xl font-bold text-white mb-4">{t("assetNotFound")}</h1>
+          <Link href="/portfolio" className="inline-flex items-center gap-2 px-6 py-3 bg-[#ADC6FF] text-[#00285d] rounded-full font-black text-sm hover:brightness-110 transition-all">
             <ArrowLeft size={16} />
             {t("backToPortfolio")}
           </Link>
@@ -920,11 +920,11 @@ export default function AssetDetailPage() {
         )}
       </AnimatePresence>
 
-      <div className="h-[calc(100vh-64px)] flex flex-col">
+      <div className="p-6 lg:p-8 max-w-[1600px] mx-auto h-[calc(100vh-64px)] flex flex-col">
         {/* Header */}
         <section className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <div className="flex items-center gap-4">
-            <Link href="/portfolio" className="p-3 bg-foreground/5 border border-foreground/10 rounded-xl text-gray-400 hover:text-foreground hover:bg-foreground/10 transition-all">
+            <Link href="/portfolio" className="p-3 bg-white/5 border border-white/10 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-all">
               <ArrowLeft size={20} />
             </Link>
 
@@ -932,17 +932,17 @@ export default function AssetDetailPage() {
               <button
                 onClick={handlePreviousAsset}
                 disabled={!canGoPrevious}
-                className={cn("p-2 rounded-lg transition-all", canGoPrevious ? "bg-foreground/5 text-gray-400 hover:text-foreground hover:bg-foreground/10" : "text-gray-600 cursor-not-allowed")}
+                className={cn("p-2 rounded-lg transition-all", canGoPrevious ? "bg-white/5 text-gray-400 hover:text-white hover:bg-white/10" : "text-gray-600 cursor-not-allowed")}
               >
                 <ChevronLeft size={20} />
               </button>
 
               <div className="flex items-center gap-3 px-4">
-                <div className="w-12 h-12 rounded-xl bg-foreground/5 flex items-center justify-center relative overflow-hidden border border-foreground/5">
+                <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center relative overflow-hidden border border-white/5">
                   <AssetLogo symbol={asset.symbol} name={asset.name} />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-black text-foreground">{asset.name}</h1>
+                  <h1 className="text-2xl font-black text-white">{asset.name}</h1>
                   <p className="text-gray-500 font-medium">{asset.symbol}</p>
                 </div>
               </div>
@@ -950,12 +950,12 @@ export default function AssetDetailPage() {
               <button
                 onClick={handleNextAsset}
                 disabled={!canGoNext}
-                className={cn("p-2 rounded-lg transition-all", canGoNext ? "bg-foreground/5 text-gray-400 hover:text-foreground hover:bg-foreground/10" : "text-gray-600 cursor-not-allowed")}
+                className={cn("p-2 rounded-lg transition-all", canGoNext ? "bg-white/5 text-gray-400 hover:text-white hover:bg-white/10" : "text-gray-600 cursor-not-allowed")}
               >
                 <ChevronRight size={20} />
               </button>
 
-              <Link href={`/terminal?symbol=${encodeURIComponent(asset.symbol)}`} replace={false} className="ml-2 px-4 py-2 bg-primary text-primary-foreground font-bold text-xs rounded-xl uppercase tracking-wide flex items-center gap-2 hover:brightness-110 transition-all">
+              <Link href={`/terminal?symbol=${encodeURIComponent(asset.symbol)}`} replace={false} className="ml-2 px-4 py-2 bg-[#ADC6FF] text-[#00285d] font-bold text-xs rounded-xl uppercase tracking-wide flex items-center gap-2 hover:brightness-110 transition-all">
                 <Activity size={16} /> {language === "th" ? "วิเคราะห์เทรด" : "Trade Assistant"}
               </Link>
             </div>
@@ -971,12 +971,12 @@ export default function AssetDetailPage() {
                 exit={{ opacity: 0, y: 10 }}
                 className="flex items-center gap-3"
               >
-                <span className="text-4xl font-black text-foreground">
+                <span className="text-4xl font-black text-white">
                   {isThaiAsset
                     ? formatMoney(hoveredIndex !== null ? currentPrice : livePrice, "THB", THB_RATE)
                     : formatMoney(hoveredIndex !== null ? currentPrice : livePrice, "USD", 1)}
                 </span>
-                <span className={cn("flex items-center gap-1 text-sm font-black px-3 py-1.5 rounded-full", isPositive ? "text-gain bg-gain/10" : "text-loss bg-loss/10")}>
+                <span className={cn("flex items-center gap-1 text-sm font-black px-3 py-1.5 rounded-full", isPositive ? "text-[#4EDEA3] bg-[#4EDEA3]/10" : "text-[#FFB4AB] bg-[#FFB4AB]/10")}>
                   {isPositive ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
                   {isPositive ? "+" : ""}{changePct.toFixed(2)}%
                 </span>
@@ -1007,21 +1007,21 @@ export default function AssetDetailPage() {
               >
                 {fetchedLivePrice === null && isLoadingChart ? (
                   <div className="space-y-1.5 mt-1">
-                    <div className="h-5 w-24 bg-foreground/10 rounded animate-pulse" />
-                    <div className="h-3 w-16 bg-foreground/5 rounded animate-pulse" />
+                    <div className="h-5 w-24 bg-white/10 rounded animate-pulse" />
+                    <div className="h-3 w-16 bg-white/5 rounded animate-pulse" />
                   </div>
                 ) : (
                   <>
-                    <div className="text-base font-black text-foreground truncate">
+                    <div className="text-base font-black text-white truncate">
                       {isThaiAsset ? formatMoney(livePrice, "THB", THB_RATE) : formatMoney(livePrice, "USD", 1)}
                     </div>
                     {(!isThaiAsset && currency === "THB") && (
-                      <div className="text-xs text-gray-500 mt-0.5">≈ {formatMoney(livePrice, "THB", THB_RATE)}</div>
+                      <div className="text-[11px] text-gray-500 mt-0.5">≈ {formatMoney(livePrice, "THB", THB_RATE)}</div>
                     )}
                     {(isThaiAsset && currency === "USD") && (
-                      <div className="text-xs text-gray-500 mt-0.5">≈ {formatMoney(livePrice, "USD", 1 / THB_RATE)}</div>
+                      <div className="text-[11px] text-gray-500 mt-0.5">≈ {formatMoney(livePrice, "USD", 1 / THB_RATE)}</div>
                     )}
-                    <div className={cn("text-xs font-bold mt-1", isPositive ? "text-gain" : "text-loss")}>
+                    <div className={cn("text-[11px] font-bold mt-1", isPositive ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
                       {isPositive ? "+" : ""}{changePct.toFixed(2)}%
                     </div>
                   </>
@@ -1030,28 +1030,28 @@ export default function AssetDetailPage() {
 
               {/* Avg Cost */}
               <StatCard label={t("avgCost")} icon={DollarSign}>
-                <div className="text-base font-black text-foreground truncate">
+                <div className="text-base font-black text-white truncate">
                   {isThaiAsset ? formatMoney(avgCost, "THB", THB_RATE) : formatMoney(avgCost, "USD", 1)}
                 </div>
-                <div className="text-xs text-gray-500 mt-0.5">
+                <div className="text-[11px] text-gray-500 mt-0.5">
                   {shares.toLocaleString('en-US', { maximumFractionDigits: 4 })} {t("units") ?? "units"}
                 </div>
                 {(!isThaiAsset && currency === "THB") && (
-                  <div className="text-xs text-gray-500">≈ {formatMoney(avgCost, "THB", THB_RATE)}</div>
+                  <div className="text-[11px] text-gray-500">≈ {formatMoney(avgCost, "THB", THB_RATE)}</div>
                 )}
               </StatCard>
 
               {/* Holdings */}
               <StatCard label={t("holdings")} icon={BarChart3}>
-                <div className="text-base font-black text-foreground truncate">
+                <div className="text-base font-black text-white truncate">
                   {isThaiAsset ? formatMoney(totalValue, "THB", THB_RATE) : formatMoney(totalValue, "USD", 1)}
                 </div>
-                <div className="text-xs text-gray-500 mt-0.5">{t("allocation")} {asset.allocation}</div>
+                <div className="text-[11px] text-gray-500 mt-0.5">{t("allocation")} {asset.allocation}</div>
                 {(!isThaiAsset && currency === "THB") && (
-                  <div className="text-xs text-gray-500 opacity-70">≈ {formatMoney(totalValue, "THB", THB_RATE)}</div>
+                  <div className="text-[11px] text-gray-500 opacity-70">≈ {formatMoney(totalValue, "THB", THB_RATE)}</div>
                 )}
                 {(isThaiAsset && currency === "USD") && (
-                  <div className="text-xs text-gray-500 opacity-70">≈ {formatMoney(totalValue, "USD", 1 / THB_RATE)}</div>
+                  <div className="text-[11px] text-gray-500 opacity-70">≈ {formatMoney(totalValue, "USD", 1 / THB_RATE)}</div>
                 )}
               </StatCard>
 
@@ -1061,18 +1061,18 @@ export default function AssetDetailPage() {
                 icon={isProfit ? ArrowUpRight : ArrowDownRight}
                 isPositive={isProfit}
               >
-                <div className={cn("text-base font-black truncate", isProfit ? "text-gain" : "text-loss")}>
+                <div className={cn("text-base font-black truncate", isProfit ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
                   {isProfit ? "+" : ""}
                   {isThaiAsset ? formatMoney(profit, "THB", THB_RATE) : formatMoney(profit, "USD", 1)}
                 </div>
-                <div className={cn("text-xs font-bold mt-0.5", isProfit ? "text-gain" : "text-loss")}>
+                <div className={cn("text-[11px] font-bold mt-0.5", isProfit ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
                   {isProfit ? "+" : ""}{profitPercent.toFixed(2)}%
                 </div>
                 {(!isThaiAsset && currency === "THB") && (
-                  <div className="text-xs text-gray-500 opacity-70">≈ {isProfit ? "+" : ""}{formatMoney(profit, "THB", THB_RATE)}</div>
+                  <div className="text-[11px] text-gray-500 opacity-70">≈ {isProfit ? "+" : ""}{formatMoney(profit, "THB", THB_RATE)}</div>
                 )}
                 {(isThaiAsset && currency === "USD") && (
-                  <div className="text-xs text-gray-500 opacity-70">≈ {isProfit ? "+" : ""}{formatMoney(profit, "USD", 1 / THB_RATE)}</div>
+                  <div className="text-[11px] text-gray-500 opacity-70">≈ {isProfit ? "+" : ""}{formatMoney(profit, "USD", 1 / THB_RATE)}</div>
                 )}
               </StatCard>
             </div>
@@ -1080,32 +1080,32 @@ export default function AssetDetailPage() {
             {/* Period Performance Stats */}
             {periodStats && (
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-3 gap-4">
-                <div className="bg-surface border border-foreground/5 rounded-xl p-4">
+                <div className="bg-[#1C1B1B]/50 border border-white/5 rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-1">
-                    <ArrowUpRight size={14} className="text-gain" />
+                    <ArrowUpRight size={14} className="text-[#4EDEA3]" />
                     <span className="text-xs text-gray-500">{t("periodHigh")}</span>
                   </div>
-                  <div className="text-lg font-bold text-foreground">
+                  <div className="text-lg font-bold text-white">
                     {isThaiAsset ? formatMoney(periodStats.high, "THB", THB_RATE) : formatMoney(periodStats.high, "USD", 1)}
                   </div>
-                  {(!isThaiAsset && currency === "THB") && <div className="text-xs text-gray-500 mt-1">≈ {formatMoney(periodStats.high, "THB", THB_RATE)}</div>}
+                  {(!isThaiAsset && currency === "THB") && <div className="text-[10px] text-gray-500 mt-1">≈ {formatMoney(periodStats.high, "THB", THB_RATE)}</div>}
                 </div>
-                <div className="bg-surface border border-foreground/5 rounded-xl p-4">
+                <div className="bg-[#1C1B1B]/50 border border-white/5 rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-1">
-                    <ArrowDownRight size={14} className="text-loss" />
+                    <ArrowDownRight size={14} className="text-[#FFB4AB]" />
                     <span className="text-xs text-gray-500">{t("periodLow")}</span>
                   </div>
-                  <div className="text-lg font-bold text-foreground">
+                  <div className="text-lg font-bold text-white">
                     {isThaiAsset ? formatMoney(periodStats.low, "THB", THB_RATE) : formatMoney(periodStats.low, "USD", 1)}
                   </div>
-                  {(!isThaiAsset && currency === "THB") && <div className="text-xs text-gray-500 mt-1">≈ {formatMoney(periodStats.low, "THB", THB_RATE)}</div>}
+                  {(!isThaiAsset && currency === "THB") && <div className="text-[10px] text-gray-500 mt-1">≈ {formatMoney(periodStats.low, "THB", THB_RATE)}</div>}
                 </div>
-                <div className="bg-surface border border-foreground/5 rounded-xl p-4">
+                <div className="bg-[#1C1B1B]/50 border border-white/5 rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-1">
-                    <Activity size={14} className="text-info" />
+                    <Activity size={14} className="text-[#ADC6FF]" />
                     <span className="text-xs text-gray-500">{t("periodReturn")}</span>
                   </div>
-                  <div className={cn("text-lg font-bold", periodStats.periodReturn >= 0 ? "text-gain" : "text-loss")}>
+                  <div className={cn("text-lg font-bold", periodStats.periodReturn >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
                     {periodStats.periodReturn >= 0 ? "+" : ""}{periodStats.periodReturn.toFixed(2)}%
                   </div>
                 </div>
@@ -1113,18 +1113,18 @@ export default function AssetDetailPage() {
             )}
 
             {/* Chart */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-surface rounded-[1.5rem] border border-foreground/5 p-6">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-[#1C1B1B] rounded-[1.5rem] border border-white/5 p-6">
               <div className="flex flex-wrap justify-between items-start gap-4 mb-6">
-                <p className="text-sm font-bold text-foreground">{t("performanceTitle")}</p>
-                <div className="flex gap-1 bg-foreground/5 rounded-lg p-1">
+                <p className="text-sm font-bold text-white">{t("performanceTitle")}</p>
+                <div className="flex gap-1 bg-white/5 rounded-lg p-1">
                   {periods.map((period) => (
                     <Link
                       key={period.key}
                       href={`/portfolio/${asset.symbol}?period=${period.key}`}
                       onClick={() => setSelectedPeriod(period.key)}
                       className={cn(
-                        "px-2 py-1 text-xs font-black uppercase tracking-wide rounded-md transition-all",
-                        selectedPeriod === period.key ? "bg-primary text-primary-foreground" : "text-gray-400 hover:text-foreground"
+                        "px-2 py-1 text-[10px] font-black uppercase tracking-wide rounded-md transition-all",
+                        selectedPeriod === period.key ? "bg-[#ADC6FF] text-[#00285d]" : "text-gray-400 hover:text-white"
                       )}
                     >
                       {t(`period${period.key.toLowerCase()}`)}
@@ -1143,12 +1143,12 @@ export default function AssetDetailPage() {
                 <AnimatePresence mode="wait">
                   {isLoadingChart ? (
                     <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full h-full flex flex-col items-center justify-center gap-3">
-                      <Loader2 className="w-8 h-8 text-info animate-spin" />
+                      <Loader2 className="w-8 h-8 text-[#ADC6FF] animate-spin" />
                       <span className="text-gray-500 text-sm">{t("loadingChartData")}</span>
                     </motion.div>
                   ) : error ? (
                     <motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full h-full flex flex-col items-center justify-center text-center px-4">
-                      <div className="text-loss mb-2"><Activity size={32} /></div>
+                      <div className="text-[#FFB4AB] mb-2"><Activity size={32} /></div>
                       <p className="text-gray-400 text-sm mb-1">{t("failedToLoadData")}</p>
                       <p className="text-gray-600 text-xs">{error}</p>
                     </motion.div>
@@ -1169,10 +1169,10 @@ export default function AssetDetailPage() {
                 </AnimatePresence>
               </div>
 
-              <div className="flex items-center justify-between mt-4 pt-4 border-t border-foreground/5">
+              <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/5">
                 <div className="flex items-center gap-4 text-xs text-gray-500">
-                  <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-gain" /><span>{t("uptrend")}</span></div>
-                  <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-loss" /><span>{t("downtrend")}</span></div>
+                  <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-[#4EDEA3]" /><span>{t("uptrend")}</span></div>
+                  <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-[#FFB4AB]" /><span>{t("downtrend")}</span></div>
                 </div>
                 <div className="text-xs text-gray-600">{t("hoverToSeePrice")}</div>
               </div>
@@ -1180,12 +1180,12 @@ export default function AssetDetailPage() {
           </div>
 
           {/* Right Side - Portfolio / Investment Journey */}
-          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="bg-surface rounded-[1.5rem] border border-foreground/5 flex flex-col overflow-hidden">
+          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="bg-[#1C1B1B] rounded-[1.5rem] border border-white/5 flex flex-col overflow-hidden">
             {/* Panel Header */}
-            <div className="p-6 border-b border-foreground/5">
+            <div className="p-6 border-b border-white/5">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
-                  <Target className="text-info" size={20} />
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Target className="text-[#ADC6FF]" size={20} />
                   {isEditMode ? (language === "th" ? "จัดการ Portfolio" : "Manage Portfolio") : t("investmentJourney")}
                 </h2>
 
@@ -1195,8 +1195,8 @@ export default function AssetDetailPage() {
                   className={cn(
                     "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200",
                     isEditMode
-                      ? "bg-primary/15 border border-primary/30 text-primary hover:bg-primary/25"
-                      : "bg-foreground/5 border border-foreground/10 text-gray-400 hover:text-foreground hover:bg-foreground/10"
+                      ? "bg-[#4EDEA3]/15 border border-[#4EDEA3]/30 text-[#4EDEA3] hover:bg-[#4EDEA3]/25"
+                      : "bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:bg-white/10"
                   )}
                 >
                   {isEditMode ? <><Check size={13} />{language === "th" ? "บันทึก" : "Done"}</> : <><Pencil size={13} />{language === "th" ? "แก้ไข" : "Edit"}</>}
@@ -1276,7 +1276,7 @@ const AssetLogo = ({ symbol, name, className }: { symbol: string; name: string; 
 
   if (imgError) {
     return (
-      <div className={cn("w-full h-full flex items-center justify-center bg-surface text-info font-black rounded-lg overflow-hidden text-xs", className)}>
+      <div className={cn("w-full h-full flex items-center justify-center bg-gradient-to-br from-[#1C1B1B] to-[#2A2A2A] text-[#ADC6FF] font-black rounded-lg overflow-hidden text-xs", className)}>
         {symbol.slice(0, 3).toUpperCase()}
       </div>
     );
@@ -1314,14 +1314,14 @@ function StatCard({ label, icon: Icon, isPositive, isActive, children }: StatCar
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       className={cn(
-        "bg-surface p-4 rounded-2xl border transition-all duration-300",
-        isActive ? "border-info/30 shadow-lg shadow-[#ADC6FF]/5" : "border-foreground/5 hover:border-foreground/10"
+        "bg-[#1C1B1B] p-4 rounded-2xl border transition-all duration-300",
+        isActive ? "border-[#ADC6FF]/30 shadow-lg shadow-[#ADC6FF]/5" : "border-white/5 hover:border-white/10"
       )}
     >
       <div className="flex items-start justify-between mb-2">
         <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">{label}</span>
-        <div className={cn("p-1.5 rounded-lg transition-colors", positive ? "bg-gain/10" : "bg-foreground/5")}>
-          <Icon size={14} className={positive ? "text-gain" : "text-gray-400"} />
+        <div className={cn("p-1.5 rounded-lg transition-colors", positive ? "bg-[#4EDEA3]/10" : "bg-white/5")}>
+          <Icon size={14} className={positive ? "text-[#4EDEA3]" : "text-gray-400"} />
         </div>
       </div>
       {children}

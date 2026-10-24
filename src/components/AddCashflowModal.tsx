@@ -42,9 +42,9 @@ function SuccessConfetti({ active }: { active: boolean }) {
         <motion.div
           key={p.id}
           initial={{ y: -50, x: p.x, opacity: 1, scale: 0, rotate: p.rotation }}
-          animate={{
-            y: window.innerHeight + 50,
-            x: p.x + (Math.random() - 0.5) * 200,
+          animate={{ 
+            y: window.innerHeight + 50, 
+            x: p.x + (Math.random() - 0.5) * 200, 
             opacity: [1, 1, 0],
             scale: 1,
             rotate: p.rotation + 360 * (Math.random() > 0.5 ? 1 : -1)
@@ -113,7 +113,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
     const now = new Date();
     const key = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const thisMonthCash = cashActivities.filter(a => a.date.startsWith(key));
-
+    
     const getEntryAmount = (a: any) => a.amountUSD ?? a.amount ?? 0;
 
     const income = thisMonthCash.filter(a => (a.type === 'INCOME' || a.type === 'DEPOSIT') && !a.isTransfer).reduce((s, a) => s + getEntryAmount(a), 0);
@@ -123,7 +123,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
 
   const projectedNetCashflow = useMemo(() => {
     const amt = Number(amount) || 0;
-
+    
     if (amt === 0) return currentNetCashflow;
     if (type === "INCOME" || type === "DEPOSIT") return currentNetCashflow + amt;
     return currentNetCashflow - amt;
@@ -137,7 +137,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
     }
 
     const lowerNote = note.toLowerCase();
-
+    
     // Keywords mapping
     const categoryMap: Record<string, { type: "INCOME"| "EXPENSE", cat: string }> = {
       // Income
@@ -147,7 +147,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
       'freelance': { type: "INCOME", cat: "salary" },
       'เงินเดือน': { type: "INCOME", cat: "salary" },
       'dividend': { type: "INCOME", cat: "investment" },
-
+      
       // Expense - Food
       'lunch': { type: "EXPENSE", cat: "food" },
       'dinner': { type: "EXPENSE", cat: "food" },
@@ -157,7 +157,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
       'grocery': { type: "EXPENSE", cat: "food" },
       'อาหาร': { type: "EXPENSE", cat: "food" },
       'กาแฟ': { type: "EXPENSE", cat: "food" },
-
+      
       // Expense - Transport
       'uber': { type: "EXPENSE", cat: "transport" },
       'grab': { type: "EXPENSE", cat: "transport" },
@@ -166,7 +166,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
       'fuel': { type: "EXPENSE", cat: "transport" },
       'train': { type: "EXPENSE", cat: "transport" },
       'เดินทาง': { type: "EXPENSE", cat: "transport" },
-
+      
       // Expense - Utilities
       'rent': { type: "EXPENSE", cat: "utilities" },
       'electric': { type: "EXPENSE", cat: "utilities" },
@@ -174,7 +174,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
       'internet': { type: "EXPENSE", cat: "utilities" },
       'phone': { type: "EXPENSE", cat: "utilities" },
       'ค่าเช่า': { type: "EXPENSE", cat: "utilities" },
-
+      
       // Expense - Entertainment
       'movie': { type: "EXPENSE", cat: "entertainment" },
       'netflix': { type: "EXPENSE", cat: "entertainment" },
@@ -182,7 +182,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
       'game': { type: "EXPENSE", cat: "entertainment" },
       'shopping': { type: "EXPENSE", cat: "entertainment" },
       'บันเทิง': { type: "EXPENSE", cat: "entertainment" },
-
+      
       // Investment
       'stock': { type: "EXPENSE", cat: "investment" },
       'shares': { type: "EXPENSE", cat: "investment" },
@@ -203,7 +203,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
         return;
       }
     }
-
+    
     setAutoSuggested(false);
   }, [note, type]);
 
@@ -212,7 +212,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
     return moneyBuckets.filter(b => b.linkedToExpenses);
   }, [moneyBuckets]);
 
-  // All categories (preset + any previously used custom ones)
+  // All categories (preset + any previously used custom ones) 
   const incomePresets = ["salary", "investment", "freelance", "dividend", "gift", "rental", "other"];
   const expensePresets = ["food", "transport", "utilities", "entertainment", "shopping", "health", "education", "investment", "other"];
   const depositPresets = ["salary", "investment", "other"];
@@ -427,36 +427,9 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
   return (
     <>
       <SuccessConfetti active={showConfetti} />
-      <Modal isOpen={isOpen} onClose={handleClose} title={t("logIncomeExpense")} footer={<>
-        {/* Buttons */}
-        <div className="flex gap-4 pt-2">
-          <button
-            type="button"
-            onClick={handleClose}
-            className="flex-1 py-3 text-gray-500 font-bold text-sm hover:text-foreground transition-colors"
-          >
-            {t("cancel")}
-          </button>
-          <button
-            type="submit" form="cashflow-entry"
-            disabled={isAdding || !amount || Number(amount) <= 0}
-            className={cn(
-              "flex-1 py-3 rounded-full font-black text-sm uppercase tracking-tight transition-all flex items-center justify-center gap-2",
-              isAdding || !amount || Number(amount) <= 0
-                ? "bg-foreground/5 text-gray-600 opacity-60 cursor-not-allowed"
-                : type === "INCOME" || type === "DEPOSIT"
-                  ? "bg-primary text-primary-foreground hover:brightness-110 shadow-sm"
-                  : "bg-primary text-primary-foreground hover:brightness-110 shadow-sm"
-            )}
-          >
-            {isAdding && <Loader2 size={16} className="animate-spin" />}
-            {t("saveRecord")}
-          </button>
-        </div>
-
-</>}>
-        <form id="cashflow-entry" onSubmit={handleSubmit} className="space-y-3">
-
+      <Modal isOpen={isOpen} onClose={handleClose} title={t("logIncomeExpense")}>
+        <form onSubmit={handleSubmit} className="space-y-6">
+        
         {/* Note (Moved up for auto-categorization) */}
         <div className="space-y-2">
           <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">
@@ -468,7 +441,8 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="e.g. Lunch at Starbucks, Salary..."
-              className="w-full px-4 py-3 bg-foreground/5 border border-border rounded-2xl text-foreground text-sm font-medium placeholder-gray-600 focus:outline-none focus:border-primary/50 transition-colors pr-10"
+              className="w-full px-4 py-4 bg-white/5 border border-border rounded-2xl text-white text-sm font-medium placeholder-gray-600 focus:outline-none focus:border-[#ADC6FF]/50 transition-colors pr-10"
+              autoFocus
             />
             <AnimatePresence>
               {autoSuggested && (
@@ -476,7 +450,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.8 }}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-warning"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#E9C349]"
                   title="Auto-categorized based on description"
                 >
                   <Sparkles size={16} />
@@ -487,15 +461,15 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
         </div>
 
         {/* Type Toggle */}
-        <div className="grid grid-cols-4 gap-1 bg-foreground/5 p-1 rounded-2xl border border-border">
+        <div className="grid grid-cols-4 gap-1 bg-white/5 p-1 rounded-2xl border border-border">
           <button
             type="button"
             onClick={() => handleTypeChange("INCOME")}
             className={cn(
               "py-3 text-xs font-black uppercase tracking-wide rounded-xl transition-all",
               type === "INCOME"
-                ? "bg-primary text-primary-foreground shadow-lg"
-                : "text-gray-400 hover:text-foreground"
+                ? "bg-[#4EDEA3] text-[#00285d] shadow-lg"
+                : "text-gray-400 hover:text-white"
             )}
           >
             {t("income")}
@@ -506,8 +480,8 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
             className={cn(
               "py-3 text-xs font-black uppercase tracking-wide rounded-xl transition-all",
               type === "EXPENSE"
-                ? "bg-loss text-primary-foreground shadow-lg"
-                : "text-gray-400 hover:text-foreground"
+                ? "bg-[#FFB4AB] text-[#00285d] shadow-lg"
+                : "text-gray-400 hover:text-white"
             )}
           >
             {t("expense")}
@@ -518,8 +492,8 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
             className={cn(
               "py-3 text-xs font-black uppercase tracking-wide rounded-xl transition-all",
               type === "DEPOSIT"
-                ? "bg-primary text-primary-foreground shadow-lg"
-                : "text-gray-400 hover:text-foreground"
+                ? "bg-[#4EDEA3] text-[#00285d] shadow-lg"
+                : "text-gray-400 hover:text-white"
             )}
           >
             {t("deposit")}
@@ -530,8 +504,8 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
             className={cn(
               "py-3 text-xs font-black uppercase tracking-wide rounded-xl transition-all",
               type === "WITHDRAW"
-                ? "bg-loss text-primary-foreground shadow-lg"
-                : "text-gray-400 hover:text-foreground"
+                ? "bg-[#FFB4AB] text-[#00285d] shadow-lg"
+                : "text-gray-400 hover:text-white"
             )}
           >
             {t("withdraw")}
@@ -545,32 +519,32 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
               {t("amount")}
             </label>
             {/* Projected Net Balance */}
-            <div className="flex items-center gap-1.5 text-xs bg-foreground/5 px-2 py-1 rounded-lg">
+            <div className="flex items-center gap-1.5 text-[10px] bg-white/5 px-2 py-1 rounded-lg">
               <span className="text-gray-500 uppercase font-bold">New Net:</span>
               <span className={cn(
                 "font-black flex items-center gap-0.5",
-                projectedNetCashflow >= 0 ? "text-gain" : "text-loss"
+                projectedNetCashflow >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]"
               )}>
                 {projectedNetCashflow >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
                 {formatMoney(Math.abs(projectedNetCashflow))}
               </span>
             </div>
           </div>
-
+          
           <div className="flex items-center justify-between mt-2 mb-2">
-            <label className="text-xs text-gray-500 uppercase tracking-wide"></label>
-            <div className="flex gap-1 p-0.5 bg-foreground/5 rounded-lg border border-border">
+            <label className="text-[10px] text-gray-500 uppercase tracking-wide"></label>
+            <div className="flex gap-1 p-0.5 bg-white/5 rounded-lg border border-border">
               {(['USD', 'THB'] as const).map(cur => (
                 <button
                   key={cur}
                   type="button"
                   onClick={() => setInputCurrency(cur)}
                   className={cn(
-                    'px-2.5 py-1 rounded-md text-xs font-black uppercase tracking-wide transition-all',
+                    'px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wide transition-all',
                     inputCurrency === cur
                       ? cur === 'THB'
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-primary text-primary-foreground'
+                        ? 'bg-[#E9C349] text-[#241a00]'
+                        : 'bg-[#ADC6FF] text-[#00285d]'
                       : 'text-gray-500 hover:text-gray-300'
                   )}
                 >
@@ -582,19 +556,17 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
 
           <div className="relative">
             <input
-              autoFocus
-              aria-label={t("amount")}
               type="number"
               step="any"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0.00"
-              className="w-full px-4 py-3 bg-foreground/5 border border-border rounded-2xl text-foreground text-sm font-medium placeholder-gray-600 focus:outline-none focus:border-primary/50 transition-colors pr-12"
+              className="w-full px-4 py-4 bg-white/5 border border-border rounded-2xl text-white text-sm font-medium placeholder-gray-600 focus:outline-none focus:border-[#ADC6FF]/50 transition-colors pr-12"
               required
             />
             <span className={cn(
               "absolute right-4 top-1/2 -translate-y-1/2 font-black text-xs uppercase opacity-90",
-              inputCurrency === 'THB' ? 'text-warning' : 'text-info'
+              inputCurrency === 'THB' ? 'text-[#E9C349]' : 'text-[#ADC6FF]'
             )}>
               {inputCurrency === 'THB' ? '฿' : '$'}
             </span>
@@ -609,11 +581,11 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
             </label>
             <AnimatePresence>
               {autoSuggested && (
-                <motion.span
+                <motion.span 
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0 }}
-                  className="text-xs bg-warning/20 text-warning px-2 py-0.5 rounded-full font-bold uppercase tracking-wide"
+                  className="text-[9px] bg-[#E9C349]/20 text-[#E9C349] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide"
                 >
                   Auto-selected
                 </motion.span>
@@ -631,8 +603,8 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
                 className={cn(
                   "px-3 py-1.5 text-xs font-bold rounded-xl border transition-all",
                   category === cat && !isCustomCategory
-                    ? "bg-foreground/10 border-foreground/25 text-foreground"
-                    : "bg-transparent border-foreground/8 text-gray-500 hover:text-gray-300 hover:border-foreground/15"
+                    ? "bg-white/10 border-white/25 text-white"
+                    : "bg-transparent border-white/8 text-gray-500 hover:text-gray-300 hover:border-white/15"
                 )}
               >
                 {t(cat)}
@@ -641,7 +613,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
 
             {/* Show active custom category chip */}
             {isCustomCategory && category && !showCustomCatInput && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-foreground/25 bg-foreground/10 text-foreground text-xs font-bold">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/25 bg-white/10 text-white text-xs font-bold">
                 <Tag size={10} />
                 {category}
                 <button
@@ -658,7 +630,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
             <button
               type="button"
               onClick={() => { setShowCustomCatInput(true); setTimeout(() => document.getElementById('custom-cat-input')?.focus(), 60); }}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-xl border border-dashed border-foreground/20 text-gray-500 hover:text-foreground hover:border-foreground/35 text-xs font-bold transition-all"
+              className="flex items-center gap-1 px-3 py-1.5 rounded-xl border border-dashed border-white/20 text-gray-500 hover:text-white hover:border-white/35 text-xs font-bold transition-all"
             >
               <Plus size={10} />
               Custom
@@ -688,19 +660,19 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
                       if (e.key === "Escape") setShowCustomCatInput(false);
                     }}
                     placeholder="Type your category name..."
-                    className="flex-1 px-3 py-2 bg-foreground/5 border border-foreground/15 rounded-xl text-foreground text-sm placeholder-gray-600 focus:outline-none focus:border-foreground/30 transition-colors"
+                    className="flex-1 px-3 py-2 bg-white/5 border border-white/15 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none focus:border-white/30 transition-colors"
                   />
                   <button
                     type="button"
                     onClick={() => { if (customCatDraft.trim()) { setCategory(customCatDraft.trim()); setShowCustomCatInput(false); setCustomCatDraft(""); } }}
-                    className="px-4 py-2 bg-foreground/10 text-foreground rounded-xl text-xs font-bold hover:bg-foreground/15 transition-all"
+                    className="px-4 py-2 bg-white/10 text-white rounded-xl text-xs font-bold hover:bg-white/15 transition-all"
                   >
                     Add
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowCustomCatInput(false)}
-                    className="p-2 text-gray-500 hover:text-foreground transition-colors"
+                    className="p-2 text-gray-500 hover:text-white transition-colors"
                   >
                     <FinanceIcon name="close" size={16} />
                   </button>
@@ -714,7 +686,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
         {moneyBuckets.length > 0 && (
           <div className="space-y-2">
             <label className="text-xs font-bold text-gray-400 uppercase tracking-wide flex items-center gap-1.5">
-              <Wallet size={12} className={type === "INCOME" || type === "DEPOSIT" ? "text-gain" : "text-loss"} />
+              <Wallet size={12} className={type === "INCOME" || type === "DEPOSIT" ? "text-[#4EDEA3]" : "text-[#FFB4AB]"} />
               {type === "INCOME" || type === "DEPOSIT"
                 ? t("selectBucket") || "Deposit to Bucket"
                 : t("deductFromBucket")}
@@ -752,11 +724,36 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="w-full px-4 py-3 bg-foreground/5 border border-border rounded-2xl text-foreground text-sm font-medium placeholder-gray-600 focus:outline-none focus:border-primary/50 transition-colors"
+            className="w-full px-4 py-4 bg-white/5 border border-border rounded-2xl text-white text-sm font-medium placeholder-gray-600 focus:outline-none focus:border-[#ADC6FF]/50 transition-colors"
             required
           />
         </div>
 
+        {/* Buttons */}
+        <div className="flex gap-4 pt-2">
+          <button
+            type="button"
+            onClick={handleClose}
+            className="flex-1 py-4 text-gray-500 font-bold text-sm hover:text-white transition-colors"
+          >
+            {t("cancel")}
+          </button>
+          <button
+            type="submit"
+            disabled={isAdding || !amount || Number(amount) <= 0}
+            className={cn(
+              "flex-1 py-4 rounded-full font-black text-sm uppercase tracking-tight transition-all flex items-center justify-center gap-2",
+              isAdding || !amount || Number(amount) <= 0
+                ? "bg-white/5 text-gray-600 opacity-60 cursor-not-allowed"
+                : type === "INCOME" || type === "DEPOSIT"
+                  ? "bg-[#4EDEA3] text-[#00285d] hover:brightness-110 shadow-[0_0_20px_rgba(78,222,163,0.3)]" 
+                  : "bg-[#FFB4AB] text-[#00285d] hover:brightness-110 shadow-[0_0_20px_rgba(255,180,171,0.3)]"
+            )}
+          >
+            {isAdding && <Loader2 size={16} className="animate-spin" />}
+            {t("addRecord")}
+          </button>
+        </div>
       </form>
       </Modal>
     </>

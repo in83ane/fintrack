@@ -47,11 +47,11 @@ export default function TraderHubPage() {
   const [timeframe, setTimeframe] = useState("1M");
 
   return (
-    <div className="space-y-8">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-8 max-w-7xl mx-auto">
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
+          <h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
               <Activity className="text-primary" size={24} />
             </div>
@@ -71,7 +71,7 @@ export default function TraderHubPage() {
                 "px-3 py-1.5 text-xs font-medium rounded-md transition-all",
                 timeframe === tf 
                   ? "bg-primary text-primary-foreground shadow-sm" 
-                  : "text-muted-foreground hover:text-foreground hover:bg-foreground/5"
+                  : "text-muted-foreground hover:text-white hover:bg-white/5"
               )}
             >
               {tf}
@@ -83,14 +83,14 @@ export default function TraderHubPage() {
       {/* Main Metrics Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Metric 1 */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-surface border border-border rounded-2xl p-5  relative overflow-hidden group">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-surface/50 border border-border rounded-2xl p-5 backdrop-blur-xl relative overflow-hidden group">
           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           <div className="flex justify-between items-start mb-4">
             <div className="text-sm font-medium text-muted-foreground">Total Equity</div>
             <Briefcase size={16} className="text-primary/50" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-bold tracking-tight text-foreground">$48,742.18</span>
+            <span className="text-3xl font-bold tracking-tight text-white">$48,742.18</span>
           </div>
           <div className="mt-2 text-xs font-medium text-primary flex items-center gap-1">
             <TrendingUp size={14} /> +$3,218.44 (7.06%) All Time
@@ -98,14 +98,14 @@ export default function TraderHubPage() {
         </motion.div>
 
         {/* Metric 2 */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-surface border border-border rounded-2xl p-5  relative overflow-hidden group">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-surface/50 border border-border rounded-2xl p-5 backdrop-blur-xl relative overflow-hidden group">
           <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           <div className="flex justify-between items-start mb-4">
             <div className="text-sm font-medium text-muted-foreground">Win Rate</div>
             <Target size={16} className="text-emerald-400/50" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-bold tracking-tight text-foreground">68.4%</span>
+            <span className="text-3xl font-bold tracking-tight text-white">68.4%</span>
           </div>
           <div className="mt-2 text-xs text-muted-foreground">
             Based on last 100 trades
@@ -113,14 +113,14 @@ export default function TraderHubPage() {
         </motion.div>
 
         {/* Metric 3 */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-surface border border-border rounded-2xl p-5  relative overflow-hidden group">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-surface/50 border border-border rounded-2xl p-5 backdrop-blur-xl relative overflow-hidden group">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-400/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           <div className="flex justify-between items-start mb-4">
             <div className="text-sm font-medium text-muted-foreground">Profit Factor</div>
             <Activity size={16} className="text-blue-400/50" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-bold tracking-tight text-foreground">1.87</span>
+            <span className="text-3xl font-bold tracking-tight text-white">1.87</span>
           </div>
           <div className="mt-2 text-xs text-muted-foreground">
             Gross Profit / Gross Loss
@@ -128,14 +128,14 @@ export default function TraderHubPage() {
         </motion.div>
 
         {/* Metric 4 */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-surface border border-border rounded-2xl p-5  relative overflow-hidden group">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-surface/50 border border-border rounded-2xl p-5 backdrop-blur-xl relative overflow-hidden group">
           <div className="absolute inset-0 bg-gradient-to-br from-red-400/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           <div className="flex justify-between items-start mb-4">
             <div className="text-sm font-medium text-muted-foreground">Max Drawdown</div>
             <ShieldAlert size={16} className="text-red-400/50" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-bold tracking-tight text-foreground">-4.2%</span>
+            <span className="text-3xl font-bold tracking-tight text-white">-4.2%</span>
           </div>
           <div className="mt-2 text-xs text-muted-foreground">
             Peak to Trough drop
@@ -144,9 +144,9 @@ export default function TraderHubPage() {
       </div>
 
       {/* Equity Curve Graph */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="bg-surface border border-border rounded-2xl p-5 sm:p-6 ">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="bg-surface/50 border border-border rounded-2xl p-5 sm:p-6 backdrop-blur-xl">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-lg font-semibold text-foreground">Equity Curve</h2>
+          <h2 className="text-lg font-semibold text-white">Equity Curve</h2>
           <div className="text-sm text-primary font-medium flex items-center gap-1 bg-primary/10 px-2 py-1 rounded-md">
             <TrendingUp size={16} /> +7.06%
           </div>
@@ -196,10 +196,10 @@ export default function TraderHubPage() {
       </motion.div>
 
       {/* Active Positions */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="bg-surface border border-border rounded-2xl  overflow-hidden">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="bg-surface/50 border border-border rounded-2xl backdrop-blur-xl overflow-hidden">
         <div className="p-5 sm:p-6 border-b border-border flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-foreground">Active Positions</h2>
-          <span className="bg-foreground/5 text-muted-foreground text-xs px-2 py-1 rounded-md">
+          <h2 className="text-lg font-semibold text-white">Active Positions</h2>
+          <span className="bg-white/5 text-muted-foreground text-xs px-2 py-1 rounded-md">
             {mockActivePositions.length} Open
           </span>
         </div>
@@ -207,7 +207,7 @@ export default function TraderHubPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-foreground/5 text-muted-foreground text-xs uppercase tracking-wider">
+              <tr className="bg-white/5 text-muted-foreground text-xs uppercase tracking-wider">
                 <th className="p-4 font-medium">Symbol</th>
                 <th className="p-4 font-medium">Type</th>
                 <th className="p-4 font-medium text-right">Size</th>
@@ -218,8 +218,8 @@ export default function TraderHubPage() {
             </thead>
             <tbody className="text-sm divide-y divide-border">
               {mockActivePositions.map((pos) => (
-                <tr key={pos.id} className="hover:bg-foreground/[0.02] transition-colors">
-                  <td className="p-4 font-medium text-foreground">{pos.symbol}</td>
+                <tr key={pos.id} className="hover:bg-white/[0.02] transition-colors">
+                  <td className="p-4 font-medium text-white">{pos.symbol}</td>
                   <td className="p-4">
                     <span className={cn(
                       "px-2 py-1 rounded-md text-xs font-bold",
