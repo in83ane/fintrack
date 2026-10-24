@@ -1,6 +1,9 @@
 "use client";
+import { formatLedgerAmount } from "@/src/lib/ledger-display";
 import { bucketNativeAmount } from '@/src/lib/native-money';
 
+import { LedgerTable } from "@/src/components/LedgerTable";
+import { DensityToggle } from "@/src/components/InterfaceControls";
 import { FinanceIcon } from "@/src/components/FinanceIcon";
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { motion, AnimatePresence, PanInfo } from "motion/react";
@@ -138,8 +141,9 @@ export default function LedgerPage() {
   const [category, setCategory] = useState("");
   const [note, setNote] = useState("");
   const [isAdding, setIsAdding] = useState(false);
+  const [query, setQuery] = useState("");
   const [showConfetti, setShowConfetti] = useState(false);
-  const [toDelete, setToDelete] = useState<{id: string, source: 'cash' | 'bucket' | 'trade'} | null>(null);
+  const [toDelete, setToDelete] = useState<{ id: string, source: 'cash' | 'bucket' | 'trade' } | null>(null);
   const [activityFilter, setActivityFilter] = useState<"all" | "cash" | "transfer" | "trade">("all");
   // Swipe-to-delete (mobile): which row is currently swiped open, plus refs to detect outside taps.
   const [swipedId, setSwipedId] = useState<string | null>(null);
@@ -151,10 +155,10 @@ export default function LedgerPage() {
   const [customCategory, setCustomCategory] = useState("");
   const [isDepositToOpen, setIsDepositToOpen] = useState(false);
   const [recordDate, setRecordDate] = useState(getLocalDateKey);
-  
+
   // Wallet Selection
   const [selectedWalletId, setSelectedWalletId] = useState<string>("all");
-  
+
   // Date selection defaults to the current month, with All and Custom ranges available.
   const [dateRange, setDateRange] = useState<DateRangeState>(() => ({
     mode: "month",
@@ -201,7 +205,7 @@ export default function LedgerPage() {
     formatted = formatted.replace("THB", "฿").replace("฿ ", "฿");
     return formatted;
   };
-  
+
   const bucketCurrency = (bucket: { currency?: string }) => (bucket.currency === "THB" ? "THB" : "USD");
 
   const bucketsById = useMemo(() => {
@@ -298,8 +302,9 @@ export default function LedgerPage() {
     return allMergedActivities
       .filter(a => isInRange(a.date, dateBounds))
       .filter(a => selectedWalletId === 'all' ? true : a.bucketId === selectedWalletId)
-      .filter(a => activityFilter === 'all' ? true : a.filterType === activityFilter);
-  }, [allMergedActivities, dateBounds, selectedWalletId, activityFilter]);
+      .filter(a => activityFilter === 'all' ? true : a.filterType === activityFilter)
+      .filter(a => `${a.category} ${a.note || ''} ${a.walletLabel || ''}`.toLowerCase().includes(query.toLowerCase()));
+  }, [allMergedActivities, dateBounds, selectedWalletId, activityFilter, query]);
 
   const grouped = useMemo(() => {
     const groups: Record<string, typeof records> = {};
@@ -370,7 +375,7 @@ export default function LedgerPage() {
               const targetCurrency = bucketCurrency(b);
               let usd = splitAmount / (exchangeRates[actionCurrency] || 1);
               const splitBucketAmount = bucketNativeAmount({ original_amount: splitAmount, currency: actionCurrency }, b.currency);
-              
+
               updateMoneyBucket(b.id, { currentAmount: b.currentAmount + splitBucketAmount });
               addBucketActivity({
                 bucketId: b.id,
@@ -415,7 +420,7 @@ export default function LedgerPage() {
           const targetCurrency = bucketCurrency(bucket);
           const bucketAmount = bucketNativeAmount({ original_amount: raw, currency: actionCurrency }, bucket.currency);
           const type = activePanel === 'INCOME' ? 'deposit' : 'withdraw';
-          
+
           await addBucketActivity({
             bucketId: bucket.id,
             bucketName: bucket.name,
@@ -429,7 +434,7 @@ export default function LedgerPage() {
           });
           const newAmount = activePanel === 'INCOME' ? bucket.currentAmount + bucketAmount : Math.max(0, bucket.currentAmount - bucketAmount);
           await updateMoneyBucket(bucket.id, { currentAmount: newAmount });
-          
+
           await addCashActivity({
             type: activePanel!,
             amountUSD: usdAmt,
@@ -458,10 +463,10 @@ export default function LedgerPage() {
         setShowConfetti(true);
         setTimeout(() => setShowConfetti(false), 1700);
       }
-      
+
       const recordD = new Date(now);
       const isCurrentlyViewingRecordMonth = dateRange.mode === "month" && dateRange.year === recordD.getFullYear() && dateRange.month === recordD.getMonth();
-      
+
       if (dateRange.mode !== "all" && !isCurrentlyViewingRecordMonth) {
         setDateRange({ mode: "month", year: recordD.getFullYear(), month: recordD.getMonth() });
       }
@@ -492,7 +497,7 @@ export default function LedgerPage() {
     setCustomCategory("");
   };
 
-  const handleDelete = (item: {id: string, source: 'cash' | 'bucket' | 'trade'}) => {
+  const handleDelete = (item: { id: string, source: 'cash' | 'bucket' | 'trade' }) => {
     if (item.source === 'trade') {
       addToast(t("cannotDeleteTradeFromLedger") || "Cannot delete trades from Ledger", "error");
       setToDelete(null);
@@ -542,25 +547,26 @@ export default function LedgerPage() {
 
   return (
     <div className="flex min-h-screen min-w-0 flex-col pb-24 lg:pb-8">
-      <SuccessConfetti active={showConfetti} />
+      <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-6 sm:px-6"><div><h1 className="text-3xl font-semibold">{language === 'th' ? 'สมุดรายการ' : 'Ledger'}</h1><p className="mt-1 text-sm text-muted">{language === 'th' ? 'ค้นหาและตรวจสอบรายการเงินสด' : 'Search and reconcile your cash activity.'}</p></div><DensityToggle /></div>
+      <div className="px-4 pb-5 sm:px-6"><input type="search" value={query} onChange={e=>setQuery(e.target.value)} aria-label={language === 'th' ? 'ค้นหารายการ' : 'Search transactions'} placeholder={language === 'th' ? 'ค้นหาหมวดหมู่ บัญชี หรือบันทึก' : 'Search category, account or note'} className="h-11 w-full max-w-md rounded-xl border border-border bg-surface px-4 text-sm"/></div>
 
       {/* ─── Header & Wallets ────────────────────────────────────────── */}
-      <div className="bg-gradient-to-b from-[#1C1B1B] to-background border-b border-border sticky top-16 z-40">
-        
+      <div className="bg-surface border-b border-border">
+
         {/* Date Range Selector & Desktop Actions */}
         <div className="flex min-w-0 items-center justify-between p-3 sm:p-4">
           <DateRangeBar value={dateRange} onChange={setDateRange} className="min-w-0 flex-1" />
-          
+
           <div className="hidden sm:flex items-center gap-2 flex-shrink-0 ml-4">
-            <button 
-              onClick={() => handleOpenPanel("INCOME")} 
-              className="px-4 py-2 bg-[#4EDEA3]/10 hover:bg-[#4EDEA3]/20 text-[#4EDEA3] rounded-xl font-bold text-xs uppercase tracking-wide flex items-center gap-2 transition-all"
+            <button
+              onClick={() => handleOpenPanel("INCOME")}
+              className="px-4 py-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-xl font-bold text-xs uppercase tracking-wide flex items-center gap-2 transition-all"
             >
               <ArrowDownLeft size={16} /> INCOME
             </button>
-            <button 
-              onClick={() => handleOpenPanel("EXPENSE")} 
-              className="px-4 py-2 bg-[#FFB4AB]/10 hover:bg-[#FFB4AB]/20 text-[#FFB4AB] rounded-xl font-bold text-xs uppercase tracking-wide flex items-center gap-2 transition-all"
+            <button
+              onClick={() => handleOpenPanel("EXPENSE")}
+              className="px-4 py-2 bg-loss/10 hover:bg-loss/20 text-loss rounded-xl font-bold text-xs uppercase tracking-wide flex items-center gap-2 transition-all"
             >
               <ArrowUpRight size={16} /> EXPENSE
             </button>
@@ -574,12 +580,12 @@ export default function LedgerPage() {
               onClick={() => setSelectedWalletId('all')}
               className={cn(
                 "flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all",
-                selectedWalletId === 'all' ? "bg-white text-background font-black border-white" : "bg-surface/50 border-white/5 text-gray-400 font-bold hover:bg-white/5"
+                selectedWalletId === 'all' ? "bg-white text-background font-black border-foreground" : "bg-surface border-foreground/5 text-gray-400 font-bold hover:bg-foreground/5"
               )}
             >
               <div className="flex flex-col text-left">
                 <span className="text-sm">allWallets</span>
-                <span className={cn("text-[10px] leading-none mt-1", selectedWalletId === 'all' ? "opacity-60 text-background" : "opacity-50")}>
+                <span className={cn("text-xs leading-none mt-1", selectedWalletId === 'all' ? "opacity-60 text-background" : "opacity-50")}>
                   {formatDisplay(totalAllWallets, currency as "USD" | "THB")}
                 </span>
               </div>
@@ -588,7 +594,7 @@ export default function LedgerPage() {
               onClick={() => setSelectedWalletId('unassigned')}
               className={cn(
                 "flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all",
-                selectedWalletId === 'unassigned' ? "bg-white text-background font-black border-white" : "bg-surface/50 border-white/5 text-gray-400 font-bold hover:bg-white/5"
+                selectedWalletId === 'unassigned' ? "bg-white text-background font-black border-foreground" : "bg-surface border-foreground/5 text-gray-400 font-bold hover:bg-foreground/5"
               )}
             >
               <ReceiptText size={14} className={selectedWalletId === 'unassigned' ? "text-background" : "text-gray-500"} />
@@ -597,7 +603,7 @@ export default function LedgerPage() {
               </div>
             </button>
             {Array.from(new Map(allMergedActivities.filter(item => item.walletLabel).map(item => [item.bucketId, item.walletLabel!])).entries()).map(([id, label]) => (
-              <button key={id} onClick={() => setSelectedWalletId(id)} className={cn('flex-shrink-0 flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-xs', selectedWalletId === id ? 'bg-white text-background border-white' : 'border-white/5 text-gray-400')}>
+              <button key={id} onClick={() => setSelectedWalletId(id)} className={cn('flex-shrink-0 flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-xs', selectedWalletId === id ? 'bg-white text-background border-foreground' : 'border-foreground/5 text-gray-400')}>
                 <Wallet size={14} />{label}
               </button>
             ))}
@@ -607,13 +613,13 @@ export default function LedgerPage() {
                 onClick={() => setSelectedWalletId(b.id)}
                 className={cn(
                   "flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all",
-                  selectedWalletId === b.id ? "bg-white text-background font-black border-white" : "bg-surface/50 border-white/5 text-gray-400 font-bold hover:bg-white/5"
+                  selectedWalletId === b.id ? "bg-white text-background font-black border-foreground" : "bg-surface border-foreground/5 text-gray-400 font-bold hover:bg-foreground/5"
                 )}
               >
                 <span className={selectedWalletId === b.id ? "text-background" : "opacity-80"}><FinanceIcon name={b.icon} /></span>
                 <div className="flex flex-col text-left">
                   <span className="text-xs leading-none">{b.name}</span>
-                  {selectedWalletId === b.id && <span className="text-[10px] leading-none mt-1 opacity-70">{formatBucketAmount(b, b.currentAmount)}</span>}
+                  {selectedWalletId === b.id && <span className="text-xs leading-none mt-1 opacity-70">{formatBucketAmount(b, b.currentAmount)}</span>}
                 </div>
               </button>
             ))}
@@ -621,53 +627,53 @@ export default function LedgerPage() {
 
           {/* Stats for selected period & wallet */}
           <div className="grid grid-cols-3 gap-2 sm:gap-3 mt-3">
-            <div className="min-w-0 bg-surface/50 border border-border rounded-xl px-2.5 py-3 sm:px-4 sm:py-4">
-              <p className="min-h-4 text-[8px] sm:text-[10px] text-gray-500 uppercase font-bold leading-4 tracking-wide truncate">
+            <div className="min-w-0 bg-surface border border-border rounded-xl px-2.5 py-3 sm:px-4 sm:py-4">
+              <p className="min-h-4 text-xs sm:text-xs text-gray-500 uppercase font-bold leading-4 tracking-wide truncate">
                 IN <span className="opacity-50">•</span> {periodLabel}
               </p>
-              <div className="mt-1.5 whitespace-nowrap text-sm sm:text-xl font-black leading-none tabular-nums text-[#4EDEA3]">{formatMoney(periodStats.inc)}</div>
+              <div className="mt-1.5 whitespace-nowrap text-sm sm:text-xl font-black leading-none tabular-nums text-gain">{formatMoney(periodStats.inc)}</div>
             </div>
-            <div className="min-w-0 bg-surface/50 border border-border rounded-xl px-2.5 py-3 sm:px-4 sm:py-4">
-              <p className="min-h-4 text-[8px] sm:text-[10px] text-gray-500 uppercase font-bold leading-4 tracking-wide truncate">
+            <div className="min-w-0 bg-surface border border-border rounded-xl px-2.5 py-3 sm:px-4 sm:py-4">
+              <p className="min-h-4 text-xs sm:text-xs text-gray-500 uppercase font-bold leading-4 tracking-wide truncate">
                 OUT <span className="opacity-50">•</span> {periodLabel}
               </p>
-              <div className="mt-1.5 whitespace-nowrap text-sm sm:text-xl font-black leading-none tabular-nums text-[#FFB4AB]">{formatMoney(periodStats.exp)}</div>
+              <div className="mt-1.5 whitespace-nowrap text-sm sm:text-xl font-black leading-none tabular-nums text-loss">{formatMoney(periodStats.exp)}</div>
             </div>
-            <div className="min-w-0 bg-surface/50 border border-border rounded-xl px-2.5 py-3 sm:px-4 sm:py-4">
-              <p className="min-h-4 text-[8px] sm:text-[10px] text-gray-500 uppercase font-bold leading-4 tracking-wide truncate">NET</p>
-              <div className={cn("mt-1.5 whitespace-nowrap text-sm sm:text-xl font-black leading-none tabular-nums", periodStats.net >= 0 ? "text-white" : "text-[#FFB4AB]")}>
+            <div className="min-w-0 bg-surface border border-border rounded-xl px-2.5 py-3 sm:px-4 sm:py-4">
+              <p className="min-h-4 text-xs sm:text-xs text-gray-500 uppercase font-bold leading-4 tracking-wide truncate">NET</p>
+              <div className={cn("mt-1.5 whitespace-nowrap text-sm sm:text-xl font-black leading-none tabular-nums", periodStats.net >= 0 ? "text-foreground" : "text-loss")}>
                 {periodStats.net >= 0 ? "+" : ""}{formatMoney(periodStats.net)}
               </div>
             </div>
           </div>
         </div>
-        
+
         {/* Activity Type Filter */}
-        <div className="px-3 sm:px-4 pb-4 border-t border-white/5 pt-3">
+        <div className="px-3 sm:px-4 pb-4 border-t border-foreground/5 pt-3">
           <div className="flex gap-2 overflow-x-auto no-scrollbar">
             <button
               onClick={() => setActivityFilter('all')}
-              className={cn("px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap", activityFilter === 'all' ? "bg-white text-background" : "bg-white/5 text-gray-400 hover:bg-white/10")}
+              className={cn("px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap", activityFilter === 'all' ? "bg-white text-background" : "bg-foreground/5 text-gray-400 hover:bg-foreground/10")}
             >
               {t("all") || "All Records"}
             </button>
             <button
               onClick={() => setActivityFilter('cash')}
-              className={cn("px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5", activityFilter === 'cash' ? "bg-[#4EDEA3] text-[#00285d]" : "bg-[#4EDEA3]/10 text-[#4EDEA3] hover:bg-[#4EDEA3]/20")}
+              className={cn("px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5", activityFilter === 'cash' ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary hover:bg-primary/20")}
             >
               <ReceiptText size={14} />
               {t("incomeExpense") || "Income / Expense"}
             </button>
             <button
               onClick={() => setActivityFilter('transfer')}
-              className={cn("px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5", activityFilter === 'transfer' ? "bg-[#ADC6FF] text-[#00285d]" : "bg-[#ADC6FF]/10 text-[#ADC6FF] hover:bg-[#ADC6FF]/20")}
+              className={cn("px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5", activityFilter === 'transfer' ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary hover:bg-primary/20")}
             >
               <Wallet size={14} />
               {t("transfers") || "Transfers"}
             </button>
             <button
               onClick={() => setActivityFilter('trade')}
-              className={cn("px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5", activityFilter === 'trade' ? "bg-[#E9C349] text-[#00285d]" : "bg-[#E9C349]/10 text-[#E9C349] hover:bg-[#E9C349]/20")}
+              className={cn("px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5", activityFilter === 'trade' ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary hover:bg-primary/20")}
             >
               <TrendingUp size={14} />
               {t("investments") || "Investments"}
@@ -677,14 +683,15 @@ export default function LedgerPage() {
       </div>
 
       {/* ─── Record List ────────────────────────────────────────────── */}
-      <div className="flex-1 max-w-3xl w-full mx-auto p-4 sm:p-6 space-y-6">
+      <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+        {records.length > 0 && <div className="hidden md:block"><LedgerTable rows={records} onDelete={item => setToDelete({id:item.id,source:item.source})}/></div>}
         {records.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4 text-3xl">
+            <div className="w-16 h-16 rounded-full bg-foreground/5 flex items-center justify-center mb-4 text-3xl">
               <FinanceIcon name="receipt" size={26} />
             </div>
-            <h3 className="text-lg font-bold text-white mb-2">{t("noTransactions") || "No transactions"}</h3>
-            <p className="text-sm text-gray-500 max-w-[250px]">{t("addTransactionToSee") || "Record a transaction to see it appear here."}</p>
+            <h3 className="text-lg font-bold text-foreground mb-2">{language === "th" ? "ไม่พบรายการในช่วงนี้" : "No transactions in this period"}</h3>
+            <p className="text-sm text-gray-500 max-w-[250px]">{language === "th" ? "เปลี่ยนช่วงเวลา หรือลองบันทึกรายการแรก" : "Choose a different period or record your first transaction."}</p>
           </div>
         ) : (
           grouped.map(([dateKey, items]) => {
@@ -692,124 +699,125 @@ export default function LedgerPage() {
             const dateLabel = formatDateGroup(dateKey, t("today") || "Today", t("yesterday") || "Yesterday", language);
 
             return (
-            <div key={dateKey}>
-              <div className="flex items-center justify-between gap-4 mb-3 pl-1">
-                <h3 className="text-[10px] sm:text-xs font-black text-gray-500 uppercase tracking-wider">
-                  {dateLabel}
-                </h3>
-                <span className={cn("text-xs font-black tabular-nums", dayNetUSD >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
-                  {dayNetUSD > 0 ? "+" : ""}{formatMoney(dayNetUSD)}
-                </span>
-              </div>
-              <div className="bg-surface/50 border border-border rounded-2xl overflow-hidden">
-                {items.map((item, idx) => {
-                  const isIncome = item.type === "INCOME";
-                  const itemTime = new Date(item.date).toLocaleTimeString(language === "th" ? "th-TH" : "en-US", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  });
-                  return (
-                    <div
-                      key={item.id}
-                      ref={(el) => { rowRefs.current[item.id] = el; }}
-                      className={cn("relative overflow-hidden", idx !== items.length - 1 && "border-b border-border/50")}
-                    >
-                      <motion.div
-                        drag={isMobile ? "x" : false}
-                        dragDirectionLock
-                        dragConstraints={{ left: -80, right: 0 }}
-                        dragElastic={{ left: 0.15, right: 0 }}
-                        animate={{ x: isMobile && swipedId === item.id ? -80 : 0 }}
-                        transition={{ type: "spring", stiffness: 500, damping: 40 }}
-                        onDragEnd={(_, info: PanInfo) => {
-                          if (info.offset.x < -40 || info.velocity.x < -400) {
-                            setSwipedId(item.id);
-                          } else {
-                            setSwipedId(null);
-                          }
-                        }}
-                        onTap={() => {
-                          if (swipedId === item.id) setSwipedId(null);
-                        }}
-                        className="flex touch-pan-y"
+              <div key={dateKey} className="md:hidden">
+                <div className="flex items-center justify-between gap-4 mb-3 pl-1">
+                  <h3 className="text-xs sm:text-xs font-black text-gray-500 uppercase tracking-wider">
+                    {dateLabel}
+                  </h3>
+                  <span className={cn("text-xs font-black tabular-nums", dayNetUSD >= 0 ? "text-gain" : "text-loss")}>
+                    {dayNetUSD > 0 ? "+" : ""}{formatMoney(dayNetUSD)}
+                  </span>
+                </div>
+                <div className="bg-surface border border-border rounded-2xl overflow-hidden">
+                  {items.map((item, idx) => {
+                    const isIncome = item.type === "INCOME";
+                    const itemTime = new Date(item.date).toLocaleTimeString(language === "th" ? "th-TH" : "en-US", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    });
+                    return (
+                      <div
+                        key={item.id}
+                        ref={(el) => { rowRefs.current[item.id] = el; }}
+                        className={cn("relative overflow-hidden", idx !== items.length - 1 && "border-b border-border/50")}
                       >
-                        {/* Row content: always the full row width and never shrinks, so the delete
+                        <motion.div
+                          drag={isMobile ? "x" : false}
+                          dragDirectionLock
+                          dragConstraints={{ left: -80, right: 0 }}
+                          dragElastic={{ left: 0.15, right: 0 }}
+                          animate={{ x: isMobile && swipedId === item.id ? -80 : 0 }}
+                          transition={{ type: "spring", stiffness: 500, damping: 40 }}
+                          onDragEnd={(_, info: PanInfo) => {
+                            if (info.offset.x < -40 || info.velocity.x < -400) {
+                              setSwipedId(item.id);
+                            } else {
+                              setSwipedId(null);
+                            }
+                          }}
+                          onTap={() => {
+                            if (swipedId === item.id) setSwipedId(null);
+                          }}
+                          className="flex touch-pan-y"
+                        >
+                          {/* Row content: always the full row width and never shrinks, so the delete
                             cell after it stays outside the visible area (clipped by the wrapper's
                             overflow-hidden) until the row is actually dragged left. This doesn't rely
                             on any background opacity to hide the delete button — it's structurally
                             off-screen. */}
-                        <div className="w-full flex-shrink-0 bg-surface/50 p-3 sm:p-4 flex items-center justify-between group">
-                          <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
-                            <div className={cn(
-                              "w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center text-lg sm:text-xl flex-shrink-0 transition-transform group-hover:scale-105",
-                              isIncome ? "bg-[#4EDEA3]/10" : "bg-white/5"
-                            )}>
-                              <FinanceIcon name={getCategoryIcon(item.category)} size={22} />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h4 className="text-sm sm:text-base font-bold text-white truncate">{t(item.category) || item.category}</h4>
-                              <div className="flex items-center gap-2 mt-0.5">
-                                {item.note && <span className="text-xs text-gray-500 truncate max-w-[120px] sm:max-w-[200px]">{item.note}</span>}
-                                {item.note && <span className="text-gray-700 text-[10px]">•</span>}
-                                <span className="text-[10px] text-gray-500 uppercase font-black inline-flex items-center gap-1">
-                                  {item.walletLabel ? <><Wallet size={12} />{item.walletLabel}</> : item.bucketId === 'unassigned' ? (
-                                    <>
-                                      <ReceiptText size={10} />
-                                      {t("unassigned") || "Unassigned"}
-                                    </>
-                                  ) : (
-                                    <>
-                                      <span className="normal-case"><FinanceIcon name={bucketsById.get(item.bucketId)?.icon || "card"} size={14} /></span>
-                                      {bucketsById.get(item.bucketId)?.name || (t("wallet") || "Wallet")}
-                                    </>
-                                  )}
-                                </span>
+                          <div className="w-full flex-shrink-0 bg-surface p-3 sm:p-4 flex items-center justify-between group">
+                            <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                              <div className={cn(
+                                "w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center text-lg sm:text-xl flex-shrink-0 transition-transform group-hover:scale-[1.02]",
+                                isIncome ? "bg-gain/10" : "bg-foreground/5"
+                              )}>
+                                <FinanceIcon name={getCategoryIcon(item.category)} size={22} />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h4 className="text-sm sm:text-base font-bold text-foreground truncate">{t(item.category) || item.category}</h4>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  {item.note && <span className="text-xs text-gray-500 truncate max-w-[120px] sm:max-w-[200px]">{item.note}</span>}
+                                  {item.note && <span className="text-gray-700 text-xs">•</span>}
+                                  <span className="text-xs text-gray-500 uppercase font-black inline-flex items-center gap-1">
+                                    {item.walletLabel ? <><Wallet size={12} />{item.walletLabel}</> : item.bucketId === 'unassigned' ? (
+                                      <>
+                                        <ReceiptText size={10} />
+                                        {language === "th" ? "ยังไม่ระบุบัญชี" : "Unassigned"}
+                                      </>
+                                    ) : (
+                                      <>
+                                        <span className="normal-case"><FinanceIcon name={bucketsById.get(item.bucketId)?.icon || "card"} size={14} /></span>
+                                        {bucketsById.get(item.bucketId)?.name || (t("wallet") || "Wallet")}
+                                      </>
+                                    )}
+                                  </span>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-3 sm:gap-4 pl-3">
-                            <div className="text-right">
-                              <span className={cn(
-                                "block text-sm sm:text-base font-black tabular-nums tracking-tight whitespace-nowrap",
-                                isIncome ? "text-[#4EDEA3]" : "text-[#FFB4AB]"
-                              )}>
-                                {isIncome ? "+" : "-"}{formatDisplay(item.originalAmount, item.originalCurrency as "USD" | "THB")}
-                              </span>
-                              <span className="block text-[10px] text-gray-500 whitespace-nowrap">{itemTime}</span>
+                            <div className="flex items-center gap-3 sm:gap-4 pl-3">
+                              <div className="text-right">
+                                <span className={cn(
+                                  "block text-sm sm:text-base font-black tabular-nums tracking-tight whitespace-nowrap",
+                                  isIncome ? "text-gain" : "text-loss"
+                                )}>
+                                  {isIncome ? "+" : "-"}{formatLedgerAmount(item, currency, exchangeRates, language)}
+                                </span>
+                                <span className="block text-xs text-gray-500 whitespace-nowrap">{itemTime}</span>
+                              </div>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setToDelete({ id: item.id, source: item.source });
+                                }}
+                                className="hidden sm:flex w-8 h-8 rounded-xl bg-red-500/10 text-red-400 items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/20 flex-shrink-0"
+                              >
+                                <Trash2 size={14} />
+                              </button>
                             </div>
+                          </div>
+
+                          {/* Delete cell: sits right after the full-width row above, so it only ever
+                            enters the visible area once the row is swiped left. Mobile only. */}
+                          <div className="w-20 flex-shrink-0 sm:hidden bg-surface flex items-center justify-center">
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
+                              onClick={() => {
                                 setToDelete({ id: item.id, source: item.source });
+                                setSwipedId(null);
                               }}
-                              className="hidden sm:flex w-8 h-8 rounded-xl bg-red-500/10 text-red-400 items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/20 flex-shrink-0"
+                              className="w-11 h-11 rounded-xl bg-red-500/10 text-red-400 flex items-center justify-center active:bg-red-500/20 transition-colors"
+                              aria-label={t("delete") || "Delete"}
                             >
-                              <Trash2 size={14} />
+                              <Trash2 size={18} />
                             </button>
                           </div>
-                        </div>
-
-                        {/* Delete cell: sits right after the full-width row above, so it only ever
-                            enters the visible area once the row is swiped left. Mobile only. */}
-                        <div className="w-20 flex-shrink-0 sm:hidden bg-surface/50 flex items-center justify-center">
-                          <button
-                            onClick={() => {
-                              setToDelete({ id: item.id, source: item.source });
-                              setSwipedId(null);
-                            }}
-                            className="w-11 h-11 rounded-xl bg-red-500/10 text-red-400 flex items-center justify-center active:bg-red-500/20 transition-colors"
-                            aria-label={t("delete") || "Delete"}
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      </motion.div>
-                    </div>
-                  );
-                })}
+                        </motion.div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )})
+            )
+          })
         )}
       </div>
 
@@ -828,17 +836,17 @@ export default function LedgerPage() {
               animate={{ y: 0, opacity: 1, scale: 1 }}
               exit={{ y: 50, opacity: 0, scale: 0.95 }}
               transition={{ type: "spring", bounce: 0.4, duration: 0.6 }}
-              className="bg-surface/95 backdrop-blur-3xl border border-white/10 rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl w-full max-w-sm sm:max-w-md max-h-[88vh] sm:max-h-[85vh] flex flex-col overflow-hidden"
+              className="bg-surface/95 backdrop-blur-3xl border border-foreground/10 rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl w-full max-w-sm sm:max-w-md max-h-[88vh] sm:max-h-[85vh] flex flex-col overflow-hidden"
               onClick={e => e.stopPropagation()}
             >
               <div className="flex justify-between items-center p-5 pb-4 shrink-0">
                 <span className={cn(
                   "px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider",
-                  activePanel === "INCOME" ? "bg-[#4EDEA3]/20 text-[#4EDEA3]" : "bg-[#FFB4AB]/20 text-[#FFB4AB]"
+                  activePanel === "INCOME" ? "bg-gain/20 text-gain" : "bg-loss/20 text-loss"
                 )}>
                   {activePanel === "INCOME" ? (t("addIncome") || "Add Income") : (t("addExpense") || "Add Expense")}
                 </span>
-                <button onClick={() => setActivePanel(null)} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-colors">
+                <button onClick={() => setActivePanel(null)} className="w-8 h-8 rounded-full bg-foreground/5 flex items-center justify-center text-gray-400 hover:text-foreground hover:bg-foreground/10 transition-colors">
                   <X size={16} />
                 </button>
               </div>
@@ -850,16 +858,16 @@ export default function LedgerPage() {
                     <button
                       type="button"
                       onClick={() => setIsDepositToOpen(!isDepositToOpen)}
-                      className="w-full bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl px-4 py-3 flex items-center justify-between transition-colors"
+                      className="w-full bg-foreground/5 hover:bg-foreground/10 border border-foreground/5 rounded-xl px-4 py-3 flex items-center justify-between transition-colors"
                     >
                       <div className="flex flex-col items-start">
-                        <span className="text-[10px] text-gray-500 uppercase font-black tracking-wider">
+                        <span className="text-xs text-gray-500 uppercase font-black tracking-wider">
                           {activePanel === "INCOME" ? "Deposit To" : "Pay From"}
                         </span>
-                        <span className="text-sm font-bold text-white mt-0.5">
-                          {depositTo === 'auto_split' ? 'Auto-split' : 
-                           depositTo === 'unassigned' ? 'Unassigned' : 
-                           (moneyBuckets.find(b => b.id === depositTo)?.name || 'Select Wallet')}
+                        <span className="text-sm font-bold text-foreground mt-0.5">
+                          {depositTo === 'auto_split' ? 'Auto-split' :
+                            depositTo === 'unassigned' ? 'Unassigned' :
+                              (moneyBuckets.find(b => b.id === depositTo)?.name || 'Select Wallet')}
                         </span>
                       </div>
                       <ChevronDown size={16} className={cn("text-gray-400 transition-transform", isDepositToOpen && "rotate-180")} />
@@ -873,34 +881,34 @@ export default function LedgerPage() {
                           exit={{ height: 0, opacity: 0 }}
                           className="overflow-hidden"
                         >
-                          <div className="mt-2 bg-[#1C1C1E] border border-white/10 rounded-xl shadow-2xl flex flex-col">
+                          <div className="mt-2 bg-surface-2 border border-foreground/10 rounded-xl shadow-2xl flex flex-col">
                             {activePanel === "INCOME" && (
                               <button
                                 type="button"
                                 onClick={() => { setDepositTo("auto_split"); setIsDepositToOpen(false); }}
-                                className="text-left px-4 py-3 hover:bg-white/5 transition-colors border-b border-white/5 flex items-center gap-2"
+                                className="text-left px-4 py-3 hover:bg-foreground/5 transition-colors border-b border-foreground/5 flex items-center gap-2"
                               >
                                 <FinanceIcon name="transfer" size={16} />
-                                <span className="text-sm font-bold text-white">Auto-split</span>
+                                <span className="text-sm font-bold text-foreground">Auto-split</span>
                               </button>
                             )}
                             <button
                               type="button"
                               onClick={() => { setDepositTo("unassigned"); setIsDepositToOpen(false); }}
-                              className="text-left px-4 py-3 hover:bg-white/5 transition-colors border-b border-white/5 flex items-center gap-2"
+                              className="text-left px-4 py-3 hover:bg-foreground/5 transition-colors border-b border-foreground/5 flex items-center gap-2"
                             >
                               <ReceiptText size={14} className="text-gray-400" />
-                              <span className="text-sm font-bold text-white">Unassigned</span>
+                              <span className="text-sm font-bold text-foreground">Unassigned</span>
                             </button>
                             {moneyBuckets.map(b => (
                               <button
                                 key={b.id}
                                 type="button"
                                 onClick={() => { setDepositTo(b.id); setIsDepositToOpen(false); }}
-                                className="text-left px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-2"
+                                className="text-left px-4 py-3 hover:bg-foreground/5 transition-colors flex items-center gap-2"
                               >
                                 <span><FinanceIcon name={b.icon} /></span>
-                                <span className="text-sm font-bold text-white">{b.name}</span>
+                                <span className="text-sm font-bold text-foreground">{b.name}</span>
                               </button>
                             ))}
                           </div>
@@ -914,7 +922,7 @@ export default function LedgerPage() {
                       <button
                         type="button"
                         onClick={() => setActionCurrency(prev => prev === "USD" ? "THB" : "USD")}
-                        className="absolute left-3 z-10 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-sm font-black text-white transition-colors"
+                        className="absolute left-3 z-10 w-8 h-8 rounded-full bg-foreground/10 hover:bg-foreground/20 flex items-center justify-center text-sm font-black text-foreground transition-colors"
                       >
                         {actionCurrency === "THB" ? "฿" : "$"}
                       </button>
@@ -926,7 +934,7 @@ export default function LedgerPage() {
                         value={amount}
                         onChange={e => setAmount(e.target.value)}
                         placeholder="0.00"
-                        className="w-full bg-background border-2 border-white/5 focus:border-white/20 rounded-[1.5rem] py-4 pl-14 pr-4 text-3xl font-black text-white placeholder-gray-600 outline-none transition-colors shadow-inner"
+                        className="w-full bg-background border-2 border-foreground/5 focus:border-foreground/20 rounded-[1.5rem] py-4 pl-14 pr-4 text-3xl font-black text-foreground placeholder-gray-600 outline-none transition-colors shadow-inner"
                       />
                     </div>
                   </div>
@@ -945,8 +953,8 @@ export default function LedgerPage() {
                           className={cn(
                             "flex items-center gap-1.5 px-3 py-2 rounded-xl border flex-shrink-0 transition-all text-xs font-bold",
                             isSelected
-                              ? (activePanel === "INCOME" ? "bg-[#4EDEA3]/20 border-[#4EDEA3] text-[#4EDEA3]" : "bg-[#FFB4AB]/20 border-[#FFB4AB] text-[#FFB4AB]")
-                              : "bg-white/5 border-transparent text-gray-400 hover:bg-white/10 hover:text-white"
+                              ? (activePanel === "INCOME" ? "bg-primary/20 border-primary text-primary" : "bg-loss/20 border-loss text-loss")
+                              : "bg-foreground/5 border-transparent text-gray-400 hover:bg-foreground/10 hover:text-foreground"
                           )}
                         >
                           <span><FinanceIcon name={p.icon} size={16} /></span>
@@ -973,8 +981,8 @@ export default function LedgerPage() {
                             className={cn(
                               "group/chip flex items-center gap-1.5 px-3 py-2 rounded-xl border flex-shrink-0 transition-all text-xs font-bold",
                               isSelected
-                                ? (activePanel === "INCOME" ? "bg-[#4EDEA3]/20 border-[#4EDEA3] text-[#4EDEA3]" : "bg-[#FFB4AB]/20 border-[#FFB4AB] text-[#FFB4AB]")
-                                : "bg-white/5 border-transparent text-gray-400 hover:bg-white/10 hover:text-white"
+                                ? (activePanel === "INCOME" ? "bg-primary/20 border-primary text-primary" : "bg-loss/20 border-loss text-loss")
+                                : "bg-foreground/5 border-transparent text-gray-400 hover:bg-foreground/10 hover:text-foreground"
                             )}
                           >
                             <span><FinanceIcon name={c.icon || "tag"} size={16} /></span>
@@ -1005,8 +1013,8 @@ export default function LedgerPage() {
                       className={cn(
                         "flex items-center gap-1.5 px-3 py-2 rounded-xl border flex-shrink-0 transition-all text-xs font-bold",
                         isCustomCategory
-                          ? (activePanel === "INCOME" ? "bg-[#4EDEA3]/20 border-[#4EDEA3] text-[#4EDEA3]" : "bg-[#FFB4AB]/20 border-[#FFB4AB] text-[#FFB4AB]")
-                          : "bg-white/5 border-transparent text-gray-400 hover:bg-white/10 hover:text-white"
+                          ? (activePanel === "INCOME" ? "bg-primary/20 border-primary text-primary" : "bg-loss/20 border-loss text-loss")
+                          : "bg-foreground/5 border-transparent text-gray-400 hover:bg-foreground/10 hover:text-foreground"
                       )}
                     >
                       <Tag size={12} />
@@ -1028,7 +1036,7 @@ export default function LedgerPage() {
                             value={customCategory}
                             onChange={e => setCustomCategory(e.target.value)}
                             placeholder={t("ledgerTypeCategory") || "Type your category name..."}
-                            className="flex-1 min-w-0 bg-background border border-white/5 focus:border-white/20 rounded-xl px-4 py-3 text-sm font-medium text-white placeholder-gray-500 outline-none transition-colors"
+                            className="flex-1 min-w-0 bg-background border border-foreground/5 focus:border-foreground/20 rounded-xl px-4 py-3 text-sm font-medium text-foreground placeholder-gray-500 outline-none transition-colors"
                           />
                           {/* Saves the category to the user's list right away (no amount needed), so it
                               never creates a fake $0 transaction in the ledger. The main Save Record
@@ -1040,8 +1048,8 @@ export default function LedgerPage() {
                             className={cn(
                               "px-4 rounded-xl text-sm font-black flex-shrink-0 transition-all",
                               customCategory.trim()
-                                ? (activePanel === "INCOME" ? "bg-[#4EDEA3] text-[#00285d] hover:brightness-110" : "bg-[#FFB4AB] text-[#5d0000] hover:brightness-110")
-                                : "bg-white/5 text-gray-600 cursor-not-allowed"
+                                ? (activePanel === "INCOME" ? "bg-primary text-primary-foreground hover:brightness-110" : "bg-loss text-primary-foreground hover:brightness-110")
+                                : "bg-foreground/5 text-gray-600 cursor-not-allowed"
                             )}
                           >
                             {t("ledgerAddCategory") || "Add"}
@@ -1057,26 +1065,26 @@ export default function LedgerPage() {
                       value={note}
                       onChange={e => setNote(e.target.value)}
                       placeholder={t("noteOptional") || "Note (Optional)"}
-                      className="w-full bg-background border border-white/5 focus:border-white/20 rounded-xl px-4 py-3 text-sm font-medium text-white placeholder-gray-500 outline-none transition-colors mb-2"
+                      className="w-full bg-background border border-foreground/5 focus:border-foreground/20 rounded-xl px-4 py-3 text-sm font-medium text-foreground placeholder-gray-500 outline-none transition-colors mb-2"
                     />
                     <input
                       type="date"
                       value={recordDate}
                       onChange={e => setRecordDate(e.target.value)}
-                      className="w-full bg-background border border-white/5 focus:border-white/20 rounded-xl px-4 py-3 text-sm font-medium text-white outline-none transition-colors"
+                      className="w-full bg-background border border-foreground/5 focus:border-foreground/20 rounded-xl px-4 py-3 text-sm font-medium text-foreground outline-none transition-colors"
                       required
                     />
                   </div>
                 </div>
 
-                <div className="shrink-0 px-5 pt-3 pb-24 sm:pb-5 border-t border-white/5">
+                <div className="shrink-0 px-5 pt-3 pb-24 sm:pb-5 border-t border-foreground/5">
                   <button
                     disabled={isAdding || !amount || (!isCustomCategory && !category) || (isCustomCategory && !customCategory)}
                     className={cn(
                       "w-full py-4 rounded-[1.25rem] font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-xl",
                       activePanel === "INCOME"
-                        ? "bg-[#4EDEA3] text-[#00285d] shadow-[#4EDEA3]/20 hover:brightness-110 active:scale-95"
-                        : "bg-[#FFB4AB] text-[#5d0000] shadow-[#FFB4AB]/20 hover:brightness-110 active:scale-95",
+                        ? "bg-primary text-primary-foreground shadow-[#4EDEA3]/20 hover:brightness-110 active:scale-95"
+                        : "bg-loss text-primary-foreground shadow-[#FFB4AB]/20 hover:brightness-110 active:scale-95",
                       (isAdding || !amount || (!isCustomCategory && !category) || (isCustomCategory && !customCategory)) && "opacity-50 cursor-not-allowed active:scale-100 shadow-none"
                     )}
                   >
@@ -1099,20 +1107,20 @@ export default function LedgerPage() {
               exit={{ y: 50, opacity: 0 }}
               className="flex justify-center pointer-events-auto"
             >
-              <div className="bg-surface/90 backdrop-blur-xl border border-white/10 rounded-full p-2 flex items-center gap-2 shadow-2xl w-full max-w-xs">
+              <div className="bg-surface/90  border border-foreground/10 rounded-full p-2 flex items-center gap-2 shadow-2xl w-full max-w-xs">
                 <button
                   onClick={() => handleOpenPanel("INCOME")}
-                  className="flex-1 py-3 bg-white/5 hover:bg-[#4EDEA3]/10 text-white hover:text-[#4EDEA3] rounded-full flex items-center justify-center gap-2 font-black text-xs uppercase tracking-wide transition-all"
+                  className="flex-1 py-3 bg-foreground/5 hover:bg-primary/10 text-foreground hover:text-primary rounded-full flex items-center justify-center gap-2 font-black text-xs uppercase tracking-wide transition-all"
                 >
-                  <ArrowDownLeft size={16} className="text-[#4EDEA3]" />
+                  <ArrowDownLeft size={16} className="text-gain" />
                   INCOME
                 </button>
-                <div className="w-[1px] h-8 bg-white/10" />
+                <div className="w-[1px] h-8 bg-foreground/10" />
                 <button
                   onClick={() => handleOpenPanel("EXPENSE")}
-                  className="flex-1 py-3 bg-white/5 hover:bg-[#FFB4AB]/10 text-white hover:text-[#FFB4AB] rounded-full flex items-center justify-center gap-2 font-black text-xs uppercase tracking-wide transition-all"
+                  className="flex-1 py-3 bg-foreground/5 hover:bg-loss/10 text-foreground hover:text-loss rounded-full flex items-center justify-center gap-2 font-black text-xs uppercase tracking-wide transition-all"
                 >
-                  <ArrowUpRight size={16} className="text-[#FFB4AB]" />
+                  <ArrowUpRight size={16} className="text-loss" />
                   EXPENSE
                 </button>
               </div>
