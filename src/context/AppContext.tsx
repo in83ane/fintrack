@@ -2686,7 +2686,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Compute net worth history from actual trade data + current portfolio value
+  // Build a daily net-worth curve from the portfolio's own trade ledger and
+  // the market history already loaded for each holding. This is display data:
+  // the current total below remains the source of truth for balances.
   const netWorthHistory = React.useMemo(() => {
     const toUSD = (amount: number, fromCurrency: Currency = "USD") => {
       return amount / (exchangeRates[fromCurrency] || 1);
@@ -2721,43 +2723,92 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return 0;
     })();
     const currentTotalUSD = (selectedPortfolioKind === "cash_management" ? 0 : (netWorthSettings.includeAssets !== false ? assets.reduce((acc, curr) => acc + curr.valueUSD, 0) : 0)) + currentCashUSD;
-    const now = new Date();
-    const currentDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
-    // Group trades by month to build historical net worth timeline
-    const monthlyInvested: Record<string, number> = {};
-    trades.forEach(trade => {
-      const month = trade.date.substring(0, 7); // "2024-01"
-      if (!monthlyInvested[month]) monthlyInvested[month] = 0;
-      if (trade.type === "BUY" || trade.type === "COVER" || trade.type === "IMPORT") {
-        monthlyInvested[month] += trade.amountUSD + (trade.fees || 0);
-      } else if (trade.type === "SELL" || trade.type === "SHORT") {
-        monthlyInvested[month] -= Math.max(0, trade.amountUSD - (trade.fees || 0));
+    const dateKey = (value: string | number) => {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '';
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    };
+    const today = dateKey(Date.now());
+    const daysBetween = (start: string, end: string) => {
+      const days: string[] = [];
+      const cursor = new Date(`${start}T12:00:00`);
+      const last = new Date(`${end}T12:00:00`);
+      while (cursor <= last && days.length < 366) {
+        days.push(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`);
+        cursor.setDate(cursor.getDate() + 1);
       }
-    });
+      return days;
+    };
 
-    // Build cumulative timeline
-    const months = Object.keys(monthlyInvested).sort();
+    const includedAssets = selectedPortfolioKind === 'cash_management' || netWorthSettings.includeAssets === false
+      ? []
+      : assets.filter(asset => asset.is_active !== false);
+    const tradeDays = trades.map(trade => dateKey(trade.date)).filter(Boolean);
+    const firstMarketDay = includedAssets
+      .flatMap(asset => asset.chartData || [])
+      .map(point => dateKey(point.time))
+      .filter(Boolean)
+      .sort()[0];
+    const start = firstMarketDay || [...tradeDays].sort()[0] || today;
+    const days = daysBetween(start, today);
+
+    const tradesBySymbol = new Map<string, Trade[]>();
+    trades.forEach(trade => {
+      const key = trade.asset.toUpperCase();
+      tradesBySymbol.set(key, [...(tradesBySymbol.get(key) || []), trade]);
+    });
+    tradesBySymbol.forEach(rows => rows.sort((a, b) => a.date.localeCompare(b.date)));
+
+    const marketAssets = includedAssets.filter(asset => (asset.chartData?.length || 0) > 1);
+    if (marketAssets.length > 0 && days.length > 1) {
+      const history = days.map(day => {
+        const assetValue = marketAssets.reduce((total, asset) => {
+          const prices = (asset.chartData || [])
+            .map(point => ({ day: dateKey(point.time), price: point.price }))
+            .filter(point => point.day && Number.isFinite(point.price) && point.price > 0)
+            .sort((a, b) => a.day.localeCompare(b.day));
+          const latestPrice = prices[prices.length - 1]?.price;
+          const historicalPrice = [...prices].reverse().find(point => point.day <= day)?.price || prices[0]?.price;
+          if (!latestPrice || !historicalPrice) return total;
+
+          const assetTrades = tradesBySymbol.get(asset.symbol.toUpperCase()) || [];
+          const recordedQuantity = assetTrades.reduce((quantity, trade) => {
+            if (dateKey(trade.date) > day) return quantity;
+            const units = trade.shares || (trade.pricePerUnit ? trade.amountUSD / trade.pricePerUnit : 0);
+            if (trade.type === 'BUY' || trade.type === 'IMPORT' || trade.type === 'COVER') return quantity + units;
+            if (trade.type === 'SELL' || trade.type === 'SHORT') return quantity - units;
+            return quantity;
+          }, 0);
+          const quantity = assetTrades.length > 0 ? recordedQuantity : (asset.shares || 0);
+          const priceInUSD = historicalPrice * ((asset.currentPrice || asset.valueUSD / Math.max(asset.shares || 1, 1)) / latestPrice);
+          return total + Math.max(0, quantity) * priceInUSD;
+        }, 0);
+        return { date: day, value: currentCashUSD + assetValue };
+      });
+      history[history.length - 1] = { date: today, value: currentTotalUSD };
+      return history;
+    }
+
+    // A holding without price history still gets one point for every calendar
+    // day, so deposits and trades never collapse into a single monthly jump.
+    const dailyInvested: Record<string, number> = {};
+    trades.forEach(trade => {
+      const day = dateKey(trade.date);
+      if (!day) return;
+      const amount = trade.amountUSD + (trade.fees || 0);
+      if (trade.type === 'BUY' || trade.type === 'COVER' || trade.type === 'IMPORT') dailyInvested[day] = (dailyInvested[day] || 0) + amount;
+      if (trade.type === 'SELL' || trade.type === 'SHORT') dailyInvested[day] = (dailyInvested[day] || 0) - Math.max(0, trade.amountUSD - (trade.fees || 0));
+    });
     let cumulative = 0;
-    const history = months.map(m => {
-      cumulative += monthlyInvested[m];
-      return { date: m, value: cumulative + currentCashUSD };
+    const history = days.map(day => {
+      cumulative += dailyInvested[day] || 0;
+      return { date: day, value: cumulative + currentCashUSD };
     });
-
-    // Always add current real portfolio value as the latest point
-    if (history.length === 0 || history[history.length - 1].date !== currentDateStr) {
-      history.push({ date: currentDateStr, value: currentTotalUSD > 0 ? currentTotalUSD : cumulative });
-    } else {
-      history[history.length - 1].value = currentTotalUSD > 0 ? currentTotalUSD : history[history.length - 1].value;
-    }
-
-    // Need at least 2 points for the chart
-    if (history.length < 2) {
-      history.unshift({ date: "Start", value: 0 });
-    }
-
+    if (history.length === 0) history.push({ date: today, value: currentTotalUSD });
+    history[history.length - 1] = { date: today, value: currentTotalUSD };
+    if (history.length < 2) history.unshift({ date: 'Start', value: 0 });
     return history;
-  }, [activePortfolioId, assets, brokerageAccounts, brokerageCashBalances, dynamicMoneyBuckets, portfolios, trades]);
+  }, [activePortfolioId, assets, brokerageAccounts, brokerageCashBalances, dynamicMoneyBuckets, exchangeRates, netWorthSettings, portfolios, trades]);
 
 
   // Update userProfile when Supabase user session changes

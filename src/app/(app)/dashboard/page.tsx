@@ -286,7 +286,7 @@ export default function DashboardPage() {
     cashActivities, moneyBuckets, bucketActivities,
     totalInvested, totalUnrealizedPL, totalRealizedPL, totalDividends,
     fetchAssetMarketData, addAsset, addTrade,
-    netWorthHistory, addToast, activePortfolio, activePortfolioId, isAllPortfolios,
+    netWorthHistory, addToast, activePortfolio, activePortfolioId, isAllPortfolios, isDataLoaded,
     portfolios, createPortfolio, selectPortfolio,
   } = useApp();
   const router = useRouter();
@@ -622,7 +622,9 @@ export default function DashboardPage() {
     return rows.filter(a => marketQuotes[a.symbol]?.dayChangePercent != null).sort((a, b) => Math.abs(marketQuotes[b.symbol]?.dayChangePercent ?? 0) - Math.abs(marketQuotes[a.symbol]?.dayChangePercent ?? 0)).slice(0, 4);
   }, [assets, marketQuotes, showFavorites]);
 
-  const isEmpty = assets.length === 0 && trades.length === 0;
+  // Data starts empty while the client restores the signed-in portfolio. Do
+  // not show an empty-state call to action during that short loading phase.
+  const isEmpty = isDataLoaded && assets.length === 0 && trades.length === 0;
   const selectedBrokerLabel = isAllPortfolios ? (language === 'th' ? 'ทุกพอร์ต' : 'All portfolios') : activePortfolio?.name;
 
   // ─── FAB ──────────────────────────────────────────────────────────────
