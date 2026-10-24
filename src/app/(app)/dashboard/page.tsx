@@ -146,6 +146,7 @@ function NetWorthSparkline({ data, formatMoney, t }: { data: NetWorthPoint[]; fo
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [pointer, setPointer] = useState<{ x: number; y: number } | null>(null);
   const [dims, setDims] = React.useState({ width: 800, height: 160 });
 
   const W = dims.width;
@@ -207,14 +208,17 @@ function NetWorthSparkline({ data, formatMoney, t }: { data: NetWorthPoint[]; fo
     const relX = Math.max(0, Math.min(mouseX - SPARKLINE_PADDING.left, chartWidth));
     const idx = Math.round((relX / chartWidth) * (data.length - 1));
     setHoveredIndex(Math.max(0, Math.min(idx, data.length - 1)));
+    // HTML overlays use rendered pixels, while the SVG uses its viewBox.
+    // Keep the data marker snapped to a day but anchor the tooltip to the cursor.
+    setPointer({ x: e.clientX - rect.left, y: e.clientY - rect.top });
   }, [data.length, W]);
 
   const color = isPositive ? "#4EDEA3" : "#FFB4AB";
   const hov = hoveredIndex != null ? data[hoveredIndex] : null;
-  const tooltipPosition = hov && hoveredIndex !== null
+  const tooltipPosition = hov && pointer
     ? {
-        left: `${Math.min(88, Math.max(12, (cx(hoveredIndex) / W) * 100))}%`,
-        top: Math.min(H - 50, Math.max(4, cy(hov.value) - 52)),
+        left: Math.min(dims.width - 64, Math.max(64, pointer.x)),
+        top: Math.min(dims.height - 8, Math.max(48, pointer.y - 10)),
       }
     : undefined;
 
@@ -233,7 +237,7 @@ function NetWorthSparkline({ data, formatMoney, t }: { data: NetWorthPoint[]; fo
         viewBox={`0 0 ${W} ${H}`}
         className="w-full h-full cursor-crosshair"
         onMouseMove={handleMouseMove}
-        onMouseLeave={() => setHoveredIndex(null)}
+        onMouseLeave={() => { setHoveredIndex(null); setPointer(null); }}
         style={{ overflow: 'visible' }}
       >
         <defs>
@@ -266,12 +270,12 @@ function NetWorthSparkline({ data, formatMoney, t }: { data: NetWorthPoint[]; fo
         )}
       </svg>
       <AnimatePresence>
-        {hov && (
+        {hov && pointer && (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            style={{ ...tooltipPosition, translate: '-50% 0' }}
+            style={{ ...tooltipPosition, translate: '-50% -100%' }}
             className="absolute bg-[#1e1e1e]/95 backdrop-blur-sm border border-border rounded-xl px-3 py-1.5 shadow-xl pointer-events-none z-10"
           >
             <div className="text-[10px] text-gray-400">{hov.date}</div>
