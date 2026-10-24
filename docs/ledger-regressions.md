@@ -25,3 +25,7 @@ Validation: TypeScript pass. Browser interaction and capture matrix pending acce
 ## 4. Entry dialogs
 Ledger entry now uses the shared native dialog/top layer, capped at 100dvh minus 48px with fixed header/footer and a scrolling body only. Both Ledger and Quick Add cashflow keep Save in the footer. Added 200ms fade/scale/rise, backdrop blur transition, mobile sheet handle, amount autofocus, single 2px focus outline, stable scrollbar gutter, reduced-motion override and focus return. Validation: TypeScript pass; rendered focus/viewport tests pending browser access.
 
+
+## 5. Copy and dev-overlay investigation
+Added all eight requested key variants to both existing locale dictionaries and replaced literal labels. Split custom-category selection/removal into native sibling buttons and deduplicated wallet keys. Translation unit test and TypeScript pass. The observed red Next.js issue cannot be identified conclusively without browser console access; no overlay was hidden or disabled. An initial generated .next-dev routes file race caused one type-check failure; subsequent generated output and checks pass without source suppression.
+

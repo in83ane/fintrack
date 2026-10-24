@@ -568,7 +568,7 @@ export default function LedgerPage() {
         <div id="ledger-filters" hidden={!filtersOpen} className="mt-3 space-y-3">
           <DateRangeBar value={dateRange} onChange={setDateRange}/>
           <div className="flex gap-2 overflow-x-auto pb-1" aria-label={t('wallet')}>
-            {[['all',t('allWallets')],['unassigned',t('unassigned')],...moneyBuckets.map(b=>[b.id,b.name]),...Array.from(new Map(allMergedActivities.filter(item=>item.walletLabel).map(item=>[item.bucketId,item.walletLabel!])).entries())].map(([id,label])=><button key={id} aria-pressed={selectedWalletId===id} onClick={()=>setSelectedWalletId(id)} className={`ft-chip ${selectedWalletId===id?'is-selected':''}`}>{label}</button>)}
+            {Array.from(new Map([['all',t('allWallets')],['unassigned',t('unassigned')],...moneyBuckets.map(b=>[b.id,b.name] as [string,string]),...Array.from(new Map(allMergedActivities.filter(item=>item.walletLabel).map(item=>[item.bucketId,item.walletLabel!])).entries())]).entries()).map(([id,label])=><button key={id} aria-pressed={selectedWalletId===id} onClick={()=>setSelectedWalletId(id)} className={`ft-chip ${selectedWalletId===id?'is-selected':''}`}>{label}</button>)}
           </div>
           <div className="flex gap-2 overflow-x-auto pb-1">{([['all','all'],['cash','incomeExpense'],['transfer','transfers'],['trade','investments']] as const).map(([id,label])=><button key={id} aria-pressed={activityFilter===id} onClick={()=>setActivityFilter(id)} className={`ft-chip ${activityFilter===id?'is-selected':''}`}>{t(label)}</button>)}</div>
         </div>
@@ -581,7 +581,7 @@ export default function LedgerPage() {
       </div>
 
       {/* ─── 1-Tap Entry Modal & Mobile Buttons ───────────────────────────── */}
-      <Modal isOpen={!!activePanel} onClose={()=>setActivePanel(null)} title={activePanel==='INCOME'?t('addIncome'):t('addExpense')} initialFocusRef={inputRef} footer={<button type="submit" form="ledger-entry" disabled={isAdding || !amount || (!isCustomCategory && !category) || (isCustomCategory && !customCategory)} className="ft-button ft-primary w-full disabled:opacity-50">{isAdding?<Loader2 size={18} className="animate-spin"/>:<Check size={18}/>} {t('saveRecord')}</button>}>
+      <Modal isOpen={!!activePanel} onClose={()=>setActivePanel(null)} title={activePanel==='INCOME'?t('addIncomeTitle'):t('addExpenseTitle')} initialFocusRef={inputRef} footer={<button type="submit" form="ledger-entry" disabled={isAdding || !amount || (!isCustomCategory && !category) || (isCustomCategory && !customCategory)} className="ft-button ft-primary w-full disabled:opacity-50">{isAdding?<Loader2 size={18} className="animate-spin"/>:<Check size={18}/>} {t('saveRecord')}</button>}>
               <form id="ledger-entry" onSubmit={handleQuickSubmit}>
                 <div className="space-y-3">
                   {/* Deposit To / Pay From Selector */}
@@ -597,7 +597,7 @@ export default function LedgerPage() {
                         </span>
                         <span className="text-sm font-bold text-foreground mt-0.5">
                           {depositTo === 'auto_split' ? 'Auto-split' :
-                            depositTo === 'unassigned' ? 'Unassigned' :
+                            depositTo === 'unassigned' ? t('unassigned') :
                               (moneyBuckets.find(b => b.id === depositTo)?.name || 'Select Wallet')}
                         </span>
                       </div>
@@ -629,7 +629,7 @@ export default function LedgerPage() {
                               className="text-left px-4 py-3 hover:bg-foreground/5 transition-colors border-b border-foreground/5 flex items-center gap-2"
                             >
                               <ReceiptText size={14} className="text-gray-400" />
-                              <span className="text-sm font-bold text-foreground">Unassigned</span>
+                              <span className="text-sm font-bold text-foreground">{t("unassigned")}</span>
                             </button>
                             {moneyBuckets.map(b => (
                               <button
@@ -705,8 +705,8 @@ export default function LedgerPage() {
                       .map((c) => {
                         const isSelected = !isCustomCategory && category === c.label;
                         return (
+                          <div key={c.id} className="inline-flex items-center gap-1 rounded-xl border border-border">
                           <button
-                            key={c.id}
                             type="button"
                             onClick={() => {
                               setIsCustomCategory(false);
@@ -721,8 +721,9 @@ export default function LedgerPage() {
                           >
                             <span><FinanceIcon name={c.icon || "tag"} size={16} /></span>
                             <span>{c.label}</span>
-                            <span
-                              role="button"
+                          </button>
+                            <button
+                              type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 removeCustomCategory(c.id);
@@ -730,12 +731,12 @@ export default function LedgerPage() {
                                   setCategory("");
                                 }
                               }}
-                              className="ml-0.5 opacity-40 hover:opacity-100 transition-opacity"
+                              className="ft-icon-button"
                               aria-label={t("delete") || "Remove"}
                             >
                               <X size={11} />
-                            </span>
-                          </button>
+                            </button>
+                          </div>
                         );
                       })}
                     <button

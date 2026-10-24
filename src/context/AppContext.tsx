@@ -368,6 +368,14 @@ interface AppState {
 
 const translations: Record<Language, Record<string, string>> = {
   en: {
+    allWallets: "All wallets",
+    unassigned: "Unassigned",
+    incomeExpense: "Income & Expense",
+    transfers: "Transfers",
+    investments: "Investments",
+    noteOptional: "Note (optional)",
+    saveRecord: "Save record",
+    SAVERECORD: "Save record",
     dashboard: "Dashboard",
     portfolio: "Portfolio",
     settings: "Settings",
@@ -965,6 +973,14 @@ const translations: Record<Language, Record<string, string>> = {
     from: "From",
   },
   th: {
+    allWallets: "ทุกกระเป๋า",
+    unassigned: "ยังไม่ระบุบัญชี",
+    incomeExpense: "รายรับและรายจ่าย",
+    transfers: "การโอน",
+    investments: "การลงทุน",
+    noteOptional: "บันทึก (ไม่บังคับ)",
+    saveRecord: "บันทึกรายการ",
+    SAVERECORD: "บันทึกรายการ",
     dashboard: "แผงควบคุม",
     portfolio: "พอร์ตโฟลิโอ",
     settings: "ตั้งค่า",
