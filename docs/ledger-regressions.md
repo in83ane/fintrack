@@ -10,3 +10,7 @@ formatLedgerAmount / ledgerDisplayAmount now read the exact stored native amount
 Tests: scripts/test-ledger-display.mjs covers 126,20,110, zero and real decimals across three FX rates and repeated USD/THB switching, with frozen fixtures.
 
 Screenshots: browser access is disabled in Work settings; required captures and old-build image comparison are pending. No screenshot claim is made for any item without a capture.
+
+## 2. Ledger composition
+Restored day groups, category tiles, wallet/note captions, signed amounts, time and sticky daily net. One desktop toolbar row, collapsible filters and a slim summary strip replace the tall header and internally scrolling table. Running net is optional in compact/hover states. Income/Expense retain semantic outlines. Type check and native display regression test pass. Captures remain blocked by browser access.
+

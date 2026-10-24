@@ -141,6 +141,7 @@ export default function LedgerPage() {
   const [category, setCategory] = useState("");
   const [note, setNote] = useState("");
   const [isAdding, setIsAdding] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [showConfetti, setShowConfetti] = useState(false);
   const [toDelete, setToDelete] = useState<{ id: string, source: 'cash' | 'bucket' | 'trade' } | null>(null);
@@ -547,278 +548,29 @@ export default function LedgerPage() {
 
   return (
     <div className="flex min-h-screen min-w-0 flex-col pb-24 lg:pb-8">
-      <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-6 sm:px-6"><div><h1 className="text-3xl font-semibold">{language === 'th' ? 'สมุดรายการ' : 'Ledger'}</h1><p className="mt-1 text-sm text-muted">{language === 'th' ? 'ค้นหาและตรวจสอบรายการเงินสด' : 'Search and reconcile your cash activity.'}</p></div><DensityToggle /></div>
-      <div className="px-4 pb-5 sm:px-6"><input type="search" value={query} onChange={e=>setQuery(e.target.value)} aria-label={language === 'th' ? 'ค้นหารายการ' : 'Search transactions'} placeholder={language === 'th' ? 'ค้นหาหมวดหมู่ บัญชี หรือบันทึก' : 'Search category, account or note'} className="h-11 w-full max-w-md rounded-xl border border-border bg-surface px-4 text-sm"/></div>
-
-      {/* ─── Header & Wallets ────────────────────────────────────────── */}
-      <div className="bg-surface border-b border-border">
-
-        {/* Date Range Selector & Desktop Actions */}
-        <div className="flex min-w-0 items-center justify-between p-3 sm:p-4">
-          <DateRangeBar value={dateRange} onChange={setDateRange} className="min-w-0 flex-1" />
-
-          <div className="hidden sm:flex items-center gap-2 flex-shrink-0 ml-4">
-            <button
-              onClick={() => handleOpenPanel("INCOME")}
-              className="px-4 py-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-xl font-bold text-xs uppercase tracking-wide flex items-center gap-2 transition-all"
-            >
-              <ArrowDownLeft size={16} /> INCOME
-            </button>
-            <button
-              onClick={() => handleOpenPanel("EXPENSE")}
-              className="px-4 py-2 bg-loss/10 hover:bg-loss/20 text-loss rounded-xl font-bold text-xs uppercase tracking-wide flex items-center gap-2 transition-all"
-            >
-              <ArrowUpRight size={16} /> EXPENSE
-            </button>
-          </div>
+      <div className="ft-ledger-content w-full max-w-[1440px] px-6 py-5">
+        <div className="ft-ledger-toolbar">
+          <h1 className="text-2xl font-semibold">{language==='th'?'สมุดรายการ':'Ledger'}</h1>
+          <label className="ft-ledger-search"><Search size={16}/><input type="search" value={query} onChange={e=>setQuery(e.target.value)} aria-label={language==='th'?'ค้นหารายการ':'Search transactions'} placeholder={language==='th'?'ค้นหารายการ':'Search transactions'}/></label>
+          <DensityToggle />
         </div>
-
-        {/* Wallets Selector */}
-        <div className="px-3 sm:px-4 pb-4">
-          <div className="flex max-w-full items-center gap-2 overflow-x-auto overscroll-x-contain no-scrollbar pb-2">
-            <button
-              onClick={() => setSelectedWalletId('all')}
-              className={cn(
-                "flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all",
-                selectedWalletId === 'all' ? "bg-white text-background font-black border-foreground" : "bg-surface border-foreground/5 text-gray-400 font-bold hover:bg-foreground/5"
-              )}
-            >
-              <div className="flex flex-col text-left">
-                <span className="text-sm">allWallets</span>
-                <span className={cn("text-xs leading-none mt-1", selectedWalletId === 'all' ? "opacity-60 text-background" : "opacity-50")}>
-                  {formatDisplay(totalAllWallets, currency as "USD" | "THB")}
-                </span>
-              </div>
-            </button>
-            <button
-              onClick={() => setSelectedWalletId('unassigned')}
-              className={cn(
-                "flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all",
-                selectedWalletId === 'unassigned' ? "bg-white text-background font-black border-foreground" : "bg-surface border-foreground/5 text-gray-400 font-bold hover:bg-foreground/5"
-              )}
-            >
-              <ReceiptText size={14} className={selectedWalletId === 'unassigned' ? "text-background" : "text-gray-500"} />
-              <div className="flex flex-col text-left">
-                <span className="text-sm">unassigned</span>
-              </div>
-            </button>
-            {Array.from(new Map(allMergedActivities.filter(item => item.walletLabel).map(item => [item.bucketId, item.walletLabel!])).entries()).map(([id, label]) => (
-              <button key={id} onClick={() => setSelectedWalletId(id)} className={cn('flex-shrink-0 flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-xs', selectedWalletId === id ? 'bg-white text-background border-foreground' : 'border-foreground/5 text-gray-400')}>
-                <Wallet size={14} />{label}
-              </button>
-            ))}
-            {moneyBuckets.map(b => (
-              <button
-                key={b.id}
-                onClick={() => setSelectedWalletId(b.id)}
-                className={cn(
-                  "flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all",
-                  selectedWalletId === b.id ? "bg-white text-background font-black border-foreground" : "bg-surface border-foreground/5 text-gray-400 font-bold hover:bg-foreground/5"
-                )}
-              >
-                <span className={selectedWalletId === b.id ? "text-background" : "opacity-80"}><FinanceIcon name={b.icon} /></span>
-                <div className="flex flex-col text-left">
-                  <span className="text-xs leading-none">{b.name}</span>
-                  {selectedWalletId === b.id && <span className="text-xs leading-none mt-1 opacity-70">{formatBucketAmount(b, b.currentAmount)}</span>}
-                </div>
-              </button>
-            ))}
-          </div>
-
-          {/* Stats for selected period & wallet */}
-          <div className="grid grid-cols-3 gap-2 sm:gap-3 mt-3">
-            <div className="min-w-0 bg-surface border border-border rounded-xl px-2.5 py-3 sm:px-4 sm:py-4">
-              <p className="min-h-4 text-xs sm:text-xs text-gray-500 uppercase font-bold leading-4 tracking-wide truncate">
-                IN <span className="opacity-50">•</span> {periodLabel}
-              </p>
-              <div className="mt-1.5 whitespace-nowrap text-sm sm:text-xl font-black leading-none tabular-nums text-gain">{formatMoney(periodStats.inc)}</div>
-            </div>
-            <div className="min-w-0 bg-surface border border-border rounded-xl px-2.5 py-3 sm:px-4 sm:py-4">
-              <p className="min-h-4 text-xs sm:text-xs text-gray-500 uppercase font-bold leading-4 tracking-wide truncate">
-                OUT <span className="opacity-50">•</span> {periodLabel}
-              </p>
-              <div className="mt-1.5 whitespace-nowrap text-sm sm:text-xl font-black leading-none tabular-nums text-loss">{formatMoney(periodStats.exp)}</div>
-            </div>
-            <div className="min-w-0 bg-surface border border-border rounded-xl px-2.5 py-3 sm:px-4 sm:py-4">
-              <p className="min-h-4 text-xs sm:text-xs text-gray-500 uppercase font-bold leading-4 tracking-wide truncate">NET</p>
-              <div className={cn("mt-1.5 whitespace-nowrap text-sm sm:text-xl font-black leading-none tabular-nums", periodStats.net >= 0 ? "text-foreground" : "text-loss")}>
-                {periodStats.net >= 0 ? "+" : ""}{formatMoney(periodStats.net)}
-              </div>
-            </div>
-          </div>
+        <div className="flex flex-wrap items-center justify-between gap-2 mt-3">
+          <button className="ft-button ft-secondary" aria-expanded={filtersOpen} aria-controls="ledger-filters" onClick={()=>setFiltersOpen(!filtersOpen)}><CalendarDays size={15}/>{periodLabel}<ChevronDown size={14} className={filtersOpen?'rotate-180':''}/></button>
+          <div className="flex gap-2"><button className="ft-button border border-gain text-gain hover:bg-gain/10" onClick={()=>handleOpenPanel('INCOME')}><ArrowDownLeft size={16}/>{t('income')}</button><button className="ft-button border border-loss text-loss hover:bg-loss/10" onClick={()=>handleOpenPanel('EXPENSE')}><ArrowUpRight size={16}/>{t('expense')}</button></div>
         </div>
-
-        {/* Activity Type Filter */}
-        <div className="px-3 sm:px-4 pb-4 border-t border-foreground/5 pt-3">
-          <div className="flex gap-2 overflow-x-auto no-scrollbar">
-            <button
-              onClick={() => setActivityFilter('all')}
-              className={cn("px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap", activityFilter === 'all' ? "bg-white text-background" : "bg-foreground/5 text-gray-400 hover:bg-foreground/10")}
-            >
-              {t("all") || "All Records"}
-            </button>
-            <button
-              onClick={() => setActivityFilter('cash')}
-              className={cn("px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5", activityFilter === 'cash' ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary hover:bg-primary/20")}
-            >
-              <ReceiptText size={14} />
-              {t("incomeExpense") || "Income / Expense"}
-            </button>
-            <button
-              onClick={() => setActivityFilter('transfer')}
-              className={cn("px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5", activityFilter === 'transfer' ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary hover:bg-primary/20")}
-            >
-              <Wallet size={14} />
-              {t("transfers") || "Transfers"}
-            </button>
-            <button
-              onClick={() => setActivityFilter('trade')}
-              className={cn("px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5", activityFilter === 'trade' ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary hover:bg-primary/20")}
-            >
-              <TrendingUp size={14} />
-              {t("investments") || "Investments"}
-            </button>
+        <div id="ledger-filters" hidden={!filtersOpen} className="mt-3 space-y-3">
+          <DateRangeBar value={dateRange} onChange={setDateRange}/>
+          <div className="flex gap-2 overflow-x-auto pb-1" aria-label={t('wallet')}>
+            {[['all',t('allWallets')],['unassigned',t('unassigned')],...moneyBuckets.map(b=>[b.id,b.name]),...Array.from(new Map(allMergedActivities.filter(item=>item.walletLabel).map(item=>[item.bucketId,item.walletLabel!])).entries())].map(([id,label])=><button key={id} aria-pressed={selectedWalletId===id} onClick={()=>setSelectedWalletId(id)} className={`ft-chip ${selectedWalletId===id?'is-selected':''}`}>{label}</button>)}
           </div>
+          <div className="flex gap-2 overflow-x-auto pb-1">{([['all','all'],['cash','incomeExpense'],['transfer','transfers'],['trade','investments']] as const).map(([id,label])=><button key={id} aria-pressed={activityFilter===id} onClick={()=>setActivityFilter(id)} className={`ft-chip ${activityFilter===id?'is-selected':''}`}>{t(label)}</button>)}</div>
         </div>
-      </div>
-
-      {/* ─── Record List ────────────────────────────────────────────── */}
-      <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
-        {records.length > 0 && <div className="hidden md:block"><LedgerTable rows={records} onDelete={item => setToDelete({id:item.id,source:item.source})}/></div>}
-        {records.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="w-16 h-16 rounded-full bg-foreground/5 flex items-center justify-center mb-4 text-3xl">
-              <FinanceIcon name="receipt" size={26} />
-            </div>
-            <h3 className="text-lg font-bold text-foreground mb-2">{language === "th" ? "ไม่พบรายการในช่วงนี้" : "No transactions in this period"}</h3>
-            <p className="text-sm text-gray-500 max-w-[250px]">{language === "th" ? "เปลี่ยนช่วงเวลา หรือลองบันทึกรายการแรก" : "Choose a different period or record your first transaction."}</p>
-          </div>
-        ) : (
-          grouped.map(([dateKey, items]) => {
-            const dayNetUSD = items.reduce((total, item) => total + (item.type === "INCOME" ? item.amountUSD : -item.amountUSD), 0);
-            const dateLabel = formatDateGroup(dateKey, t("today") || "Today", t("yesterday") || "Yesterday", language);
-
-            return (
-              <div key={dateKey} className="md:hidden">
-                <div className="flex items-center justify-between gap-4 mb-3 pl-1">
-                  <h3 className="text-xs sm:text-xs font-black text-gray-500 uppercase tracking-wider">
-                    {dateLabel}
-                  </h3>
-                  <span className={cn("text-xs font-black tabular-nums", dayNetUSD >= 0 ? "text-gain" : "text-loss")}>
-                    {dayNetUSD > 0 ? "+" : ""}{formatMoney(dayNetUSD)}
-                  </span>
-                </div>
-                <div className="bg-surface border border-border rounded-2xl overflow-hidden">
-                  {items.map((item, idx) => {
-                    const isIncome = item.type === "INCOME";
-                    const itemTime = new Date(item.date).toLocaleTimeString(language === "th" ? "th-TH" : "en-US", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    });
-                    return (
-                      <div
-                        key={item.id}
-                        ref={(el) => { rowRefs.current[item.id] = el; }}
-                        className={cn("relative overflow-hidden", idx !== items.length - 1 && "border-b border-border/50")}
-                      >
-                        <motion.div
-                          drag={isMobile ? "x" : false}
-                          dragDirectionLock
-                          dragConstraints={{ left: -80, right: 0 }}
-                          dragElastic={{ left: 0.15, right: 0 }}
-                          animate={{ x: isMobile && swipedId === item.id ? -80 : 0 }}
-                          transition={{ type: "spring", stiffness: 500, damping: 40 }}
-                          onDragEnd={(_, info: PanInfo) => {
-                            if (info.offset.x < -40 || info.velocity.x < -400) {
-                              setSwipedId(item.id);
-                            } else {
-                              setSwipedId(null);
-                            }
-                          }}
-                          onTap={() => {
-                            if (swipedId === item.id) setSwipedId(null);
-                          }}
-                          className="flex touch-pan-y"
-                        >
-                          {/* Row content: always the full row width and never shrinks, so the delete
-                            cell after it stays outside the visible area (clipped by the wrapper's
-                            overflow-hidden) until the row is actually dragged left. This doesn't rely
-                            on any background opacity to hide the delete button — it's structurally
-                            off-screen. */}
-                          <div className="w-full flex-shrink-0 bg-surface p-3 sm:p-4 flex items-center justify-between group">
-                            <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
-                              <div className={cn(
-                                "w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center text-lg sm:text-xl flex-shrink-0 transition-transform group-hover:scale-[1.02]",
-                                isIncome ? "bg-gain/10" : "bg-foreground/5"
-                              )}>
-                                <FinanceIcon name={getCategoryIcon(item.category)} size={22} />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <h4 className="text-sm sm:text-base font-bold text-foreground truncate">{t(item.category) || item.category}</h4>
-                                <div className="flex items-center gap-2 mt-0.5">
-                                  {item.note && <span className="text-xs text-gray-500 truncate max-w-[120px] sm:max-w-[200px]">{item.note}</span>}
-                                  {item.note && <span className="text-gray-700 text-xs">•</span>}
-                                  <span className="text-xs text-gray-500 uppercase font-black inline-flex items-center gap-1">
-                                    {item.walletLabel ? <><Wallet size={12} />{item.walletLabel}</> : item.bucketId === 'unassigned' ? (
-                                      <>
-                                        <ReceiptText size={10} />
-                                        {language === "th" ? "ยังไม่ระบุบัญชี" : "Unassigned"}
-                                      </>
-                                    ) : (
-                                      <>
-                                        <span className="normal-case"><FinanceIcon name={bucketsById.get(item.bucketId)?.icon || "card"} size={14} /></span>
-                                        {bucketsById.get(item.bucketId)?.name || (t("wallet") || "Wallet")}
-                                      </>
-                                    )}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-3 sm:gap-4 pl-3">
-                              <div className="text-right">
-                                <span className={cn(
-                                  "block text-sm sm:text-base font-black tabular-nums tracking-tight whitespace-nowrap",
-                                  isIncome ? "text-gain" : "text-loss"
-                                )}>
-                                  {isIncome ? "+" : "-"}{formatLedgerAmount(item, currency, exchangeRates, language)}
-                                </span>
-                                <span className="block text-xs text-gray-500 whitespace-nowrap">{itemTime}</span>
-                              </div>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setToDelete({ id: item.id, source: item.source });
-                                }}
-                                className="hidden sm:flex w-8 h-8 rounded-xl bg-red-500/10 text-red-400 items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/20 flex-shrink-0"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Delete cell: sits right after the full-width row above, so it only ever
-                            enters the visible area once the row is swiped left. Mobile only. */}
-                          <div className="w-20 flex-shrink-0 sm:hidden bg-surface flex items-center justify-center">
-                            <button
-                              onClick={() => {
-                                setToDelete({ id: item.id, source: item.source });
-                                setSwipedId(null);
-                              }}
-                              className="w-11 h-11 rounded-xl bg-red-500/10 text-red-400 flex items-center justify-center active:bg-red-500/20 transition-colors"
-                              aria-label={t("delete") || "Delete"}
-                            >
-                              <Trash2 size={18} />
-                            </button>
-                          </div>
-                        </motion.div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )
-          })
-        )}
+        <div className="ft-ledger-summary my-4" aria-label={periodLabel}>
+          <div><span>{language==='th'?'เข้า':'IN'}</span><strong className="text-gain">+{formatMoney(periodStats.inc)}</strong></div>
+          <div><span>{language==='th'?'ออก':'OUT'}</span><strong className="text-loss">−{formatMoney(periodStats.exp)}</strong></div>
+          <div><span>{language==='th'?'สุทธิ':'NET'}</span><strong className={periodStats.net>=0?'text-gain':'text-loss'}>{periodStats.net>=0?'+':''}{formatMoney(periodStats.net)}</strong></div>
+        </div>
+        {records.length ? <LedgerTable rows={records} onDelete={item=>setToDelete({id:item.id,source:item.source})} categoryIcon={getCategoryIcon} walletName={item=>item.walletLabel||bucketsById.get(item.bucketId)?.name||t('unassigned')} dateLabel={day=>formatDateGroup(day,t('today'),t('yesterday'),language)}/> : <div className="py-16 text-center"><ReceiptText size={28} className="mx-auto mb-3 text-muted"/><h2 className="font-semibold">{language==='th'?'ไม่พบรายการในช่วงนี้':'No transactions in this period'}</h2><p className="mt-2 text-sm text-muted">{language==='th'?'เปลี่ยนตัวกรองหรือบันทึกรายการแรก':'Change your filters or record your first transaction.'}</p></div>}
       </div>
 
       {/* ─── 1-Tap Entry Modal & Mobile Buttons ───────────────────────────── */}
@@ -1097,37 +849,6 @@ export default function LedgerPage() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      <div className="sm:hidden fixed bottom-[80px] left-1/2 -translate-x-1/2 z-40 w-full px-4 max-w-sm pointer-events-none">
-        <AnimatePresence>
-          {!activePanel && (
-            <motion.div
-              initial={{ y: 50, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 50, opacity: 0 }}
-              className="flex justify-center pointer-events-auto"
-            >
-              <div className="bg-surface/90  border border-foreground/10 rounded-full p-2 flex items-center gap-2 shadow-2xl w-full max-w-xs">
-                <button
-                  onClick={() => handleOpenPanel("INCOME")}
-                  className="flex-1 py-3 bg-foreground/5 hover:bg-primary/10 text-foreground hover:text-primary rounded-full flex items-center justify-center gap-2 font-black text-xs uppercase tracking-wide transition-all"
-                >
-                  <ArrowDownLeft size={16} className="text-gain" />
-                  INCOME
-                </button>
-                <div className="w-[1px] h-8 bg-foreground/10" />
-                <button
-                  onClick={() => handleOpenPanel("EXPENSE")}
-                  className="flex-1 py-3 bg-foreground/5 hover:bg-loss/10 text-foreground hover:text-loss rounded-full flex items-center justify-center gap-2 font-black text-xs uppercase tracking-wide transition-all"
-                >
-                  <ArrowUpRight size={16} className="text-loss" />
-                  EXPENSE
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
 
       <ConfirmModal
         isOpen={!!toDelete}
