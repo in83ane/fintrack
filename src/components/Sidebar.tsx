@@ -9,6 +9,7 @@ import { usePathname } from "next/navigation";
 import { supabase } from "@/src/lib/supabase";
 import { logoutAction } from "@/src/app/actions";
 import { SettingsModal } from "@/src/components/SettingsModal";
+import { LayoutGroup, motion, useReducedMotion } from "motion/react";
 
 interface SidebarProps {
   isMobile?: boolean;
@@ -29,6 +30,8 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
     [portfolios]
   );
   const pathname = usePathname();
+  const navigationId = React.useId();
+  const reducedMotion = useReducedMotion();
   const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
   const [portfolioName, setPortfolioName] = React.useState("");
   const [isAddingPortfolio, setIsAddingPortfolio] = React.useState(false);
@@ -251,28 +254,39 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
           )}
       </div>
 
-      <nav className="flex-1 space-y-0.5 overflow-y-auto custom-scrollbar">
+      <LayoutGroup id={navigationId}>
+      <motion.nav layoutScroll className="flex-1 space-y-0.5 overflow-y-auto custom-scrollbar">
         {navItems.map((item) => {
-          const isActive = pathname === item.href;
+          const route = item.href === '/trade/plan' ? '/trade' : item.href;
+          const isActive = pathname === route || pathname.startsWith(`${route}/`);
           return (
             <Link
-              key={item.label}
+              key={item.href}
               href={item.href}
               replace={false}
               onClick={onClose}
+              aria-current={isActive ? 'page' : undefined}
               className={cn(
-                "flex items-center gap-3 mx-3 py-2.5 px-4 rounded-xl transition-all duration-200",
+                "relative isolate flex items-center gap-3 mx-3 py-2.5 px-4 rounded-xl transition-colors duration-200",
                 isActive
-                  ? "bg-primary/10 text-primary font-semibold"
+                  ? "text-primary font-semibold"
                   : "text-gray-500 hover:bg-white/5 hover:text-white"
               )}
             >
+              {isActive && <motion.span
+                layoutId="sidebar-active-item"
+                aria-hidden="true"
+                initial={false}
+                className="pointer-events-none absolute inset-0 -z-10 rounded-xl bg-primary/10"
+                transition={{ type: 'tween', duration: reducedMotion ? 0 : 0.28, ease: [0.22, 1, 0.36, 1] }}
+              />}
               <item.icon size={18} className={isActive ? "text-primary" : ""} />
               <span className="text-sm font-medium">{item.label}</span>
             </Link>
           );
         })}
-      </nav>
+      </motion.nav>
+      </LayoutGroup>
 
       <div className="px-4 mt-auto space-y-3">
 

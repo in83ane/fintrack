@@ -3,6 +3,7 @@ import { Noto_Sans_Thai } from "next/font/google";
 import "../index.css";
 import { AppProvider } from "@/src/context/AppContext";
 import { ErrorBoundary } from "@/src/components/ErrorBoundary";
+import { PageTransition } from "@/src/components/PageTransition";
 
 const notoSansThai = Noto_Sans_Thai({
   subsets: ["latin", "thai"],
@@ -43,7 +44,7 @@ export default function RootLayout({
       </head>
       <body suppressHydrationWarning className={`${notoSansThai.className} bg-[#131313] text-[#e5e2e1] min-h-screen min-w-0 antialiased`}>
         <AppProvider>
-          {children}
+          <PageTransition>{children}</PageTransition>
         </AppProvider>
       </body>
     </html>

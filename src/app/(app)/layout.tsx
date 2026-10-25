@@ -29,7 +29,7 @@ export default function AppLayout({
       
       <div className="min-w-0 flex-1 lg:ml-64 pb-[calc(4.75rem+env(safe-area-inset-bottom))] lg:pb-0 relative">
         <TopBar />
-        <main className="min-w-0">
+        <main data-page-content className="min-w-0">
           <ErrorBoundary>
             {children}
           </ErrorBoundary>
