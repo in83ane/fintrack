@@ -1,6 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { flushSync } from 'react-dom';
+import { transitionTheme, type ThemeOrigin } from '@/src/lib/theme-transition';
 import { db, supabase } from "@/src/lib/supabase";
 import { validateAssetFunding } from '@/src/lib/asset-funding';
 import { User } from "@supabase/supabase-js";
@@ -338,7 +340,7 @@ interface AppState {
   netWorthSettings: NetWorthSettings;
   setNetWorthSettings: (settings: NetWorthSettings | ((prev: NetWorthSettings) => NetWorthSettings)) => void;
   darkMode: boolean;
-  setDarkMode: (val: boolean) => void;
+  setDarkMode: (val: boolean, origin?: ThemeOrigin) => void;
   notifications: AppNotification[];
   addNotification: (title: string, message: string, type: AppNotification['type']) => void;
   markNotificationRead: (id: string) => void;
@@ -1634,11 +1636,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   }, [netWorthSettings]);
 
-  const setDarkMode = (isDark: boolean) => {
-    setDarkModeState(isDark);
-    try {
-      localStorage.setItem("theme", isDark ? "dark" : "light");
-    } catch {}
+  const setDarkMode = (isDark: boolean, origin?: ThemeOrigin) => {
+    if (isDark === darkMode) return;
+    transitionTheme(() => {
+      // Theme class and React controls must appear in the same new snapshot.
+      flushSync(() => setDarkModeState(isDark));
+      document.documentElement.classList.toggle('light-mode', !isDark);
+      try {
+        localStorage.setItem("theme", isDark ? "dark" : "light");
+      } catch {}
+    }, origin);
   };
 
   useEffect(() => {

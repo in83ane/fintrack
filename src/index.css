@@ -147,6 +147,18 @@ html.light-mode video {
   filter: invert(1) hue-rotate(180deg);
 }
 
+/* A curved reveal from the theme switch, using the existing theme colors. */
+html.theme-transition::view-transition-group(root) { animation: none; }
+html.theme-transition::view-transition-old(root),
+html.theme-transition::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+html.theme-transition::view-transition-old(root) { z-index: 1; }
+html.theme-transition::view-transition-new(root) { z-index: 2; }
+html.theme-transition::view-transition { pointer-events: none; }
+html.theme-transition [data-theme-thumb] { transition: none; }
+
 /* Wiggle animation for notification bell (#24) */
 @keyframes wiggle {
   0%, 100% { transform: rotate(0deg); }

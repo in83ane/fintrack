@@ -212,16 +212,22 @@ export default function SettingsPage() {
                 </div>
               </div>
               <button
-                onClick={() => setDarkMode(!darkMode)}
+                role="switch"
+                aria-checked={darkMode}
+                aria-label={t('darkMode')}
+                onClick={event => {
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  setDarkMode(!darkMode, { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+                }}
                 className={cn(
-                  "relative w-12 h-7 rounded-full transition-all duration-300 focus:outline-none",
+                  "relative w-12 h-7 rounded-full transition-colors duration-300 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary",
                   darkMode ? "bg-[#8B5CF6]" : "bg-white/10"
                 )}
               >
-                <motion.div
-                  className="absolute top-1 w-5 h-5 rounded-full bg-white shadow-md"
-                  animate={{ left: darkMode ? 24 : 4 }}
-                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                <span
+                  data-theme-thumb
+                  className="absolute left-1 top-1 w-5 h-5 rounded-full bg-white shadow-md transition-transform duration-200 motion-reduce:transition-none"
+                  style={{ transform: `translateX(${darkMode ? 20 : 0}px)` }}
                 />
               </button>
             </div>
