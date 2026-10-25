@@ -72,3 +72,22 @@ test('each wallet node conserves money even with unlinked balances; inputs are i
   assert.equal(graph.reconciliationMinor,40000);
   assert.equal(JSON.stringify(records),before);
 });
+
+test('unknown native currency and invalid calendar dates never become invented money', () => {
+  assert.equal(transactionMoney({ originalAmount: 126, type: 'EXPENSE', date: '2026-10-25' }, scope), null);
+  assert.equal(api.localCashflowDay('2026-02-30'), '');
+  assert.equal(api.localCashflowDay('2026-02-28'), '2026-02-28');
+  const summary = getCashflowSummary([row('overspent', 'EXPENSE', 126)], scope);
+  assert.equal(summary.netMinor, -12600);
+  assert.equal(summary.overspentMinor, 12600);
+  assert.equal(summary.savedMinor, 0);
+  assert.equal(getFlowGraph(summary, []).reconciliationMinor, 12600);
+});
+
+test('net-worth labels mirror existing all, trading and cash-management valuation scopes', () => {
+  const enabled = { includeAssets: true, includeCash: true, includeBuckets: true };
+  assert.deepEqual(api.getNetWorthIncludedSources(null, undefined, enabled), { assets: true, cash: true, buckets: true });
+  assert.deepEqual(api.getNetWorthIncludedSources('p', 'trading', enabled), { assets: true, cash: true, buckets: false });
+  assert.deepEqual(api.getNetWorthIncludedSources('p', 'cash_management', enabled), { assets: false, cash: false, buckets: true });
+  assert.deepEqual(api.getNetWorthIncludedSources(null, undefined, { includeAssets: false, includeCash: false, includeBuckets: false }), { assets: false, cash: false, buckets: false });
+});

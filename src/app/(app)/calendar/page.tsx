@@ -304,7 +304,7 @@ export default function CalendarPage() {
             ))}
           </div>
 
-          <div data-chart data-chart-revision={currentMonthPrefix} className="grid grid-cols-7">
+          <div data-chart data-chart-revision={`${year}-${currentMonth.getMonth()}`} className="grid grid-cols-7">
             {calendarDays.map((day, idx) => {
               if (day === null) {
                 return <div key={`empty-${idx}`} className="aspect-[4/3] border-r border-b border-border" />;

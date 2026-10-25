@@ -22,11 +22,18 @@ export function ChartFrame({ title, description, children, rows, headers, classN
     if (!expanded) return;
     const before = document.activeElement as HTMLElement | null;
     root.current?.focus();
-    const close = (event: KeyboardEvent) => { if (event.key === 'Escape') setExpanded(false); };
+    const close = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setExpanded(false);
+      if (event.key !== 'Tab') return;
+      const items = [...(root.current?.querySelectorAll<HTMLElement>('button, a[href], input, select, [tabindex="0"]') || [])].filter(node => node.getClientRects().length);
+      const first = items[0], last = items.at(-1);
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === root.current)) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
     window.addEventListener('keydown', close);
     return () => { window.removeEventListener('keydown', close); before?.focus(); };
   }, [expanded]);
-  return <section ref={root} tabIndex={-1} id={id} aria-label={title} className={`min-w-0 rounded-2xl border border-border bg-background p-4 sm:p-5 ${expanded ? 'fixed inset-3 z-[90] overflow-auto shadow-2xl sm:inset-8' : className}`}>
+  return <section ref={root} tabIndex={-1} id={id} role={expanded ? 'dialog' : undefined} aria-modal={expanded || undefined} aria-label={title} className={`min-w-0 rounded-2xl border border-border bg-background p-4 sm:p-5 ${expanded ? 'fixed inset-3 z-[90] overflow-auto shadow-2xl sm:inset-8' : className}`}>
     <header className="mb-4 flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-sm font-semibold text-foreground">{title}</h2>{period && <p className="mt-1 text-[10px] text-muted">{period}</p>}</div>
       <div className="flex items-center gap-1.5">{action}<button aria-pressed={table} title="View as table / ดูตาราง" onClick={() => setTable(v => !v)} className="rounded-lg border border-border p-2 text-muted hover:text-foreground"><Table2 size={14}/><span className="sr-only">View as table</span></button><button aria-label={expanded ? 'Close full view' : 'Expand to full view'} onClick={() => setExpanded(v => !v)} className="rounded-lg border border-border p-2 text-muted hover:text-foreground">{expanded ? <Minimize2 size={14}/> : <Maximize2 size={14}/>}</button></div>
     </header>

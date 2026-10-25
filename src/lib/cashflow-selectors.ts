@@ -21,6 +21,14 @@ export type CashflowEntry = {
 export const CATEGORY_ALIASES = {
   food: { en: 'Food', th: 'อาหาร', aliases: ['food', 'อาหาร'] },
 } as const;
+/** Labels mirror AppContext's existing valuation scope; they do not recalculate it. */
+export function getNetWorthIncludedSources(portfolioId: string | null | undefined, kind: string | undefined, settings: { includeAssets?: boolean; includeCash?: boolean; includeBuckets?: boolean }) {
+  return {
+    assets: kind !== 'cash_management' && settings.includeAssets !== false,
+    cash: (!portfolioId || kind === 'trading') && settings.includeCash !== false,
+    buckets: (!portfolioId || kind === 'cash_management') && settings.includeBuckets !== false,
+  };
+}
 export function cashflowCategoryKey(category = 'Other') {
   const key = category.trim().toLocaleLowerCase('en-US');
   return (CATEGORY_ALIASES.food.aliases as readonly string[]).includes(key) ? 'food' : key || 'other';
@@ -29,7 +37,7 @@ export function displayCashflowCategory(category = 'Other', language: 'en' | 'th
   return cashflowCategoryKey(category) === 'food' ? CATEGORY_ALIASES.food[language] : category;
 }
 export function localCashflowDay(value: string, timeZone = 'Asia/Bangkok') {
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return Number.isNaN(Date.parse(value)) ? '' : value;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return Number.isNaN(Date.parse(value)) || new Date(value).toISOString().slice(0, 10) !== value ? '' : value;
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return '';
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date);
@@ -63,7 +71,8 @@ export function formatCashflowMoney(minor: number, currency = 'USD', signed = fa
 export function transactionMoney(row: CashflowRecord, scope: CashflowScope = {}) {
   const target = scope.currency || 'USD';
   const originalKnown = row.originalAmount !== undefined && Number.isFinite(row.originalAmount);
-  const nativeCurrency = originalKnown ? row.currency || 'USD' : 'USD';
+  if (originalKnown && !['USD', 'THB'].includes(row.currency || '')) return null;
+  const nativeCurrency = originalKnown ? row.currency! : 'USD';
   const nativeAmount = originalKnown ? row.originalAmount! : row.amountUSD ?? row.amount;
   if (nativeAmount === undefined || !Number.isFinite(nativeAmount) || nativeAmount < 0) return null;
   const stored = validRate(row.fxRateTHB) ? row.fxRateTHB! : validRate(row.rateAtTime) ? row.rateAtTime! : null;
@@ -97,16 +106,19 @@ export function getCashflowSummary(records: readonly CashflowRecord[], scope: Ca
     rows.forEach((row, index) => {
       const kind = classify(row, trade);
       if (!kind || (trade && kind !== 'income' && !scope.includeInvestments)) return;
+      const category = trade && kind === 'income' ? 'Dividend' : row.category || (kind === 'proceeds' ? 'Investment proceeds' : kind === 'invested' ? 'Invested' : 'Other');
+      if (trade && scope.category && cashflowCategoryKey(category) !== scope.category) return;
       const id = `${trade ? 'trade:' : 'cash:'}${row.id ?? index}`;
       const money = transactionMoney(row, scope);
-      if (!money) { missing.push({ id, reason: 'Missing native amount or usable FX rate' }); return; }
-      entries.push({ ...money, id, kind, walletId: walletKey(row), day: localCashflowDay(row.date, scope.timeZone), category: trade && kind === 'income' ? 'Dividend' : row.category || (kind === 'proceeds' ? 'Investment proceeds' : kind === 'invested' ? 'Invested' : 'Other'), record: row });
+      if (!money) { missing.push({ id, reason: 'Missing native amount, currency or usable FX rate' }); return; }
+      entries.push({ ...money, id, kind, walletId: walletKey(row), day: localCashflowDay(row.date, scope.timeZone), category, record: row });
     });
   }
   const sum = (kind: FlowKind) => entries.filter(row => row.kind === kind).reduce((total, row) => total + row.minor, 0);
   const incomeMinor = sum('income'), expenseMinor = sum('expense'), investedMinor = sum('invested'), proceedsMinor = sum('proceeds');
   const inflowMinor = incomeMinor + proceedsMinor, outflowMinor = expenseMinor + investedMinor;
   const netMinor = inflowMinor - outflowMinor;
+  if (![incomeMinor, expenseMinor, investedMinor, proceedsMinor, inflowMinor, outflowMinor, netMinor].every(Number.isSafeInteger)) throw Error('Money total exceeds safe minor-unit range');
   return {
     records: selected, entries, missing, currency: scope.currency || 'USD',
     incomeMinor, expenseMinor, investedMinor, proceedsMinor, inflowMinor, outflowMinor, netMinor,
@@ -198,7 +210,7 @@ export function getFlowGraph(summary: CashflowSummary, wallets: readonly { id: s
     const balance = balances.get(wallet) || { incoming: 0, outgoing: 0 };
     if (entry.kind === 'income' || entry.kind === 'proceeds') {
       const name = displayCashflowCategory(entry.category, language), id = `source:${cashflowCategoryKey(entry.category)}`;
-      add(id, name, 0, entry.kind); link(id, wallet, entry.minor); balance.incoming += entry.minor;
+      add(id, name, 0, entry.kind, undefined, cashflowCategoryKey(entry.category)); link(id, wallet, entry.minor); balance.incoming += entry.minor;
     } else {
       const category = cashflowCategoryKey(entry.category), other = !expanded && small.has(category);
       const id = entry.kind === 'invested' ? 'invested' : `category:${other ? '__other' : category}`;

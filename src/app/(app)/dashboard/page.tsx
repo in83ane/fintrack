@@ -13,7 +13,7 @@ import { Modal } from "@/src/components/Modal";
 import * as XLSX from "xlsx";
 import { formatPnL, getPnLColor, formatPercent } from "@/src/lib/format";
 import { calcMaxDrawdown, calcProfitFactor } from "@/src/lib/finance";
-import { formatCashflowMoney, getCashflowSummary } from "@/src/lib/cashflow-selectors";
+import { formatCashflowMoney, getCashflowSummary, getNetWorthIncludedSources, localCashflowDay, monthBounds } from "@/src/lib/cashflow-selectors";
 import { useRouter } from "next/navigation";
 
 // ─── Net Worth Sparkline ──────────────────────────────────────────────────────
@@ -581,11 +581,10 @@ export default function DashboardPage() {
   const getEntryAmount = (entry: { amountUSD?: number; amount?: number }) => entry.amountUSD ?? entry.amount ?? 0;
   const formatEntryMoney = (v: number) => formatMoney(Math.abs(v));
 
+  const included = getNetWorthIncludedSources(activePortfolioId, activePortfolio?.kind, netWorthSettings);
+
   // Monthly cashflow — compare using local date to avoid UTC offset issues (UTC+7)
-    const now2 = new Date();
-    const monthStart = `${now2.getFullYear()}-${String(now2.getMonth() + 1).padStart(2, '0')}-01`;
-    const monthEnd = `${now2.getFullYear()}-${String(now2.getMonth() + 1).padStart(2, '0')}-${String(new Date(now2.getFullYear(), now2.getMonth() + 1, 0).getDate()).padStart(2, '0')}`;
-    const monthSummary = getCashflowSummary(cashActivities, { from: monthStart, to: monthEnd, currency, exchangeRates, trades, portfolioId: activePortfolioId });
+    const monthSummary = getCashflowSummary(cashActivities, { ...monthBounds(localCashflowDay(new Date().toISOString()).slice(0, 7)), currency, exchangeRates, trades, portfolioId: activePortfolioId });
     const { income: monthIncome, expenses: monthExpense, net: monthNet } = monthSummary;
 
   // P/L metrics
@@ -710,7 +709,7 @@ export default function DashboardPage() {
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tighter text-white leading-none">
               <AnimatedNumber value={currentNetWorth} formatter={(v) => formatMoney(v)} />
             </h1>
-            <p className="text-[10px] text-muted">{activePortfolio?.name || (language === 'th' ? 'ทุกพอร์ต' : 'All portfolios')} · {netWorthSettings.includeAssets ? 'assets' : 'assets excluded'} · {netWorthSettings.includeCash ? 'broker cash' : 'cash excluded'} · {netWorthSettings.includeBuckets ? 'buckets' : 'buckets excluded'}</p>
+            <p className="text-[10px] text-muted">{activePortfolio?.name || (language === 'th' ? 'ทุกพอร์ต' : 'All portfolios')} · {included.assets ? 'assets' : 'assets excluded'} · {included.cash ? 'broker cash' : 'cash excluded'} · {included.buckets ? 'buckets' : 'buckets excluded'}</p>
             <div className="flex items-center gap-2">
               <div className={cn("flex items-center gap-1", getPnLColor(netWorthReturnPct))}>
                 {netWorthReturnPct >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
