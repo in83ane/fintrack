@@ -13,7 +13,7 @@ import { Modal } from "@/src/components/Modal";
 import * as XLSX from "xlsx";
 import { formatPnL, getPnLColor, formatPercent } from "@/src/lib/format";
 import { calcMaxDrawdown, calcProfitFactor } from "@/src/lib/finance";
-import { getCashflowSummary } from "@/src/lib/cashflow-selectors";
+import { formatCashflowMoney, getCashflowSummary } from "@/src/lib/cashflow-selectors";
 import { useRouter } from "next/navigation";
 
 // ─── Net Worth Sparkline ──────────────────────────────────────────────────────
@@ -585,7 +585,8 @@ export default function DashboardPage() {
     const now2 = new Date();
     const monthStart = `${now2.getFullYear()}-${String(now2.getMonth() + 1).padStart(2, '0')}-01`;
     const monthEnd = `${now2.getFullYear()}-${String(now2.getMonth() + 1).padStart(2, '0')}-${String(new Date(now2.getFullYear(), now2.getMonth() + 1, 0).getDate()).padStart(2, '0')}`;
-    const { income: monthIncome, expenses: monthExpense, net: monthNet } = getCashflowSummary(cashActivities, { from: monthStart, to: monthEnd });
+    const monthSummary = getCashflowSummary(cashActivities, { from: monthStart, to: monthEnd, currency, exchangeRates, trades, portfolioId: activePortfolioId });
+    const { income: monthIncome, expenses: monthExpense, net: monthNet } = monthSummary;
 
   // P/L metrics
   const { grossProfit, grossLoss } = useMemo(() => {
@@ -683,7 +684,7 @@ export default function DashboardPage() {
           { label: language === 'th' ? 'สินทรัพย์' : 'Assets', value: activePositions.toString(), icon: <Briefcase size={16} />, color: '#ADC6FF', onClick: () => router.push('/portfolio') },
           { label: language === 'th' ? 'กำไร/ขาดทุน' : "P/L", value: `${totalUnrealizedPL >= 0 ? '+' : ''}${formatMoney(totalUnrealizedPL)}`, icon: <BarChart3 size={16} />, color: totalUnrealizedPL >= 0 ? '#4EDEA3' : '#FFB4AB', onClick: () => router.push('/portfolio') },
           { label: language === 'th' ? 'เงินในกระเป๋า' : 'Buckets', value: formatMoney(totalBucketValue), icon: <Wallet size={16} />, color: '#E9C349', onClick: () => router.push('/budget') },
-          { label: language === 'th' ? 'เดือนนี้' : 'This Month', value: `${monthNet >= 0 ? '+' : ''}${formatEntryMoney(monthNet)}`, icon: <TrendingUp size={16} />, color: monthNet >= 0 ? '#4EDEA3' : '#FFB4AB', onClick: () => router.push('/cashflow') },
+          { label: language === 'th' ? 'เดือนนี้' : 'This Month', value: formatCashflowMoney(monthSummary.netMinor, currency, true), icon: <TrendingUp size={16} />, color: monthNet >= 0 ? '#4EDEA3' : '#FFB4AB', onClick: () => router.push('/cashflow') },
         ].map((stat, i) => (
           <motion.button key={i} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={stat.onClick}
             className="bg-surface/50 backdrop-blur-xl rounded-2xl p-4 border border-border text-left hover:border-white/10 transition-all group">
@@ -786,19 +787,19 @@ export default function DashboardPage() {
           </div>
 
           <h2 className={cn("text-2xl font-bold tracking-tight mb-3", monthNet >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
-            {monthNet >= 0 ? "+" : "-"}{formatEntryMoney(monthNet)}
+            {formatCashflowMoney(monthSummary.netMinor, currency, true)}
           </h2>
 
           <div className="grid grid-cols-2 gap-2 mb-4">
             <div className="flex items-center gap-2 bg-white/5 px-3 py-2 rounded-xl">
               <div className="w-1.5 h-1.5 rounded-full bg-[#4EDEA3]" />
               <span className="text-[10px] text-gray-400 font-bold">{t("income")}</span>
-              <span className="text-xs text-white font-bold ml-auto">{formatEntryMoney(monthIncome)}</span>
+              <span className="text-xs text-white font-bold ml-auto">{formatCashflowMoney(monthSummary.incomeMinor, currency)}</span>
             </div>
             <div className="flex items-center gap-2 bg-white/5 px-3 py-2 rounded-xl">
               <div className="w-1.5 h-1.5 rounded-full bg-[#FFB4AB]" />
               <span className="text-[10px] text-gray-400 font-bold">{t("expense")}</span>
-              <span className="text-xs text-white font-bold ml-auto">{formatEntryMoney(monthExpense)}</span>
+              <span className="text-xs text-white font-bold ml-auto">{formatCashflowMoney(monthSummary.expenseMinor, currency)}</span>
             </div>
           </div>
 

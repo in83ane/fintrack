@@ -30,7 +30,7 @@ import { AnimatedNumber } from "@/src/components/AnimatedNumber";
 import { DateRangeBar, DateRangeState, getDateBounds, isInRange, toLocalDateKey } from "@/src/components/DateRangeBar";
 import { BrokerLedgerView } from "@/src/components/BrokerLedgerView";
 import { getLocalDateKey, localDateKeyToIso } from "@/src/lib/local-date";
-import { getCashflowSummary } from "@/src/lib/cashflow-selectors";
+import { formatCashflowMoney, getCashflowSummary } from "@/src/lib/cashflow-selectors";
 
 const INCOME_PRESET_KEYS = [
   { icon: "wallet", key: "salary" },
@@ -318,9 +318,9 @@ export default function LedgerPage() {
       ...(dateBounds ? { from: `${dateBounds.from.getFullYear()}-${String(dateBounds.from.getMonth() + 1).padStart(2, '0')}-${String(dateBounds.from.getDate()).padStart(2, '0')}`, to: `${dateBounds.to.getFullYear()}-${String(dateBounds.to.getMonth() + 1).padStart(2, '0')}-${String(dateBounds.to.getDate()).padStart(2, '0')}` } : {}),
       walletId: selectedWalletId,
     };
-    const summary = getCashflowSummary(cashActivities, scope);
-    return { inc: summary.income, exp: summary.expenses, net: summary.net };
-  }, [cashActivities, dateBounds, selectedWalletId]);
+    const summary = getCashflowSummary(cashActivities, { ...scope, currency, exchangeRates, trades });
+    return { inc: summary.incomeMinor, exp: summary.expenseMinor, net: summary.netMinor };
+  }, [cashActivities, dateBounds, selectedWalletId, currency, exchangeRates, trades]);
 
   const handleOpenPanel = (type: "INCOME" | "EXPENSE") => {
     setActivePanel(type);
@@ -629,18 +629,18 @@ export default function LedgerPage() {
               <p className="min-h-4 text-[8px] sm:text-[10px] text-gray-500 uppercase font-bold leading-4 tracking-wide truncate">
                 IN <span className="opacity-50">•</span> {periodLabel}
               </p>
-              <div className="mt-1.5 whitespace-nowrap text-sm sm:text-xl font-black leading-none tabular-nums text-[#4EDEA3]">{formatMoney(periodStats.inc)}</div>
+              <div className="mt-1.5 whitespace-nowrap text-sm sm:text-xl font-black leading-none tabular-nums text-[#4EDEA3]">{formatCashflowMoney(periodStats.inc, currency)}</div>
             </div>
             <div className="min-w-0 bg-surface/50 border border-border rounded-xl px-2.5 py-3 sm:px-4 sm:py-4">
               <p className="min-h-4 text-[8px] sm:text-[10px] text-gray-500 uppercase font-bold leading-4 tracking-wide truncate">
                 OUT <span className="opacity-50">•</span> {periodLabel}
               </p>
-              <div className="mt-1.5 whitespace-nowrap text-sm sm:text-xl font-black leading-none tabular-nums text-[#FFB4AB]">{formatMoney(periodStats.exp)}</div>
+              <div className="mt-1.5 whitespace-nowrap text-sm sm:text-xl font-black leading-none tabular-nums text-[#FFB4AB]">{formatCashflowMoney(periodStats.exp, currency)}</div>
             </div>
             <div className="min-w-0 bg-surface/50 border border-border rounded-xl px-2.5 py-3 sm:px-4 sm:py-4">
               <p className="min-h-4 text-[8px] sm:text-[10px] text-gray-500 uppercase font-bold leading-4 tracking-wide truncate">NET</p>
               <div className={cn("mt-1.5 whitespace-nowrap text-sm sm:text-xl font-black leading-none tabular-nums", periodStats.net >= 0 ? "text-white" : "text-[#FFB4AB]")}>
-                {periodStats.net >= 0 ? "+" : ""}{formatMoney(periodStats.net)}
+                {formatCashflowMoney(periodStats.net, currency, true)}
               </div>
             </div>
           </div>
