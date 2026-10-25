@@ -1684,7 +1684,7 @@ function Donut({ segments }: { segments: Segment[] }) {
   return (
     <div className="flex items-center gap-5">
       <div className="relative w-[124px] h-[124px] shrink-0">
-        <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90" role="img" aria-label="สัดส่วนสินทรัพย์">
+        <svg data-chart="donut" viewBox="0 0 120 120" className="w-full h-full -rotate-90" role="img" aria-label="สัดส่วนสินทรัพย์">
           <circle cx="60" cy="60" r={R} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="13" strokeDasharray={sum > 0 ? undefined : "3 6"} />
           {sum > 0 &&
             segments.map((s) => {

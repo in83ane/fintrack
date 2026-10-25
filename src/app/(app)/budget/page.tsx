@@ -609,7 +609,7 @@ export default function BudgetPage() {
           {/* Ring Chart (#15) */}
           {moneyBuckets.length > 0 && (
             <div className="flex items-center gap-3">
-              <svg viewBox="0 0 100 100" className="w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0">
+              <svg data-chart="donut" viewBox="0 0 100 100" className="w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0">
                 {(() => {
                   let cumPct = 0;
                   const R = 38, r = 26, C = 50;
@@ -650,15 +650,12 @@ export default function BudgetPage() {
             </div>
           )}
         </div>
-        <div className="h-2.5 sm:h-3 bg-white/5 rounded-full overflow-hidden flex mt-4">
+        <div data-chart className="h-2.5 sm:h-3 bg-white/5 rounded-full overflow-hidden flex mt-4">
           {moneyBuckets.map((b) => (
-            <motion.div
+            <div data-chart-bar
               key={b.id}
-              initial={{ width: 0 }}
-              animate={{ width: `${totalTargetPercent > 0 ? (b.targetPercent / totalTargetPercent) * 100 : 0}%` }}
-              transition={{ duration: 0.8, ease: "easeOut" }}
               className="h-full first:rounded-l-full last:rounded-r-full"
-              style={{ backgroundColor: b.color }}
+              style={{ backgroundColor: b.color, width: `${totalTargetPercent > 0 ? (b.targetPercent / totalTargetPercent) * 100 : 0}%` }}
             />
           ))}
         </div>
@@ -764,7 +761,8 @@ export default function BudgetPage() {
                       </div>
                       <div className="h-1 w-full rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}>
                         <div
-                          className="h-full rounded-full transition-all duration-500"
+                          data-chart-progress
+                          className="h-full rounded-full transition-transform duration-500"
                           style={{ width: `${Math.max(0, Math.min(actualPct, 100))}%`, backgroundColor: bucket.color }}
                         />
                       </div>

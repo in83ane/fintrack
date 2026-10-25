@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Sidebar } from "@/src/components/Sidebar";
 import { TopBar } from "@/src/components/TopBar";
 import { BottomNav } from "@/src/components/BottomNav";
@@ -9,6 +9,8 @@ import { OfflineIndicator } from "@/src/components/OfflineIndicator";
 import { PriceAlertManager } from "@/src/components/PriceAlertManager";
 import { AddCashflowModal } from "@/src/components/AddCashflowModal";
 import { Plus } from "lucide-react";
+import { installChartMotion, replayVisibleCharts } from '@/src/lib/chart-motion';
+import { useApp } from '@/src/context/AppContext';
 
 export default function AppLayout({
   children,
@@ -16,6 +18,10 @@ export default function AppLayout({
   children: React.ReactNode;
 }) {
   const [isAddCashflowOpen, setIsAddCashflowOpen] = useState(false);
+  const { currency } = useApp();
+
+  useEffect(() => installChartMotion(), []);
+  useEffect(() => replayVisibleCharts(), [currency]);
 
   return (
     <div className="flex min-h-screen min-w-0">

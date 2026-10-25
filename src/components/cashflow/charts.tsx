@@ -17,7 +17,7 @@ const axisAmount = (value: number) => new Intl.NumberFormat('en', { notation: 'c
 const fmt = (value: number, props: Common, signed = false) => props.privateAmounts ? '••••••' : formatCashflowMoney(Math.round(value), props.currency, signed);
 
 export const MonthlyChart = memo(function MonthlyChart(props: Common & { data: { label: string; incomeMinor: number; expenseMinor: number; investedMinor: number; proceedsMinor: number; netMinor: number }[]; includeInvestments: boolean }) {
-  return <ChartReveal label="Monthly income, expenses and investment cash movements; signed net line" revision={props.revision} className="h-64">
+  return <ChartReveal label="Monthly income, expenses and investment cash movements; signed net line" revision={props.revision} endValue={props.privateAmounts ? undefined : (props.data.at(-1)?.netMinor ?? 0) / 100} className="h-64">
     <ResponsiveContainer width="100%" height="100%"><ComposedChart data={props.data} accessibilityLayer margin={{ top: 10, left: 0, right: 12, bottom: 6 }}>
       <CartesianGrid stroke={chartTheme.grid} vertical={false}/><XAxis dataKey="label" tick={tick} axisLine={false} tickLine={false}/><YAxis tick={tick} width={48} tickFormatter={props.privateAmounts ? () => '•••' : axisAmount} axisLine={false} tickLine={false}/>
       <Tooltip contentStyle={tipStyle} formatter={(v: any, name: any) => [fmt(Number(v), props, name === 'Net'), name]}/>
@@ -38,12 +38,12 @@ export const SavingsChart = memo(function SavingsChart(props: Common & { data: {
     <CartesianGrid stroke={chartTheme.grid} vertical={false}/><XAxis dataKey="label" tick={tick} axisLine={false} tickLine={false}/><YAxis tick={tick} unit="%" axisLine={false} tickLine={false}/>
     <ReferenceArea y1={18} y2={22} fill={chartTheme.income} fillOpacity={.1}/><ReferenceLine y={20} stroke={chartTheme.income} strokeDasharray="3 3"/>
     <Tooltip contentStyle={tipStyle} formatter={(v: any) => [props.privateAmounts ? '••••' : `${Number(v) < 0 ? '' : '+'}${Number(v).toFixed(1)}%`, 'Savings rate']}/>
-    <Area dataKey="savingsRate" type="monotone" stroke={chartTheme.net} fill={`url(#${id})`} strokeWidth={2} isAnimationActive={false}/>
+    <Area dataKey="savingsRate" type="monotone" stroke={chartTheme.net} fill={`url(#${id})`} strokeWidth={2} dot={{ r: 3, fill: chartTheme.net }} isAnimationActive={false}/>
   </AreaChart></ResponsiveContainer></ChartReveal>;
 });
 export const BalanceChart = memo(function BalanceChart(props: Common & { data: { day: string; netMinor: number | null; projectedMinor: number | null; large: boolean }[] }) {
   const id = useId();
-  return <ChartReveal label="Daily cumulative net. Dashed line is the pace projection; dots mark large transaction days." revision={props.revision} className="h-64"><ResponsiveContainer width="100%" height="100%"><ComposedChart data={props.data} accessibilityLayer margin={{ left: 0, right: 12 }}>
+  return <ChartReveal label="Daily cumulative net. Dashed line is the pace projection; dots mark large transaction days." revision={props.revision} endValue={props.privateAmounts ? undefined : (props.data.filter(d => d.netMinor !== null).at(-1)?.netMinor ?? 0) / 100} className="h-64"><ResponsiveContainer width="100%" height="100%"><ComposedChart data={props.data} accessibilityLayer margin={{ left: 0, right: 12 }}>
     <defs><linearGradient id={id} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={chartTheme.net} stopOpacity={.25}/><stop offset="100%" stopColor={chartTheme.net} stopOpacity={0}/></linearGradient></defs>
     <CartesianGrid stroke={chartTheme.grid} vertical={false}/><XAxis dataKey="day" tick={tick} tickFormatter={d => String(Number(d.slice(-2)))} axisLine={false} tickLine={false}/><YAxis tick={tick} width={48} tickFormatter={props.privateAmounts ? () => '•••' : axisAmount} axisLine={false} tickLine={false}/>
     <Tooltip contentStyle={tipStyle} formatter={(v: any, name: any) => [fmt(Number(v), props, true), name]}/><ReferenceLine y={0} stroke={chartTheme.grid}/>

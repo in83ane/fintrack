@@ -39,7 +39,7 @@ function MiniChart({ data, positive }: { data: { time: number; price: number }[]
   const pts = data.map((d, i) => `${(i / (data.length - 1)) * W},${H - ((d.price - min) / range) * H}`).join(" ");
   const color = positive ? "#4EDEA3" : "#FFB4AB";
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-16">
+    <svg data-chart viewBox={`0 0 ${W} ${H}`} className="w-full h-16">
       <defs>
         <linearGradient id={`cg-${positive}`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity={0.3} />
@@ -56,7 +56,7 @@ function ConfidenceMeter({ value }: { value: number }) {
   const color = value >= 85 ? "#4EDEA3" : value >= 70 ? "#ADC6FF" : value >= 50 ? "#E9C349" : "#FFB4AB";
   return (
     <div className="relative w-20 h-20">
-      <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+      <svg data-chart="ring" viewBox="0 0 36 36" className="w-full h-full -rotate-90">
         <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="3" />
         <circle cx="18" cy="18" r="15.9" fill="none" stroke={color} strokeWidth="3" strokeDasharray={`${value} ${100 - value}`} strokeLinecap="round" className="transition-all duration-1000" />
       </svg>

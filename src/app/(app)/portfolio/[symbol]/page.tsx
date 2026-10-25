@@ -381,6 +381,9 @@ function SVGChart({ data, isPositive, period, hoveredIndex, onHover, language, s
   return (
     <div ref={containerRef} className="w-full h-full relative">
       <svg
+        data-chart
+        data-chart-revision={`${symbol}:${period}`}
+        data-chart-end-value={data.at(-1)?.price}
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
         className="w-full h-full cursor-crosshair"

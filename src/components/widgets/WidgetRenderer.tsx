@@ -50,7 +50,7 @@ function EquityCurveWidget() {
         </span>
       </div>
       <div className="flex-1 min-h-0">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full" preserveAspectRatio="none">
+        <svg data-chart viewBox={`0 0 ${W} ${H}`} className="w-full h-full" preserveAspectRatio="none">
           <defs>
             <linearGradient id="eq-grad" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={color} stopOpacity={0.3} />
@@ -97,7 +97,7 @@ function AllocationPieWidget() {
     <div className="h-full flex flex-col">
       <span className="text-[10px] font-black text-gray-500 uppercase tracking-wide mb-2">{t("widgetAllocationPie")}</span>
       <div className="flex-1 flex items-center gap-3 min-h-0">
-        <svg viewBox="0 0 100 100" className="w-20 h-20 flex-shrink-0">
+        <svg data-chart="donut" viewBox="0 0 100 100" className="w-20 h-20 flex-shrink-0">
           {segments.map((seg, i) => {
             let pct = Math.max(seg.value, 0.5);
             if (pct >= 100) pct = 99.99;
@@ -325,7 +325,7 @@ function BucketOverviewWidget() {
                 <span className="text-[10px] font-black text-white">{display?.original && <span className="mr-2 text-gray-500">{display.original}</span>}{display?.amount || 'unresolved'}</span>
               </div>
               <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-                <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: b.color }} />
+                <div data-chart-progress className="h-full rounded-full transition-transform" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: b.color }} />
               </div>
             </div>
           );

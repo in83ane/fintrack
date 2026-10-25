@@ -144,7 +144,7 @@ function HealthScoreRing({ score }: { score: number }) {
   return (
     <div className="flex items-center gap-3">
       <div className="relative w-14 h-14 flex-shrink-0">
-        <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+        <svg data-chart viewBox="0 0 36 36" className="w-full h-full -rotate-90">
           <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="3" />
           <circle cx="18" cy="18" r="15.9" fill="none" stroke={color} strokeWidth="3"
             strokeDasharray={dashArr} strokeLinecap="round"
@@ -171,7 +171,7 @@ function MonthlyTrendChart({ data }: {
   const W = 280; const H = 72;
   const bW = Math.max(4, (W / data.length) * 0.32);
   return (
-    <svg viewBox={`0 0 ${W} ${H + 18}`} className="w-full">
+    <svg data-chart viewBox={`0 0 ${W} ${H + 18}`} className="w-full">
       {data.map((d, i) => {
         const slotW = W / data.length;
         const x = i * slotW + slotW * 0.12;
@@ -245,10 +245,8 @@ function ExpenseVelocityWidget({ currentMonthExpenses, lastMonthExpenses, dayOfM
         <span className="text-[10px] text-gray-500 mb-0.5">of last month with {daysInMonth - dayOfMonth} days left</span>
       </div>
       <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-        <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: `${Math.min(100, pctUsed)}%` }}
-          transition={{ duration: 1, ease: "easeOut" }}
+        <div data-chart-progress
+          style={{ width: `${Math.min(100, pctUsed)}%` }}
           className={cn("h-full rounded-full", isOverPace ? "bg-[#FFB4AB]" : "bg-[#4EDEA3]")}
         />
       </div>
@@ -264,7 +262,7 @@ function ExpenseVelocityWidget({ currentMonthExpenses, lastMonthExpenses, dayOfM
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN AI FINANCIAL ADVISOR COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
-export function AIFinancialAdvisor() {
+export function AIFinancialAdvisor({ compactPrompts = false }: { compactPrompts?: boolean }) {
   const {
     formatMoney, language,
     cashActivities, bucketActivities,
@@ -660,8 +658,7 @@ export function AIFinancialAdvisor() {
     { label: "Budget Check", icon: Wallet },
     { label: "Net Worth", icon: DollarSign },
     { label: "Expense Breakdown", icon: PieChart },
-    { label: "Portfolio", icon: TrendingUp },
-    { label: "Advice", icon: Lightbulb },
+    ...(compactPrompts ? [] : [{ label: "Portfolio", icon: TrendingUp }, { label: "Advice", icon: Lightbulb }]),
     { label: "Velocity", icon: Gauge },
   ];
 

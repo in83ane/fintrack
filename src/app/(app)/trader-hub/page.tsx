@@ -183,6 +183,7 @@ export default function TraderHubPage() {
                 itemStyle={{ color: 'var(--color-primary)' }}
               />
               <Area 
+                isAnimationActive={false}
                 type="monotone" 
                 dataKey="equity" 
                 stroke="var(--color-primary)" 

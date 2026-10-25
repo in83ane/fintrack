@@ -1106,6 +1106,7 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
+                      isAnimationActive={false}
                       data={activeEntries}
                       dataKey="amount"
                       nameKey="id"

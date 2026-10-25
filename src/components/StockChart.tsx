@@ -334,6 +334,9 @@ export function StockChart({
   return (
     <div ref={containerRef} className={cn("w-full relative", className)} style={{ height }}>
       <svg
+        data-chart
+        data-chart-revision={`${symbol}:${period}`}
+        data-chart-end-value={data.at(-1)?.price}
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
         className="w-full h-full cursor-crosshair"

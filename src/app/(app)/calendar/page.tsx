@@ -304,7 +304,7 @@ export default function CalendarPage() {
             ))}
           </div>
 
-          <div className="grid grid-cols-7">
+          <div data-chart data-chart-revision={currentMonthPrefix} className="grid grid-cols-7">
             {calendarDays.map((day, idx) => {
               if (day === null) {
                 return <div key={`empty-${idx}`} className="aspect-[4/3] border-r border-b border-border" />;
@@ -325,6 +325,7 @@ export default function CalendarPage() {
               return (
                 <div
                   key={day}
+                  data-chart-cell data-chart-column={idx % 7}
                   onClick={() => setSelectedDate(dateStr)}
                   className={cn(
                     "min-h-[72px] sm:min-h-[88px] p-2 sm:p-3 border-r border-b border-border flex flex-col items-center justify-center gap-0.5 sm:gap-1 cursor-pointer transition-all group relative",
@@ -407,7 +408,7 @@ export default function CalendarPage() {
 
               return (
                 <div className="h-20">
-                  <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full" preserveAspectRatio="none">
+                  <svg data-chart viewBox={`0 0 ${W} ${H}`} className="w-full h-full" preserveAspectRatio="none">
                     <defs>
                       <linearGradient id="cal-eq-grad" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor={color} stopOpacity={0.25} />
@@ -504,9 +505,8 @@ export default function CalendarPage() {
                   <span>{macroAlignment.toFixed(0)}%</span>
                 </div>
                 <div className="h-1.5 sm:h-2 bg-white/5 rounded-full overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${macroAlignment}%` }}
+                  <div data-chart-progress
+                    style={{ width: `${macroAlignment}%` }}
                     className="h-full bg-[#ADC6FF] rounded-full"
                   />
                 </div>
@@ -517,9 +517,8 @@ export default function CalendarPage() {
                   <span>{riskExposure.toFixed(0)}%</span>
                 </div>
                 <div className="h-1.5 sm:h-2 bg-white/5 rounded-full overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${riskExposure}%` }}
+                  <div data-chart-progress
+                    style={{ width: `${riskExposure}%` }}
                     className="h-full bg-[#E9C349] rounded-full"
                   />
                 </div>

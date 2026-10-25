@@ -76,6 +76,19 @@ html[lang="en"] body {
   line-height: 1.5;
 }
 
+/* Shared, viewport-triggered chart entrance. Keep the reveal on the plot layer
+   so labels remain readable; reduced motion resolves directly to the final data. */
+.chart-reveal {
+  min-width: 0;
+}
+[data-chart-animating="true"] .recharts-tooltip-wrapper,
+[data-chart-animating="true"] .recharts-tooltip-cursor,
+[data-chart-animating="true"] .recharts-active-dot { opacity: 0 !important; pointer-events: none; }
+[data-chart-animating="true"] { pointer-events: none; }
+.cashflow-page .cashflow-private[data-private="true"] svg text { filter: blur(4px); }
+.cashflow-page [data-money] { transition: opacity 300ms linear; }
+.cashflow-page svg [role="button"]:focus-visible rect { stroke: var(--color-foreground); stroke-width: 2px; }
+
 /* Hide scrollbar but keep scroll functional */
 .scrollbar-none::-webkit-scrollbar {
   display: none;
