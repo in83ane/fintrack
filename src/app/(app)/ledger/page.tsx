@@ -318,9 +318,9 @@ export default function LedgerPage() {
       ...(dateBounds ? { from: `${dateBounds.from.getFullYear()}-${String(dateBounds.from.getMonth() + 1).padStart(2, '0')}-${String(dateBounds.from.getDate()).padStart(2, '0')}`, to: `${dateBounds.to.getFullYear()}-${String(dateBounds.to.getMonth() + 1).padStart(2, '0')}-${String(dateBounds.to.getDate()).padStart(2, '0')}` } : {}),
       walletId: selectedWalletId,
     };
-    const summary = getCashflowSummary(cashActivities, { ...scope, currency, exchangeRates, trades });
+    const summary = getCashflowSummary(cashActivities, { ...scope, currency, exchangeRates, trades, portfolioId: activePortfolio?.id });
     return { inc: summary.incomeMinor, exp: summary.expenseMinor, net: summary.netMinor };
-  }, [cashActivities, dateBounds, selectedWalletId, currency, exchangeRates, trades]);
+  }, [cashActivities, dateBounds, selectedWalletId, currency, exchangeRates, trades, activePortfolio?.id]);
 
   const handleOpenPanel = (type: "INCOME" | "EXPENSE") => {
     setActivePanel(type);

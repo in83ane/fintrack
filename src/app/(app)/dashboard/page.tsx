@@ -299,7 +299,7 @@ export default function DashboardPage() {
     cashActivities, moneyBuckets, bucketActivities,
     totalInvested, totalUnrealizedPL, totalRealizedPL, totalDividends,
     fetchAssetMarketData, addAsset, addTrade,
-    netWorthHistory, addToast, activePortfolio, activePortfolioId, isAllPortfolios, isDataLoaded,
+    netWorthHistory, netWorthSettings, addToast, activePortfolio, activePortfolioId, isAllPortfolios, isDataLoaded,
     portfolios, createPortfolio, selectPortfolio,
   } = useApp();
   const router = useRouter();
@@ -710,6 +710,7 @@ export default function DashboardPage() {
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tighter text-white leading-none">
               <AnimatedNumber value={currentNetWorth} formatter={(v) => formatMoney(v)} />
             </h1>
+            <p className="text-[10px] text-muted">{activePortfolio?.name || (language === 'th' ? 'ทุกพอร์ต' : 'All portfolios')} · {netWorthSettings.includeAssets ? 'assets' : 'assets excluded'} · {netWorthSettings.includeCash ? 'broker cash' : 'cash excluded'} · {netWorthSettings.includeBuckets ? 'buckets' : 'buckets excluded'}</p>
             <div className="flex items-center gap-2">
               <div className={cn("flex items-center gap-1", getPnLColor(netWorthReturnPct))}>
                 {netWorthReturnPct >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}

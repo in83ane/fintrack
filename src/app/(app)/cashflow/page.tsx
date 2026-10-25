@@ -122,7 +122,9 @@ export default function CashflowPage() {
       for (const row of importRows) {
         const rate = Number(row.rate || exchangeRates.THB);
         if (row.currency === 'THB' && !(rate > 0)) throw Error('THB exchange rate is required');
-        await addCashActivity({ type: row.type as 'INCOME' | 'EXPENSE', amountUSD: row.currency === 'THB' ? Number(decimal(row.amount).div(decimal(rate)).toFixed(12)) : Number(row.amount), originalAmount: Number(row.amount), currency: row.currency, rateAtTime: rate || 1, category: row.category || 'Other', date: `${row.date}T12:00:00+07:00`, note: row.note || 'CSV import' });
+        const saved = await addCashActivity({ type: row.type as 'INCOME' | 'EXPENSE', amountUSD: row.currency === 'THB' ? Number(decimal(row.amount).div(decimal(rate)).toFixed(12)) : Number(row.amount), originalAmount: Number(row.amount), currency: row.currency, rateAtTime: rate || 1, category: row.category || 'Other', date: `${row.date}T12:00:00+07:00`, note: row.note || 'CSV import' });
+        if (!saved) throw Error('Import stopped: this record could not be saved. Previously saved rows have been removed from the preview.');
+        setImportRows(pending => pending.slice(1));
       }
       setImportRows([]); addToast(text('CSV imported', 'นำเข้า CSV แล้ว'), 'success');
     } catch (error) { addToast(String(error), 'error'); } finally { setImporting(false); }
@@ -166,12 +168,13 @@ export default function CashflowPage() {
         { label: summary.netMinor < 0 ? text('Overspent', 'ใช้เกินรายรับ') : text('Saved', 'ออม'), values: [m(summary.netMinor, true)], subtotal: true },
       ];
       const grouped: DataRow[] = [];
-      for (const [layer, title] of [[0, text('Income sources', 'แหล่งเงินเข้า')], [1, text('Wallets', 'กระเป๋า')], [2, text('Destinations', 'ปลายทาง')]] as const) {
-        const nodes = graph.nodes.filter(n => n.layer === layer);
-        grouped.push({ label: title, values: ['', ''], subtotal: true });
-        nodes.forEach(n => grouped.push({ label: n.name, values: [m(n.minor), `${(n.minor / Math.max(summary.inflowMinor, summary.outflowMinor, 1) * 100).toFixed(1)}%`] }));
-        grouped.push({ label: `${title} · ${text('subtotal', 'รวม')}`, values: [m(nodes.reduce((s, n) => s + n.minor, 0)), ''], subtotal: true });
-      }
+      const tableGroups = [
+        { title:text('Income / investment proceeds','รายรับ / เงินจากการขายลงทุน'), rows:graph.nodes.filter(n => n.layer===0 && n.kind!=='reconciliation').map(n=>({name:n.name,minor:n.minor})), total:summary.inflowMinor },
+        { title:text('Wallets · recorded inflows','กระเป๋า · เงินเข้าที่บันทึก'), rows:result.wallets.map(w=>({name:w.name,minor:summary.entries.filter(e=>e.walletId===w.id && (e.kind==='income'||e.kind==='proceeds')).reduce((s,e)=>s+e.minor,0)})).concat([{name:text('Unassigned wallet','ไม่ระบุกระเป๋า'),minor:summary.entries.filter(e=>e.walletId==='unassigned' && (e.kind==='income'||e.kind==='proceeds')).reduce((s,e)=>s+e.minor,0)}]), total:summary.inflowMinor },
+        { title:text('Expenses','รายจ่าย'), rows:graph.nodes.filter(n=>n.kind==='expense').map(n=>({name:n.name,minor:n.minor})), total:summary.expenseMinor },
+        { title:text('Invested','ลงทุน'), rows:summary.entries.filter(e=>e.kind==='invested').map(e=>({name:e.record.note||e.record.type,minor:e.minor})), total:summary.investedMinor },
+      ];
+      for(const group of tableGroups){grouped.push({label:group.title,values:['',''],subtotal:true});group.rows.forEach(row=>grouped.push({label:row.name,values:[m(row.minor),`${(row.minor/Math.max(summary.inflowMinor,1)*100).toFixed(1)}%`]}));grouped.push({label:`${group.title} · ${text('subtotal','รวม')}`,values:[m(group.total),''],subtotal:true});}
       grouped.push(...totalsTable.map(row => ({ ...row, values: [...row.values, ''] })));
       const portfolioValue = assets.reduce((s, asset) => s.add(decimal(asset.valueUSD)), decimal(0));
       const basis = assets.reduce((s, asset) => s.add(decimal(asset.avgCost || 0).mul(decimal(asset.shares || 0))), decimal(0));
