@@ -1,0 +1,2 @@
+import { Sk } from '@/src/components/skeleton';
+export default function PlanSkeleton(){return <Sk.Root name="plan"><div className="app-page-container space-y-6 py-6"><h1 className="text-3xl font-semibold">PLAN</h1><div className="grid grid-cols-3 gap-4">{[0,1,2].map(i=><Sk.Card key={i}><Sk.Line width="60%"/><Sk.Line height={28} width="40%"/></Sk.Card>)}</div><Sk.Card><div className="space-y-5">{[0,1,2,3].map(i=><Sk.Block key={i} height={40}/>)}</div></Sk.Card></div></Sk.Root>;}
