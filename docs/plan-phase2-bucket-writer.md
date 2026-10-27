@@ -1,6 +1,6 @@
 # Phase 2 — atomic Bucket writer review
 
-Status: implementation and local verification complete for the approved concurrency scope. **Not deployed, not committed; no hosted SQL or real user data touched. Phase 3 and account purge remain deferred.** FX selection remains unchanged pending the user's decision.
+Status: implementation and local verification complete for the approved concurrency scope. **Committed in two commits: `5f66256` and `69df4f3`; not pushed, not deployed; awaiting two-session PostgreSQL verification on a database copy. No hosted SQL or real user data touched. Phase 3, goal completion, and account purge remain deferred.** FX selection remains unchanged pending the user's decision.
 
 ## What changed and why
 
