@@ -2,6 +2,8 @@
 
 27 October 2026. This phase is local code plus an **unapplied** migration. No customer database was changed. Email remains off. Savings transfers and PLAN currency accounts belong to phase 2; the new calendar/mobile dashboard belongs to phase 3.
 
+Base migration history: `supabase/migrations/20261027070148_daily_plans.sql` precedes `supabase/migrations/20261027070606_plan_monthly_targets.sql`; both precede `20261027075524_plan_recurrence_rules.sql`. These filenames match the deployed history. SQL content matches after normalizing line endings and outer newlines; no remote history or SQL was changed.
+
 ## Changes
 
 - Extend `daily_plans` and `plan_checks` instead of renaming or replacing them. Existing IDs, cash entries and check-in amount snapshots stay intact.

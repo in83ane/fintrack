@@ -32,8 +32,8 @@ try {
  insert into money_buckets(id,user_id,name,currency,current_amount) values('${bucket}','${owner}','QA','THB',1000);
  insert into cash_activities(user_id,bucket_id,type,amount,original_amount,currency,rate_at_time,date) values('${owner}','${bucket}','INCOME',1000/34.0,1000,'THB',34,now());
  `);
- await db.exec(sql('supabase/migrations/20261027070010_daily_plans.sql'));
- await db.exec(sql('supabase/migrations/20261027070508_plan_monthly_targets.sql'));
+ await db.exec(sql('supabase/migrations/20261027070148_daily_plans.sql'));
+ await db.exec(sql('supabase/migrations/20261027070606_plan_monthly_targets.sql'));
  await run("select set_config('request.jwt.claim.sub',$1,false)",[owner]);
  await db.exec('set role authenticated');
  const [{id:legacy}]=await run("insert into daily_plans(name,amount,bucket_id,starts_on,ends_on) values('Legacy',100,$1,current_date-20,current_date+20) returning id",[bucket]);
