@@ -44,7 +44,7 @@ const browser=await chromium.launch({executablePath:'C:\\Program Files (x86)\\Mi
 const results=[],errors=[];
 try{
  for(const width of [390,1280])for(const lang of ['en','th'])for(const theme of ['dark','light']){
-  tables={daily_plans:[],plan_checks:[],plan_rule_versions:[]};lastWrite=null;
+  tables={daily_plans:[],plan_checks:[],plan_rule_versions:[],plan_month_locks:[],plan_status_events:[]};lastWrite=null;
   const context=await browser.newContext({viewport:{width,height:900}}),p=await context.newPage();p.on('pageerror',e=>errors.push(e.message));p.on('dialog',dialog=>dialog.accept());
   const th=lang==='th',t=(en,thai)=>th?thai:en;
   await p.goto(`http://127.0.0.1:${server.address().port}/?lang=${lang}`);
@@ -60,13 +60,13 @@ try{
   await p.getByRole('checkbox',{name:th?'จ':'Mon',exact:true}).check();
   assert.equal(await submit.isEnabled(),true);
   await p.getByRole('combobox',{name:t('Goal type','ประเภทเป้าหมาย'),exact:true}).click();
-  await p.getByRole('option',{name:t('Money goal · expense from bucket','เป้าหมายเงิน · รายจ่ายจาก bucket'),exact:true}).click();
+  await p.getByRole('option',{name:t('Money goal','เป้าหมายเงิน'),exact:true}).click();
   await p.getByRole('combobox',{name:t('Amount frequency','ช่วงเป้าหมายเงิน'),exact:true}).click();
   await p.getByRole('option',{name:t('Monthly target','เป้าหมายต่อเดือน'),exact:true}).click();
   await p.getByLabel(t('Monthly target','ยอดเป้าหมายต่อเดือน'),{exact:true}).fill('100');
   await p.getByRole('combobox',{name:t('Source bucket','กระเป๋าที่หักเงิน'),exact:true}).click();
   await p.getByRole('option',{name:'QA wallet · THB',exact:true}).click();
-  assert.equal(await submit.isEnabled(),false);await p.getByRole('alert').waitFor();
+  assert.equal(await submit.isEnabled(),true); // Phase 2 enables monthly recurrence.
   await p.getByRole('combobox',{name:t('Repeat','ความถี่'),exact:true}).click();
   await p.getByRole('option',{name:t('Every day','ทุกวัน'),exact:true}).click();
   assert.equal(await submit.isEnabled(),true);
@@ -87,12 +87,11 @@ try{
   await p.getByLabel(t('Day of month','วันที่ของเดือน'),{exact:true}).fill('31');
   await p.screenshot({path:path.join(out,`${width}-${lang}-${theme}-editor.png`),fullPage:true});
   await p.getByRole('combobox',{name:t('Goal type','ประเภทเป้าหมาย'),exact:true}).click();
-  await p.getByRole('option',{name:t('Money goal · expense from bucket','เป้าหมายเงิน · รายจ่ายจาก bucket'),exact:true}).click();
+  await p.getByRole('option',{name:t('Money goal','เป้าหมายเงิน'),exact:true}).click();
   await p.getByLabel(t('Monthly target','ยอดเป้าหมายต่อเดือน'),{exact:true}).fill('100');
   await p.getByRole('combobox',{name:t('Source bucket','กระเป๋าที่หักเงิน'),exact:true}).click();
   await p.getByRole('option',{name:'QA wallet · THB',exact:true}).click();
-  assert.equal(await p.getByRole('button',{name:t('Save changes','บันทึกการแก้ไข'),exact:true}).isEnabled(),false);
-  await p.getByRole('alert').waitFor();
+  assert.equal(await p.getByRole('button',{name:t('Save changes','บันทึกการแก้ไข'),exact:true}).isEnabled(),true);
   await p.getByRole('combobox',{name:t('Goal type','ประเภทเป้าหมาย'),exact:true}).click();
   await p.getByRole('option',{name:t('Habit · no money movement','เป้าหมายทั่วไป · ไม่หักเงิน'),exact:true}).click();
   await p.getByRole('button',{name:t('Save changes','บันทึกการแก้ไข'),exact:true}).click();

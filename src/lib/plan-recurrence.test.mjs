@@ -3,16 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 const code = ts.transpileModule(readFileSync(new URL('./plan-recurrence.ts', import.meta.url), 'utf8'), {compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
-const {blocksMonthlyMoneyRule,planDates,isPlanDay,ruleOnDay,weeklyPlanProgress,validatePlanRule,validPlanDate}=await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`);
+const {planDates,isPlanDay,ruleOnDay,weeklyPlanProgress,validatePlanRule,validPlanDate}=await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`);
 const base={starts_on:'2024-01-01',ends_on:null,frequency:'daily',days_of_week:[],weekly_target:3,monthly_day:31,status:'active'};
-test('temporary gate blocks every non-daily monthly money combination, including editing',()=>{
- for(const frequency of ['weekdays','weekly_target','monthly']){
-  assert.equal(blocksMonthlyMoneyRule({amount:100,amount_period:'month',frequency}),true);
-  assert.equal(blocksMonthlyMoneyRule({amount:100,amount_period:'day',frequency}),false);
-  assert.equal(blocksMonthlyMoneyRule({amount:0,amount_period:'month',frequency}),false);
- }
- assert.equal(blocksMonthlyMoneyRule({amount:100,amount_period:'month',frequency:'daily'}),false);
-});
 test('endless daily rules generate only the requested month, including leap day',()=>{
  assert.equal(planDates(base,'2024-02-01','2024-02-29').length,29);
  assert.equal(planDates(base,'2025-02-01','2025-02-28').length,28);

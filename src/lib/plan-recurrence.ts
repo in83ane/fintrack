@@ -15,10 +15,8 @@ export interface DailyPlan extends PlanRule {
   id: string; name: string; amount: number; amount_period: 'day' | 'month';
   bucket_id: string | null; currency: string | null; archived: boolean;
   has_money_history: boolean;
-}
-/** Temporary phase-1 gate. Remove only when the phase-2 money allocator is verified. */
-export function blocksMonthlyMoneyRule(plan: { amount: number; amount_period: 'day' | 'month'; frequency: PlanFrequency }): boolean {
-  return plan.amount > 0 && plan.amount_period === 'month' && plan.frequency !== 'daily';
+  money_mode?: 'expense' | 'saving';
+  monthly_method?: 'split' | 'flexible';
 }
 export function validPlanDate(day: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return false;
