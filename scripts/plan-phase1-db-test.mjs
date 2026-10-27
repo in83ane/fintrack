@@ -15,6 +15,7 @@ const fail=async(q,args,pattern)=>{await assert.rejects(()=>run(q,args),pattern)
 let passed=0;
 try {
  await db.exec(`
+ set time zone 'Asia/Bangkok';
  create role anon; create role authenticated; create role service_role bypassrls;
  create schema auth; create table auth.users(id uuid primary key);
  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
@@ -46,8 +47,30 @@ try {
  await db.exec(sql('supabase/rollbacks/20261027075524_plan_recurrence_rules.down.sql'));
  assert.deepEqual(await run('select * from cash_activities order by id'),before);
  await db.exec(migration);passed++;
+ const guard=sql('supabase/migrations/20261027081807_plan_monthly_recurrence_guard.sql');
+ await db.exec(guard);
+ await db.exec(sql('supabase/rollbacks/20261027081807_plan_monthly_recurrence_guard.down.sql'));
+ await db.exec(guard);passed++;
  await db.exec('set role authenticated');
  const [{id:habit}]=await run("insert into daily_plans(name,starts_on,ends_on) values('Endless',current_date-20,null) returning id");
+ // Both inserts and updates are protected, even through direct REST/database writes.
+ for(const frequency of ['weekdays','weekly_target','monthly']){
+  await fail("insert into daily_plans(name,amount,amount_period,bucket_id,starts_on,ends_on,frequency,days_of_week) values('Blocked monthly',100,'month',$1,current_date,null,$2,'{1}')",[bucket,frequency],/plan_monthly_money_daily_only/);
+  await fail("update daily_plans set amount_period='month',frequency=$2,days_of_week='{1}' where id=$1",[legacy,frequency],/plan_monthly_money_daily_only/);
+ }
+ await run("update daily_plans set amount_period='month',frequency='daily' where id=$1",[legacy]);
+ await run("update daily_plans set amount_period='day' where id=$1",[legacy]);passed++;
+ // A session timezone (or client clock) cannot supply the rule's effective date.
+ await db.exec("begin; set local time zone 'Pacific/Honolulu'");
+ await run("update daily_plans set name='Server date proof' where id=$1",[habit]);
+ const [dates]=await run("select effective_on::text effective, (now() at time zone 'Asia/Bangkok')::date::text bangkok from plan_rule_versions where plan_id=$1 and rule->>'name'='Server date proof'",[habit]);
+ assert.equal(dates.effective,dates.bangkok);
+ await db.exec('rollback');passed++;
+ for(const fn of ['plan_private.capture_rule_version','plan_private.remember_plan_money','public.validate_daily_plan_rule','public.guard_plan_schedule'])await fail(`select ${fn}()`,[],/permission denied/);
+ await db.exec('set role anon');
+ for(const fn of ['plan_private.capture_rule_version','plan_private.remember_plan_money','public.validate_daily_plan_rule','public.guard_plan_schedule'])await fail(`select ${fn}()`,[],/permission denied/);
+ await db.exec('set role authenticated');passed++;
+
  await run('insert into plan_checks(plan_id,day) values($1,current_date)',[habit]);
  await fail('insert into plan_checks(plan_id,day) values($1,current_date)',[habit],/duplicate/i);passed++;
  await run("update daily_plans set status='paused' where id=$1",[habit]);

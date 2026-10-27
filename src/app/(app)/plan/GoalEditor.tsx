@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { Modal } from '@/src/components/Modal';
 import { CustomSelect } from '@/src/components/CustomSelect';
-import { validatePlanRule, type DailyPlan, type PlanFrequency } from '@/src/lib/plan-recurrence';
+import { blocksMonthlyMoneyRule, validatePlanRule, type DailyPlan, type PlanFrequency } from '@/src/lib/plan-recurrence';
 
 export type GoalDraft = Pick<DailyPlan, 'name'|'amount'|'amount_period'|'bucket_id'|'starts_on'|'ends_on'|'frequency'|'days_of_week'|'weekly_target'|'monthly_day'|'status'>;
 const field = 'mt-1 w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm';
@@ -20,7 +20,8 @@ export default function GoalEditor({plan,today,th,buckets,onSave,onClose,hasChec
  const [kind,setKind]=useState(plan?.amount?'money':'habit'),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [amount,setAmount]=useState(plan?.amount?String(plan.amount):'');
  const payload={...draft,name:draft.name.trim(),amount:kind==='habit'?0:Number(amount),bucket_id:kind==='habit'?null:draft.bucket_id};
- const valid=!!payload.name&&payload.name.length<=100&&!validatePlanRule(payload)&&(kind==='habit'||(!!payload.bucket_id&&Number.isFinite(payload.amount)&&payload.amount>=0.01&&payload.amount<1e12&&/^\d+(\.\d{1,2})?$/.test(amount)));
+ const blockedMonthly=blocksMonthlyMoneyRule(payload);
+ const valid=!blockedMonthly&&!!payload.name&&payload.name.length<=100&&!validatePlanRule(payload)&&(kind==='habit'||(!!payload.bucket_id&&Number.isFinite(payload.amount)&&payload.amount>=0.01&&payload.amount<1e12&&/^\d+(\.\d{1,2})?$/.test(amount)));
  const update=<K extends keyof GoalDraft>(key:K,value:GoalDraft[K])=>setDraft(d=>({...d,[key]:value}));
  async function save(e:React.FormEvent){e.preventDefault();if(!valid||busy)return;setBusy(true);setError('');try{await onSave(payload);}catch{setError(text('Could not save. Check your connection and try again.','บันทึกไม่สำเร็จ ตรวจการเชื่อมต่อแล้วลองอีกครั้ง'));}finally{setBusy(false);}}
  return <Modal isOpen onClose={()=>{if(!busy)onClose();}} title={plan?text('Edit goal','แก้ไขเป้าหมาย'):text('New goal','เพิ่มเป้าหมาย')}>
@@ -39,6 +40,7 @@ export default function GoalEditor({plan,today,th,buckets,onSave,onClose,hasChec
    <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={draft.ends_on===null} onChange={e=>update('ends_on',e.target.checked?null:draft.starts_on)}/>{text('No end date','ไม่มีวันสิ้นสุด')}</label>
    <div className="grid grid-cols-2 gap-3"><label className="text-sm">{text('Start','เริ่ม')}<input required disabled={hasChecks} type="date" className={field} value={draft.starts_on} max={draft.ends_on||undefined} onChange={e=>update('starts_on',e.target.value)}/></label>{draft.ends_on!==null&&<label className="text-sm">{text('End','สิ้นสุด')}<input required type="date" min={draft.starts_on} className={field} value={draft.ends_on} onChange={e=>update('ends_on',e.target.value)}/></label>}</div>
    {plan&&<p className="text-xs text-muted">{text('Rule changes apply from today. Existing recorded amounts stay unchanged.','กฎที่แก้มีผลตั้งแต่วันนี้ ยอดที่เคยบันทึกไว้ไม่เปลี่ยน')}</p>}
+   {blockedMonthly&&<p className="text-sm text-loss" role="alert">{text('Monthly money targets currently support Every day only. Choose Every day or Amount per check.','เป้าเงินรายเดือนรองรับเฉพาะ “ทุกวัน” ในตอนนี้ กรุณาเลือกทุกวัน หรือเปลี่ยนเป็นจำนวนเงินต่อครั้ง')}</p>}
    {error&&<p className="text-sm text-loss" role="alert">{error}</p>}
    <button type="submit" disabled={!valid||busy} className={`${button} w-full bg-primary text-primary-foreground`}>{busy?text('Saving…','กำลังบันทึก…'):plan?text('Save changes','บันทึกการแก้ไข'):text('Create goal','สร้างเป้าหมาย')}</button>
   </form>
