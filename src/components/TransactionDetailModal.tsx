@@ -110,7 +110,7 @@ export function TransactionDetailModal({ isOpen, onClose, transaction }: Transac
     <Modal isOpen={isOpen} onClose={onClose} title={t("transactionDetails") || "Transaction Details"}>
       <div className="space-y-6">
         {/* Header - Transaction Type */}
-        <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-border">
+        <div className="flex items-center justify-between p-4 bg-foreground/5 rounded-2xl border border-border">
           <div className="flex items-center gap-3">
             <div className={cn(
               "w-12 h-12 rounded-xl flex items-center justify-center",
@@ -136,7 +136,7 @@ export function TransactionDetailModal({ isOpen, onClose, transaction }: Transac
               )}
             </div>
             <div>
-              <h3 className="text-lg font-black text-white">
+              <h3 className="text-lg font-black text-foreground">
                 {isTrade
                   ? `${transaction.type} ${transaction.asset}`
                   : isBucketActivity
@@ -155,10 +155,10 @@ export function TransactionDetailModal({ isOpen, onClose, transaction }: Transac
               transaction.type === 'BUY' || transaction.type === 'IMPORT' ||
               transaction.type === 'INCOME' || transaction.type === 'DEPOSIT' ||
               (transaction.activityType && ['deposit', 'income_split', 'profit_split'].includes(transaction.activityType))
-                ? 'text-[#4EDEA3]'
+                ? 'text-gain'
                 : transaction.type === 'SELL' || transaction.type === 'EXPENSE' || transaction.type === 'WITHDRAW' || transaction.activityType === 'withdraw'
-                  ? 'text-[#FFB4AB]'
-                  : 'text-white'
+                  ? 'text-loss'
+                  : 'text-foreground'
             )}>
               {(transaction.type === 'BUY' || transaction.type === 'IMPORT' || transaction.type === 'INCOME' || transaction.type === 'DEPOSIT') ? '+' : ''}
               {(transaction.type === 'SELL' || transaction.type === 'EXPENSE' || transaction.type === 'WITHDRAW') ? '-' : ''}
@@ -172,53 +172,53 @@ export function TransactionDetailModal({ isOpen, onClose, transaction }: Transac
           <>
             {/* Quantity & Price */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="p-4 bg-white/5 rounded-2xl border border-border">
+              <div className="p-4 bg-foreground/5 rounded-2xl border border-border">
                 <div className="flex items-center gap-2 mb-2">
                   <Hash size={14} className="text-gray-500" />
                   <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">
                     {t("shares") || "Shares"}
                   </span>
                 </div>
-                <p className="text-lg font-black text-white">
+                <p className="text-lg font-black text-foreground">
                   {transaction.shares?.toFixed(6) || '0.00'}
                 </p>
-                <p className="text-[10px] text-gray-500 mt-0.5">{transaction.asset}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{transaction.asset}</p>
               </div>
 
-              <div className="p-4 bg-white/5 rounded-2xl border border-border">
+              <div className="p-4 bg-foreground/5 rounded-2xl border border-border">
                 <div className="flex items-center gap-2 mb-2">
                   <DollarSign size={14} className="text-gray-500" />
                   <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">
                     {t("pricePerUnit") || "Price/Unit"}
                   </span>
                 </div>
-                <p className="text-lg font-black text-white">
+                <p className="text-lg font-black text-foreground">
                   {formatMoney(transaction.pricePerUnit || 0, transaction.currency as any, transaction.rateAtTime)}
                 </p>
-                <p className="text-[10px] text-gray-500 mt-0.5">
+                <p className="text-xs text-gray-500 mt-0.5">
                   {t("atTimeOfTrade") || "At time of trade"}
                 </p>
               </div>
             </div>
 
             {/* Total Value */}
-            <div className="p-4 bg-gradient-to-br from-[#ADC6FF]/5 to-[#4EDEA3]/5 rounded-2xl border border-[#ADC6FF]/20">
+            <div className="p-4 bg-gradient-to-br from-info/5 to-gain/5 rounded-2xl border border-info/20">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">
                   {t("totalValue") || "Total Value"}
                 </span>
-                <TrendingUp size={14} className="text-[#ADC6FF]" />
+                <TrendingUp size={14} className="text-info" />
               </div>
-              <p className="text-2xl font-black text-white">
+              <p className="text-2xl font-black text-foreground">
                 {formatMoney(transaction.amountUSD, transaction.currency as any, transaction.rateAtTime, transaction.originalAmount)}
               </p>
             </div>
 
             {/* Source Bucket */}
             {sourceBucket && (
-              <div className="p-4 bg-[#E9C349]/5 rounded-2xl border border-[#E9C349]/20">
+              <div className="p-4 bg-warning/5 rounded-2xl border border-warning/20">
                 <div className="flex items-center gap-2 mb-3">
-                  <Wallet size={14} className="text-[#E9C349]" />
+                  <Wallet size={14} className="text-warning" />
                   <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">
                     {t("sourceBucket") || "Source Bucket"}
                   </span>
@@ -227,10 +227,10 @@ export function TransactionDetailModal({ isOpen, onClose, transaction }: Transac
                   <div className="flex items-center gap-2">
                     <span className="text-xl"><FinanceIcon name={sourceBucket.icon} /></span>
                     <div>
-                      <p className="text-sm font-bold text-white">
+                      <p className="text-sm font-bold text-foreground">
                         {t(sourceBucket.name) || sourceBucket.name}
                       </p>
-                      <p className="text-[10px] text-gray-500">
+                      <p className="text-xs text-gray-500">
                         {formatMoney(sourceBucket.currentAmount / (exchangeRates[sourceBucket.currency || 'USD'] || 1), sourceBucket.currency as any, undefined, sourceBucket.currentAmount)} {t("remaining") || "remaining"}
                       </p>
                     </div>
@@ -243,7 +243,7 @@ export function TransactionDetailModal({ isOpen, onClose, transaction }: Transac
 
             {/* Tag */}
             {transaction.tag && (
-              <div className="flex items-center gap-2 p-3 bg-white/5 rounded-xl border border-border">
+              <div className="flex items-center gap-2 p-3 bg-foreground/5 rounded-xl border border-border">
                 <Tag size={14} className="text-gray-500" />
                 <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">
                   {t("tag") || "Tag"}:
@@ -262,12 +262,12 @@ export function TransactionDetailModal({ isOpen, onClose, transaction }: Transac
 
             {/* Exchange Rate */}
             {transaction.rateAtTime && transaction.rateAtTime !== 1 && (
-              <div className="flex items-center gap-2 p-3 bg-white/5 rounded-xl border border-border">
+              <div className="flex items-center gap-2 p-3 bg-foreground/5 rounded-xl border border-border">
                 <TrendingUp size={14} className="text-gray-500" />
                 <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">
                   {t("exchangeRate") || "Exchange Rate"}:
                 </span>
-                <span className="text-xs font-bold text-white">
+                <span className="text-xs font-bold text-foreground">
                   1 USD = {transaction.rateAtTime} {transaction.currency}
                 </span>
               </div>
@@ -278,7 +278,7 @@ export function TransactionDetailModal({ isOpen, onClose, transaction }: Transac
         {/* Bucket Activity Details */}
         {isBucketActivity && (
           <>
-            <div className="p-4 bg-white/5 rounded-2xl border border-border">
+            <div className="p-4 bg-foreground/5 rounded-2xl border border-border">
               <div className="flex items-center gap-2 mb-3">
                 {React.createElement(getActivityIcon(transaction.type === 'DEPOSIT' || transaction.type === 'WITHDRAW' ? (transaction.type === 'DEPOSIT' ? 'deposit' : 'withdraw') : (transaction.activityType || 'deposit')), {
                   size: 14,
@@ -296,14 +296,14 @@ export function TransactionDetailModal({ isOpen, onClose, transaction }: Transac
             </div>
 
             {transaction.bucketName && (
-              <div className="p-4 bg-[#E9C349]/5 rounded-2xl border border-[#E9C349]/20">
+              <div className="p-4 bg-warning/5 rounded-2xl border border-warning/20">
                 <div className="flex items-center gap-2 mb-2">
-                  <Wallet size={14} className="text-[#E9C349]" />
+                  <Wallet size={14} className="text-warning" />
                   <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">
                     {t("bucket") || "Bucket"}
                   </span>
                 </div>
-                <p className="text-sm font-bold text-white">
+                <p className="text-sm font-bold text-foreground">
                   {t(transaction.bucketName) || transaction.bucketName}
                 </p>
               </div>
@@ -314,23 +314,23 @@ export function TransactionDetailModal({ isOpen, onClose, transaction }: Transac
         {/* Cash Activity Details */}
         {isCashActivity && (
           <>
-            <div className="p-4 bg-white/5 rounded-2xl border border-border">
+            <div className="p-4 bg-foreground/5 rounded-2xl border border-border">
               <div className="flex items-center gap-2 mb-3">
                 <DollarSign size={14} className="text-gray-500" />
                 <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">
                   {t("category") || "Category"}
                 </span>
               </div>
-              <p className="text-sm font-bold text-white">
+              <p className="text-sm font-bold text-foreground">
                 {t(transaction.category || '') || transaction.category}
               </p>
             </div>
 
             {transaction.isTransfer && (
-              <div className="p-4 bg-[#ADC6FF]/5 rounded-2xl border border-[#ADC6FF]/20">
+              <div className="p-4 bg-info/5 rounded-2xl border border-info/20">
                 <div className="flex items-center gap-2 mb-2">
-                  <Wallet size={14} className="text-[#ADC6FF]" />
-                  <span className="text-xs font-bold text-[#ADC6FF] uppercase tracking-wide">
+                  <Wallet size={14} className="text-info" />
+                  <span className="text-xs font-bold text-info uppercase tracking-wide">
                     {t("transfer") || "Money Transfer"}
                   </span>
                 </div>
@@ -344,7 +344,7 @@ export function TransactionDetailModal({ isOpen, onClose, transaction }: Transac
             )}
 
             {transaction.note && (
-              <div className="p-4 bg-white/5 rounded-2xl border border-border">
+              <div className="p-4 bg-foreground/5 rounded-2xl border border-border">
                 <div className="flex items-center gap-2 mb-2">
                   <Tag size={14} className="text-gray-500" />
                   <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">
@@ -360,12 +360,12 @@ export function TransactionDetailModal({ isOpen, onClose, transaction }: Transac
         )}
 
         {/* Timestamp */}
-        <div className="flex items-center gap-2 p-3 bg-white/5 rounded-xl border border-border">
+        <div className="flex items-center gap-2 p-3 bg-foreground/5 rounded-xl border border-border">
           <Calendar size={14} className="text-gray-500" />
           <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">
             {t("timestamp") || "Timestamp"}:
           </span>
-          <span className="text-xs font-bold text-white">
+          <span className="text-xs font-bold text-foreground">
             {format(new Date(transaction.date), language === 'th' ? 'dd MMMM yyyy HH:mm:ss' : 'MMMM dd, yyyy HH:mm:ss')}
           </span>
         </div>
@@ -374,7 +374,7 @@ export function TransactionDetailModal({ isOpen, onClose, transaction }: Transac
         <div className="flex gap-3 pt-2">
           <button
             onClick={onClose}
-            className="flex-1 py-3 bg-white/5 text-gray-400 rounded-xl font-bold text-sm hover:text-white hover:bg-white/10 transition-all"
+            className="flex-1 py-3 bg-foreground/5 text-gray-400 rounded-xl font-bold text-sm hover:text-foreground hover:bg-foreground/10 transition-all"
           >
             {t("close") || "Close"}
           </button>

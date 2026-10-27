@@ -1,3 +1,4 @@
+import { createBucketCommander } from './bucket-command';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseUrl, getSupabaseAnonKey } from './env';
 
@@ -205,8 +206,14 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
+const executeBucketCommand=createBucketCommander(async args=>await supabase.rpc('write_bucket_cash',args));
+
 // Database helper functions
 export const db = {
+  bucketWriter: {
+    execute: async (owner:string,command:any)=>executeBucketCommand(owner,command),
+    save: async (requestId:string,id:string,details:any,rate?:number)=>await supabase.rpc('save_cash_bucket',{request_id:requestId,bucket_id:id,details,opening_rate:rate??null}),
+  },
   // Immutable trade ledger. The database is the writer (via trade triggers);
   // clients can only read a bounded, indexed page.
   history: {
@@ -233,7 +240,7 @@ export const db = {
 
   // Assets
   assets: {
-    getAll: async (userId: string, portfolioId?: string | null) => {
+    getAll: async (userId: string, portfolioId?: string | null, range?: { from: number; to: number }) => {
       let query = supabase
         .from('assets')
         .select('*')
@@ -241,6 +248,7 @@ export const db = {
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: false });
       if (portfolioId) query = query.eq('portfolio_id', portfolioId);
+      if (range) query = query.order('id').range(range.from, range.to);
       return await query;
     },
     insert: async (asset: Omit<Asset, 'id' | 'created_at' | 'updated_at'>) => {
@@ -306,13 +314,14 @@ export const db = {
 
   // Trades
   trades: {
-    getAll: async (userId: string, portfolioId?: string | null) => {
+    getAll: async (userId: string, portfolioId?: string | null, range?: { from: number; to: number }) => {
       let query = supabase
         .from('trades')
         .select('*, cost_basis_sales(method,selections,request)')
         .eq('user_id', userId)
         .order('execution_date', { ascending: false });
       if (portfolioId) query = query.eq('portfolio_id', portfolioId);
+      if (range) query = query.order('id').range(range.from, range.to);
       return await query;
     },
     insert: async (trade: Omit<Trade, 'id' | 'created_at'>) => {
@@ -394,13 +403,14 @@ export const db = {
   // Brokerage cash accounts belong only to trading portfolios. Their balance
   // is calculated from the append-only brokerage_cash_entries ledger.
   brokerageAccounts: {
-    getAll: async (userId: string, portfolioId?: string | null) => {
+    getAll: async (userId: string, portfolioId?: string | null, range?: { from: number; to: number }) => {
       let query = supabase
         .from('brokerage_accounts')
         .select('*')
         .eq('user_id', userId)
         .order('created_at');
       if (portfolioId) query = query.eq('portfolio_id', portfolioId);
+      if (range) query = query.order('id').range(range.from, range.to);
       return await query;
     },
     insert: async (account: Omit<BrokerageAccount, 'id' | 'created_at' | 'updated_at'>) => {
@@ -432,34 +442,37 @@ export const db = {
     insert: async (entry: Omit<BrokerageCashEntry, 'id' | 'created_at'>) => {
       return await supabase.from('brokerage_cash_entries').insert(entry).select().single();
     },
-    getBalances: async (userId: string, portfolioId?: string | null) => {
+    getBalances: async (userId: string, portfolioId?: string | null, range?: { from: number; to: number }) => {
       let query = supabase
         .from('brokerage_account_balances')
         .select('*')
         .eq('user_id', userId);
       if (portfolioId) query = query.eq('portfolio_id', portfolioId);
+      if (range) query = query.order('brokerage_account_id').range(range.from, range.to);
       return await query;
     },
-    getAll: async (userId: string, portfolioId?: string | null) => {
+    getAll: async (userId: string, portfolioId?: string | null, range?: { from: number; to: number }) => {
       let query = supabase
         .from('brokerage_cash_entries')
         .select('*')
         .eq('user_id', userId)
         .order('occurred_at', { ascending: false });
       if (portfolioId) query = query.eq('portfolio_id', portfolioId);
+      if (range) query = query.order('id').range(range.from, range.to);
       return await query;
     },
   },
 
   // Allocations
   allocations: {
-    getAll: async (userId: string, portfolioId?: string | null) => {
+    getAll: async (userId: string, portfolioId?: string | null, range?: { from: number; to: number }) => {
       let query = supabase
         .from('allocations')
         .select('*')
         .eq('user_id', userId)
         .order('label');
       if (portfolioId) query = query.eq('portfolio_id', portfolioId);
+      if (range) query = query.order('id').range(range.from, range.to);
       return await query;
     },
     upsert: async (allocation: Omit<Allocation, 'id'>) => {
@@ -480,64 +493,67 @@ export const db = {
 
   // Money Buckets
   buckets: {
-    getAll: async (userId: string, portfolioId?: string | null) => {
+    getAll: async (userId: string, portfolioId?: string | null, range?: { from: number; to: number }) => {
       let query = supabase
         .from('money_buckets')
         .select('*')
         .eq('user_id', userId)
         .order('created_at');
       if (portfolioId) query = query.eq('portfolio_id', portfolioId);
+      if (range) query = query.order('id').range(range.from, range.to);
       return await query;
     },
     insert: async (bucket: Omit<MoneyBucket, 'id' | 'created_at'>) => {
-      return await supabase.from('money_buckets').insert(bucket).select().single();
+      throw new Error('Use save_cash_bucket');
     },
     update: async (id: string, updates: Partial<MoneyBucket>) => {
-      return await supabase.from('money_buckets').update(updates).eq('id', id).select().single();
+      throw new Error('Use save_cash_bucket');
     },
     delete: async (id: string) => {
-      return await supabase.from('money_buckets').delete().eq('id', id);
+      return await supabase.rpc('remove_empty_cash_bucket',{bucket_id:id});
     },
   },
 
   // Bucket Activities
   bucketActivities: {
-    getAll: async (userId: string, portfolioId?: string | null) => {
+    getAll: async (userId: string, portfolioId?: string | null, range?: { from: number; to: number }) => {
       let query = supabase
         .from('bucket_activities')
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
       if (portfolioId) query = query.eq('portfolio_id', portfolioId);
+      if (range) query = query.order('id').range(range.from, range.to);
       return await query;
     },
     insert: async (activity: Omit<BucketActivity, 'id' | 'created_at'>) => {
-      return await supabase.from('bucket_activities').insert(activity).select().single();
+      throw new Error('Use atomic bucket writer; mirror activities are database-owned');
     },
     delete: async (id: string) => {
-      return await supabase.from('bucket_activities').delete().eq('id', id);
+      throw new Error('Use atomic bucket writer; mirror activities are database-owned');
     },
   },
 
   // Cash Activities
   cashActivities: {
-    getAll: async (userId: string, portfolioId?: string | null) => {
+    getAll: async (userId: string, portfolioId?: string | null, range?: { from: number; to: number }) => {
       let query = supabase
         .from('cash_activities')
         .select('*')
         .eq('user_id', userId)
         .order('date', { ascending: false });
       if (portfolioId) query = query.eq('portfolio_id', portfolioId);
+      if (range) query = query.order('id').range(range.from, range.to);
       return await query;
     },
     insert: async (activity: Omit<CashActivity, 'id' | 'created_at'>) => {
-      return await supabase.from('cash_activities').insert(activity).select().single();
+      const {user_id,...row}=activity;const result=await executeBucketCommand(user_id,{op:'create',rows:[row]});return {...result,data:result.data?.[0]??null};
     },
     update: async (id: string, updates: Partial<CashActivity>) => {
-      return await supabase.from('cash_activities').update(updates).eq('id', id).select().single();
+      const {data:{user}}=await supabase.auth.getUser();const result=await executeBucketCommand(user?.id||'',{op:'edit',id,patch:updates});return {...result,data:result.data?.[0]??null};
     },
     delete: async (id: string) => {
-      return await supabase.from('cash_activities').delete().eq('id', id);
+      const {data:{user}}=await supabase.auth.getUser();return executeBucketCommand(user?.id||'',{op:'delete',id});
     },
   },
 
@@ -581,13 +597,14 @@ export const db = {
 
   // User Custom Categories (for Ledger)
   userCategories: {
-    getAll: async (userId: string, portfolioId?: string | null) => {
+    getAll: async (userId: string, portfolioId?: string | null, range?: { from: number; to: number }) => {
       let query = supabase
         .from('user_categories')
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: true });
       if (portfolioId) query = query.eq('portfolio_id', portfolioId);
+      if (range) query = query.order('id').range(range.from, range.to);
       return await query;
     },
     insert: async (userId: string, type: 'INCOME' | 'EXPENSE', label: string, icon: string, portfolioId?: string | null) => {

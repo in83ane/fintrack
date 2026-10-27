@@ -4,7 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 import assert from 'node:assert/strict';
-import {planDatabase,sql} from './plan-phase2-db-fixture.mjs';
+import {sql} from './plan-phase2-db-fixture.mjs';
+import {writerDatabase as planDatabase} from './bucket-writer-db-fixture.mjs';
 const require=createRequire(path.join(os.tmpdir(),'fintrack-cashflow-qa/package.json'));
 const {build}=require('esbuild'),{chromium}=require('playwright');
 const {default:postcss}=await import('postcss'),{default:tailwind}=await import('@tailwindcss/postcss');
@@ -16,7 +17,7 @@ const bundle=await build({entryPoints:[fixture],bundle:true,write:false,format:'
  b.onLoad({filter:/.*/,namespace:'qa'},()=>({contents:`export {useApp} from ${JSON.stringify(fixture)}`,loader:'tsx',resolveDir:repo}));
 }}]});
 const css=(await postcss([tailwind()]).process(readFileSync('src/index.css','utf8'),{from:path.join(repo,'src/index.css')})).css;
-let db;
+let db,retryFirstCheck=false,emptyReply='array',duplicateResponses=0;
 const q=async(query,args=[])=>(await db.query(query,args)).rows;
 const server=http.createServer(async(req,res)=>{
  if(req.url==='/qa-db'){
@@ -34,6 +35,12 @@ const server=http.createServer(async(req,res)=>{
     else if(request.operation==='update')query='update '+request.table+' set '+Object.entries(request.body).map(([k,v])=>ident(k)+'='+bind(v)).join(',')+where+' returning *';
     else if(request.operation==='delete')query='delete from '+request.table+where+' returning *';
     data=(await q(query,params)).map(row=>Object.fromEntries(Object.entries(row).map(([key,value])=>[key,['day','starts_on','ends_on','effective_on','month_key'].includes(key)&&value instanceof Date?value.toISOString().slice(0,10):value])));
+    if(retryFirstCheck&&request.table==='plan_checks'&&request.operation==='insert'){
+     // First request committed but its response was lost; the response delivered
+     // to the real UI is the duplicate retry's empty result, not the first row.
+     retryFirstCheck=false;assert.equal((await q(query,params)).length,0);
+     data=emptyReply==='null'?null:[];duplicateResponses++;
+    }
    }
   }catch(e){error={message:e.message,code:e.code};}
   res.setHeader('Content-Type','application/json');res.end(JSON.stringify({data,error}));return;
@@ -46,7 +53,7 @@ const browser=await chromium.launch({executablePath:'C:\\Program Files (x86)\\Mi
 const results=[],errors=[];let activePage;
 try{
  for(const width of [390,1280])for(const lang of ['en','th'])for(const theme of ['dark','light']){
-  db=await planDatabase();
+  db=await planDatabase();retryFirstCheck=true;emptyReply=lang==='th'?'null':'array';
   const context=await browser.newContext({viewport:{width,height:900}}),p=await context.newPage();activePage=p;p.on('pageerror',e=>errors.push(e.message));
   await p.clock.install({time:new Date('2026-10-27T05:00:00Z')});
   let dialogMessages=[];p.on('dialog',dialog=>{dialogMessages.push(dialog.message());return dialog.accept(dialog.type()==='prompt'?'3.50':undefined);});
@@ -68,6 +75,9 @@ try{
   const first=p.getByRole('checkbox',{name:'Savings test 2026-10-26',exact:true});await first.click();
   await p.waitForFunction(()=>document.querySelector('input[aria-label="Savings test 2026-10-26"]')?.checked);
   const [{id}]=await q('select id from daily_plans');const [locked]=await q('select * from plan_month_locks');assert.equal(Number(locked.target_minor),10000);
+  assert.equal((await q('select count(*) count from plan_checks'))[0].count,1);
+  assert.equal(Number((await q("select current_amount from money_buckets where id='33333333-3333-4333-8333-333333333333'"))[0].current_amount),900);
+  assert.equal(await p.locator('#toast').innerText(),'');
   const sum=await q('select sum(current_amount) sum from money_buckets');assert.equal(Number(sum[0].sum),1000);
   const extra=p.getByRole('checkbox',{name:'Savings test 2026-10-27',exact:true});await extra.click();await p.waitForFunction(()=>document.querySelector('input[aria-label="Savings test 2026-10-27"]')?.checked);
   assert.ok(dialogMessages.some(s=>s.includes(th?'ไม่หักเงิน':'without moving money')));
@@ -83,7 +93,7 @@ try{
   assert.equal((await q('select * from plan_month_locks')).length,0);assert.equal(Number((await q("select current_amount from money_buckets where id='33333333-3333-4333-8333-333333333333'"))[0].current_amount),1000);
   await p.screenshot({path:path.join(out,`${width}-${lang}-${theme}.png`),fullPage:true});
   await db.close();db=null;
-  results.push({width,lang,theme,passed:true});await context.close();
+  results.push({width,lang,theme,passed:true,duplicateEmptyReply:emptyReply});await context.close();
  }
- assert.deepEqual(errors,[]);writeFileSync(path.join(out,'results.json'),JSON.stringify(results,null,2));console.log(JSON.stringify({passed:results.length,errors}));
+ assert.deepEqual(errors,[]);assert.equal(duplicateResponses,8);writeFileSync(path.join(out,'results.json'),JSON.stringify(results,null,2));console.log(JSON.stringify({passed:results.length,duplicateResponses,errors}));
 }catch(e){if(activePage){await activePage.screenshot({path:path.join(out,'failure.png'),fullPage:true});console.error(await activePage.locator('body').innerText());console.error(JSON.stringify(await q('select * from daily_plans')));console.error(JSON.stringify(await q('select * from plan_rule_versions')));}throw e;}finally{if(db)await db.close();await browser.close();server.close();}

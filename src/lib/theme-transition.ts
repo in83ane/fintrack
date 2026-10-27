@@ -22,6 +22,9 @@ export function transitionTheme(update: () => void, origin?: ThemeOrigin) {
   const x = Math.max(0, Math.min(innerWidth, origin?.x ?? innerWidth - 32));
   const y = Math.max(0, Math.min(innerHeight, origin?.y ?? 32));
   const radius = Math.ceil(Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y)));
+  root.style.setProperty('--vx', `${x}px`);
+  root.style.setProperty('--vy', `${y}px`);
+  const multiplier = Number(getComputedStyle(root).getPropertyValue('--m')) || 1;
   let applied = false;
   const apply = () => {
     if (current !== revision || applied) return;
@@ -38,7 +41,7 @@ export function transitionTheme(update: () => void, origin?: ThemeOrigin) {
       if (current !== revision) return;
       reveal = root.animate(
         { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
-        { duration: 650, easing: 'cubic-bezier(.4,0,.2,1)', pseudoElement: '::view-transition-new(root)' },
+        { duration: 600 * multiplier, easing: 'cubic-bezier(.22,1,.36,1)', pseudoElement: '::view-transition-new(root)' },
       );
     }).catch(apply);
     void transition.finished.catch(apply).finally(() => {

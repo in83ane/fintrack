@@ -1,6 +1,8 @@
+import {writerDatabase} from './bucket-writer-db-fixture.mjs';
 import assert from 'node:assert/strict';
 import {planDatabase,owner,other,bucket,sql} from './plan-phase2-db-fixture.mjs';
-const db=await planDatabase(),results=[];
+const writer=process.argv.includes('--writer');
+const db=await (writer?writerDatabase():planDatabase()),results=[];
 const q=async(s,args=[])=>(await db.query(s,args)).rows;
 const clock=day=>q("select set_config('test.today',$1,false)",[day]);
 const reject=async(s,args,pattern)=>{await db.exec('savepoint expected_failure');try{await assert.rejects(()=>q(s,args),pattern);}finally{await db.exec('rollback to savepoint expected_failure; release savepoint expected_failure');}};
@@ -28,8 +30,8 @@ try{
   assert.equal(await balance(bucket)+await balance(dest),1000);assert.equal(await balance(dest),20);
   const legs=await q('select type,is_transfer,original_amount,currency from cash_activities where id in ($1,$2)',[c.cash_id,c.destination_cash_id]);
   assert.equal(legs.length,2);assert.ok(legs.every(l=>l.is_transfer&&Number(l.original_amount)===10&&l.currency==='THB'));
-  await reject('delete from cash_activities where id=$1',[c.destination_cash_id],/Manage this linked/);
-  await reject('update bucket_activities set amount=1 where id=$1',[c.destination_activity_id],/Manage this linked/);
+  await reject('delete from cash_activities where id=$1',[c.destination_cash_id],/Manage this linked|permission denied/);
+  await reject('update bucket_activities set amount=1 where id=$1',[c.destination_activity_id],/Manage this linked|permission denied/);
   await undo(a,'2026-10-05');assert.equal(await balance(dest),10);assert.equal(await balance(bucket)+await balance(dest),1000);
   await q("select set_config('request.jwt.claim.sub',$1,true)",[other]);assert.equal((await q('select * from plan_system_buckets')).length,0);
  });
@@ -41,9 +43,14 @@ try{
  });
  await run('same-currency savings accounts are separate per portfolio; USD never enters THB',async()=>{
   await db.exec('reset role');
-  await q("insert into portfolios values('55555555-5555-4555-8555-555555555555',$1,'cash_management')",[owner]);
-  const [u]=await q("insert into money_buckets(user_id,portfolio_id,name,currency,current_amount) values($1,'55555555-5555-4555-8555-555555555555','USD','USD',500) returning id",[owner]);
-  await q("insert into cash_activities(user_id,portfolio_id,bucket_id,type,amount,original_amount,currency,rate_at_time,date) values($1,'55555555-5555-4555-8555-555555555555',$2,'INCOME',500,500,'USD',1,now())",[owner,u.id]);
+  await q("insert into portfolios(id,user_id,kind) values('55555555-5555-4555-8555-555555555555',$1,'cash_management')",[owner]);
+  let u;
+  if(writer){const id=crypto.randomUUID();await q('select save_cash_bucket($1,$2,$3,$4)',[crypto.randomUUID(),id,{name:'USD',portfolio_id:'55555555-5555-4555-8555-555555555555',currency:'USD',current_amount:500},1]);u={id};}
+  else{
+  const [seed]=await q("insert into money_buckets(user_id,portfolio_id,name,currency,current_amount) values($1,'55555555-5555-4555-8555-555555555555','USD','USD',500) returning id",[owner]);
+  await q("insert into cash_activities(user_id,portfolio_id,bucket_id,type,amount,original_amount,currency,rate_at_time,date) values($1,'55555555-5555-4555-8555-555555555555',$2,'INCOME',500,500,'USD',1,now())",[owner,seed.id]);
+   u=seed;
+  }
   await db.exec('set role authenticated');
   const id=await goal({bucket_id:u.id,money_mode:'saving',amount:1.01});await check(id,'2026-10-05');
   const [wallet]=await q('select * from plan_system_buckets');assert.equal(wallet.currency,'USD');assert.equal(wallet.portfolio_id,'55555555-5555-4555-8555-555555555555');assert.equal(await balance(wallet.bucket_id),1.01);assert.equal(await balance(bucket),1000);
@@ -128,11 +135,16 @@ try{
  });
  await run('spent PLAN funds block undo atomically; system identity stays fixed',async()=>{
   const id=await goal({money_mode:'saving'});const [c]=await check(id,'2026-10-05');
-  await reject('update money_buckets set name=$1 where id=$2',['Renamed',c.destination_bucket_id],/identity cannot/);
-  const [spent]=await q("insert into cash_activities(user_id,portfolio_id,bucket_id,type,amount,original_amount,currency,rate_at_time,date) values($1,'44444444-4444-4444-8444-444444444444',$2,'EXPENSE',10/34.0,10,'THB',34,now()) returning id",[owner,c.destination_bucket_id]);
-  await reject('delete from plan_checks where plan_id=$1',[id],/Insufficient PLAN/);
+  await reject('update money_buckets set name=$1 where id=$2',['Renamed',c.destination_bucket_id],/identity cannot|permission denied/);
+  let spent;
+  if(writer){const id=crypto.randomUUID();await q('select write_bucket_cash($1,$2)',[crypto.randomUUID(),{op:'create',rows:[{id,portfolio_id:'44444444-4444-4444-8444-444444444444',bucket_id:c.destination_bucket_id,type:'EXPENSE',original_amount:10,currency:'THB',rate_at_time:34,date:'2026-10-05'}]}]);spent={id};}
+  else{
+  const [seed]=await q("insert into cash_activities(user_id,portfolio_id,bucket_id,type,amount,original_amount,currency,rate_at_time,date) values($1,'44444444-4444-4444-8444-444444444444',$2,'EXPENSE',10/34.0,10,'THB',34,now()) returning id",[owner,c.destination_bucket_id]);
+   spent=seed;
+  }
+  await reject('delete from plan_checks where plan_id=$1',[id],/Insufficient/);
   assert.equal((await q('select * from plan_checks where plan_id=$1',[id])).length,1);assert.equal(await balance(bucket),990);
-  await q('delete from cash_activities where id=$1',[spent.id]);await undo(id,'2026-10-05');assert.equal(await balance(bucket),1000);
+  if(writer)await q('select write_bucket_cash($1,$2)',[crypto.randomUUID(),{op:'delete',id:spent.id}]);else await q('delete from cash_activities where id=$1',[spent.id]);await undo(id,'2026-10-05');assert.equal(await balance(bucket),1000);
  });
  await run('no client can forge snapshots, execute trigger functions or read another owner locks',async()=>{
   const id=await goal({amount_period:'month'});await check(id,'2026-10-05');
@@ -154,12 +166,37 @@ try{
  });
  await run('two THB portfolios have distinct lazy PLAN wallets',async()=>{
   await db.exec('reset role');
-  await q("insert into portfolios values('55555555-5555-4555-8555-555555555555',$1,'cash_management')",[owner]);
-  const [b]=await q("insert into money_buckets(user_id,portfolio_id,name,currency,current_amount) values($1,'55555555-5555-4555-8555-555555555555','Other THB','THB',100) returning id",[owner]);
-  await q("insert into cash_activities(user_id,portfolio_id,bucket_id,type,amount,original_amount,currency,rate_at_time,date) values($1,'55555555-5555-4555-8555-555555555555',$2,'INCOME',100/34.0,100,'THB',34,now())",[owner,b.id]);
+  await q("insert into portfolios(id,user_id,kind) values('55555555-5555-4555-8555-555555555555',$1,'cash_management')",[owner]);
+  let b;
+  if(writer){const id=crypto.randomUUID();await q('select save_cash_bucket($1,$2,$3,$4)',[crypto.randomUUID(),id,{name:'Other THB',portfolio_id:'55555555-5555-4555-8555-555555555555',currency:'THB',current_amount:100},34]);b={id};}
+  else{
+  const [seed]=await q("insert into money_buckets(user_id,portfolio_id,name,currency,current_amount) values($1,'55555555-5555-4555-8555-555555555555','Other THB','THB',100) returning id",[owner]);
+  await q("insert into cash_activities(user_id,portfolio_id,bucket_id,type,amount,original_amount,currency,rate_at_time,date) values($1,'55555555-5555-4555-8555-555555555555',$2,'INCOME',100/34.0,100,'THB',34,now())",[owner,seed.id]);
+   b=seed;
+  }
   await db.exec('set role authenticated');
   await check(await goal({money_mode:'saving'}),'2026-10-05');await check(await goal({bucket_id:b.id,money_mode:'saving'}),'2026-10-05');
   const wallets=await q('select * from plan_system_buckets');assert.equal(wallets.length,2);assert.ok(wallets.every(w=>w.currency==='THB'));assert.notEqual(wallets[0].portfolio_id,wallets[1].portfolio_id);
+ });
+ // Snapshot reset was introduced by the writer migration, not the historical Phase 2 migration.
+ if(writer) await run('forged reference inserts are denied to clients and reset on every zero-money path',async()=>{
+  const cols=['cash_id','bucket_activity_id','destination_cash_id','destination_activity_id','source_bucket_id','destination_bucket_id','month_key','group_key'];
+  const fake='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const values=[fake,fake,fake,fake,fake,fake,'1999-01-01','forged'];
+  const habit=await goal({amount:0});
+  for(let i=0;i<cols.length;i++)await reject(`insert into plan_checks(plan_id,day,${cols[i]}) values($1,$2,$3)`,[habit,'2026-10-05',values[i]],/permission denied/);
+  // Bypass column ACL only in this rolled-back test to verify trigger defence
+  // independently of grants (e.g. privileged internal caller/future ACL drift).
+  await db.exec('reset role');await db.exec(`grant insert(${cols.join(',')}) on plan_checks to authenticated`);await db.exec('set role authenticated');
+  const forged=(id,day)=>q(`insert into plan_checks(plan_id,day,${cols.join(',')}) values(${Array.from({length:10},(_,i)=>'$'+(i+1)).join(',')}) returning *`,[id,day,...values]);
+  const [h]=await forged(habit,'2026-10-05');for(const col of cols)assert.equal(h[col],null,col);
+  const monthly=await goal({amount:0.01,amount_period:'month'});const [zero]=await forged(monthly,'2026-10-05');
+  assert.equal(Number(zero.amount_minor),0);assert.equal(zero.source_bucket_id,bucket);assert.equal(zero.group_key,'2026-10-05');assert.equal(new Date(zero.month_key).toISOString().slice(0,10),'2026-10-01');
+  for(const col of cols.slice(0,4).concat('destination_bucket_id'))assert.equal(zero[col],null,col);
+  const weekly=await goal({amount:1,amount_period:'month',frequency:'weekly_target',weekly_target:1,starts_on:'2026-10-01',ends_on:'2026-10-04'});
+  await check(weekly,'2026-10-01');const [extra]=await forged(weekly,'2026-10-02');assert.equal(extra.credited,false);assert.equal(Number(extra.amount_minor),0);
+  for(const col of cols.slice(0,4).concat('destination_bucket_id'))assert.equal(extra[col],null,col);
+  assert.equal(extra.source_bucket_id,bucket);assert.equal(extra.group_key,'week:2026-09-28');
  });
  // Independent migration copies test real database time and safe downgrade/reapply.
  const copy=await planDatabase({testClock:false});
@@ -190,5 +227,5 @@ try{
   await legacy.query('delete from plan_checks where plan_id=$1',[p.id]);assert.equal(Number((await legacy.query('select current_amount from money_buckets where id=$1',[bucket])).rows[0].current_amount),1000);
   results.push('migration leaves legacy transactions intact; legacy sub-cent undo remains exact; private execute denied');
  }finally{await legacy.close();}
- console.log(JSON.stringify({passed:results.length,cases:results,productionTouched:false},null,2));
+ console.log(JSON.stringify({passed:results.length,writer,cases:results,productionTouched:false},null,2));
 }finally{await db.close();}

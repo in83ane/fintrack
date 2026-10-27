@@ -1,186 +1,91 @@
 "use client";
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { Check, ChevronDown } from 'lucide-react';
+import { FloatingPopover } from './FloatingPopover';
+import { cn } from '@/src/lib/utils';
 
-import React, { useState, useRef, useEffect, useMemo } from "react";
-import { ChevronDown, Check } from "lucide-react";
-import { cn } from "@/src/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
-
-export type SelectOption = {
-  value: string;
-  label: React.ReactNode;
-  disabled?: boolean;
-};
-
-export type SelectGroup = {
-  label: string;
-  options: SelectOption[];
-};
-
+export type SelectOption = { value: string; label: React.ReactNode; disabled?: boolean; textValue?: string };
+export type SelectGroup = { label: string; options: SelectOption[] };
 export type SelectItem = SelectOption | SelectGroup;
-
 interface CustomSelectProps {
-  value: string;
-  onChange: (val: string) => void;
-  items: SelectItem[];
-  className?: string;
-  placeholder?: string;
-  dropdownAlign?: "left" | "right";
-  disabled?: boolean;
+  value: string; onChange: (value: string) => void; items: SelectItem[];
+  className?: string; triggerClassName?: string; placeholder?: string; disabled?: boolean;
+  dropdownAlign?: 'left' | 'right'; id?: string; name?: string;
+  dropdownWidth?: number | 'anchor'; dropdownClassName?: string;
+  'aria-label'?: string; 'aria-labelledby'?: string; triggerLabel?: React.ReactNode;
 }
-
-export function CustomSelect({
-  value,
-  onChange,
-  items,
-  className,
-  placeholder = "Select...",
-  dropdownAlign = "left",
-  disabled = false,
-}: CustomSelectProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // Close on click outside
-  useEffect(() => {
-    const handleOutsideClick = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    if (isOpen) {
-      document.addEventListener("mousedown", handleOutsideClick);
+function plainText(node: React.ReactNode): string {
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(plainText).join('');
+  if (React.isValidElement<{ children?: React.ReactNode }>(node)) return plainText(node.props.children);
+  return '';
+}
+/** One themed, portalled select for all forms. Focus stays on the combobox. */
+export function CustomSelect({ value, onChange, items, className, triggerClassName, placeholder = '—', disabled,
+  dropdownAlign = 'left', dropdownWidth, dropdownClassName, id, name, triggerLabel, ...aria }: CustomSelectProps) {
+  const [open, setOpen] = useState(false), [active, setActive] = useState(-1);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const listId = useId(), search = useRef({ text: '', time: 0 });
+  const options = useMemo(() => items.flatMap(item => 'options' in item ? item.options : [item]), [items]);
+  const selected = options.find(option => option.value === value);
+  const close = () => { setOpen(false); trigger.current?.focus({ preventScroll: true }); };
+  const select = (index: number) => { const option = options[index]; if (!option || option.disabled) return; onChange(option.value); close(); };
+  const first = () => options.findIndex(option => !option.disabled);
+  const last = () => { for (let n = options.length - 1; n >= 0; n--) if (!options[n].disabled) return n; return -1; };
+  const start = (end = false) => { setActive(end ? last() : Math.max(first(), options.findIndex(option => option.value === value && !option.disabled))); setOpen(true); };
+  const move = (step: number) => {
+    let index = active;
+    for (let n = 0; n < options.length; n++) { index = (index + step + options.length) % options.length; if (!options[index].disabled) { setActive(index); break; } }
+  };
+  const keys = (event: React.KeyboardEvent) => {
+    if (event.key === 'Tab') { setOpen(false); return; }
+    if (['ArrowDown','ArrowUp','Home','End','Enter',' '].includes(event.key)) {
+      event.preventDefault(); event.stopPropagation();
+      if (!open) start(event.key === 'End' || event.key === 'ArrowUp');
+      else if (event.key === 'ArrowDown') move(1);
+      else if (event.key === 'ArrowUp') move(-1);
+      else if (event.key === 'Home') setActive(first());
+      else if (event.key === 'End') setActive(last());
+      else select(active);
+    } else if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      event.preventDefault();
+      const now = performance.now();
+      search.current.text = (now - search.current.time > 700 ? '' : search.current.text) + event.key.toLocaleLowerCase();
+      search.current.time = now;
+      const index = options.findIndex(option => !option.disabled && (option.textValue || plainText(option.label)).trim().toLocaleLowerCase().startsWith(search.current.text));
+      if (index >= 0) { setActive(index); setOpen(true); }
     }
-    return () => {
-      document.removeEventListener("mousedown", handleOutsideClick);
-    };
-  }, [isOpen]);
-
-  // Flatten options to find the selected label
-  const allOptions = useMemo(() => {
-    const opts: SelectOption[] = [];
-    items.forEach((item) => {
-      if ("options" in item) {
-        opts.push(...item.options);
-      } else {
-        opts.push(item);
-      }
-    });
-    return opts;
-  }, [items]);
-
-  const selectedOption = allOptions.find((opt) => opt.value === value);
-
-  return (
-    <div className={cn("relative w-full", className)} ref={containerRef}>
-      {/* Trigger Button */}
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => setIsOpen((prev) => !prev)}
-        className={cn(
-          "w-full flex items-center justify-between gap-2 px-3 py-2.5 text-sm font-bold text-white",
-          "bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors focus:outline-none focus:border-[#4EDEA3]/50",
-          isOpen && "border-[#4EDEA3]/50 bg-white/10",
-          disabled && "cursor-not-allowed opacity-50 hover:bg-white/5"
-        )}
-      >
-        <span className="truncate">
-          {selectedOption ? selectedOption.label : <span className="text-gray-500">{placeholder}</span>}
-        </span>
-        <ChevronDown
-          size={16}
-          className={cn("text-gray-400 transition-transform duration-200 shrink-0", isOpen && "rotate-180")}
-        />
-      </button>
-
-      {/* Dropdown Menu */}
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: -10, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -10, scale: 0.95 }}
-            transition={{ duration: 0.15, ease: "easeOut" }}
-            className={cn(
-              "absolute z-50 mt-1 min-w-full max-h-60 overflow-y-auto rounded-xl",
-              "bg-[#1C1B1B] border border-white/10 shadow-xl custom-scrollbar",
-              dropdownAlign === "right" ? "right-0" : "left-0"
-            )}
-            style={{
-              scrollbarWidth: "thin",
-              scrollbarColor: "rgba(255,255,255,0.2) transparent",
-            }}
-          >
-            <div className="p-1.5 flex flex-col gap-0.5">
-              {items.map((item, index) => {
-                if ("options" in item) {
-                  // Render Group
-                  return (
-                    <div key={item.label + index} className="mb-1">
-                      <div className="px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-gray-500 select-none">
-                        {item.label}
-                      </div>
-                      {item.options.map((opt) => (
-                        <OptionItem
-                          key={opt.value}
-                          option={opt}
-                          isSelected={value === opt.value}
-                          onSelect={() => {
-                            onChange(opt.value);
-                            setIsOpen(false);
-                          }}
-                        />
-                      ))}
-                    </div>
-                  );
-                } else {
-                  // Render Single Option
-                  return (
-                    <OptionItem
-                      key={item.value}
-                      option={item}
-                      isSelected={value === item.value}
-                      onSelect={() => {
-                        onChange(item.value);
-                        setIsOpen(false);
-                      }}
-                    />
-                  );
-                }
-              })}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-function OptionItem({
-  option,
-  isSelected,
-  onSelect,
-}: {
-  option: SelectOption;
-  isSelected: boolean;
-  onSelect: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      disabled={option.disabled}
-      onClick={onSelect}
-      className={cn(
-        "w-full flex items-center justify-between gap-3 px-2.5 py-2 rounded-lg text-sm transition-colors text-left",
-        option.disabled
-          ? "opacity-50 cursor-not-allowed"
-          : isSelected
-          ? "bg-[#4EDEA3]/10 text-[#4EDEA3] font-bold"
-          : "text-white hover:bg-white/10"
-      )}
-    >
-      <span className="truncate">{option.label}</span>
-      {isSelected && <Check size={14} className="shrink-0" />}
+  };
+  useEffect(() => {
+    if (!open) return;
+    const item = document.getElementById(`${listId}-${active}`);
+    const panel = item?.closest<HTMLElement>('[data-field-popover]');
+    if (!item || !panel) return;
+    const row = item.getBoundingClientRect(), viewport = panel.getBoundingClientRect();
+    // scrollIntoView also scrolls the document. Only move this menu's viewport.
+    if (row.top < viewport.top) panel.scrollTop -= viewport.top - row.top;
+    else if (row.bottom > viewport.bottom) panel.scrollTop += row.bottom - viewport.bottom;
+  }, [active, open, listId]);
+  useEffect(() => { if (disabled) setOpen(false); }, [disabled]);
+  return <div className={cn('ui-select', className)}>
+    {name && <input type="hidden" name={name} value={value}/>}
+    <button {...aria} id={id || `${listId}-trigger`} ref={trigger} type="button" role="combobox" aria-haspopup="listbox"
+      aria-expanded={open} aria-controls={open ? listId : undefined} aria-activedescendant={open && active >= 0 ? `${listId}-${active}` : undefined}
+      disabled={disabled} className={cn('ui-select-trigger', triggerClassName)} onKeyDown={keys} onClick={() => open ? close() : start()}>
+      <span className="min-w-0 truncate">{triggerLabel ?? selected?.label ?? placeholder}</span><ChevronDown size={14} className="shrink-0 text-muted"/>
     </button>
-  );
+    <FloatingPopover open={open} anchor={trigger} onClose={() => setOpen(false)} align={dropdownAlign} width={dropdownWidth} className={cn('ui-select-popover', dropdownClassName)}>
+      <div id={listId} role="listbox" aria-label={aria['aria-label']} aria-labelledby={aria['aria-labelledby'] || (!aria['aria-label'] ? (id || `${listId}-trigger`) : undefined)} data-select-menu className="ui-select-menu">
+        {items.map((item, groupIndex) => <React.Fragment key={'options' in item ? `group-${groupIndex}` : item.value}>
+          {'options' in item && <div className="ui-select-group">{item.label}</div>}
+          {('options' in item ? item.options : [item]).map(option => { const index = options.indexOf(option); return <div
+            key={option.value} id={`${listId}-${index}`} role="option" aria-selected={value === option.value} aria-disabled={option.disabled || undefined}
+            className={cn('ui-select-option', active === index && 'active')} onPointerMove={() => !option.disabled && setActive(index)}
+            onPointerDown={event => event.preventDefault()} onClick={() => select(index)}>
+            <span>{option.label}</span>{value === option.value && <Check size={15} className="shrink-0"/>}
+          </div>; })}
+        </React.Fragment>)}
+      </div>
+    </FloatingPopover>
+  </div>;
 }

@@ -124,7 +124,7 @@ function AsciiBarChart({ income, expenses, investments, savings }: {
     { label: "Savings    ", v: savings, color: "#E9C349" },
   ];
   return (
-    <div className="font-mono text-[11px] space-y-1.5 bg-black/30 rounded-xl p-3 border border-border">
+    <div className="font-mono text-xs space-y-1.5 bg-black/30 rounded-xl p-3 border border-border">
       {rows.map(r => (
         <div key={r.label} className="flex items-center gap-2">
           <span className="text-gray-400 w-28 flex-shrink-0">{r.label}</span>
@@ -151,12 +151,12 @@ function HealthScoreRing({ score }: { score: number }) {
             className="transition-all duration-1000" />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-sm font-black text-white">{score}</span>
+          <span className="text-sm font-black text-foreground">{score}</span>
         </div>
       </div>
       <div>
-        <p className="text-xs font-black text-white">{label}</p>
-        <p className="text-[10px] text-gray-500">Financial Health</p>
+        <p className="text-xs font-black text-foreground">{label}</p>
+        <p className="text-xs text-gray-500">Financial Health</p>
       </div>
     </div>
   );
@@ -197,24 +197,24 @@ function InsightCard({ icon: Icon, title, desc, color, priority }: {
   return (
     <div className={cn(
       "flex items-start gap-3 p-3 rounded-xl border",
-      color === "#4EDEA3" ? "bg-[#4EDEA3]/5 border-[#4EDEA3]/20" :
-      color === "#FFB4AB" ? "bg-[#FFB4AB]/5 border-[#FFB4AB]/20" :
-      color === "#E9C349" ? "bg-[#E9C349]/5 border-[#E9C349]/20" :
-      "bg-[#ADC6FF]/5 border-[#ADC6FF]/20"
+      color === "#4EDEA3" ? "bg-gain/5 border-gain/20" :
+      color === "#FFB4AB" ? "bg-loss/5 border-loss/20" :
+      color === "#E9C349" ? "bg-warning/5 border-warning/20" :
+      "bg-info/5 border-info/20"
     )}>
       <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${color}20` }}>
         <Icon size={14} style={{ color }} />
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
-          <p className="text-xs font-black text-white">{title}</p>
+          <p className="text-xs font-black text-foreground">{title}</p>
           {priority && (
-            <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full" style={{ color, backgroundColor: `${color}20` }}>
+            <span className="text-xs font-black px-1.5 py-0.5 rounded-full" style={{ color, backgroundColor: `${color}20` }}>
               {priority}
             </span>
           )}
         </div>
-        <p className="text-[10px] text-gray-400 leading-relaxed">{desc}</p>
+        <p className="text-xs text-gray-400 leading-relaxed">{desc}</p>
       </div>
     </div>
   );
@@ -232,26 +232,26 @@ function ExpenseVelocityWidget({ currentMonthExpenses, lastMonthExpenses, dayOfM
   return (
     <div className={cn(
       "p-3 rounded-xl border",
-      isOverPace ? "bg-[#FFB4AB]/5 border-[#FFB4AB]/20" : "bg-[#4EDEA3]/5 border-[#4EDEA3]/20"
+      isOverPace ? "bg-loss/5 border-loss/20" : "bg-gain/5 border-gain/20"
     )}>
       <div className="flex items-center gap-2 mb-2">
-        <Gauge size={12} className={isOverPace ? "text-[#FFB4AB]" : "text-[#4EDEA3]"} />
-        <span className="text-[10px] font-black text-gray-400 uppercase tracking-wide">Spending Velocity</span>
+        <Gauge size={12} className={isOverPace ? "text-loss" : "text-gain"} />
+        <span className="text-xs font-black text-gray-400 uppercase tracking-wide">Spending Velocity</span>
       </div>
       <div className="flex items-end gap-2 mb-2">
-        <span className={cn("text-lg font-black", isOverPace ? "text-[#FFB4AB]" : "text-[#4EDEA3]")}>
+        <span className={cn("text-lg font-black", isOverPace ? "text-loss" : "text-gain")}>
           {pctUsed.toFixed(0)}%
         </span>
-        <span className="text-[10px] text-gray-500 mb-0.5">of last month with {daysInMonth - dayOfMonth} days left</span>
+        <span className="text-xs text-gray-500 mb-0.5">of last month with {daysInMonth - dayOfMonth} days left</span>
       </div>
-      <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+      <div className="h-1.5 bg-foreground/5 rounded-full overflow-hidden">
         <div data-chart-progress
           style={{ width: `${Math.min(100, pctUsed)}%` }}
-          className={cn("h-full rounded-full", isOverPace ? "bg-[#FFB4AB]" : "bg-[#4EDEA3]")}
+          className={cn("h-full rounded-full", isOverPace ? "bg-loss" : "bg-gain")}
         />
       </div>
       {isOverPace && (
-        <p className="text-[10px] text-[#FFB4AB] mt-1.5 font-bold">
+        <p className="text-xs text-loss mt-1.5 font-bold">
           On pace to exceed last month by {projectedOverspend.toFixed(0)}%
         </p>
       )}
@@ -523,14 +523,16 @@ export function AIFinancialAdvisor({ compactPrompts = false }: { compactPrompts?
       const cashType = parsed.type === "INCOME" ? "INCOME" : "EXPENSE";
 
       // Actually add the transaction
-      addCashActivity({
+      const saved = await addCashActivity({
         type: cashType,
+        originalAmount: parsed.amount, currency: 'USD', rateAtTime: 1,
         amountUSD: parsed.amount,
         category: parsed.category,
         date: new Date().toISOString(),
         note: parsed.note,
       });
 
+      if (!saved) { setIsThinking(false); return; }
       const newNet = snapshot.monthNet + (parsed.type === "INCOME" ? parsed.amount : -parsed.amount);
 
       content = `**Transaction Logged**\n\n• Type: ${typeLabel}\n• Amount: ${formatMoney(parsed.amount)}\n• Category: ${parsed.category.charAt(0).toUpperCase() + parsed.category.slice(1)}\n• Note: "${parsed.note}"\n\n**Updated Net Balance:** ${newNet >= 0 ? "+" : ""}${formatMoney(newNet)}\n\n${parsed.type === "EXPENSE" && snapshot.monthExpenses + parsed.amount > snapshot.monthIncome * 0.7 ? "Warning: Expenses approaching 70% of income threshold." : parsed.type === "INCOME" ? `Consider allocating ${formatMoney(parsed.amount * 0.2)} (20%) to investments.` : `Investment allocation: ${formatMoney(snapshot.monthInvested + (parsed.type === "INVEST" ? parsed.amount : 0))} this month.`}`;
@@ -664,30 +666,30 @@ export function AIFinancialAdvisor({ compactPrompts = false }: { compactPrompts?
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="bg-gradient-to-br from-[#1C1B1B] via-[#161616] to-[#0E0E0E] rounded-3xl border border-border overflow-hidden shadow-2xl">
+    <div className="bg-surface rounded-2xl border border-border overflow-hidden shadow-2xl">
       {/* Header */}
       <div className="p-4 sm:p-5 border-b border-border">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-[#A78BFA] to-[#ADC6FF] rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/20 flex-shrink-0">
-              <Brain size={18} className="text-white" />
+            <div className="w-10 h-10 bg-gradient-to-br from-[#A78BFA] to-info rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/20 flex-shrink-0">
+              <Brain size={18} className="text-foreground" />
             </div>
             <div>
-              <h3 className="text-sm font-black text-white flex items-center gap-2">
+              <h3 className="text-sm font-black text-foreground flex items-center gap-2">
                 AI Financial Advisor
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#4EDEA3]/10 text-[#4EDEA3] text-[9px] font-black rounded-full border border-[#4EDEA3]/20">
-                  <span className="w-1.5 h-1.5 bg-[#4EDEA3] rounded-full animate-pulse" />
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gain/10 text-gain text-xs font-black rounded-full border border-gain/20">
+                  <span className="w-1.5 h-1.5 bg-gain rounded-full animate-pulse" />
                   LIVE
                 </span>
               </h3>
-              <p className="text-[10px] text-gray-500 mt-0.5">
+              <p className="text-xs text-gray-500 mt-0.5">
                 Integrating Portfolio · {snapshot.assetCount} Assets · {snapshot.tradeCount} Trades · {moneyBuckets.length} Buckets · Cashflow
               </p>
             </div>
           </div>
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="p-2 text-gray-500 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+            className="p-2 text-gray-500 hover:text-foreground hover:bg-foreground/5 rounded-lg transition-all"
           >
             {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </button>
@@ -695,7 +697,7 @@ export function AIFinancialAdvisor({ compactPrompts = false }: { compactPrompts?
 
         {/* Key Stats Row */}
         <div className="mt-4 grid grid-cols-2 sm:grid-cols-5 gap-3">
-          <div className="col-span-2 sm:col-span-1 flex items-center gap-3 p-3 bg-white/[0.03] rounded-2xl border border-border">
+          <div className="col-span-2 sm:col-span-1 flex items-center gap-3 p-3 bg-foreground/[0.03] rounded-2xl border border-border">
             <HealthScoreRing score={snapshot.healthScore} />
           </div>
           {[
@@ -729,22 +731,22 @@ export function AIFinancialAdvisor({ compactPrompts = false }: { compactPrompts?
               subtitle: `${(snapshot.dayOfMonth / snapshot.daysInMonth * 100).toFixed(0)}% through`,
             },
           ].map(stat => (
-            <div key={stat.label} className="p-3 bg-white/[0.03] rounded-2xl border border-border">
+            <div key={stat.label} className="p-3 bg-foreground/[0.03] rounded-2xl border border-border">
               <div className="flex items-center gap-1.5 mb-1.5">
                 <stat.icon size={10} style={{ color: stat.color }} />
-                <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">{stat.label}</span>
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">{stat.label}</span>
                 {stat.trend && (
                   <span className="ml-auto">
                     {stat.trend === "up"
-                      ? <ArrowUpRight size={10} className="text-[#4EDEA3]" />
-                      : <ArrowDownRight size={10} className="text-[#FFB4AB]" />
+                      ? <ArrowUpRight size={10} className="text-gain" />
+                      : <ArrowDownRight size={10} className="text-loss" />
                     }
                   </span>
                 )}
               </div>
               <span className="text-sm font-black" style={{ color: stat.color }}>{stat.value}</span>
               {(stat as any).subtitle && (
-                <p className="text-[9px] text-gray-600 mt-0.5">{(stat as any).subtitle}</p>
+                <p className="text-xs text-gray-600 mt-0.5">{(stat as any).subtitle}</p>
               )}
             </div>
           ))}
@@ -764,15 +766,15 @@ export function AIFinancialAdvisor({ compactPrompts = false }: { compactPrompts?
             <div className="px-4 sm:px-5 pt-4 grid grid-cols-1 lg:grid-cols-2 gap-3">
               {/* Monthly Trend Chart */}
               {snapshot.monthlyTrend.length > 0 && (
-                <div className="bg-white/[0.03] rounded-2xl border border-border p-4">
+                <div className="bg-foreground/[0.03] rounded-2xl border border-border p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <BarChart3 size={12} className="text-[#ADC6FF]" />
-                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-wide">6-Month Trend</span>
+                      <BarChart3 size={12} className="text-info" />
+                      <span className="text-xs font-black text-gray-400 uppercase tracking-wide">6-Month Trend</span>
                     </div>
                     <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-1"><div className="w-2 h-2 bg-[#4EDEA3] rounded-full" /><span className="text-[9px] text-gray-500">Income</span></div>
-                      <div className="flex items-center gap-1"><div className="w-2 h-2 bg-[#FFB4AB] rounded-full" /><span className="text-[9px] text-gray-500">Expenses</span></div>
+                      <div className="flex items-center gap-1"><div className="w-2 h-2 bg-gain rounded-full" /><span className="text-xs text-gray-500">Income</span></div>
+                      <div className="flex items-center gap-1"><div className="w-2 h-2 bg-loss rounded-full" /><span className="text-xs text-gray-500">Expenses</span></div>
                     </div>
                   </div>
                   <MonthlyTrendChart data={snapshot.monthlyTrend} />
@@ -793,10 +795,10 @@ export function AIFinancialAdvisor({ compactPrompts = false }: { compactPrompts?
             {/* ASCII Bar Chart */}
             {snapshot.monthIncome > 0 && (
               <div className="px-4 sm:px-5 pt-3">
-                <div className="bg-white/[0.03] rounded-2xl border border-border p-4">
+                <div className="bg-foreground/[0.03] rounded-2xl border border-border p-4">
                   <div className="flex items-center gap-2 mb-3">
-                    <Sparkles size={12} className="text-[#E9C349]" />
-                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-wide">Current Month Breakdown</span>
+                    <Sparkles size={12} className="text-warning" />
+                    <span className="text-xs font-black text-gray-400 uppercase tracking-wide">Current Month Breakdown</span>
                   </div>
                   <AsciiBarChart
                     income={snapshot.monthIncome}
@@ -812,9 +814,9 @@ export function AIFinancialAdvisor({ compactPrompts = false }: { compactPrompts?
             {insights.length > 0 && (
               <div className="px-4 sm:px-5 pt-3">
                 <button onClick={() => setShowInsights(!showInsights)} className="flex items-center gap-2 w-full mb-2">
-                  <Zap size={12} className="text-[#E9C349]" />
-                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-wide">Smart Insights ({insights.length})</span>
-                  <span className="ml-auto text-[9px] text-gray-600 font-bold">{showInsights ? "Hide ▲" : "Show ▼"}</span>
+                  <Zap size={12} className="text-warning" />
+                  <span className="text-xs font-black text-gray-400 uppercase tracking-wide">Smart Insights ({insights.length})</span>
+                  <span className="ml-auto text-xs text-gray-600 font-bold">{showInsights ? "Hide ▲" : "Show ▼"}</span>
                 </button>
                 <AnimatePresence>
                   {showInsights && (
@@ -834,36 +836,36 @@ export function AIFinancialAdvisor({ compactPrompts = false }: { compactPrompts?
 
             {/* Chat Interface */}
             <div className="px-4 sm:px-5 pt-3 pb-4">
-              <div className="bg-white/[0.03] rounded-2xl border border-border overflow-hidden">
+              <div className="bg-foreground/[0.03] rounded-2xl border border-border overflow-hidden">
                 {/* Messages */}
                 <div className="h-56 overflow-y-auto p-3 space-y-3" style={{ scrollbarWidth: "none" }}>
                   {messages.map(msg => (
                     <div key={msg.id} className={cn("flex gap-2", msg.role === "user" ? "flex-row-reverse" : "flex-row")}>
                       {msg.role === "assistant" && (
-                        <div className="w-6 h-6 bg-gradient-to-br from-[#A78BFA] to-[#ADC6FF] rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <Brain size={11} className="text-white" />
+                        <div className="w-6 h-6 bg-gradient-to-br from-[#A78BFA] to-info rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <Brain size={11} className="text-foreground" />
                         </div>
                       )}
                       <div className={cn(
-                        "max-w-[88%] rounded-2xl px-3 py-2.5 text-[11px] leading-relaxed",
+                        "max-w-[88%] rounded-2xl px-3 py-2.5 text-xs leading-relaxed",
                         msg.role === "user"
-                          ? "bg-[#ADC6FF]/20 text-[#ADC6FF] rounded-tr-sm"
-                          : "bg-white/[0.06] text-gray-300 rounded-tl-sm"
+                          ? "bg-info/20 text-info rounded-tr-sm"
+                          : "bg-foreground/[0.06] text-gray-300 rounded-tl-sm"
                       )}>
                         {msg.content ? (
                           <div className="whitespace-pre-wrap">
                             {msg.content.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
                               part.startsWith("**") && part.endsWith("**")
-                                ? <strong key={i} className="text-white font-black">{part.slice(2, -2)}</strong>
+                                ? <strong key={i} className="text-foreground font-black">{part.slice(2, -2)}</strong>
                                 : <span key={i}>{part}</span>
                             )}
                           </div>
                         ) : msg.data?.type === "health_score" && (
                           <div className="space-y-1.5">
-                            <p className="text-white font-black">Financial Intelligence Hub Active</p>
-                            <p className="text-gray-400">I&apos;m monitoring <strong className="text-white">{snapshot.assetCount} assets</strong>, <strong className="text-white">{snapshot.tradeCount} trades</strong>, <strong className="text-white">{moneyBuckets.length} budget buckets</strong>, and your complete cashflow in real-time.</p>
-                            <p className="text-gray-400">Financial health: <strong className="text-white">{snapshot.healthScore}/100</strong>. What would you like to analyse?</p>
-                            <p className="text-gray-500 text-[10px] mt-1">Log transactions directly: type <strong className="text-[#ADC6FF]">&quot;Salary 50k&quot;</strong> or <strong className="text-[#ADC6FF]">&quot;Lunch 150&quot;</strong></p>
+                            <p className="text-foreground font-black">Financial Intelligence Hub Active</p>
+                            <p className="text-gray-400">I&apos;m monitoring <strong className="text-foreground">{snapshot.assetCount} assets</strong>, <strong className="text-foreground">{snapshot.tradeCount} trades</strong>, <strong className="text-foreground">{moneyBuckets.length} budget buckets</strong>, and your complete cashflow in real-time.</p>
+                            <p className="text-gray-400">Financial health: <strong className="text-foreground">{snapshot.healthScore}/100</strong>. What would you like to analyse?</p>
+                            <p className="text-gray-500 text-xs mt-1">Log transactions directly: type <strong className="text-info">&quot;Salary 50k&quot;</strong> or <strong className="text-info">&quot;Lunch 150&quot;</strong></p>
                           </div>
                         )}
                       </div>
@@ -872,14 +874,14 @@ export function AIFinancialAdvisor({ compactPrompts = false }: { compactPrompts?
 
                   {isThinking && (
                     <div className="flex gap-2">
-                      <div className="w-6 h-6 bg-gradient-to-br from-[#A78BFA] to-[#ADC6FF] rounded-full flex items-center justify-center flex-shrink-0">
-                        <Brain size={11} className="text-white" />
+                      <div className="w-6 h-6 bg-gradient-to-br from-[#A78BFA] to-info rounded-full flex items-center justify-center flex-shrink-0">
+                        <Brain size={11} className="text-foreground" />
                       </div>
-                      <div className="bg-white/[0.06] rounded-2xl rounded-tl-sm px-3 py-2.5 flex items-center gap-1.5">
+                      <div className="bg-foreground/[0.06] rounded-2xl rounded-tl-sm px-3 py-2.5 flex items-center gap-1.5">
                         {[0, 0.15, 0.3].map((delay, i) => (
                           <motion.div
                             key={i}
-                            className="w-1.5 h-1.5 bg-[#ADC6FF] rounded-full"
+                            className="w-1.5 h-1.5 bg-info rounded-full"
                             animate={{ y: [0, -4, 0] }}
                             transition={{ duration: 0.6, repeat: Infinity, delay }}
                           />
@@ -896,7 +898,7 @@ export function AIFinancialAdvisor({ compactPrompts = false }: { compactPrompts?
                     <button
                       key={qp.label}
                       onClick={() => processInput(qp.label)}
-                      className="flex items-center gap-1.5 px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-border rounded-full text-[10px] text-gray-400 hover:text-white transition-all font-bold"
+                      className="flex items-center gap-1.5 px-2.5 py-1 bg-foreground/5 hover:bg-foreground/10 border border-border rounded-full text-xs text-gray-400 hover:text-foreground transition-all font-bold"
                     >
                       <qp.icon size={9} />
                       {qp.label}
@@ -913,16 +915,16 @@ export function AIFinancialAdvisor({ compactPrompts = false }: { compactPrompts?
                       value={input}
                       onChange={e => setInput(e.target.value)}
                       placeholder={isTh ? "ถามเกี่ยวกับการเงิน หรือบันทึก เช่น 'เงินเดือน 50k'…" : "Ask about finances or log: 'Salary 50k', 'Lunch 150'…"}
-                      className="flex-1 bg-transparent text-xs text-white placeholder-gray-600 focus:outline-none"
+                      className="flex-1 bg-transparent text-xs text-foreground placeholder-gray-600 "
                     />
                     <button
                       type="submit"
                       disabled={!input.trim() || isThinking}
-                      className="w-7 h-7 bg-gradient-to-br from-[#A78BFA] to-[#ADC6FF] hover:opacity-90 rounded-lg flex items-center justify-center transition-all disabled:opacity-40 flex-shrink-0"
+                      className="w-7 h-7 bg-gradient-to-br from-[#A78BFA] to-info hover:opacity-90 rounded-lg flex items-center justify-center transition-all disabled:opacity-40 flex-shrink-0"
                     >
                       {isThinking
-                        ? <RefreshCcw size={11} className="text-white animate-spin" />
-                        : <Send size={11} className="text-white" />
+                        ? <RefreshCcw size={11} className="text-foreground animate-spin" />
+                        : <Send size={11} className="text-foreground" />
                       }
                     </button>
                   </form>

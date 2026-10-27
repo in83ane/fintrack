@@ -81,7 +81,7 @@ export function InvestmentTransferModal({
   const insufficient = Number(sourceAmount) > sourceBucket.currentAmount;
   const invalidFee = Number(sourceAmount) > 0 && Number(fee) >= Number(sourceAmount);
   const fmt = (amount: number, denomination: string) => `${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${denomination}`;
-  const fieldClass = "w-full min-w-0 rounded-xl border border-white/10 bg-white/[0.04] py-3 pl-3.5 pr-16 text-lg font-bold tabular-nums text-white outline-none focus:border-[#4EDEA3]/60 focus:ring-2 focus:ring-[#4EDEA3]/10";
+  const fieldClass = "w-full min-w-0 rounded-xl border border-foreground/10 bg-foreground/[0.04] py-3 pl-3.5 pr-16 text-lg font-bold tabular-nums text-foreground outline-none   ";
 
   const chooseBroker = (id: string) => {
     setBrokerId(id);
@@ -138,8 +138,8 @@ export function InvestmentTransferModal({
       contentClassName="p-5 sm:p-6"
       footer={
         <div className="flex gap-3">
-          <button type="button" disabled={saving} onClick={close} className="rounded-xl border border-white/10 px-5 py-3.5 text-sm font-bold text-gray-400 hover:bg-white/5 disabled:opacity-40">ยกเลิก</button>
-          <button type="submit" form="investment-transfer-form" disabled={saving || !quote || !account || insufficient || invalidFee} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#4EDEA3] py-3.5 text-sm font-black text-[#08251a] hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40">
+          <button type="button" disabled={saving} onClick={close} className="rounded-xl border border-foreground/10 px-5 py-3.5 text-sm font-bold text-gray-400 hover:bg-foreground/5 disabled:opacity-40">ยกเลิก</button>
+          <button type="submit" form="investment-transfer-form" disabled={saving || !quote || !account || insufficient || invalidFee} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-black text-primary-foreground hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40">
             {saving ? <Loader2 size={16} className="animate-spin" /> : <Wallet size={16} />}{saving ? "กำลังบันทึก…" : "ยืนยันการโอน"}
           </button>
         </div>
@@ -147,8 +147,8 @@ export function InvestmentTransferModal({
     >
       <form id="investment-transfer-form" onSubmit={submit} className="space-y-4">
         <fieldset disabled={saving} className="min-w-0 space-y-4 disabled:opacity-60">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-            <label className="mb-2 block text-[11px] font-semibold text-gray-400">จาก Bucket</label>
+          <div className="rounded-2xl border border-foreground/10 bg-foreground/[0.03] p-4">
+            <label className="mb-2 block text-xs font-semibold text-gray-400">จาก Bucket</label>
             <CustomSelect
               value={bucketId}
               onChange={chooseBucket}
@@ -161,15 +161,15 @@ export function InvestmentTransferModal({
           </div>
 
           <div className="space-y-3">
-            <p className="flex items-center gap-2 text-xs font-semibold text-gray-400"><ArrowDown size={14} className="text-[#4EDEA3]" /> เข้าพอร์ตลงทุน</p>
-            {brokers.length === 0 ? <p className="rounded-xl border border-dashed border-white/15 p-4 text-sm text-gray-400">ยังไม่มีพอร์ตลงทุน กรุณาเพิ่มโบรกเกอร์ก่อน</p> : <>
+            <p className="flex items-center gap-2 text-xs font-semibold text-gray-400"><ArrowDown size={14} className="text-gain" /> เข้าพอร์ตลงทุน</p>
+            {brokers.length === 0 ? <p className="rounded-xl border border-dashed border-foreground/15 p-4 text-sm text-gray-400">ยังไม่มีพอร์ตลงทุน กรุณาเพิ่มโบรกเกอร์ก่อน</p> : <>
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-gray-300">โบรกเกอร์ปลายทาง</label>
                 <CustomSelect value={brokerId} onChange={chooseBroker} placeholder="เลือกโบรกเกอร์" items={brokers.map((item) => ({ value: item.id, label: <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full" style={{ background: item.color }} />{item.name}</span> }))} />
               </div>
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-gray-300">บัญชีเงินสดปลายทาง</label>
-                <CustomSelect value={accountId} onChange={chooseAccount} placeholder="เลือกบัญชีเงินสด" items={accounts.filter((item) => item.portfolioId === brokerId).map((item) => ({ value: item.id, label: <span className="flex items-center gap-2"><span className={item.currency === "THB" ? "text-[#4EDEA3]" : "text-[#9B7BFF]"}>{item.currency === "THB" ? "฿" : "$"}</span>{item.currency} · {item.name}</span> }))} />
+                <CustomSelect value={accountId} onChange={chooseAccount} placeholder="เลือกบัญชีเงินสด" items={accounts.filter((item) => item.portfolioId === brokerId).map((item) => ({ value: item.id, label: <span className="flex items-center gap-2"><span className={item.currency === "THB" ? "text-gain" : "text-[#9B7BFF]"}>{item.currency === "THB" ? "฿" : "$"}</span>{item.currency} · {item.name}</span> }))} />
               </div>
             </>}
           </div>
@@ -178,11 +178,11 @@ export function InvestmentTransferModal({
             <div className="space-y-2"><label htmlFor="funding-source" className="text-xs font-semibold text-gray-300">ยอดที่หักจาก Bucket</label><div className="relative"><input id="funding-source" type="number" inputMode="decimal" min="0.01" step="0.01" required value={sourceAmount} onChange={(event) => setSourceAmount(event.target.value)} placeholder="0.00" className={fieldClass} /><span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">{sourceCurrency}</span></div></div>
             <div className="space-y-2"><label htmlFor="funding-fee" className="text-xs font-semibold text-gray-300">ค่าธรรมเนียม <span className="font-normal text-gray-500">(ถ้ามี)</span></label><div className="relative"><input id="funding-fee" type="number" inputMode="decimal" min="0" step="0.01" value={fee} onChange={(event) => setFee(event.target.value)} placeholder="0.00" className={fieldClass} /><span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">{sourceCurrency}</span></div></div>
           </div>
-          <p className="-mt-2 text-[11px] text-gray-500">ค่าธรรมเนียมรวมอยู่ในยอดที่หักจาก Bucket แล้ว</p>
-          {insufficient && <p role="alert" className="text-xs text-[#FFB4AB]">ยอดหักเกินเงินคงเหลือใน Bucket</p>}
-          {invalidFee && <p role="alert" className="text-xs text-[#FFB4AB]">ค่าธรรมเนียมต้องน้อยกว่ายอดที่หัก</p>}
+          <p className="-mt-2 text-xs text-gray-500">ค่าธรรมเนียมรวมอยู่ในยอดที่หักจาก Bucket แล้ว</p>
+          {insufficient && <p role="alert" className="text-xs text-loss">ยอดหักเกินเงินคงเหลือใน Bucket</p>}
+          {invalidFee && <p role="alert" className="text-xs text-loss">ค่าธรรมเนียมต้องน้อยกว่ายอดที่หัก</p>}
 
-          {isExchange ? <div className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+          {isExchange ? <div className="space-y-3 rounded-2xl border border-foreground/10 bg-foreground/[0.02] p-4">
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-gray-300">ข้อมูลการแลกเงิน</label>
               <CustomSelect
@@ -197,19 +197,19 @@ export function InvestmentTransferModal({
             {fxEntry === "received" ? <div className="space-y-2">
               <label htmlFor="funding-received" className="text-xs font-semibold text-gray-300">ยอดที่เข้าบัญชีจริง</label>
               <div className="relative"><input id="funding-received" type="number" inputMode="decimal" min="0.01" step="0.01" required value={receivedAmount} onChange={(event) => setReceivedAmount(event.target.value)} placeholder="0.00" className={fieldClass} /><span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">{destinationCurrency}</span></div>
-              <p className="text-[11px] leading-relaxed text-gray-500">กรอกตัวเลขที่โบรกเกอร์ได้รับจริง ระบบจะคำนวณเรตของรายการนี้ให้อัตโนมัติ</p>
+              <p className="text-xs leading-relaxed text-gray-500">กรอกตัวเลขที่โบรกเกอร์ได้รับจริง ระบบจะคำนวณเรตของรายการนี้ให้อัตโนมัติ</p>
             </div> : <div className="space-y-2">
               <label htmlFor="funding-rate" className="text-xs font-semibold text-gray-300">1 USD เท่ากับ</label>
               <div className="relative"><input id="funding-rate" type="number" inputMode="decimal" min="0.000001" step="any" required value={rate} onChange={(event) => setRate(event.target.value)} placeholder="เช่น 33.50" className={fieldClass} /><span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">THB</span></div>
-              <p className="text-[11px] leading-relaxed text-gray-500">ใช้เรตจากธนาคารหรือโบรกเกอร์ ระบบจะคำนวณยอดที่เข้าบัญชีให้</p>
+              <p className="text-xs leading-relaxed text-gray-500">ใช้เรตจากธนาคารหรือโบรกเกอร์ ระบบจะคำนวณยอดที่เข้าบัญชีให้</p>
             </div>}
-          </div> : <p className="rounded-xl bg-white/[0.03] px-3 py-2.5 text-xs text-gray-400">สกุลเงินต้นทางและปลายทางตรงกัน จึงไม่มีการแลกเงิน</p>}
+          </div> : <p className="rounded-xl bg-foreground/[0.03] px-3 py-2.5 text-xs text-gray-400">สกุลเงินต้นทางและปลายทางตรงกัน จึงไม่มีการแลกเงิน</p>}
 
-          <div aria-live="polite" className="space-y-2.5 rounded-2xl border border-[#4EDEA3]/15 bg-[#4EDEA3]/[0.04] p-4">
+          <div aria-live="polite" className="space-y-2.5 rounded-2xl border border-gain/15 bg-gain/[0.04] p-4">
             <div className="flex items-center justify-between gap-3 text-xs text-gray-400"><span>หักจาก Bucket</span><span className="tabular-nums">{quote ? fmt(quote.sourceAmount, sourceCurrency) : "—"}</span></div>
             {Number(fee) > 0 && <div className="flex justify-between gap-3 text-xs text-gray-400"><span>ค่าธรรมเนียม</span><span>{fmt(Number(fee), sourceCurrency)}</span></div>}
             {quote?.rate && <div className="flex justify-between gap-3 text-xs text-gray-400"><span>เรตที่เกิดขึ้นจริง</span><span>1 USD = {quote.rate.toLocaleString("en-US", { maximumFractionDigits: 6 })} THB</span></div>}
-            <div className="flex items-center justify-between gap-3 border-t border-white/5 pt-3"><span className="min-w-0 truncate text-xs font-semibold text-gray-300">เข้าบัญชี {broker?.name || "ปลายทาง"}</span><span className="shrink-0 text-lg font-black tabular-nums text-[#4EDEA3]">{quote ? fmt(quote.receivedAmount, destinationCurrency) : `— ${destinationCurrency}`}</span></div>
+            <div className="flex items-center justify-between gap-3 border-t border-foreground/5 pt-3"><span className="min-w-0 truncate text-xs font-semibold text-gray-300">เข้าบัญชี {broker?.name || "ปลายทาง"}</span><span className="shrink-0 text-lg font-black tabular-nums text-gain">{quote ? fmt(quote.receivedAmount, destinationCurrency) : `— ${destinationCurrency}`}</span></div>
           </div>
         </fieldset>
       </form>

@@ -1,10 +1,13 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
+import { GlideGroup, GlidingIndicator } from './GlidingIndicator';
 import { cn } from "@/src/lib/utils";
 import { Calendar, ChevronDown, X } from "lucide-react";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
-import { AnimatePresence, motion } from "motion/react";
+import { CustomSelect } from "./CustomSelect";
+import { FloatingPopover } from "./FloatingPopover";
+import { useApp } from "@/src/context/AppContext";
 
 export type DateRangeState =
   | { mode: "1d" | "1w" | "1m" | "2m" | "3m" | "6m" | "1y" | "all" }
@@ -105,18 +108,22 @@ interface DateRangeBarProps {
   value: DateRangeState;
   onChange: (v: DateRangeState) => void;
   className?: string;
+  wrap?: boolean;
+  hideCurrentMonthBadge?: boolean;
 }
 
-export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) {
-  const [showMonthPicker, setShowMonthPicker] = useState(false);
+export function DateRangeBar({ value, onChange, className, wrap = false, hideCurrentMonthBadge = false }: DateRangeBarProps) {
+  const { language, t } = useApp();
+  const text = (en: string, th: string) => language === "th" ? th : en;
+
   const [showCustom, setShowCustom] = useState(false);
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
-  const [dropdownLeft, setDropdownLeft] = useState(0);
-  
+
+
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const monthBtnRef = useRef<HTMLButtonElement>(null);
+
   const customBtnRef = useRef<HTMLButtonElement>(null);
   const customFromPickerRef = useRef<HTMLInputElement>(null);
   const customToPickerRef = useRef<HTMLInputElement>(null);
@@ -127,66 +134,19 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
   });
   const recentMonths = months.slice(0, 2);
 
-  // ปิด Dropdown เมื่อคลิกข้างนอก
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setShowMonthPicker(false);
-        setShowCustom(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
-  // ปิด Dropdown เมื่อเลื่อน Scroll แนวนอน (เพื่อไม่ให้มันลอยค้างตอนเลื่อนจอ)
-  useEffect(() => {
-    const scrollEl = scrollContainerRef.current;
-    const handleScroll = () => {
-      setShowMonthPicker(false);
-      setShowCustom(false);
-    };
-    if (scrollEl) scrollEl.addEventListener("scroll", handleScroll);
-    return () => {
-      if (scrollEl) scrollEl.removeEventListener("scroll", handleScroll);
-    };
-  }, []);
-
-  // ฟังก์ชันคำนวณตำแหน่งแกน X ให้ Dropdown อยู่ตรงกับปุ่ม
-  const updateDropdownPosition = (btnRef: React.RefObject<HTMLButtonElement | null>, dropdownWidth: number) => {
-    if (btnRef.current && containerRef.current) {
-      const btnRect = btnRef.current.getBoundingClientRect();
-      const contRect = containerRef.current.getBoundingClientRect();
-      let left = btnRect.left - contRect.left;
-      
-      // ป้องกันไม่ให้ Dropdown ทะลุขอบจอฝั่งขวา
-      if (btnRect.left + dropdownWidth > window.innerWidth - 16) {
-        left = window.innerWidth - contRect.left - dropdownWidth - 16;
-      }
-      
-      setDropdownLeft(Math.max(0, left)); // ไม่ให้ติดลบจนตกขอบซ้าย
-    }
-  };
-
-  const handleToggleMonth = () => {
-    if (!showMonthPicker) updateDropdownPosition(monthBtnRef, 192); // 192px = w-48
-    setShowMonthPicker(!showMonthPicker);
-    setShowCustom(false);
-  };
-
   const handleToggleCustom = () => {
     if (!showCustom) {
-      updateDropdownPosition(customBtnRef, 288); // 288px = w-72
       if (value.mode === "custom") {
         setCustomFrom(value.from);
         setCustomTo(value.to);
       }
     }
     setShowCustom(!showCustom);
-    setShowMonthPicker(false);
+
   };
 
   const activeBadge = (() => {
+    if (hideCurrentMonthBadge && value.mode === 'month' && value.year === new Date().getFullYear() && value.month === new Date().getMonth()) return null;
     if (value.mode === "month")
       return format(new Date(value.year, value.month, 1), "MMM yyyy");
     if (value.mode === "custom" && value.from && value.to)
@@ -205,68 +165,55 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
 
   return (
     <div className={cn("relative w-full", className)} ref={containerRef}>
-      
-      <div 
+
+      <div
         ref={scrollContainerRef}
-        className="flex max-w-full items-center gap-2 overflow-x-auto overscroll-x-contain scrollbar-none pb-1"
+        className={cn("flex max-w-full min-w-0 items-center gap-3", wrap ? "flex-wrap" : "overflow-x-auto overscroll-x-contain scrollbar-none pb-1")}
       >
-        <div className="flex shrink-0 items-center gap-0.5 rounded-xl border border-border bg-white/5 p-1">
+        <GlideGroup><div className="flex shrink-0 items-center gap-0.5 rounded-xl border border-border bg-white/5 p-1">
           {PRESETS.map((preset) => (
             <button
               key={preset.id}
               onClick={() => {
                 onChange({ mode: preset.id as "1d" | "1w" | "1m" | "2m" | "3m" | "6m" | "1y" | "all" });
-                setShowMonthPicker(false);
+
                 setShowCustom(false);
               }}
               className={cn(
-                "px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap",
+                "relative isolate px-3 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap",
                 value.mode === preset.id
-                  ? "bg-[#ADC6FF]/20 text-[#ADC6FF]"
+                  ? "text-[#ADC6FF]"
                   : "text-gray-500 hover:text-gray-300"
               )}
             >
-              {preset.label}
+              {value.mode === preset.id && <GlidingIndicator activeKey={preset.id} className="!bg-[#ADC6FF]/20"/>}
+              {preset.id === "all" ? t("all") : preset.label}
             </button>
           ))}
-        </div>
+        </div></GlideGroup>
 
-        <div className="flex shrink-0 items-center gap-1 rounded-xl border border-border bg-white/[0.03] p-1">
+        <GlideGroup><div className="flex shrink-0 items-center gap-1 rounded-xl border border-border bg-white/[0.03] p-1">
           {recentMonths.map((m) => (
             <button
               key={`${m.year}-${m.month}`}
               onClick={() => {
                 onChange({ mode: "month", year: m.year, month: m.month });
-                setShowMonthPicker(false);
+
                 setShowCustom(false);
               }}
               className={cn(
-                "rounded-lg px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wide transition-all whitespace-nowrap",
+                "relative isolate rounded-lg px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wide transition-all whitespace-nowrap",
                 value.mode === "month" && value.year === m.year && value.month === m.month
-                  ? "bg-[#ADC6FF]/20 text-[#ADC6FF]"
+                  ? "text-[#ADC6FF]"
                   : "text-gray-500 hover:bg-white/5 hover:text-gray-300"
               )}
             >
-              {format(new Date(m.year, m.month, 1), "MMM yy")}
+              {value.mode === "month" && value.year === m.year && value.month === m.month && <GlidingIndicator activeKey={`${m.year}-${m.month}`} className="!bg-[#ADC6FF]/20"/>}{format(new Date(m.year, m.month, 1), "MMM yy")}
             </button>
           ))}
-        </div>
+        </div></GlideGroup>
 
-        <button
-          ref={monthBtnRef}
-          onClick={handleToggleMonth}
-          className={cn(
-            "shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all",
-            value.mode === "month"
-              ? "bg-[#ADC6FF]/20 text-[#ADC6FF] border-[#ADC6FF]/30"
-              : "bg-white/5 text-gray-500 border-border hover:text-gray-300"
-          )}
-        >
-          <Calendar size={12} />
-          <span>{value.mode === "month" ? format(new Date(value.year, value.month, 1), "MMM yyyy") : "More months"}</span>
-          <ChevronDown size={10} className={cn("transition-transform", showMonthPicker && "rotate-180")} />
-        </button>
-
+        <CustomSelect className="date-month-select" aria-label={text('Month','เดือน')} value={value.mode==='month'?`${value.year}-${value.month}`:''} onChange={key=>{const [year,month]=key.split('-').map(Number);onChange({mode:'month',year,month});setShowCustom(false);}} placeholder={text('More months','เลือกเดือน')} items={months.map(m=>({value:`${m.year}-${m.month}`,label:m.label}))}/>
         <button
           ref={customBtnRef}
           onClick={handleToggleCustom}
@@ -278,7 +225,7 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
           )}
         >
           <Calendar size={12} />
-          <span>Custom</span>
+          <span>{text('Custom','กำหนดเอง')}</span>
           <ChevronDown size={10} className={cn("transition-transform", showCustom && "rotate-180")} />
         </button>
 
@@ -293,49 +240,11 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
         )}
       </div>
 
-      <AnimatePresence>
-        {showMonthPicker && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            style={{ left: dropdownLeft }}
-            className="absolute top-full mt-2 w-48 bg-[#1a1a1a] border border-border rounded-2xl shadow-2xl z-50 overflow-hidden"
-          >
-            <div className="p-2 max-h-64 overflow-y-auto space-y-0.5">
-              <p className="px-3 pb-1 pt-1 text-[10px] font-black uppercase tracking-wide text-gray-600">All months</p>
-              {months.slice(2).map((m) => (
-                <button
-                  key={`${m.year}-${m.month}`}
-                  onClick={() => { onChange({ mode: "month", year: m.year, month: m.month }); setShowMonthPicker(false); }}
-                  className={cn(
-                    "w-full text-left px-3 py-2 rounded-lg text-xs font-bold transition-all",
-                    value.mode === "month" && value.year === m.year && value.month === m.month
-                      ? "bg-[#ADC6FF]/20 text-[#ADC6FF]"
-                      : "text-gray-400 hover:bg-white/5 hover:text-white"
-                  )}
-                >
-                  {m.label}
-                </button>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showCustom && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            style={{ left: dropdownLeft }}
-            className="absolute top-full mt-2 w-[280px] sm:w-72 bg-[#1a1a1a] border border-border rounded-2xl shadow-2xl z-50 p-4 space-y-3"
-          >
-            <p className="text-[10px] font-black text-gray-500 uppercase tracking-wide">Custom Range</p>
+      <FloatingPopover open={showCustom} anchor={customBtnRef} onClose={()=>setShowCustom(false)} width={288} className="date-custom-popover p-4 space-y-3">
+            <p className="text-[10px] font-black text-gray-500 uppercase tracking-wide">{text('Custom range','กำหนดช่วงวันที่')}</p>
             <div className="space-y-2">
               <div>
-                <label className="text-[10px] text-gray-500 font-bold uppercase mb-1 block">From</label>
+                <label className="text-[10px] text-gray-500 font-bold uppercase mb-1 block">{text('From','ตั้งแต่')}</label>
                 <div className="relative">
                   <input
                   type="text"
@@ -344,7 +253,7 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
                   placeholder="YYYY-MM-DD"
                   value={selectedCustomFrom}
                   onChange={(e) => setCustomFrom(normalizeDateInput(e.target.value))}
-                  className="w-full bg-white/5 border border-border rounded-xl px-3 py-2 pr-9 text-white text-xs font-bold focus:outline-none focus:border-[#4EDEA3]/50 transition-all"
+                  className="w-full bg-white/5 border border-border rounded-xl px-3 py-2 pr-9 text-white text-xs font-bold   transition-all"
                 />
                   <button
                     type="button"
@@ -365,7 +274,7 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
                 </div>
               </div>
               <div>
-                <label className="text-[10px] text-gray-500 font-bold uppercase mb-1 block">To</label>
+                <label className="text-[10px] text-gray-500 font-bold uppercase mb-1 block">{text('To','ถึง')}</label>
                 <div className="relative">
                   <input
                   type="text"
@@ -374,7 +283,7 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
                   placeholder="YYYY-MM-DD"
                   value={selectedCustomTo}
                   onChange={(e) => setCustomTo(normalizeDateInput(e.target.value))}
-                  className="w-full bg-white/5 border border-border rounded-xl px-3 py-2 pr-9 text-white text-xs font-bold focus:outline-none focus:border-[#4EDEA3]/50 transition-all"
+                  className="w-full bg-white/5 border border-border rounded-xl px-3 py-2 pr-9 text-white text-xs font-bold   transition-all"
                 />
                   <button
                     type="button"
@@ -397,9 +306,9 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
               </div>
             </div>
             {hasInvalidCustomDate ? (
-              <p className="text-[10px] font-bold text-[#FFB4AB]">Use a valid date in YYYY-MM-DD format.</p>
+              <p className="text-[10px] font-bold text-[#FFB4AB]">{text('Use a valid date in YYYY-MM-DD format.','กรุณาระบุวันที่ในรูปแบบ YYYY-MM-DD')}</p>
             ) : hasInvalidCustomRange && (
-              <p className="text-[10px] font-bold text-[#FFB4AB]">End date must be on or after the start date.</p>
+              <p className="text-[10px] font-bold text-[#FFB4AB]">{text('End date must be on or after the start date.','วันสิ้นสุดต้องไม่อยู่ก่อนวันเริ่มต้น')}</p>
             )}
             <button
               onClick={() => {
@@ -415,11 +324,9 @@ export function DateRangeBar({ value, onChange, className }: DateRangeBarProps) 
               disabled={!selectedCustomFrom || !selectedCustomTo || hasInvalidCustomDate || hasInvalidCustomRange}
               className="w-full py-2 bg-[#4EDEA3] text-[#0E0E0E] rounded-xl font-black text-xs uppercase tracking-wide hover:brightness-110 transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              Apply
+              {text('Apply','ใช้ช่วงวันที่')}
             </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      </FloatingPopover>
     </div>
   );
 }

@@ -1,8 +1,13 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { bucketWriteMessage } from '@/src/lib/bucket-command';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useLayoutEffect } from "react";
 import { flushSync } from 'react-dom';
 import { transitionTheme, type ThemeOrigin } from '@/src/lib/theme-transition';
+import { afterFinancialWrite, financialSnapshots, readFinancialSnapshot, scopeFinancialSnapshot } from '@/src/lib/financial-snapshot';
+import { MemoryResource } from '@/src/lib/memory-resource';
+import { getNetWorthRange, getNetWorthSeries, type NetWorthScope, type NetWorthPoint } from '@/src/lib/net-worth-series';
+import { STALE_TTL } from '@/src/lib/loading-policy';
 import { db, supabase } from "@/src/lib/supabase";
 import { validateAssetFunding } from '@/src/lib/asset-funding';
 import { User } from "@supabase/supabase-js";
@@ -10,6 +15,7 @@ import { projectLotPosition } from "@/src/lib/trade-lots";
 import { tradeDeletionReason, tradeDeleteError } from '@/src/lib/trade-deletion-policy';
 import { bucketNativeAmount, getNativeLeg, nativeBucketBalance } from '@/src/lib/native-money';
 import { decimal, isFxCurrency } from '@/src/lib/fx';
+import { useNotificationInbox } from '@/src/hooks/useNotificationInbox';
 import { useFxRate } from '@/src/hooks/useFxRate';
 
 export type Language = "en" | "th";
@@ -296,6 +302,7 @@ interface AppState {
   /** Returns false when the trade was rejected (for example, insufficient cash). */
   addTrade: (trade: Omit<Trade, "id">, metadata?: Pick<Asset, 'name' | 'allocation' | 'currentPrice' | 'currency' | 'excludeFromTotal' | 'chartData'>) => Promise<boolean>;
   cashActivities: CashActivity[];
+  addCashActivities: (activities: Omit<CashActivity, 'id'>[], operation?: 'create'|'transfer'|'distribute') => Promise<CashActivity[] | null>;
   addCashActivity: (activity: Omit<CashActivity, "id">) => Promise<CashActivity | null>;
   removeCashActivity: (id: string) => void;
   allocations: Allocation[];
@@ -324,7 +331,8 @@ interface AppState {
   addAsset: (asset: Asset) => void;
   syncDcaPosition: (symbol: string, entries: unknown) => void;
   bulkAddTrades: (trades: Omit<Trade, "id">[]) => void;
-  netWorthHistory: { date: string; value: number }[];
+  netWorthHistory: NetWorthPoint[];
+  netWorthScope: NetWorthScope;
   userProfile?: { email: string; avatarUrl: string; initials: string };
   setUserProfile: (profile: { email: string; avatarUrl: string; initials: string } | undefined) => void;
   fetchAssetMarketData: (symbol: string) => Promise<any>;
@@ -333,7 +341,7 @@ interface AppState {
   reorderAssets: (reordered: Asset[]) => void;
   removeTrade: (id: number) => Promise<boolean>;
   updateTrade: (id: number, updates: Partial<Trade>) => Promise<boolean>;
-  updateCashActivity: (id: string, updates: Partial<CashActivity>) => void;
+  updateCashActivity: (id: string, updates: Partial<CashActivity>) => Promise<boolean | void>;
   toasts: AppToast[];
   addToast: (message: string, type?: AppToast['type']) => void;
   removeToast: (id: string) => void;
@@ -342,16 +350,24 @@ interface AppState {
   darkMode: boolean;
   setDarkMode: (val: boolean, origin?: ThemeOrigin) => void;
   notifications: AppNotification[];
+  notificationUnread: number;
+  notificationHasMore: boolean;
+  notificationError: boolean;
+  notificationLoading: boolean;
+  loadMoreNotifications: () => void;
+  refreshNotifications: () => void;
   addNotification: (title: string, message: string, type: AppNotification['type']) => void;
   markNotificationRead: (id: string) => void;
   clearNotifications: () => void;
   isDataLoaded: boolean;
+  isDataRefreshing: boolean;
+  dataLoadError: string | null;
   notifPreferences: NotifPreferences;
   setNotifPreferences: (prefs: NotifPreferences) => void;
   moneyBuckets: MoneyBucket[];
   allMoneyBuckets: MoneyBucket[];
-  addMoneyBucket: (bucket: Omit<MoneyBucket, 'id'>) => void;
-  updateMoneyBucket: (id: string, updates: Partial<MoneyBucket>) => void;
+  addMoneyBucket: (bucket: Omit<MoneyBucket, 'id'>) => Promise<boolean | void>;
+  updateMoneyBucket: (id: string, updates: Partial<MoneyBucket>) => Promise<boolean | void>;
   removeMoneyBucket: (id: string) => void;
   bucketActivities: BucketActivity[];
   addBucketActivity: (activity: Omit<BucketActivity, 'id'>) => void;
@@ -608,6 +624,8 @@ const translations: Record<Language, Record<string, string>> = {
     settingsSaved: "Settings saved successfully!",
     appearance: "Appearance",
     allWallets: "All wallets",
+    wallet: "Wallet",
+    currency: "Currency",
     unassigned: "Unassigned",
     incomeExpense: "Income / Expense",
     transfers: "Transfers",
@@ -615,7 +633,10 @@ const translations: Record<Language, Record<string, string>> = {
     noteOptional: "Note (optional)",
     SAVERECORD: "Save record",
     ledgerTitle: "Ledger",
-    ledgerDescription: "Your money movements, grouped by day.",
+    cashflow: "Cash Flow",
+    terminal: "Terminal",
+    trade: "Trade",
+    ledgerPageDescription: "Your money movements, grouped by day.",
     ledgerExport: "Export",
     ledgerSelectPrompt: "Select records to export",
     ledgerSelectAll: "Select all in this period",
@@ -627,13 +648,17 @@ const translations: Record<Language, Record<string, string>> = {
     ledgerFilters: "Filters",
     ledgerIn: "In",
     ledgerOut: "Out",
-    ledgerNet: "Net",
     ledgerEmpty: "No records in this period.",
     ledgerExcluded: "Transfers are shown but excluded from cashflow totals.",
     ledgerDeleteQuestion: "Delete {n} records, total {amount}?",
     ledgerEditLimited: "Amount and wallet changes require the existing wallet or trade workflow.",
     ledgerManaged: "Manage this linked record in Portfolio.",
     ledgerPartial: "Some records have missing native amounts or FX. Available records are shown.",
+    ledgerMoreWallets: "More",
+    ledgerBrokers: "Brokers",
+    ledgerLoading: "Loading records",
+    yesterday: "Yesterday",
+    confirmDeleteRecord: "Delete record?",
     ledgerPending: "Pending deletion · Undo available for 5 seconds",
     ledgerDeleteFailed: "Some records could not be deleted; they are shown again.",
     ledgerEditTitle: "Edit record",
@@ -1064,6 +1089,8 @@ const translations: Record<Language, Record<string, string>> = {
     settingsSaved: "บันทึกการตั้งค่าเรียบร้อย!",
     appearance: "รูปลักษณ์",
     allWallets: "ทุกกระเป๋า",
+    wallet: "กระเป๋า",
+    currency: "สกุลเงิน",
     unassigned: "ไม่ระบุกระเป๋า",
     incomeExpense: "รายรับ / รายจ่าย",
     transfers: "เงินโอน",
@@ -1071,7 +1098,10 @@ const translations: Record<Language, Record<string, string>> = {
     noteOptional: "หมายเหตุ (ไม่บังคับ)",
     SAVERECORD: "บันทึกรายการ",
     ledgerTitle: "บัญชีรายการ",
-    ledgerDescription: "การเคลื่อนไหวของเงิน แยกตามวัน",
+    cashflow: "กระแสเงินสด",
+    terminal: "เทอร์มินัล",
+    trade: "เทรด",
+    ledgerPageDescription: "การเคลื่อนไหวของเงิน แยกตามวัน",
     ledgerExport: "ส่งออก",
     ledgerSelectPrompt: "เลือกรายการเพื่อส่งออก",
     ledgerSelectAll: "เลือกทั้งหมดในช่วงนี้",
@@ -1083,13 +1113,17 @@ const translations: Record<Language, Record<string, string>> = {
     ledgerFilters: "ตัวกรอง",
     ledgerIn: "เข้า",
     ledgerOut: "ออก",
-    ledgerNet: "สุทธิ",
     ledgerEmpty: "ไม่มีรายการในช่วงนี้",
     ledgerExcluded: "แสดงเงินโอนเพื่ออ้างอิง แต่ไม่นับในยอดกระแสเงินสด",
     ledgerDeleteQuestion: "ลบ {n} รายการ ยอดรวม {amount} หรือไม่?",
     ledgerEditLimited: "การแก้ยอดเงินหรือกระเป๋าต้องทำผ่านขั้นตอนจัดการกระเป๋าหรือรายการเทรดเดิม",
     ledgerManaged: "จัดการรายการที่เชื่อมโยงนี้ในหน้าพอร์ต",
     ledgerPartial: "บางรายการขาดยอดต้นฉบับหรือเรท แสดงเฉพาะข้อมูลที่คำนวณได้",
+    ledgerMoreWallets: "เพิ่มเติม",
+    ledgerBrokers: "โบรกเกอร์",
+    ledgerLoading: "กำลังโหลดรายการ",
+    yesterday: "เมื่อวาน",
+    confirmDeleteRecord: "ลบรายการนี้หรือไม่?",
     ledgerPending: "รอลบ · เลิกทำได้ภายใน 5 วินาที",
     ledgerDeleteFailed: "บางรายการลบไม่สำเร็จ จึงแสดงรายการนั้นอีกครั้ง",
     ledgerEditTitle: "แก้ไขรายการ",
@@ -1759,7 +1793,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [dataLoadError, setDataLoadError] = useState<string | null>(null);
   const [financialRevision, setFinancialRevision] = useState(0);
+  const [isDataRefreshing, setIsDataRefreshing] = useState(false);
+  const [dataPortfolioId, setDataPortfolioId] = useState<string | null | undefined>(undefined);
+  const loadedUser = useRef<string | null>(null);
+  const lastFinancialRevision = useRef(financialRevision);
+  const draftCache = useRef(new MemoryResource<Array<{symbol:string; entries:unknown; portfolio_id?:string|null}>>());
   const [dcaPositions, setDcaPositions] = useState<DcaPosition[]>([]);
   const dcaAssetSaveTimers = React.useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const deletedAssetSymbols = React.useRef<Set<string>>(new Set());
@@ -1768,7 +1808,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // so React toast keys are always unique.
   const toastSequence = React.useRef(0);
   const [toasts, setToasts] = useState<AppToast[]>([]);
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const inbox = useNotificationInbox(user?.id, user?.email);
+  const { notifications } = inbox;
   const [customCategories, setCustomCategories] = useState<CustomCategory[]>([]);
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
   const [brokerageAccounts, setBrokerageAccounts] = useState<BrokerageAccount[]>([]);
@@ -1821,13 +1862,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return portfolio;
     }
 
-    const { data, error } = await db.portfolios.insert({
+    financialSnapshots.invalidate();
+    const { data, error } = afterFinancialWrite(await db.portfolios.insert({
       user_id: user.id,
       name: trimmedName,
       color: portfolioColor,
       is_default: portfolios.length === 0,
       kind: 'trading',
-    });
+    }));
     if (error || !data) {
       console.error('Failed to create portfolio', error);
       return null;
@@ -1899,10 +1941,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setAllBrokerageAccounts(prev => [...prev, localAccount]);
       return localAccount;
     }
-    const { data, error } = await db.brokerageAccounts.insert({
+    financialSnapshots.invalidate();
+    const { data, error } = afterFinancialWrite(await db.brokerageAccounts.insert({
       user_id: user.id, portfolio_id: activePortfolioId, name,
       broker: account.broker || null, currency: account.currency, color: account.color, kind: account.kind,
-    });
+    }));
     if (error || !data) { console.error('Failed to create brokerage account', error); return null; }
     const created = { id: data.id, name: data.name, broker: data.broker || undefined, currency: data.currency as Currency, color: data.color, portfolioId: data.portfolio_id, kind: data.kind || 'cash' as const };
     setBrokerageAccounts(prev => [...prev, created]);
@@ -1927,12 +1970,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setAllBrokerageAccounts(prev => prev.map(account => account.id === id ? { ...account, ...updates, name } : account));
       return true;
     }
-    const { data, error } = await db.brokerageAccounts.update(id, {
+    financialSnapshots.invalidate();
+    const { data, error } = afterFinancialWrite(await db.brokerageAccounts.update(id, {
       name,
       broker: updates.broker || null,
       currency: updates.currency,
       kind: updates.kind,
-    });
+    }));
     if (error || !data) { console.error('Failed to update brokerage account', error); return false; }
     setBrokerageAccounts(prev => prev.map(account => account.id === id ? {
       ...account,
@@ -1979,7 +2023,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }, ...prev]);
       return true;
     }
-    const { data, error } = await db.brokerageCashEntries.insert({
+    financialSnapshots.invalidate();
+    const { data, error } = afterFinancialWrite(await db.brokerageCashEntries.insert({
       user_id: user.id,
       portfolio_id: account.portfolioId,
       brokerage_account_id: accountId,
@@ -1989,7 +2034,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       trade_id: null,
       occurred_at: new Date().toISOString(),
       note: note || null,
-    });
+    }));
     if (error) { console.error('Failed to record brokerage cash movement', error); return false; }
     setBrokerageCashBalances(prev => {
       const current = prev.find(item => item.accountId === accountId)?.balance || 0;
@@ -2024,7 +2069,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setPortfolios(prev => prev.map(portfolio => portfolio.id === id ? { ...portfolio, name: trimmedName, ...(portfolioColor ? { color: portfolioColor } : {}) } : portfolio));
       return true;
     }
-    const { data, error } = await db.portfolios.update(id, { name: trimmedName, ...(portfolioColor ? { color: portfolioColor } : {}) });
+    financialSnapshots.invalidate();
+    const { data, error } = afterFinancialWrite(await db.portfolios.update(id, { name: trimmedName, ...(portfolioColor ? { color: portfolioColor } : {}) }));
     if (error || !data) {
       console.error('Failed to rename portfolio', error);
       return false;
@@ -2178,13 +2224,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       let records = data || [];
       if (records.length === 0) {
-        const created = await db.portfolios.insert({
+        const created = afterFinancialWrite(await db.portfolios.insert({
           user_id: user.id,
           name: 'Main Portfolio',
           color: '#ADC6FF',
           is_default: true,
           kind: 'trading',
-        });
+        }));
         if (cancelled) return;
         records = created.data ? [created.data] : [];
         if (created.error) console.error('Unable to create default portfolio', created.error);
@@ -2217,12 +2263,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => { cancelled = true; };
   }, [authReady, user]);
 
-  // Fetch data when user or selected portfolio changes
-  useEffect(() => {
+  // A cached scope is projected before paint; remote refresh never remounts pages.
+  useLayoutEffect(() => {
     if (!authReady || (user && !portfoliosReady)) return;
     let cancelled = false;
 
-    setIsDataLoaded(false);
+    const owner = user?.id || 'offline';
+    if (loadedUser.current !== owner) {
+      financialSnapshots.invalidate();
+      draftCache.current.invalidate();
+      setIsDataLoaded(false);
+      loadedUser.current = owner;
+    }
+    if (lastFinancialRevision.current !== financialRevision) {
+      financialSnapshots.invalidate();
+      draftCache.current.invalidate();
+      lastFinancialRevision.current = financialRevision;
+    }
+    setDataLoadError(null);
 
     if (!user) {
       // Load from localStorage for offline mode
@@ -2231,11 +2289,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       } catch (err) {
         console.error("Failed to load from localStorage", err);
       }
+      setDataPortfolioId(activePortfolioId);
       setIsDataLoaded(true);
       return;
     }
 
-    const loadData = async () => {
+    const applyData = (snapshot: Awaited<ReturnType<typeof readFinancialSnapshot>>) => {
+      if (cancelled) return;
+      deletedAssetSymbols.current.clear();
+      setDataPortfolioId(activePortfolioId);
       try {
         const cashManagementPortfolioId = portfolios.find(portfolio => portfolio.kind === 'cash_management')?.id || null;
         const selectedPortfolio = portfolios.find(portfolio => portfolio.id === activePortfolioId);
@@ -2252,19 +2314,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           { data: allBrokerageAccountsData, error: allBrokerageAccountsError },
           { data: brokerageCashBalancesData, error: brokerageCashBalancesError },
           { data: brokerageCashEntriesData, error: brokerageCashEntriesError },
-        ] = await Promise.all([
-          db.assets.getAll(user.id, tradingPortfolioId),
-          db.trades.getAll(user.id, tradingPortfolioId),
-          db.allocations.getAll(user.id, tradingPortfolioId),
-          db.buckets.getAll(user.id, null),
-          db.bucketActivities.getAll(user.id, cashManagementPortfolioId),
-          db.cashActivities.getAll(user.id, cashManagementPortfolioId),
-          db.userCategories.getAll(user.id, activePortfolioId),
-          db.brokerageAccounts.getAll(user.id, tradingPortfolioId),
-          db.brokerageAccounts.getAll(user.id, null),
-          db.brokerageCashEntries.getBalances(user.id, null),
-          db.brokerageCashEntries.getAll(user.id, tradingPortfolioId),
-        ]);
+        ] = scopeFinancialSnapshot(snapshot, tradingPortfolioId, cashManagementPortfolioId, activePortfolioId);
         if (cancelled) return;
 
         const loadErrors = [
@@ -2283,6 +2333,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
         if (loadErrors.length > 0) {
           console.error("Supabase data load errors:", loadErrors);
+          setDataLoadError('Financial data could not be loaded.');
         }
 
         // Signed-in data never falls back to the browser cache.  A cache may
@@ -2516,13 +2567,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       } catch (err) {
         console.error("Failed to load data from Supabase", err);
+        if (!cancelled) setDataLoadError('Financial data could not be loaded.');
       } finally {
         if (!cancelled) setIsDataLoaded(true);
       }
     };
 
-    loadData();
+    const cached = financialSnapshots.peek(user.id);
+    if (cached) applyData(cached);
+    if (!financialSnapshots.fresh(user.id)) {
+      setIsDataRefreshing(!!cached);
+      void readFinancialSnapshot(user.id).then(applyData).catch(error => {
+        if (!cancelled) { console.error('Financial snapshot refresh failed', error); setDataLoadError('Financial data could not be loaded.'); }
+      }).finally(() => { if (!cancelled) setIsDataRefreshing(false); });
+    } else setIsDataRefreshing(false);
     return () => { cancelled = true; };
+
   }, [user, authReady, activePortfolioId, portfolios, portfoliosReady, loadFromLocalStorage, financialRevision]);
 
   // Reconcile all financial views together after returning from another tab.
@@ -2530,7 +2590,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!user) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const refresh = () => {
+    const refresh = (event: Event) => {
+      if (event.type !== 'fintrack:financial-change' && financialSnapshots.fresh(user.id)) return;
+      if (event.type === 'fintrack:financial-change') financialSnapshots.invalidate(user.id);
       if (document.visibilityState !== 'visible') return;
       clearTimeout(timer);
       timer = setTimeout(() => setFinancialRevision(value => value + 1), 250);
@@ -2549,7 +2611,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Never let a previous portfolio's virtual DCA lots appear while the next
   // selected portfolio is still loading its own draft.
   useEffect(() => {
-    deletedAssetSymbols.current.clear();
     setDcaPositions([]);
   }, [activePortfolioId]);
 
@@ -2580,14 +2641,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const loadDcaPositions = async () => {
       const localPositions = getDcaPositions(getLocalDcaDrafts());
       if (user) {
-        let query = supabase
-          .from('dca_drafts')
-          .select('symbol, entries')
-          .eq('user_id', user.id);
         const selectedPortfolio = portfolios.find(p => p.id === activePortfolioId);
         const tradingPortfolioId = selectedPortfolio?.kind === 'trading' ? activePortfolioId : null;
-        if (tradingPortfolioId) query = query.eq('portfolio_id', tradingPortfolioId);
-        const { data, error } = await query;
+        const result = await draftCache.current.read(user.id, async () => {
+          const {data, error} = await supabase.from('dca_drafts').select('symbol, entries, portfolio_id').eq('user_id', user.id);
+          if (error) throw error;
+          return data || [];
+        }).then(data => ({data: tradingPortfolioId ? data.filter(row => row.portfolio_id === tradingPortfolioId) : data, error: null as Error | null}))
+          .catch(error => ({data: null, error: error as Error}));
+        const {data, error} = result;
 
         if (cancelled) return;
         if (error) {
@@ -2611,6 +2673,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
 
     const handleDcaDraftChange = (event: Event) => {
+      draftCache.current.invalidate();
       const detail = (event as CustomEvent<{ symbol?: string; entries?: unknown; portfolioId?: string | null }>).detail;
       if (detail?.portfolioId && detail.portfolioId !== activePortfolioId) return;
       if (detail?.symbol && detail.entries !== undefined) {
@@ -2662,18 +2725,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setToasts(prev => prev.filter(t => t.id !== id));
   };
 
-  const addNotification = (title: string, message: string, type: AppNotification['type']) => {
-    const id = Date.now().toString();
-    setNotifications(prev => [{ id, title, message, type, time: new Date(), read: false }, ...prev]);
-  };
-
-  const markNotificationRead = (id: string) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-  };
-
-  const clearNotifications = () => {
-    setNotifications([]);
-  };
+  const addNotification = inbox.add;
+  const markNotificationRead = (id: string) => { void inbox.mark(id); };
+  // Kept for old callers: clearing the unread badge never deletes history.
+  const clearNotifications = () => { void inbox.mark(); };
 
   // Compute dynamic bucket balances directly from Ledger transactions (Single Source of Truth)
   const dynamicMoneyBuckets = React.useMemo(() => {
@@ -2701,8 +2756,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [moneyBuckets, cashActivities]);
 
   const transferBucketToBroker = async (transfer: InvestmentTransfer): Promise<boolean> => {
-    // Existing 018 has a legacy FX fallback. Reject unresolved source records
-    // before calling it; never let today's reference rate repair old legs.
+    // Fast client feedback only. The atomic DB writer rechecks native history,
+    // locks and balance; this snapshot never authorizes a debit.
     try {
       const bucket = moneyBuckets.find(b => b.id === transfer.bucketId);
       if (!bucket || !isFxCurrency(bucket.currency)) throw Error('unresolved: Bucket currency');
@@ -2714,7 +2769,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return false;
     }
     try {
-      const { data, error } = await db.brokerageCashEntries.transferFromBucket({ ...transfer, legacyThbPerUsd: exchangeRates.THB });
+      const { data, error } = afterFinancialWrite(await db.brokerageCashEntries.transferFromBucket({ ...transfer, legacyThbPerUsd: exchangeRates.THB }));
       if (error || !data) {
         console.error('Failed to transfer Bucket funds', error);
         const message = error?.message || '';
@@ -2748,6 +2803,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setBrokerageCashBalances(prev => [...prev.filter(item => item.accountId !== entry.brokerage_account_id), {
         accountId: entry.brokerage_account_id, balance: Number(data.brokerage_balance),
       }]);
+      setFinancialRevision(v=>v+1);
       addToast(`โอนเข้าพอร์ตสำเร็จ ${Number(entry.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} ${entry.currency}`, 'success');
       return true;
     } catch (error) {
@@ -2757,129 +2813,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Build a daily net-worth curve from the portfolio's own trade ledger and
-  // the market history already loaded for each holding. This is display data:
-  // the current total below remains the source of truth for balances.
+  // Shared daily valuation: asset prices + reconstructed native cash balances.
+  const netWorthScope = React.useMemo<NetWorthScope>(() => ({
+      portfolioId: activePortfolioId,
+      kind: portfolios.find(portfolio => portfolio.id === activePortfolioId)?.kind,
+      settings: netWorthSettings, exchangeRates, currency: 'USD',
+      assets, trades, cashActivities, buckets: dynamicMoneyBuckets,
+      accounts: brokerageAccounts, balances: brokerageCashBalances, brokerEntries: brokerageCashEntries,
+  }), [activePortfolioId, assets, trades, cashActivities, dynamicMoneyBuckets, brokerageAccounts, brokerageCashBalances, brokerageCashEntries, exchangeRates, netWorthSettings, portfolios]);
   const netWorthHistory = React.useMemo(() => {
-    const toUSD = (amount: number, fromCurrency: Currency = "USD") => {
-      return amount / (exchangeRates[fromCurrency] || 1);
-    };
-    const selectedPortfolioKind = portfolios.find(portfolio => portfolio.id === activePortfolioId)?.kind;
-    const currentCashUSD = (() => {
-      if (!activePortfolioId) {
-        const bucketsTotal = netWorthSettings.includeBuckets !== false
-          ? dynamicMoneyBuckets.reduce((acc, curr) => acc + toUSD(curr.currentAmount, curr.currency || "USD"), 0)
-          : 0;
-        const brokerageTotal = netWorthSettings.includeCash !== false
-          ? brokerageAccounts.reduce((acc, account) => {
-              const balance = brokerageCashBalances.find(item => item.accountId === account.id)?.balance || 0;
-              return acc + toUSD(balance, account.currency);
-            }, 0)
-          : 0;
-        return bucketsTotal + brokerageTotal;
-      }
-      if (selectedPortfolioKind === "cash_management") {
-        return netWorthSettings.includeBuckets !== false
-          ? dynamicMoneyBuckets.reduce((acc, curr) => acc + toUSD(curr.currentAmount, curr.currency || "USD"), 0)
-          : 0;
-      }
-      if (selectedPortfolioKind === "trading") {
-        return netWorthSettings.includeCash !== false
-          ? brokerageAccounts.reduce((acc, account) => {
-              const balance = brokerageCashBalances.find(item => item.accountId === account.id)?.balance || 0;
-              return acc + toUSD(balance, account.currency);
-            }, 0)
-          : 0;
-      }
-      return 0;
-    })();
-    const currentTotalUSD = (selectedPortfolioKind === "cash_management" ? 0 : (netWorthSettings.includeAssets !== false ? assets.reduce((acc, curr) => acc + curr.valueUSD, 0) : 0)) + currentCashUSD;
-    const dateKey = (value: string | number) => {
-      const date = new Date(value);
-      if (Number.isNaN(date.getTime())) return '';
-      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-    };
-    const today = dateKey(Date.now());
-    const daysBetween = (start: string, end: string) => {
-      const days: string[] = [];
-      const cursor = new Date(`${start}T12:00:00`);
-      const last = new Date(`${end}T12:00:00`);
-      while (cursor <= last && days.length < 366) {
-        days.push(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`);
-        cursor.setDate(cursor.getDate() + 1);
-      }
-      return days;
-    };
-
-    const includedAssets = selectedPortfolioKind === 'cash_management' || netWorthSettings.includeAssets === false
-      ? []
-      : assets.filter(asset => asset.is_active !== false);
-    const tradeDays = trades.map(trade => dateKey(trade.date)).filter(Boolean);
-    const firstMarketDay = includedAssets
-      .flatMap(asset => asset.chartData || [])
-      .map(point => dateKey(point.time))
-      .filter(Boolean)
-      .sort()[0];
-    const start = firstMarketDay || [...tradeDays].sort()[0] || today;
-    const days = daysBetween(start, today);
-
-    const tradesBySymbol = new Map<string, Trade[]>();
-    trades.forEach(trade => {
-      const key = trade.asset.toUpperCase();
-      tradesBySymbol.set(key, [...(tradesBySymbol.get(key) || []), trade]);
-    });
-    tradesBySymbol.forEach(rows => rows.sort((a, b) => a.date.localeCompare(b.date)));
-
-    const marketAssets = includedAssets.filter(asset => (asset.chartData?.length || 0) > 1);
-    if (marketAssets.length > 0 && days.length > 1) {
-      const history = days.map(day => {
-        const assetValue = marketAssets.reduce((total, asset) => {
-          const prices = (asset.chartData || [])
-            .map(point => ({ day: dateKey(point.time), price: point.price }))
-            .filter(point => point.day && Number.isFinite(point.price) && point.price > 0)
-            .sort((a, b) => a.day.localeCompare(b.day));
-          const latestPrice = prices[prices.length - 1]?.price;
-          const historicalPrice = [...prices].reverse().find(point => point.day <= day)?.price || prices[0]?.price;
-          if (!latestPrice || !historicalPrice) return total;
-
-          const assetTrades = tradesBySymbol.get(asset.symbol.toUpperCase()) || [];
-          const recordedQuantity = assetTrades.reduce((quantity, trade) => {
-            if (dateKey(trade.date) > day) return quantity;
-            const units = trade.shares || (trade.pricePerUnit ? trade.amountUSD / trade.pricePerUnit : 0);
-            if (trade.type === 'BUY' || trade.type === 'IMPORT' || trade.type === 'COVER') return quantity + units;
-            if (trade.type === 'SELL' || trade.type === 'SHORT') return quantity - units;
-            return quantity;
-          }, 0);
-          const quantity = assetTrades.length > 0 ? recordedQuantity : (asset.shares || 0);
-          const priceInUSD = historicalPrice * ((asset.currentPrice || asset.valueUSD / Math.max(asset.shares || 1, 1)) / latestPrice);
-          return total + Math.max(0, quantity) * priceInUSD;
-        }, 0);
-        return { date: day, value: currentCashUSD + assetValue };
-      });
-      history[history.length - 1] = { date: today, value: currentTotalUSD };
-      return history;
-    }
-
-    // A holding without price history still gets one point for every calendar
-    // day, so deposits and trades never collapse into a single monthly jump.
-    const dailyInvested: Record<string, number> = {};
-    trades.forEach(trade => {
-      const day = dateKey(trade.date);
-      if (!day) return;
-      const amount = trade.amountUSD + (trade.fees || 0);
-      if (trade.type === 'BUY' || trade.type === 'COVER' || trade.type === 'IMPORT') dailyInvested[day] = (dailyInvested[day] || 0) + amount;
-      if (trade.type === 'SELL' || trade.type === 'SHORT') dailyInvested[day] = (dailyInvested[day] || 0) - Math.max(0, trade.amountUSD - (trade.fees || 0));
-    });
-    let cumulative = 0;
-    const history = days.map(day => {
-      cumulative += dailyInvested[day] || 0;
-      return { date: day, value: cumulative + currentCashUSD };
-    });
-    if (history.length === 0) history.push({ date: today, value: currentTotalUSD });
-    history[history.length - 1] = { date: today, value: currentTotalUSD };
-    if (history.length < 2) history.unshift({ date: 'Start', value: 0 });
-    return history;
-  }, [activePortfolioId, assets, brokerageAccounts, brokerageCashBalances, dynamicMoneyBuckets, exchangeRates, netWorthSettings, portfolios, trades]);
+    // Unresolved native balances must not become invented zero history. Loading
+    // and missing-data presentation belongs to the existing chart boundary.
+    try { return getNetWorthSeries(netWorthScope, getNetWorthRange(netWorthScope)); }
+    catch { return []; }
+  }, [netWorthScope]);
 
 
   // Update userProfile when Supabase user session changes
@@ -2905,7 +2852,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Sync asset holdings from trades (Moving Average method)
   useEffect(() => {
-    if (!isDataLoaded) return;
+    if (!isDataLoaded || dataPortfolioId !== activePortfolioId) return;
 
     type PositionStats = {
       portfolioId?: string;
@@ -3049,7 +2996,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem("fintrack-assets", JSON.stringify(deduplicatedAssets));
       return deduplicatedAssets;
     });
-  }, [activePortfolioId, trades, dcaPositions, isDataLoaded]);
+  }, [activePortfolioId, dataPortfolioId, trades, dcaPositions, isDataLoaded]);
+
+  const marketQuotesRef = useRef(marketQuotes);
+  marketQuotesRef.current = marketQuotes;
 
   // Fetch Live Market Data and persist prices to Supabase.  Depend on the
   // symbol list, not the asset objects themselves, so a newly executed trade
@@ -3059,7 +3009,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [assets, trades]
   );
   useEffect(() => {
-    if (!isDataLoaded) return;
+    if (!isDataLoaded || dataPortfolioId !== activePortfolioId) return;
 
     let mounted = true;
     let inFlight = false;
@@ -3082,6 +3032,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const snapshot = assetsRef.current;
       const symbolsQuery = marketSymbolKey.split('|').filter(Boolean).map(mapToMarketSymbol).join(',');
       if (!symbolsQuery || inFlight || document.visibilityState === 'hidden') return;
+      if (marketSymbolKey.split('|').every(symbol => marketQuotesRef.current[symbol] && Date.now() - marketQuotesRef.current[symbol].updatedAt < STALE_TTL)) return;
       inFlight = true;
 
       try {
@@ -3181,7 +3132,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener('focus', fetchMarketData);
       document.removeEventListener('visibilitychange', fetchMarketData);
     };
-  }, [activePortfolioId, exchangeRates, isDataLoaded, marketSymbolKey, user]);
+  }, [activePortfolioId, dataPortfolioId, exchangeRates, isDataLoaded, marketSymbolKey, user]);
 
 
   const fetchAssetMarketData = async (symbol: string) => {
@@ -3243,6 +3194,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
 
   const addAsset = async (assetData: Asset) => {
+    financialSnapshots.invalidate();
     const targetPortfolioId = assetData.portfolioId ?? activePortfolioId;
     const selectedPortfolio = portfolios.find(portfolio => portfolio.id === targetPortfolioId);
     if (targetPortfolioId && selectedPortfolio?.kind !== 'trading') {
@@ -3260,7 +3212,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     try {
-      const { data, error } = await db.assets.upsert({
+      const { data, error } = afterFinancialWrite(await db.assets.upsert({
         user_id: user.id,
         portfolio_id: targetPortfolioId,
         brokerage_account_id: assetData.brokerageAccountId || null,
@@ -3283,7 +3235,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         change_24h: 0,
         change_percentage: assetData.change,
         exclude_from_total: assetData.excludeFromTotal || false
-      });
+      }));
       if (data) {
         const newAsset = {
           ...assetData,
@@ -3309,6 +3261,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addTrade = async (tradeData: Omit<Trade, "id">, metadata?: Pick<Asset, 'name' | 'allocation' | 'currentPrice' | 'currency' | 'excludeFromTotal' | 'chartData'>): Promise<boolean> => {
+    financialSnapshots.invalidate();
     if (tradeData.type === 'SELL') {
       addToast(language === 'th' ? 'บันทึกการขายผ่าน Live P&L ในหน้า Trade / Plan เพื่อตรวจสอบต้นทุนและไม้ก่อนยืนยัน' : 'Use Trade / Plan → Live P&L to preview allocations before selling.', 'warning');
       return false;
@@ -3375,8 +3328,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
       if (user) {
         try {
-          const { error } = await supabase.from('assets').update({ name: metadata.name, allocation: metadata.allocation, current_price: metadata.currentPrice, exclude_from_total: metadata.excludeFromTotal ?? false })
-            .eq('user_id', user.id).eq('portfolio_id', targetPortfolioId).eq('symbol', tradeData.asset);
+          const { error } = afterFinancialWrite(await supabase.from('assets').update({ name: metadata.name, allocation: metadata.allocation, current_price: metadata.currentPrice, exclude_from_total: metadata.excludeFromTotal ?? false })
+            .eq('user_id', user.id).eq('portfolio_id', targetPortfolioId).eq('symbol', tradeData.asset));
           if (error) throw error;
         } catch {
           addToast('บันทึกรายการแล้ว แต่รายละเอียดชื่อ/กลุ่มสินทรัพย์ยังไม่อัปเดต กรุณาแก้ใน Portfolio ไม่ต้องเพิ่มรายการซ้ำ', 'warning');
@@ -3420,7 +3373,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return true;
     }
     try {
-      const { data, error } = await db.trades.insert({
+      const { data, error } = afterFinancialWrite(await db.trades.insert({
         user_id: user.id,
         portfolio_id: targetPortfolioId,
         asset_id: null,
@@ -3440,7 +3393,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         status: "completed",
         notes: tradeData.sourceBucketId ? `Source Wallet ID: ${tradeData.sourceBucketId}` : null,
         tags: [...(tradeData.tag ? [tradeData.tag] : []), ...(tradeData.fxRateTHB ? [`FX USD/THB ${tradeData.fxRateTHB}`] : [])]
-      } as any);
+      } as any));
       if (error || !data) {
         const message = error?.message || (language === 'th' ? 'บันทึกรายการซื้อขายไม่สำเร็จ' : 'Could not save the trade.');
         console.error('Failed to add trade to Supabase', error);
@@ -3516,6 +3469,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const refreshBrokerageLedger = async () => {
+    financialSnapshots.invalidate();
     if (!user) return;
     const [balances, entries] = await Promise.all([
       db.brokerageCashEntries.getBalances(user.id, null),
@@ -3530,8 +3484,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const correctFinancialEvent = async (rpc: string, args: Record<string, unknown>): Promise<boolean> => {
+    financialSnapshots.invalidate();
     if (!user) { addToast('เข้าสู่ระบบก่อนจัดการรายการเงินจริง', 'warning'); return false; }
-    const { data, error } = await supabase.rpc(rpc, args);
+    const { data, error } = afterFinancialWrite(await supabase.rpc(rpc, args));
     if (error || data === false || data == null) {
       addToast(error?.message?.includes('Insufficient') ? 'ย้อนรายการไม่ได้ เพราะเงินคงเหลือไม่พอ กรุณาจัดการรายการที่ใช้เงินนี้ก่อน'
         : error?.message?.includes('Ambiguous') ? 'ประวัติเก่ามีเลขไม้ซ้ำ กรุณาลบรายการที่ต้องการใน Ledger เพื่อไม่ให้ลบผิดไม้'
@@ -3551,6 +3506,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     correctFinancialEvent('transfer_broker_to_bucket', { p_id: id, p_account_id: accountId, p_bucket_id: bucketId, p_amount: amount, p_rate: rate });
 
   const removeAsset = async (symbol: string, portfolioId?: string) => {
+    financialSnapshots.invalidate();
     const sym = symbol.toUpperCase();
     const targetPortfolioId = portfolioId ?? activePortfolioId;
     const isTargetAsset = (asset: Asset) => asset.symbol.toUpperCase() === sym
@@ -3579,7 +3535,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       // Broker cash entries deliberately protect their linked trade from a
       // plain DELETE.  The RPC removes both sides atomically, so the asset
       // cannot return after a refresh because the original trade survived.
-      const { error } = await db.trades.deletePositionWithBrokerageCash(sym, targetPortfolioId);
+      const { error } = afterFinancialWrite(await db.trades.deletePositionWithBrokerageCash(sym, targetPortfolioId));
       if (error) throw error;
       
       setAssets(prev => prev.filter(asset => !isTargetAsset(asset)));
@@ -3593,6 +3549,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateAsset = async (symbol: string, updates: Partial<Asset>) => {
+    financialSnapshots.invalidate();
     const selectedPortfolio = portfolios.find(portfolio => portfolio.id === activePortfolioId);
     if (activePortfolioId && selectedPortfolio?.kind !== 'trading') {
       addToast(language === 'th' ? 'แก้ไขสินทรัพย์ได้เฉพาะพอร์ตลงทุน' : 'Assets can only be changed in a trading portfolio.', 'warning');
@@ -3622,7 +3579,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (updates.is_active !== undefined) supabaseUpdates.is_active = updates.is_active;
         if (updates.brokerageAccountId !== undefined) supabaseUpdates.brokerage_account_id = updates.brokerageAccountId || null;
         
-        await db.assets.update(asset.id, supabaseUpdates);
+        afterFinancialWrite(await db.assets.update(asset.id, supabaseUpdates));
       }
       setAssets(prev => prev.map(a => a.symbol.toUpperCase() === sym ? { ...a, ...updates } : a));
     } catch (err) {
@@ -3631,6 +3588,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const saveAssetPreferences = async (portfolioId: string, symbol: string, preferences: { isFavorite?: boolean; sortOrder?: number }): Promise<boolean> => {
+    financialSnapshots.invalidate();
     if (!portfolios.some(p => p.id === portfolioId && p.kind === 'trading')) return false;
     if (preferences.isFavorite !== undefined && typeof preferences.isFavorite !== 'boolean') return false;
     if (preferences.sortOrder !== undefined && (!Number.isInteger(preferences.sortOrder) || preferences.sortOrder < 0)) return false;
@@ -3640,7 +3598,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!Object.keys(payload).length) return false;
     try {
       if (user) {
-        const { data, error } = await supabase.from('assets').update(payload).eq('user_id', user.id).eq('portfolio_id', portfolioId).eq('symbol', symbol).select('id');
+        const { data, error } = afterFinancialWrite(await supabase.from('assets').update(payload).eq('user_id', user.id).eq('portfolio_id', portfolioId).eq('symbol', symbol).select('id'));
         if (error || !data?.length) throw new Error('Asset preference was not saved');
       }
       setAssets(previous => {
@@ -3658,6 +3616,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const reorderAssets = async (reordered: Asset[]) => {
+    financialSnapshots.invalidate();
     setAssets(reordered);
     if (!user) {
       localStorage.setItem("fintrack-assets", JSON.stringify(reordered));
@@ -3670,7 +3629,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         .map((a, idx) => ({ id: a.id!, sort_order: idx }));
 
       if (updates.length > 0) {
-        await db.assets.bulkUpdate(updates);
+        afterFinancialWrite(await db.assets.bulkUpdate(updates));
       }
     } catch (err) {
       console.error("Failed to reorder assets in Supabase", err);
@@ -3678,6 +3637,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const removeTrade = async (id: number): Promise<boolean> => {
+    financialSnapshots.invalidate();
     const tradeToRemove = trades.find(t => t.id === id);
     if (!tradeToRemove) return false;
     const blockedReason = tradeDeletionReason(tradeToRemove, trades, language);
@@ -3691,7 +3651,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return true;
     }
     try {
-      const { data, error } = await db.trades.deleteWithBrokerageCash(tradeToRemove.dbId);
+      const { data, error } = afterFinancialWrite(await db.trades.deleteWithBrokerageCash(tradeToRemove.dbId));
       if (error) throw error;
       if (!data) throw new Error('Trade was not deleted');
       setTrades(prev => prev.filter(t => t.id !== id));
@@ -3710,6 +3670,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateTrade = async (id: number, updates: Partial<Trade>): Promise<boolean> => {
+    financialSnapshots.invalidate();
     const tradeToUpdate = trades.find(t => t.id === id);
     if (!tradeToUpdate) return false;
     // Editors submit gross execution amounts. Preserve the already-paid fee
@@ -3755,7 +3716,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         && (nextTrade.type === 'BUY' || nextTrade.type === 'SELL');
 
       if (isPostedBrokerageTrade) {
-        const { error } = await db.trades.replaceWithBrokerageCash({
+        const { error } = afterFinancialWrite(await db.trades.replaceWithBrokerageCash({
           id: tradeToUpdate.dbId,
           symbol: nextTrade.asset,
           executionDate: new Date(nextTrade.date).toISOString(),
@@ -3763,10 +3724,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           priceAtExecution: Number(nextTrade.pricePerUnit),
           amountUSD: Number(nextTrade.amountUSD),
           originalAmount: Number(nextTrade.originalAmount ?? nextTrade.amountUSD),
-        });
+        }));
         if (error) throw error;
       } else if (Object.keys(dbUpdates).length > 0) {
-        const { error } = await db.trades.update(tradeToUpdate.dbId, dbUpdates);
+        const { error } = afterFinancialWrite(await db.trades.update(tradeToUpdate.dbId, dbUpdates));
         if (error) throw error;
       }
       if (isPostedBrokerageTrade && nextTrade.portfolioId) {
@@ -3804,42 +3765,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateCashActivity = async (id: string, updates: Partial<CashActivity>) => {
-    if (cashActivities.find(activity => activity.id === id)?.note?.includes('[funding:')) {
-      addToast('รายการนี้เชื่อมกับยอดเงินในโบรกเกอร์ ไม่สามารถแก้ไขฝั่งเดียวได้', 'warning');
-      return;
-    }
-    const activityToUpdate = cashActivities.find(c => c.id === id);
-    if (!activityToUpdate) return;
-    
-    if (!user) {
-      setCashActivities(prev => {
-        const newActivities = prev.map(c => c.id === id ? { ...c, ...updates } : c);
-        localStorage.setItem("fintrack-cash-activities", JSON.stringify(newActivities));
-        return newActivities;
-      });
-      return;
-    }
-    
-    // Optimistic
-    setCashActivities(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
-    
-    try {
-      const dbUpdates: any = {};
-      if (updates.type !== undefined) dbUpdates.type = updates.type;
-      if (updates.amountUSD !== undefined) dbUpdates.amount = updates.amountUSD;
-      if (updates.category !== undefined) dbUpdates.category = updates.category;
-      if (updates.date !== undefined) dbUpdates.date = updates.date;
-      if (updates.note !== undefined) dbUpdates.note = updates.note;
-      if (updates.originalAmount !== undefined) dbUpdates.original_amount = updates.originalAmount;
-      if (updates.currency !== undefined) dbUpdates.currency = updates.currency;
-      if (updates.rateAtTime !== undefined) dbUpdates.rate_at_time = updates.rateAtTime;
-      
-      if (Object.keys(dbUpdates).length > 0) {
-        await db.cashActivities.update(id, dbUpdates);
-      }
-    } catch (err) {
-      console.error("Failed to update cash activity in Supabase", err);
-    }
+    if(!user){addToast('เข้าสู่ระบบก่อนบันทึกรายการเงินจริง','warning');return false;}
+    const patch:any={};
+    for(const key of ['type','category','note','date','currency'] as const)if(updates[key]!==undefined)patch[key]=updates[key];
+    if(updates.originalAmount!==undefined)patch.original_amount=updates.originalAmount;
+    if(updates.rateAtTime!==undefined)patch.rate_at_time=updates.rateAtTime;
+    if(updates.bucketId!==undefined)patch.bucket_id=updates.bucketId;
+    try{const {error}=await db.cashActivities.update(id,patch);if(error)throw error;
+      financialSnapshots.invalidate();setFinancialRevision(v=>v+1);return true;
+    }catch(error){addToast(bucketWriteMessage((error as any)?.message||'',language==='th'),'error');return false;}
   };
 
   // Bucket data lives only in the dedicated cash-management portfolio.  The
@@ -3850,81 +3784,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     ? selectedPortfolioForBuckets.id
     : portfolios.find(portfolio => portfolio.kind === 'cash_management')?.id || null;
 
-  const addMoneyBucket = async (bucket: Omit<MoneyBucket, 'id'>) => {
-    if (!isFxCurrency(bucket.currency)) { addToast('unresolved: กรุณาระบุสกุล Bucket', 'error'); return; }
-    if (!user) {
-      const id = Date.now().toString();
-      setMoneyBuckets(prev => {
-        const newBuckets = [...prev, { ...bucket, id }];
-        localStorage.setItem("fintrack-buckets", JSON.stringify(newBuckets));
-        return newBuckets;
-      });
-      return;
-    }
-    // Optimistically add to state right away so UI is always responsive
-    const tempId = Date.now().toString();
-    setMoneyBuckets(prev => [...prev, { ...bucket, id: tempId }]);
-    try {
-      let { data, error } = await db.buckets.insert({
-        user_id: user.id,
-        portfolio_id: bucketPortfolioId,
-        name: bucket.name,
-        target_percent: bucket.targetPercent,
-        target_amount: bucket.targetAmount || 0,
-        current_amount: bucket.currentAmount,
-        currency: bucket.currency,
-        color: bucket.color,
-        icon: bucket.icon,
-        linked_to_expenses: bucket.linkedToExpenses || false
-      } as any);
-      if (error) {
-        console.error("Supabase bucket insert error:", error.message || error);
-        // Replace tempId with itself — state stays, DB failed silently
-        return;
-      }
-      if (data) {
-        // Replace temp entry with DB-confirmed entry (real UUID)
-        setMoneyBuckets(prev => prev.map(b => b.id === tempId ? { ...bucket, id: data.id } : b));
-      }
-    } catch (err) {
-      console.error("Failed to add bucket to Supabase:", err);
-    }
+  const bucketSaveRequests=useRef(new Map<string,{id:string;request:string;rate:number|undefined}>());
+  const saveMoneyBucket=async(id:string|null,updates:Partial<MoneyBucket>)=>{
+    if(!user){addToast('เข้าสู่ระบบก่อนบันทึกรายการเงินจริง','warning');return false;}
+    const key=JSON.stringify([user.id,id,updates]);let saved=bucketSaveRequests.current.get(key);
+    if(!saved){saved={id:id||crypto.randomUUID(),request:crypto.randomUUID(),rate:exchangeRates[updates.currency||'USD']};bucketSaveRequests.current.set(key,saved);}
+    const details:any={};
+    for(const [source,target] of Object.entries({name:'name',targetPercent:'target_percent',targetAmount:'target_amount',currentAmount:'current_amount',currency:'currency',color:'color',icon:'icon',linkedToExpenses:'linked_to_expenses'}))
+      if((updates as any)[source]!==undefined)details[target]=(updates as any)[source];
+    if(!id)details.portfolio_id=bucketPortfolioId;
+    try{const {error}=await db.bucketWriter.save(saved.request,saved.id,details,saved.rate);if(error)throw error;
+      bucketSaveRequests.current.delete(key);financialSnapshots.invalidate();setFinancialRevision(v=>v+1);return true;
+    }catch(error){const e=error as any;if(/^(?:[0-9]{2}|[A-Z][0-9]|XX)[0-9A-Z]{3}$/.test(e?.code||'')||String(e?.code||'').startsWith('PGRST'))bucketSaveRequests.current.delete(key);addToast(bucketWriteMessage(e?.message||'',language==='th'),'error');return false;}
   };
-
-  const updateMoneyBucket = async (id: string, updates: Partial<MoneyBucket>) => {
-    const bucket = moneyBuckets.find(b => b.id === id);
-    if (!bucket || !isFxCurrency(bucket.currency) || (updates.currentAmount !== undefined && (!Number.isFinite(updates.currentAmount) || updates.currentAmount < 0))
-      || (updates.currency !== undefined && updates.currency !== bucket.currency)) {
-      addToast('unresolved: ตรวจสกุลและยอด Bucket ก่อนบันทึก ห้ามเปลี่ยนสกุลยอดเดิม', 'error'); return;
-    }
-    if (!user) {
-      setMoneyBuckets(prev => {
-        const newBuckets = prev.map(b => b.id === id ? { ...b, ...updates } : b);
-        localStorage.setItem("fintrack-buckets", JSON.stringify(newBuckets));
-        return newBuckets;
-      });
-      return;
-    }
-    try {
-      const supabaseUpdates: any = {};
-      if (updates.name !== undefined) supabaseUpdates.name = updates.name;
-      if (updates.currentAmount !== undefined) supabaseUpdates.current_amount = updates.currentAmount;
-      if (updates.currency !== undefined) supabaseUpdates.currency = updates.currency;
-      if (updates.targetPercent !== undefined) supabaseUpdates.target_percent = updates.targetPercent;
-      if (updates.targetAmount !== undefined) supabaseUpdates.target_amount = updates.targetAmount;
-      if (updates.color !== undefined) supabaseUpdates.color = updates.color;
-      if (updates.icon !== undefined) supabaseUpdates.icon = updates.icon;
-      if (updates.linkedToExpenses !== undefined) supabaseUpdates.linked_to_expenses = updates.linkedToExpenses;
-      
-      const { error } = await db.buckets.update(id, supabaseUpdates);
-      if (error) throw error;
-      setMoneyBuckets(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
-    } catch (err) {
-      console.error("Failed to update bucket in Supabase", err);
-    }
-  };
+  const addMoneyBucket=async(bucket:Omit<MoneyBucket,'id'>)=>saveMoneyBucket(null,bucket);
+  const updateMoneyBucket=async(id:string,updates:Partial<MoneyBucket>)=>saveMoneyBucket(id,updates);
 
   const removeMoneyBucket = async (id: string) => {
+    financialSnapshots.invalidate();
     if (!user) {
       setMoneyBuckets(prev => {
         const newBuckets = prev.filter(b => b.id !== id);
@@ -3934,230 +3811,57 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     try {
-      await db.buckets.delete(id);
+      const {error}=afterFinancialWrite(await db.buckets.delete(id));if(error)throw error;
       setMoneyBuckets(prev => prev.filter(b => b.id !== id));
     } catch (err) {
-      console.error("Failed to remove bucket from Supabase", err);
+      addToast(language==='th'?'ลบกระเป๋าไม่ได้ กระเป๋าอาจมีประวัติการเงินหรือถูกใช้งานอยู่':'Cannot delete a wallet with financial history or linked records','error');
     }
   };
 
-  const addBucketActivity = async (activity: Omit<BucketActivity, 'id'>) => {
-    try {
-      const bucket = moneyBuckets.find(b => b.id === activity.bucketId);
-      bucketNativeAmount({ original_amount: activity.originalAmount, currency: activity.currency }, bucket?.currency);
-    } catch (error) { addToast(String(error), 'error'); return; }
-    if (!user) {
-      const id = Date.now().toString() + "-" + Math.random().toString(36).substr(2, 9);
-      setBucketActivities(prev => {
-        const newActivities = [{ ...activity, id }, ...prev];
-        localStorage.setItem("fintrack-bucket-activities", JSON.stringify(newActivities));
-        return newActivities;
-      });
-      return;
-    }
-
-    // Optimistic update
-    const tempId = Date.now().toString() + "-" + Math.random().toString(36).substr(2, 9);
-    setBucketActivities(prev => [{ ...activity, id: tempId }, ...prev]);
-
-    try {
-      const { data, error } = await db.bucketActivities.insert({
-        user_id: user.id,
-        portfolio_id: bucketPortfolioId,
-        bucket_id: activity.bucketId,
-        type: activity.type,
-        amount: activity.amount,
-        note: activity.note || null,
-        date: activity.date,
-        currency: activity.currency || null,
-        rate_at_time: activity.rateAtTime || null,
-        original_amount: activity.originalAmount ?? null
-      } as any);
-
-      if (error) {
-        console.error("Supabase bucket_activities insert error:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-        setBucketActivities(prev => prev.filter(a => a.id !== tempId));
-        return;
-      }
-
-      if (data) {
-        setBucketActivities(prev => prev.map(a => a.id === tempId ? { ...activity, id: data.id } : a));
-      }
-    } catch (err) {
-      console.error("Failed to add bucket activity to Supabase", err);
-    }
+  // Mirror rows are owned by the database writer. Retained signatures fail closed
+  // for any obsolete caller rather than issuing a second financial write.
+  const addBucketActivity = async (_activity:Omit<BucketActivity,'id'>) => {addToast('Use the atomic cash operation','error');};
+  const removeBucketActivity = async (_id:string) => {addToast('Manage this activity from its Ledger source','error');};
+  const addCashActivities=async(activities:Omit<CashActivity,'id'>[],operation:'create'|'transfer'|'distribute'='create'):Promise<CashActivity[]|null>=>{
+    if(!user){addToast('เข้าสู่ระบบก่อนบันทึกรายการเงินจริง','warning');return null;}
+    try{
+      const rows=activities.map(a=>({portfolio_id:(a.bucketId?allMoneyBuckets.find(b=>b.id===a.bucketId)?.portfolioId:null)||bucketPortfolioId,type:a.type,original_amount:a.originalAmount,currency:a.currency,
+        rate_at_time:a.rateAtTime,category:a.category,note:a.note||null,date:a.date,bucket_id:a.bucketId||null,is_transfer:!!a.isTransfer}));
+      const {data,error}=await db.bucketWriter.execute(user.id,{op:operation,rows});if(error)throw error;
+      financialSnapshots.invalidate();setFinancialRevision(v=>v+1);
+      const saved=(data||[]).map((a:any)=>({id:a.id,type:a.type,amountUSD:Number(a.amount),originalAmount:Number(a.original_amount),currency:a.currency,rateAtTime:Number(a.rate_at_time),category:a.category,note:a.note,date:a.date,bucketId:a.bucket_id,isTransfer:a.is_transfer}));
+      setCashActivities(prev=>[...prev.filter(a=>!saved.some((b:any)=>a.id===b.id)),...saved]);return saved;
+    }catch(error){addToast(bucketWriteMessage((error as any)?.message||'',language==='th'),'error');return null;}
   };
+  const addCashActivity=async(activity:Omit<CashActivity,'id'>):Promise<CashActivity|null>=>
+    (await addCashActivities([activity],'create'))?.[0]||null;
 
-
-
-  const removeBucketActivity = async (id: string) => {
-    if (bucketActivities.find(activity => activity.id === id)?.note?.includes('[funding:')) {
-      addToast('รายการนี้เชื่อมกับยอดเงินในโบรกเกอร์ ไม่สามารถลบฝั่งเดียวได้', 'warning');
-      return;
-    }
-    if (!user) {
-      setBucketActivities(prev => {
-        const newActivities = prev.filter(a => a.id !== id);
-        localStorage.setItem("fintrack-bucket-activities", JSON.stringify(newActivities));
-        return newActivities;
-      });
-      return;
-    }
-    try {
-      await db.bucketActivities.delete(id);
-      setBucketActivities(prev => prev.filter(a => a.id !== id));
-    } catch (err) {
-      console.error("Failed to remove bucket activity from Supabase", err);
-    }
+  const removeCashActivity = async (id:string) => {
+    if(!user){addToast('เข้าสู่ระบบก่อนจัดการรายการเงินจริง','warning');return;}
+    try{const {error}=await db.cashActivities.delete(id);if(error)throw error;
+      financialSnapshots.invalidate();setCashActivities(prev=>prev.filter(a=>a.id!==id));setFinancialRevision(v=>v+1);
+    }catch(error){addToast(bucketWriteMessage((error as any)?.message||'',language==='th'),'error');throw error;}
   };
-
-  const addCashActivity = async (activityData: Omit<CashActivity, "id">): Promise<CashActivity | null> => {
-    try {
-      const row = { original_amount: activityData.originalAmount, currency: activityData.currency };
-      getNativeLeg(row);
-      if (activityData.bucketId) {
-        const bucket = moneyBuckets.find(b => b.id === activityData.bucketId);
-        bucketNativeAmount(row, bucket?.currency);
-      }
-    } catch (error) { addToast(String(error), 'error'); return null; }
-    if (!user) {
-      const id = Math.random().toString(36).substr(2, 9);
-      const newActivity = { ...activityData, id };
-      setCashActivities(prev => {
-        const newActivities = [...prev, newActivity];
-        localStorage.setItem("fintrack-cash-activities", JSON.stringify(newActivities));
-        return newActivities;
-      });
-      return newActivity;
-    }
-
-    const tempId = Math.random().toString(36).substr(2, 9);
-    const optimisticActivity = { ...activityData, id: tempId };
-    setCashActivities(prev => [...prev, optimisticActivity]);
-
-    try {
-      const { data, error } = await db.cashActivities.insert({
-        user_id: user.id,
-        portfolio_id: bucketPortfolioId,
-        type: activityData.type,
-        amount: activityData.amountUSD,
-        category: activityData.category,
-        note: activityData.note || null,
-        date: activityData.date,
-        time: activityData.time || null,
-        bucket_id: activityData.bucketId || null,
-        is_transfer: activityData.isTransfer || false,
-        currency: activityData.currency || null,
-        rate_at_time: activityData.rateAtTime || null,
-        original_amount: activityData.originalAmount ?? null
-      } as any);
-
-      if (error) {
-        console.error("Supabase cash_activities insert error:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-        console.error("Failed to insert cash activity:", JSON.stringify(activityData, Object.getOwnPropertyNames(activityData), 2));
-        setCashActivities(prev => prev.filter(a => a.id !== tempId));
-        addToast(t("errorOccurred") || "Failed to save record", "error");
-        return null;
-      }
-      
-      if (data) {
-        const savedActivity = { ...activityData, id: data.id };
-        setCashActivities(prev => prev.map(a => a.id === tempId ? savedActivity : a));
-        return savedActivity;
-      }
-      return optimisticActivity;
-    } catch (err) {
-      console.error("Failed to add cash activity to Supabase", err);
-      setCashActivities(prev => prev.filter(a => a.id !== tempId));
-      addToast(t("errorOccurred") || "Failed to save record", "error");
-      return null;
-    }
-  };
-
-  const removeCashActivity = async (id: string) => {
-    const activity = cashActivities.find(a => a.id === id);
-    if (!activity) return;
-    if (activity.note?.includes('[funding:')) {
-      addToast('รายการนี้เชื่อมกับยอดเงินในโบรกเกอร์ ไม่สามารถลบฝั่งเดียวได้', 'warning');
-      return;
-    }
-
-    // Validate BEFORE deletion; a missing native leg must never remove the source.
-    const sourceBucket = moneyBuckets.find(b => b.id === activity.bucketId);
-    let reversalBalance: number | undefined;
-    try {
-      getNativeLeg({ original_amount: activity.originalAmount, currency: activity.currency });
-      if (activity.bucketId) {
-        if (!sourceBucket) throw Error('unresolved: ไม่พบ Bucket ของรายการเดิม');
-        reversalBalance = nativeBucketBalance(sourceBucket.currentAmount,
-          { original_amount: activity.originalAmount, currency: activity.currency }, sourceBucket.currency,
-          activity.type === 'EXPENSE' || activity.type === 'WITHDRAW' ? 1 : -1);
-      }
-    } catch (error) { addToast(String(error), 'error'); return; }
-    // Reverse the recorded native leg, never today's FX quote.
-    const revertBucket = () => {
-      if (activity.bucketId && activity.bucketId !== "<no-bucket>" && activity.bucketId !== "<auto-distribute>") {
-        const bucket = moneyBuckets.find(b => b.id === activity.bucketId);
-        if (bucket) {
-          const leg = getNativeLeg({ original_amount: activity.originalAmount, currency: activity.currency });
-          const bCur = leg.currency;
-          const bRate = activity.rateAtTime;
-          const amountInBucketCur = leg.amount;
-          const newAmount = reversalBalance!;
-          
-          updateMoneyBucket(bucket.id, { currentAmount: newAmount });
-          addBucketActivity({
-            bucketId: bucket.id,
-            bucketName: bucket.name,
-            type: (activity.type === "EXPENSE" || activity.type === "WITHDRAW") ? "deposit" : "withdraw",
-            amount: amountInBucketCur,
-            date: new Date().toISOString(),
-            note: "Revert: " + (activity.note || activity.category),
-            currency: bCur,
-            rateAtTime: bRate,
-            originalAmount: amountInBucketCur,
-          });
-        }
-      }
-    };
-
-    if (!user) {
-      setCashActivities(prev => {
-        const newActivities = prev.filter(a => a.id !== id);
-        localStorage.setItem("fintrack-cash-activities", JSON.stringify(newActivities));
-        return newActivities;
-      });
-      revertBucket();
-      return;
-    }
-    try {
-      const { error } = await db.cashActivities.delete(id);
-      if (error) throw error;
-      setCashActivities(prev => prev.filter(a => a.id !== id));
-      revertBucket();
-    } catch (err) {
-      console.error("Failed to remove cash activity from Supabase", err);
-    }
-  };
-
   const updateAllocation = async (label: string, value: number) => {
+    financialSnapshots.invalidate();
     setAllocations(prev => prev.map(a => a.label === label ? { ...a, value } : a));
     if (!user) return;
     try {
       const allocation = allocations.find(a => a.label === label);
-      await db.allocations.upsert({
+      afterFinancialWrite(await db.allocations.upsert({
         user_id: user.id,
         portfolio_id: activePortfolioId,
         label,
         value,
         color: allocation?.color || "#6B7280"
-      });
+      }));
     } catch (err) {
       console.error("Failed to update allocation in Supabase", err);
     }
   };
 
   const bulkAddTrades = async (newTrades: Omit<Trade, "id">[]) => {
+    financialSnapshots.invalidate();
     if (!user) {
       const tradesWithIds = newTrades.map((t, i) => ({ ...t, id: Date.now() + i }));
       setTrades(prev => [...tradesWithIds, ...prev]);
@@ -4183,7 +3887,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         notes: t.sourceBucketId ? `Source Wallet ID: ${t.sourceBucketId}` : null,
         tags: t.tag ? [t.tag] : []
       } as any));
-      const { data } = await db.trades.bulkInsert(supabaseTrades);
+      const { data } = afterFinancialWrite(await db.trades.bulkInsert(supabaseTrades));
       if (data) {
         const tradesWithIds = newTrades.map((t, i) => ({ 
           ...t, 
@@ -4214,37 +3918,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const addTradeFromBucket = async (tradeData: Omit<Trade, 'id'>, bucketId: string) => {
-    const bucket = moneyBuckets.find(b => b.id === bucketId);
-    if (!bucket) return;
-    let tradeAmountInBucketCurrency: number;
-    try {
-      tradeAmountInBucketCurrency = bucketNativeAmount({ original_amount: tradeData.originalAmount, currency: tradeData.currency }, bucket.currency);
-    } catch (error) { addToast(String(error), 'error'); return; }
-    if (tradeAmountInBucketCurrency > bucket.currentAmount) {
-      addToast(t("amountExceedsBalance"), 'error');
-      return;
-    }
-
-    // Add the trade
-    const saved = await addTrade({ ...tradeData, sourceBucketId: bucketId });
-    if (!saved) return;
-
-    // Deduct from bucket
-    await updateMoneyBucket(bucketId, { currentAmount: bucket.currentAmount - tradeAmountInBucketCurrency });
-
-    // Log activity
-    await addBucketActivity({
-      bucketId: bucket.id,
-      bucketName: bucket.name,
-      type: 'invest',
-      amount: tradeAmountInBucketCurrency,
-      date: new Date().toISOString(),
-      note: `Trade ${tradeData.asset} — ${t('deductedFromBucket')}`,
-      currency: tradeData.currency,
-      originalAmount: tradeAmountInBucketCurrency,
-      rateAtTime: tradeData.rateAtTime,
-    });
+  // Old bucket-first trade flow is retired: fund the broker atomically, then trade.
+  const addTradeFromBucket = async (_tradeData: Omit<Trade, 'id'>, _bucketId: string) => {
+    addToast(language==='th'?'กรุณาโอนเงินจาก Bucket ไปโบรกก่อนทำรายการซื้อขาย':'Transfer Bucket funds to the broker before trading','error');
   };
 
 
@@ -4277,6 +3953,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // ── Custom Category Actions ───────────────────────────────────
   const addCustomCategory = async (type: 'INCOME' | 'EXPENSE', label: string, icon = 'tag') => {
+    financialSnapshots.invalidate();
     const trimmed = label.trim();
     if (!trimmed) return;
     // Optimistic update
@@ -4294,7 +3971,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const { data, error } = await db.userCategories.insert(user.id, type, trimmed, icon, activePortfolioId);
+      const { data, error } = afterFinancialWrite(await db.userCategories.insert(user.id, type, trimmed, icon, activePortfolioId));
       if (error) throw error;
       if (data) {
         // Replace temp with real DB id
@@ -4308,6 +3985,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const removeCustomCategory = async (id: string) => {
+    financialSnapshots.invalidate();
     setCustomCategories(prev => prev.filter(c => c.id !== id));
     if (!user) {
       try {
@@ -4317,7 +3995,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     try {
-      await db.userCategories.delete(id);
+      afterFinancialWrite(await db.userCategories.delete(id));
     } catch (err) {
       addToast('Failed to delete category', 'error');
     }
@@ -4335,14 +4013,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
   };
   const readOnlyCashActivity = async (): Promise<CashActivity | null> => {
+    financialSnapshots.invalidate();
     blockAllPortfolioMutation();
     return null;
   };
   const blockAllPortfolioMutationAsync = async (): Promise<boolean> => {
+    financialSnapshots.invalidate();
     blockAllPortfolioMutation();
     return false;
   };
   const blockAllPortfolioMutationVoidAsync = async (): Promise<void> => {
+    financialSnapshots.invalidate();
     blockAllPortfolioMutation();
   };
   // Bucket is the shared bank layer.  It remains usable regardless of the
@@ -4372,6 +4053,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       trades,
       addTrade,
       cashActivities: canUseMoneyBuckets ? cashActivities : [],
+      addCashActivities: canUseMoneyBuckets ? addCashActivities : async()=>{blockMoneyBucketMutation();return null;},
       addCashActivity: canUseMoneyBuckets ? addCashActivity : readOnlyCashActivity,
       removeCashActivity: canUseMoneyBuckets ? removeCashActivity : blockMoneyBucketMutation,
       allocations,
@@ -4399,7 +4081,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addAsset: isAllPortfolios ? blockAllPortfolioMutation : addAsset,
       syncDcaPosition,
       bulkAddTrades: isAllPortfolios ? blockAllPortfolioMutation : bulkAddTrades,
-      netWorthHistory,
+      netWorthHistory, netWorthScope,
       userProfile,
       setUserProfile,
       fetchAssetMarketData,
@@ -4409,7 +4091,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       reorderAssets: isAllPortfolios ? blockAllPortfolioMutation : reorderAssets,
       removeTrade: isAllPortfolios ? blockAllPortfolioMutationAsync : removeTrade,
       updateTrade: isAllPortfolios ? blockAllPortfolioMutationAsync : updateTrade,
-      updateCashActivity: canUseMoneyBuckets ? updateCashActivity : blockMoneyBucketMutation,
+      updateCashActivity: canUseMoneyBuckets ? updateCashActivity : async()=>{blockMoneyBucketMutation();return false;},
       toasts,
       addToast,
       removeToast,
@@ -4418,16 +4100,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       darkMode,
       setDarkMode,
       notifications,
+      notificationUnread: inbox.unread,
+      notificationHasMore: inbox.hasMore,
+      notificationError: inbox.error,
+      notificationLoading: inbox.loading,
+      loadMoreNotifications: inbox.loadMore,
+      refreshNotifications: () => { void inbox.refresh(); },
       addNotification,
       markNotificationRead,
       clearNotifications,
       isDataLoaded,
+      isDataRefreshing,
+      dataLoadError,
       notifPreferences,
       setNotifPreferences,
       moneyBuckets: canUseMoneyBuckets ? dynamicMoneyBuckets : [],
       allMoneyBuckets: canUseMoneyBuckets ? allMoneyBuckets : [],
-      addMoneyBucket: canUseMoneyBuckets ? addMoneyBucket : blockMoneyBucketMutation,
-      updateMoneyBucket: canUseMoneyBuckets ? updateMoneyBucket : blockMoneyBucketMutation,
+      addMoneyBucket: canUseMoneyBuckets ? addMoneyBucket : async()=>{blockMoneyBucketMutation();return false;},
+      updateMoneyBucket: canUseMoneyBuckets ? updateMoneyBucket : async()=>{blockMoneyBucketMutation();return false;},
       removeMoneyBucket: canUseMoneyBuckets ? removeMoneyBucket : blockMoneyBucketMutation,
       bucketActivities: canUseMoneyBuckets ? bucketActivities : [],
       addBucketActivity: canUseMoneyBuckets ? addBucketActivity : blockMoneyBucketMutation,

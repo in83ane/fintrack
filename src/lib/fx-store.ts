@@ -2,8 +2,8 @@ import { FX_REFRESH_MS, FX_RESUME_MS, FX_STALE_MS, parseQuote, validRate, type F
 
 export const FX_CACHE_KEY = 'fintrack.fx.valuation.cache.v1';
 export const FX_SETTINGS_KEY = 'fintrack.fx.valuation.settings.v1';
-export type FxState = { mode: 'auto' | 'manual'; rate: string | null; quote: FxQuote | null; stale: boolean; loading: boolean };
-export const INITIAL_FX: FxState = { mode: 'auto', rate: null, quote: null, stale: false, loading: false };
+export type FxState = { mode: 'auto' | 'manual'; rate: string | null; quote: FxQuote | null; stale: boolean; loading: boolean; error: boolean };
+export const INITIAL_FX: FxState = { mode: 'auto', rate: null, quote: null, stale: false, loading: false, error: false };
 type Environment = { now: () => number; visible: () => boolean; fetch: () => Promise<unknown>;
   read: (key: string) => string | null; write: (key: string, value: string) => void;
   every: (callback: () => void, ms: number) => () => void;
@@ -24,7 +24,7 @@ export function createFxStore(env: Environment) {
     if (state.mode !== 'auto' || !env.visible() || (!force && env.now() < nextFetch)) return;
     if (pending) return pending;
     const requestGeneration = generation;
-    emit({ loading: true });
+    emit({ loading: true, error: false });
     pending = (async () => {
       try {
         const quote = parseQuote(await env.fetch(), env.now());
@@ -35,6 +35,7 @@ export function createFxStore(env: Environment) {
         emit({ quote, rate: quote.rate });
       } catch {
         if (generation === requestGeneration) {
+          emit({ error: true });
           failures++; nextFetch = env.now() + Math.min(FX_REFRESH_MS * 2 ** (failures - 1), FX_STALE_MS);
         }
       } finally {

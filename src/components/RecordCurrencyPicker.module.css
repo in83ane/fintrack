@@ -1,0 +1,77 @@
+.picker {
+  flex: 0 0 auto;
+  width: max-content;
+  white-space: nowrap;
+}
+
+.picker :global(.ui-select-trigger) {
+  width: max-content;
+  position: relative;
+  min-width: 0;
+  height: 34px;
+  min-height: 34px;
+  flex-shrink: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 0 8px;
+  gap: 4px;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--field-menu);
+  cursor: pointer;
+  transition: background-color 120ms, border-color 120ms;
+}
+
+.menu :global(.ui-select-menu) {
+  padding: 3px;
+}
+
+.menu :global(.ui-select-option) {
+  justify-content: flex-start;
+  gap: 3px;
+  padding: 7px 4px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.menu :global(.ui-select-option) > svg {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 12px;
+}
+
+/* Compact visible pill, with a 44px-tall pointer target inside the amount field. */
+.picker :global(.ui-select-trigger)::after {
+  content: '';
+  position: absolute;
+  inset: -5px 0;
+}
+
+/* Currency codes must never inherit the shared select's ellipsis treatment. */
+.picker :global(.ui-select-trigger) > span {
+  flex: 0 0 auto;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.picker :global(.ui-select-trigger) > svg {
+  display: block;
+  flex: 0 0 12px;
+  width: 12px;
+  height: 12px;
+}
+
+.picker :global(.ui-select-trigger):hover,
+.picker :global(.ui-select-trigger):focus-visible {
+  background: color-mix(in srgb, var(--color-foreground) 6%, var(--field-menu));
+  border-color: var(--color-muted);
+}
+
+.picker :global(.ui-select-trigger):active,
+.picker :global(.ui-select-trigger)[aria-expanded=true] {
+  background: color-mix(in srgb, var(--color-primary) 12%, var(--field-menu));
+  border-color: var(--color-primary);
+}

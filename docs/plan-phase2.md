@@ -1,6 +1,6 @@
 # PLAN phase 2 — review checkpoint, 27 October 2026
 
-Implementation is ready for review on the current working tree. **No production SQL was applied. Stop here before phase 3.** Shared dependency groups 1–4 remain deferred as requested; this does not claim that committed HEAD builds on its own.
+Implementation is at the review checkpoint on the current working tree. **Follow-up review found account-deletion and Ledger concurrency blockers: see [the review findings](plan-phase2-review.md). Not ready to deploy. No production SQL was applied. Stop here before phase 3.** Shared dependency groups 1–4 remain deferred as requested; this does not claim that committed HEAD builds on its own.
 
 ## Approved policy implemented
 

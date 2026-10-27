@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { lockDocumentScroll } from "@/src/lib/scroll-lock";
 import { motion, AnimatePresence } from "motion/react";
 import { X } from "lucide-react";
 
@@ -16,15 +17,8 @@ interface ModalProps {
 }
 
 export function Modal({ isOpen, onClose, title, assetName, assetSymbol, children, contentClassName = 'p-8', footer }: ModalProps) {
-  React.useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
-    }
-    return () => {
-      document.body.style.overflow = "unset";
-    };
+  React.useLayoutEffect(() => {
+    if (isOpen) return lockDocumentScroll();
   }, [isOpen]);
 
   return (

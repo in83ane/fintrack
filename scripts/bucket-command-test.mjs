@@ -1,0 +1,28 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import ts from 'typescript';
+const code=ts.transpileModule(readFileSync('src/lib/bucket-command.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
+const {createBucketCommander,splitBucketMoney}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
+const store=new Map(),storage={getItem:k=>store.get(k),setItem:(k,v)=>store.set(k,v)};
+const input={op:'create',rows:[{type:'EXPENSE',original_amount:800,currency:'THB',rate_at_time:35,date:'2026-10-01T12:00:00+07:00'}]};
+let calls=[],fail=true;
+const transport=async args=>{calls.push(args);return fail?{data:null,error:{message:'Network failed'}}:{data:args.command.rows,error:null};};
+let send=createBucketCommander(transport,storage);
+await send('owner',input);const original=calls[0];
+send=createBucketCommander(transport,storage); // tab reload, uncertain prior commit
+const different=await send('owner',{...input,rows:[{...input.rows[0],original_amount:1}]});
+assert.match(different.error.message,/Pending uncertain/);assert.equal(calls.length,1);
+fail=false;
+await send('owner',{...input,rows:[{...input.rows[0],rate_at_time:36,date:'2026-10-01T12:01:00+07:00'}]});
+assert.deepEqual(calls[1],original,'same ID, original timestamp and FX snapshot');
+await send('owner',input);assert.notEqual(calls[2].request_id,original.request_id,'intentional repeat after success');
+let release;calls=[];
+send=createBucketCommander(async args=>{calls.push(args);return new Promise(r=>release=r);});
+const first=send('owner',input),second=send('owner',input);release({data:[],error:null});await Promise.all([first,second]);assert.equal(calls.length,1);
+calls=[];send=createBucketCommander(async args=>{calls.push(args);return{data:null,error:{code:'P0001',message:'Insufficient'}};});
+await send('owner',input);await send('owner',input);assert.notEqual(calls[0].request_id,calls[1].request_id);
+assert.deepEqual(splitBucketMoney('1',[1,1,1]),[0.33,0.33,0.34]);
+assert.deepEqual(splitBucketMoney('0.01',[0,1,1,0]),[0,0,0.01,0]);
+assert.deepEqual(splitBucketMoney('1000.01',[50,30,20]),[500,300,200.01]);
+assert.throws(()=>splitBucketMoney('1.001',[1]));assert.throws(()=>splitBucketMoney('1',[0]));
+console.log(JSON.stringify({passed:8,cases:['uncertain response','reload replay','changed input blocked','new intentional repeat','in-flight deduplication','SQL rejection retry','exact split and remainder','invalid input'],productionTouched:false}));
