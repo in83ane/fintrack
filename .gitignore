@@ -17,3 +17,4 @@ next
 *_migration.sql
 READY_TO_RUN.sql
 update_*.sql
+/supabase/.temp/
