@@ -1,4 +1,5 @@
 import { createBucketCommander } from './bucket-command';
+import { DATA_RESET_DISABLED_CODE, dataResetCopy } from './data-reset-policy';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseUrl, getSupabaseAnonKey } from './env';
 
@@ -587,12 +588,16 @@ export const db = {
     },
   },
 
-  // Wipe all user data
+  // Temporarily unavailable in this app. Do not call Auth/RPC or clear local data.
   deleteAllUserData: async (userId: string) => {
-    // `userId` is intentionally not sent to the RPC. The database derives the
-    // target from auth.uid(), preventing a client from purging another account.
     void userId;
-    return await supabase.rpc('purge_my_financial_data');
+    return {
+      data: null,
+      error: {
+        code: DATA_RESET_DISABLED_CODE,
+        message: dataResetCopy.en.description,
+      },
+    };
   },
 
   // User Custom Categories (for Ledger)
