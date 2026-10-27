@@ -1,0 +1,12 @@
+{
+  "name": "fintrack-plan-copy-tests",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test offline.test.mjs",
+    "check": "node --check run.mjs && node --check guard.mjs && node --check fixture.mjs && node --check competitors.mjs && node --check observe.mjs && node --check assertions.mjs"
+  },
+  "dependencies": { "pg": "8.23.1" }
+}
