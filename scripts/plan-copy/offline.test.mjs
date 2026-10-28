@@ -4,7 +4,8 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { execute, main, schedulerGuidance } from './run.mjs';
 import { readConfig, CONFIRMATION, safeError, GuardError } from './guard.mjs';
-import { newFixture, requireFixture } from './fixture.mjs';
+import { newFixture, requireFixture, BANGKOK_TODAY_SQL } from './fixture.mjs';
+import { assertSqlSyntax } from './local-syntax.mjs';
 import { validateResult } from './assertions.mjs';
 import { waitForBlocking, provesWaiting, deadline } from './observe.mjs';
 import { insufficient } from './competitors.mjs';
@@ -17,8 +18,8 @@ const validTotals = winner => ({ current_amount: '200.0000', cash_sum: '200.0000
   cash_rows: 2, mirror_rows: 2, checks: winner === 'plan' ? 1 : 0,
   ledger_receipts: winner === 'ledger' ? 1 : 0, bad_cash_links: 0, orphan_mirrors: 0 });
 
-/** No pg import, sockets, SQL engine or app environment. This is a protocol mock,
- * NOT proof that PostgreSQL accepts SQL, blocks locks, or enforces RLS. */
+/** No pg import, sockets, SQL engine or app environment. Outgoing SQL is raw-parsed
+ * offline; the protocol mock does NOT validate runtime behavior, locks or RLS. */
 function mockPg(fault = {}) {
   const state = { clients: [], connects: 0, events: [], holder: null, pending: null, winner: null, fixtureWrites: 0 };
   class MockClient {
@@ -36,16 +37,24 @@ function mockPg(fault = {}) {
     async query(sql, params = []) {
       state.events.push({ session: this.label, sql, params });
       if (this.ended) throw new Error('closed');
+      assertSqlSyntax(sql, 'runner-query');
       const rows = value => ({ rows: value });
-      if (sql.includes('copy:identity')) return rows([{ db: fault.database || 'fintrack_copy', login_role: 'qa_admin', current_role: 'qa_admin',
+      if (sql.includes('copy:identity')) return rows([{ db: fault.database || (fault.local ? 'fintrack_local_test' : 'fintrack_copy'), login_role: fault.local ? 'fintrack_tester' : 'qa_admin', current_role: fault.local ? 'fintrack_tester' : 'qa_admin',
         server_addr: fault.address || '127.0.0.1', server_port: 5432, pid: fault.samePid ? 1 : this.pid,
         read_only: fault.writable ? 'off' : 'on', can_assume_authenticated: !fault.roleDenied }]);
       if (sql.includes('copy:marker-acl')) return rows([{ unsafe: !!fault.markerWritable }]);
-      if (sql.includes('copy:marker')) return rows([{ copy_id: fault.marker || env().PLAN_COPY_ID, database_name: 'fintrack_copy',
+      if (sql.includes('copy:marker')) return rows([{ copy_id: fault.marker || env().PLAN_COPY_ID, database_name: fault.local ? 'fintrack_local_test' : 'fintrack_copy',
         purpose: 'fintrack-disposable-concurrency-copy', outbound_disabled: !fault.outbound, fixture_triggers_reviewed: !fault.triggersUnreviewed }]);
-      if (sql.includes('copy:capabilities')) return rows([{ writer_ready: !fault.noWriter, cron_table: fault.badCron ? null : 'cron.job', cron_installed: true,
-        queue_table: fault.badQueue ? null : 'net.http_request_queue', net_installed: true, vault_table: 'vault.decrypted_secrets',
+      if (sql.includes('copy:capabilities')) return rows([{ writer_ready: !fault.noWriter, cron_table: fault.absent || fault.badCron ? null : 'cron.job', cron_installed: !fault.absent,
+        queue_table: fault.absent || fault.badQueue ? null : 'net.http_request_queue', net_installed: !fault.absent, vault_table: fault.absent || fault.badVault ? null : 'vault.decrypted_secrets', vault_installed: !fault.absent,
         can_seed_user: !fault.seedDenied, can_read_links: !fault.linksDenied, can_read_receipts: !fault.receiptsDenied }]);
+      if (sql.includes('copy:local-inventory')) return rows([{server_version:'18.6 mock',server_version_num:fault.oldVersion ? 170000 : 180006,
+        rolsuper:!!fault.superuser,rolbypassrls:!!fault.bypass,rolcreatedb:false,rolcreaterole:false,rolreplication:false,
+        owner_member:!!fault.ownerMember,service_member:!!fault.serviceMember,
+        extensions:fault.extraExtension ? ['plpgsql','uuid-ossp','dblink'] : ['plpgsql','uuid-ossp'],
+        outbound_schema:!!fault.outboundSchema,foreign_server:!!fault.foreignServer,subscription:!!fault.subscription }]);
+      if (sql.includes('copy:local-marker-acl')) return rows([{unsafe:!!fault.localMarkerWritable}]);
+      if (sql.includes('copy:local-marker')) return rows([{environment:'local-synthetic',manifest_sha256:fault.badHash ? '0'.repeat(64) : 'a'.repeat(64),server_major:18,purpose:'fintrack-disposable-concurrency-copy'}]);
       if (sql.includes('copy:scheduler')) {
         if (fault.permission) throw Object.assign(new Error('secret SQL detail'), { code: '42501' });
         return rows(fault.active ? [{ id: '7', active: true, unresolved_command: false }]
@@ -53,7 +62,7 @@ function mockPg(fault = {}) {
       }
       if (sql.includes('copy:queue')) return rows([{ pending: fault.queue ? '1' : '0' }]);
       if (sql.includes('copy:vault-url')) return rows([{ entries: 1, unsafe: !!fault.productionUrl }]);
-      if (sql.includes('copy:visibility')) return rows(fault.hiddenSessions ? [] : state.clients.map(c => ({ pid: c.pid, usename: 'qa_admin', application_name: c.options.application_name })));
+      if (sql.includes('copy:visibility')) return rows(fault.hiddenSessions ? [] : state.clients.map(c => ({ pid: c.pid, usename: fault.local ? 'fintrack_tester' : 'qa_admin', application_name: c.options.application_name })));
       if (sql.includes('copy:today')) return rows([{ day: fault.midnight && this.label === 'B' ? '2026-10-29' : '2026-10-28' }]);
       if (sql.includes("set_config('request.jwt.claim.sub'")) { this.uid = params[0]; return rows([]); }
       if (sql.includes('copy:auth-check')) return rows([{ role: 'authenticated', uid: this.uid }]);
@@ -96,6 +105,12 @@ function mockPg(fault = {}) {
 }
 const fastClock = () => { let t = 0; return { now: () => t, sleep: async ms => { t += ms; }, timeoutMs: 300 }; };
 
+test('Bangkok date query: old bare DAY alias fails parsing; shared explicit alias parses', () => {
+  const original = "/* copy:today */ select (clock_timestamp() at time zone 'Asia/Bangkok')::date::text day";
+  assert.throws(() => assertSqlSyntax(original, 'original-today'), /SOURCE_SQL_SYNTAX_INVALID/);
+  assert.equal(assertSqlSyntax(BANGKOK_TODAY_SQL, 'today'), 1);
+});
+
 for (const [name, patch] of [
   ['missing URL', { PLAN_COPY_DATABASE_URL: undefined }], ['bad confirmation', { PLAN_COPY_CONFIRM: 'yes' }],
   ['invalid URL', { PLAN_COPY_DATABASE_URL: 'bad' }], ['non-postgres URL', { PLAN_COPY_DATABASE_URL: 'https://qa_admin:pw@127.0.0.1:5432/fintrack_copy' }],
@@ -120,7 +135,7 @@ test('only explicit PLAN_COPY configuration is used; TLS is verified for remote 
   const e = { ...env(), DATABASE_URL: 'production-secret', PGHOST: 'production', PGOPTIONS: 'unsafe', PLAN_COPY_DATABASE_URL: 'postgresql://qa_admin:pw@copy.example.test:5432/fintrack_copy', PLAN_COPY_EXPECTED_HOST: 'copy.example.test' };
   const c = readConfig(e); assert.equal(c.host, 'copy.example.test'); assert.deepEqual(c.ssl, { rejectUnauthorized: true }); assert.match(c.options, /read_only=on/); assert.ok(!JSON.stringify(c).includes('production-secret'));
 });
-for (const fault of ['database', 'address', 'samePid', 'writable', 'roleDenied', 'marker', 'markerWritable', 'outbound', 'triggersUnreviewed', 'noWriter', 'seedDenied', 'linksDenied', 'receiptsDenied', 'badCron', 'badQueue', 'active', 'unresolvedJob', 'queue', 'productionUrl', 'permission', 'hiddenSessions']) {
+for (const fault of ['database', 'address', 'samePid', 'writable', 'roleDenied', 'marker', 'markerWritable', 'outbound', 'triggersUnreviewed', 'noWriter', 'seedDenied', 'linksDenied', 'receiptsDenied', 'badCron', 'badQueue', 'badVault', 'active', 'unresolvedJob', 'queue', 'productionUrl', 'permission', 'hiddenSessions']) {
   test(`preflight ${fault}: no fixture writes; all sessions closed`, async () => {
     const mock = mockPg({ [fault]: ['database', 'address', 'marker'].includes(fault) ? 'mismatch' : true });
     const report = await execute(env(), { Client: mock.Client });
@@ -146,6 +161,9 @@ test('all three mocked races: wait evidence precedes A release; fresh fixtures, 
   }
   assert.ok(mock.state.events.filter(e => e.session === 'observer').every(e => !/begin read write|insert into|delete from|update public|alter |grant /i.test(e.sql)));
   assert.equal(mock.state.events.filter(e => e.sql.includes('copy:opening')).length, 3);
+  const dateQueries = mock.state.events.filter(e => e.sql.includes('copy:today'));
+  assert.equal(dateQueries.length, 9); // Seed + A + B for each of three rounds.
+  assert.ok(dateQueries.every(e => e.sql === BANGKOK_TODAY_SQL));
   assert.ok(mock.state.events.filter(e => e.sql.includes('copy:seed-plan')).every(e => e.sql.includes("800,'day','expense'")));
   assert.ok(!mock.state.events.some(e => /delete from auth|update public.money_buckets|truncate /i.test(e.sql)));
 });
@@ -215,4 +233,48 @@ test('source has no dotenv, application imports, pool or automatic cleanup', () 
     const source = readFileSync(new URL(file, import.meta.url), 'utf8');
     assert.doesNotMatch(source, /from ['"]dotenv|from ['"].*src\/|new Pool\(|delete from auth\.users|purge_my_financial_data/i);
   }
+});
+
+const localEnv = () => ({...env(),PLAN_COPY_MODE:'local-synthetic',
+ PLAN_COPY_DATABASE_URL:'postgresql://fintrack_tester:synthetic-password@127.0.0.1:5432/fintrack_local_test',
+ PLAN_COPY_EXPECTED_DATABASE:'fintrack_local_test',PLAN_COPY_EXPECTED_LOGIN_ROLE:'fintrack_tester',PLAN_COPY_MANIFEST_SHA256:'a'.repeat(64)});
+for (const [name,patch] of [
+ ['remote host',{PLAN_COPY_EXPECTED_HOST:'remote.invalid',PLAN_COPY_DATABASE_URL:'postgresql://fintrack_tester:pw@remote.invalid:5432/fintrack_local_test'}],
+ ['localhost DNS alias',{PLAN_COPY_EXPECTED_HOST:'localhost',PLAN_COPY_DATABASE_URL:'postgresql://fintrack_tester:pw@localhost:5432/fintrack_local_test'}],
+ ['remote backend',{PLAN_COPY_EXPECTED_SERVER_ADDRS:'192.0.2.1'}],
+ ['different port',{PLAN_COPY_EXPECTED_PORT:'5433',PLAN_COPY_DATABASE_URL:'postgresql://fintrack_tester:pw@127.0.0.1:5433/fintrack_local_test'}],
+ ['different database',{PLAN_COPY_EXPECTED_DATABASE:'other',PLAN_COPY_DATABASE_URL:'postgresql://fintrack_tester:pw@127.0.0.1:5432/other'}],
+ ['different runner',{PLAN_COPY_EXPECTED_LOGIN_ROLE:'admin',PLAN_COPY_DATABASE_URL:'postgresql://admin:pw@127.0.0.1:5432/fintrack_local_test'}],
+ ['missing hash',{PLAN_COPY_MANIFEST_SHA256:undefined}], ['bad mode',{PLAN_COPY_MODE:'unsafe'}],
+]) test(`local ${name}: mock pg.Client.connect=0`, async()=>{
+ const m=mockPg(); await assert.rejects(()=>execute({...localEnv(),...patch},{Client:m.Client}),GuardError);
+ assert.equal(m.state.connects,0); assert.equal(m.state.clients.length,0);
+});
+test('absent Supabase extensions are not reported as checked or empty queues',async()=>{
+ const m=mockPg({absent:true});const r=await execute(env(),{Client:m.Client});
+ assert.equal(r.passed,true);assert.deepEqual(r.preflight.scheduler,{
+ cron:'absent-not-exercised',pgNet:'absent-not-exercised',vault:'absent-not-exercised',jobCount:null,pendingRequests:null});
+ assert.ok(!m.state.events.some(e=>/copy:(scheduler|queue|vault-url)/.test(e.sql)));
+});
+test('local protocol mock retains all three races and reports PG18 limitations',async()=>{
+ const m=mockPg({local:true,absent:true});const r=await execute(localEnv(),{Client:m.Client});
+ assert.equal(r.passed,true);assert.equal(r.mode,'local-synthetic');assert.equal(r.rounds.length,3);
+ assert.match(r.preflight.local.fidelity,/not Supabase/);
+ assert.equal(m.state.clients[0].options.ssl,false);
+ assert.equal(m.state.clients[0].options.manifestHash,undefined);
+});
+for(const serverAddress of ['192.0.2.1','::1','mismatch']) test(`local live backend ${serverAddress} must match explicit allowlist before fixtures`,async()=>{
+ const m=mockPg({local:true,absent:true,address:serverAddress});const r=await execute(localEnv(),{Client:m.Client});
+ assert.equal(r.error.code,'LIVE_SERVER_MISMATCH');assert.equal(m.state.fixtureWrites,0);
+ assert.equal(r.fixtures.length,0);assert.equal(r.connectionsClosed,true);
+});
+for(const fault of ['oldVersion','superuser','bypass','ownerMember','serviceMember','extraExtension','outboundSchema','foreignServer','subscription','badHash','localMarkerWritable']) {
+ test(`local preflight ${fault}: zero fixture writes`,async()=>{
+ const m=mockPg({local:true,absent:true,[fault]:true});const r=await execute(localEnv(),{Client:m.Client});
+ assert.equal(r.passed,false);assert.equal(m.state.fixtureWrites,0);assert.equal(r.connectionsClosed,true);
+ });
+}
+test('local rejects installed outbound extensions; no fallback to Supabase mode',async()=>{
+ const m=mockPg({local:true});const r=await execute(localEnv(),{Client:m.Client});
+ assert.equal(r.error.code,'LOCAL_UNEXPECTED_CAPABILITIES');assert.equal(m.state.fixtureWrites,0);
 });

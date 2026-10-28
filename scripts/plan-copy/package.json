@@ -3,10 +3,15 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22" },
-  "scripts": {
-    "test": "node --test offline.test.mjs",
-    "check": "node --check run.mjs && node --check guard.mjs && node --check fixture.mjs && node --check competitors.mjs && node --check observe.mjs && node --check assertions.mjs"
+  "engines": {
+    "node": ">=22"
   },
-  "dependencies": { "pg": "8.23.1" }
+  "scripts": {
+    "test": "node --test offline.test.mjs local-bootstrap.test.mjs",
+    "check": "node --check run.mjs && node --check guard.mjs && node --check fixture.mjs && node --check competitors.mjs && node --check observe.mjs && node --check assertions.mjs && node --check local-bootstrap.mjs && node --check local-manifest.mjs && node --check local-syntax.mjs && node --check local-bootstrap.test.mjs"
+  },
+  "dependencies": {
+    "libpg-query": "18.2.1",
+    "pg": "8.23.1"
+  }
 }

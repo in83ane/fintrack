@@ -59,7 +59,7 @@ export async function runRound({ a, b, observer, pids, fixture, scenario, result
 export async function execute(env, { Client, loadClient, save = async () => {}, signal, runTimeoutMs = 180000, waitOptions } = {}) {
   const config = readConfig(env); // Must precede driver loading, construction and connect.
   const Driver = Client || await (loadClient || (async () => (await import('pg')).Client))();
-  const report = { runId: randomUUID(), mode: 'copy-integration', startedAt: new Date().toISOString(),
+  const report = { runId: randomUUID(), mode: config.mode, startedAt: new Date().toISOString(),
     copyId: config.copyId, passed: false, fixtures: [], rounds: [], sessionErrors: [] };
   const clients = [];
   let stopping = false;

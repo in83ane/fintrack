@@ -1,4 +1,4 @@
-import { authenticate, requireFixture } from './fixture.mjs';
+import { authenticate, requireFixture, BANGKOK_TODAY_SQL } from './fixture.mjs';
 import { requireSafe } from './guard.mjs';
 
 export const SCENARIOS = Object.freeze([
@@ -10,7 +10,7 @@ export async function beginActor(c, f) {
   requireFixture(f);
   await c.query('begin read write');
   await authenticate(c, f);
-  const today = (await c.query("/* copy:today */ select (clock_timestamp() at time zone 'Asia/Bangkok')::date::text day")).rows[0]?.day;
+  const today = (await c.query(BANGKOK_TODAY_SQL)).rows[0]?.day;
   requireSafe(today === f.day, 'BANGKOK_DAY_CHANGED_START_NEW_RUN');
 }
 export async function perform(c, kind, f) {

@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { requireSafe, UUID } from './guard.mjs';
 
+// DAY requires AS when used as an unquoted output alias in PostgreSQL.
+// Keep seed and actor date checks identical so midnight checks use the same SQL.
+export const BANGKOK_TODAY_SQL = "/* copy:today */ select (clock_timestamp() at time zone 'Asia/Bangkok')::date::text AS day";
+
 const owned = new WeakSet();
 export function newFixture(runId, round) {
   const f = { runId, round, owner: randomUUID(), portfolio: randomUUID(), bucket: randomUUID(),
@@ -25,7 +29,7 @@ export async function createFixture(c, f, checkpoint = async () => {}) {
   await checkpoint(f);
   await c.query('begin read write');
   try {
-    f.day = (await c.query("/* copy:today */ select (clock_timestamp() at time zone 'Asia/Bangkok')::date::text day")).rows[0].day;
+    f.day = (await c.query(BANGKOK_TODAY_SQL)).rows[0].day;
     // No Auth API, signup mail, password or copied user identity. Inspect auth triggers first.
     await c.query(`/* copy:seed-user */ insert into auth.users
       (id,aud,role,email,encrypted_password,raw_app_meta_data,raw_user_meta_data,created_at,updated_at)

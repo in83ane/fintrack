@@ -49,8 +49,18 @@ export function readConfig(env) {
   const serverAddresses = get('EXPECTED_SERVER_ADDRS').split(',').map(s => address(s.trim()));
   requireSafe(serverAddresses.length > 0 && serverAddresses.every(s => isIP(s)), 'INVALID_SERVER_ADDRESSES');
   const copyId = get('ID'); requireSafe(UUID.test(copyId), 'INVALID_COPY_ID');
+  const mode = env.PLAN_COPY_MODE ?? 'supabase-copy';
+  requireSafe(['supabase-copy', 'local-synthetic'].includes(mode), 'INVALID_COPY_MODE');
+  let manifestHash;
+  if (mode === 'local-synthetic') {
+    requireSafe(host === '127.0.0.1', 'LOCAL_LOOPBACK_REQUIRED');
+    requireSafe(port === '5432' && database === 'fintrack_local_test' && user === 'fintrack_tester', 'LOCAL_TARGET_MISMATCH');
+    requireSafe(serverAddresses.every(ip => ip === '127.0.0.1'|| ip === '::1'), 'LOCAL_SERVER_ADDRESS_REQUIRED');
+    manifestHash = get('MANIFEST_SHA256');
+    requireSafe(/^[a-f0-9]{64}$/.test(manifestHash), 'LOCAL_MANIFEST_HASH_REQUIRED');
+  }
   // Explicit fields prevent pg/libpq environment fallback or URL option overrides.
-  return Object.freeze({ host, port: Number(port), user, password, database, copyId, serverAddresses,
+  return Object.freeze({ host, port: Number(port), user, password, database, copyId, serverAddresses, mode, manifestHash,
     ssl: ['localhost', '127.0.0.1', '::1'].includes(host) ? false : { rejectUnauthorized: true },
     connectionTimeoutMillis: 5000, query_timeout: 35000, statement_timeout: 30000,
     lock_timeout: 15000, idle_in_transaction_session_timeout: 45000,
@@ -58,7 +68,7 @@ export function readConfig(env) {
   });
 }
 export function clientConfig(config, runId, label) {
-  const { copyId, serverAddresses, ...connection } = config;
+  const { copyId, serverAddresses, mode, manifestHash, ...connection } = config;
   return { ...connection, application_name: `plan-copy:${runId}:${label}` };
 }
 
@@ -79,6 +89,7 @@ select to_regclass('cron.job')::text cron_table,
  to_regclass('vault.decrypted_secrets')::text vault_table,
  exists(select from pg_extension where extname='pg_cron') cron_installed,
  exists(select from pg_extension where extname='pg_net') net_installed,
+ exists(select from pg_extension where extname in ('supabase_vault','vault')) vault_installed,
  to_regprocedure('public.save_cash_bucket(uuid,uuid,jsonb,numeric)') is not null
  and to_regprocedure('public.write_bucket_cash(uuid,jsonb)') is not null
  and to_regclass('bucket_private.links') is not null
@@ -96,6 +107,25 @@ export const VAULT_SQL = `/* copy:vault-url */
 select count(*)::int entries,
  coalesce(bool_or(decrypted_secret is null or decrypted_secret <> 'https://disabled.invalid'),false) unsafe
 from vault.decrypted_secrets where name='fintrack_price_alert_url'`;
+
+export const LOCAL_SQL = `/* copy:local-inventory */
+select current_setting('server_version') server_version,
+ current_setting('server_version_num')::int server_version_num,
+ r.rolsuper, r.rolbypassrls, r.rolcreatedb, r.rolcreaterole, r.rolreplication,
+ pg_has_role(session_user,'fintrack_local_owner','MEMBER') owner_member,
+ pg_has_role(session_user,'service_role','MEMBER') service_member,
+ (select array_agg(extname::text order by extname) from pg_extension) extensions,
+ exists(select from pg_namespace where nspname in ('cron','net','vault')) outbound_schema,
+ exists(select from pg_foreign_server) foreign_server,
+ exists(select from pg_subscription) subscription
+from pg_roles r where rolname=session_user`;
+export const LOCAL_MARKER_SQL = `/* copy:local-marker */
+select environment, manifest_sha256, server_major, purpose
+from plan_copy_guard.bootstrap where singleton=true`;
+export const LOCAL_ACL_SQL = `/* copy:local-marker-acl */
+select exists(select from (values ('identity'),('bootstrap')) t(name)
+ cross join (values ('fintrack_tester'),('authenticated'),('anon')) r(name)
+ where has_table_privilege(r.name,'plan_copy_guard.'||t.name,'INSERT,UPDATE,DELETE,TRUNCATE')) unsafe`;
 
 export function checkIdentity(row, config) {
   requireSafe(row?.db === config.database && row.login_role === config.user && row.current_role === config.user, 'LIVE_IDENTITY_MISMATCH');
@@ -119,6 +149,26 @@ export async function preflight(clients, config) {
   requireSafe(cap.can_seed_user === true && cap.can_read_links === true && cap.can_read_receipts === true, 'COPY_ADMIN_PRIVILEGES_REQUIRED');
   requireSafe(!cap.cron_installed || cap.cron_table === 'cron.job', 'CRON_INVENTORY_UNAVAILABLE');
   requireSafe(!cap.net_installed || cap.queue_table === 'net.http_request_queue', 'NET_INVENTORY_UNAVAILABLE');
+  requireSafe(!cap.vault_installed || cap.vault_table === 'vault.decrypted_secrets', 'VAULT_INVENTORY_UNAVAILABLE');
+  let local;
+  if (config.mode === 'local-synthetic') {
+    const inventory = (await observer.query(LOCAL_SQL)).rows[0];
+    requireSafe(inventory && inventory.server_version_num >= 180000 && inventory.server_version_num < 190000, 'LOCAL_SERVER_VERSION_MISMATCH');
+    requireSafe(['rolsuper','rolbypassrls','rolcreatedb','rolcreaterole','rolreplication','owner_member','service_member']
+      .every(k => inventory[k] === false), 'LOCAL_RUNNER_PRIVILEGES_UNSAFE');
+    requireSafe(Array.isArray(inventory.extensions) && inventory.extensions.length === 2
+      && ['plpgsql','uuid-ossp'].every(e => inventory.extensions.includes(e))
+      && inventory.outbound_schema === false && inventory.foreign_server === false && inventory.subscription === false
+      && !cap.cron_installed && !cap.net_installed && !cap.vault_installed
+      && !cap.cron_table && !cap.queue_table && !cap.vault_table, 'LOCAL_UNEXPECTED_CAPABILITIES');
+    const localMarkers = (await observer.query(LOCAL_MARKER_SQL)).rows;
+    requireSafe(localMarkers.length === 1 && localMarkers[0].environment === 'local-synthetic'
+      && localMarkers[0].manifest_sha256 === config.manifestHash && localMarkers[0].server_major === 18
+      && localMarkers[0].purpose === 'fintrack-disposable-concurrency-copy', 'LOCAL_BOOTSTRAP_MISMATCH');
+    requireSafe((await observer.query(LOCAL_ACL_SQL)).rows[0]?.unsafe === false, 'LOCAL_MARKER_WRITABLE');
+    local = { serverVersion: inventory.server_version, manifestSha256: config.manifestHash,
+      fidelity: 'PG18 synthetic schema; not Supabase Auth/PostgREST/JWT or PG17 verification' };
+  }
   const jobs = cap.cron_table ? (await observer.query(SCHEDULER_SQL)).rows : [];
   // Arbitrary SQL/Vault indirection cannot be reliably classified by a regex.
   // Require no jobs or inactive SELECT 1 placeholders, even for copied unknown jobs.
@@ -133,5 +183,9 @@ export async function preflight(clients, config) {
     from pg_stat_activity where pid = any($1::int[])`, [pids]);
   requireSafe(visibility.rows.length === 3 && visibility.rows.every(r => r.usename === config.user
     && String(r.application_name).startsWith('plan-copy:')), 'OBSERVER_VISIBILITY_INSUFFICIENT');
-  return { pids, scheduler: { checked: true, jobCount: jobs.length, pendingRequests: 0 } };
+  const capability = present => present ? 'present-and-checked' : 'absent-not-exercised';
+  return { pids, local, scheduler: {
+    cron: capability(cap.cron_table), pgNet: capability(cap.queue_table), vault: capability(cap.vault_table),
+    jobCount: cap.cron_table ? jobs.length : null, pendingRequests: cap.queue_table ? 0 : null,
+  } };
 }
