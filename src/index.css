@@ -26,7 +26,7 @@
 html.light-mode { color-scheme:light; }
 :is(input,textarea,select,[role=combobox]) { caret-color:var(--color-primary); }
 :is(input,textarea,select,[role=combobox]):is(:focus,:focus-visible), :has(> input):focus-within { outline:none!important; box-shadow:none!important; }
-:is(input:not([type=checkbox]):not([type=radio]):not([type=range]),textarea,select,[role=combobox]):focus { background-color:var(--field-menu); transition:background-color 120ms; }
+:is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not(.record-search-input),textarea,select,[role=combobox]):focus { background-color:var(--field-menu); transition:background-color 120ms; }
 input:-webkit-autofill,input:-webkit-autofill:focus { -webkit-text-fill-color:var(--color-foreground); -webkit-background-clip:text; caret-color:var(--color-primary); box-shadow:none!important; }
 select option { color:var(--color-foreground); background:var(--field-menu); }
 .ui-select { min-width:0; }
@@ -353,6 +353,8 @@ input[type="number"]::-webkit-inner-spin-button {
 [data-refresh-shimmer] [data-loading-data] { background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--color-foreground) 7%, transparent), transparent); background-size:200% 100%; animation: sk-shimmer 1.6s linear infinite; }
 @media (prefers-reduced-motion: reduce) { [data-route-page] [data-loading-data] { transition:none; } [data-refresh-shimmer] [data-loading-data] { animation:none; } }
 /* RecordSearch supplies a labeled clear button; suppress the browser's duplicate. */
+.record-search-field:focus-within { background-color:var(--field-menu); }
+.record-search-input { background:transparent; }
 .record-search-input::-webkit-search-cancel-button {
   -webkit-appearance: none;
   appearance: none;

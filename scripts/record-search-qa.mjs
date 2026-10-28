@@ -34,10 +34,16 @@ await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.
 const browser=await chromium.launch({executablePath:'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',headless:true});
 const errors=[],results=[];
 try{
- for(const width of [390,768,1440])for(const route of ['ledger','cashflow'])for(const lang of ['en','th']){
+ for(const theme of ['dark','light'])for(const width of [390,768,1440])for(const route of ['ledger','cashflow'])for(const lang of ['en','th']){
   const p=await browser.newPage({viewport:{width,height:1000},timezoneId:'Asia/Bangkok'});p.on('pageerror',e=>errors.push(e.message));
   await p.clock.install({time:new Date('2026-10-25T05:00:00Z')});await p.goto(`${base}/${route}?lang=${lang}`);
+  if(theme==='light')await p.evaluate(()=>document.documentElement.classList.add('light-mode'));
   const search=p.getByRole('searchbox');await search.waitFor();
+  const assertUnifiedSurface=async()=>{
+   const style=await search.evaluate(el=>{const s=getComputedStyle(el);return {background:s.backgroundColor,image:s.backgroundImage,border:s.borderTopWidth};});
+   assert.deepEqual(style,{background:'rgba(0, 0, 0, 0)',image:'none',border:'0px'},'input must not paint an inner rectangle');
+  };
+  await assertUnifiedSurface();
   const geometry=()=>search.evaluate(el=>{
    const field=el.parentElement,root=field.parentElement,status=root.querySelector('[role="status"]');
    const box=node=>{const r=node.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};};
@@ -47,6 +53,7 @@ try{
   const assertStable=async state=>assert.deepEqual(await geometry(),emptyGeometry,`${route}/${lang}/${width}: ${state} must not move search or the following content`);
   await search.fill('no-such-transaction');await p.waitForTimeout(100);
   await assertStable('no matches');
+  await assertUnifiedSurface();
   assert.ok((await p.getByRole('status').allTextContents()).some(t=>t.includes('0 ')));
   await search.fill('Food');await p.waitForTimeout(100);
   await assertStable('matching query');
@@ -58,11 +65,12 @@ try{
   const clear=p.getByRole('button',{name:lang==='th'?'ล้างคำค้น':'Clear search',exact:true});
   assert.equal(await clear.count(),1);
   await search.focus();
-  await search.locator('..').screenshot({path:path.join(out,`${route}-${lang}-${width}-filled.png`)});
+  await search.locator('..').screenshot({path:path.join(out,`${route}-${lang}-${width}-${theme}-filled.png`)});
   await clear.click();assert.equal(await search.inputValue(),'');
   await assertStable('cleared query');
+  await assertUnifiedSurface();
   assert.equal(await clear.count(),0);assert(await search.evaluate(el=>el===document.activeElement));
-  await p.screenshot({path:path.join(out,`${route}-${lang}-${width}.png`),fullPage:true});results.push({route,lang,width,oneClearButton:true,focusRestored:true,stableGeometry:true,passed:true});await p.close();
+  await p.screenshot({path:path.join(out,`${route}-${lang}-${width}-${theme}.png`),fullPage:true});results.push({route,lang,width,theme,unifiedSurface:true,oneClearButton:true,focusRestored:true,stableGeometry:true,passed:true});await p.close();
  }
  assert.deepEqual(errors,[]);writeFileSync(path.join(out,'results.json'),JSON.stringify(results,null,2));console.log(JSON.stringify(results));
 }finally{await browser.close();server.close();}
