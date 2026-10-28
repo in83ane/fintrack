@@ -17,6 +17,17 @@ try{
   assert.equal((await q("select count(*) n from cash_activities where type='EXPENSE'"))[0].n,1);
   assert.equal((await q('select count(*) n from bucket_activities'))[0].n,1);
  });
+ await run('identical intentional expenses remain separate; retry debits once',async()=>{
+  const first={op:'create',rows:[row('EXPENSE',153)]};
+  const second={op:'create',rows:[{...first.rows[0],id:crypto.randomUUID()}]};
+  const firstKey=crypto.randomUUID(),secondKey=crypto.randomUUID();
+  await write(first,firstKey);await write(first,firstKey);
+  await write(second,secondKey);await write(second,secondKey);
+  assert.equal(Number((await balances()).total),694);
+  assert.equal(Number((await balances()).current_amount),694);
+  assert.equal(Number((await q("select count(*) n from cash_activities where type='EXPENSE'"))[0].n),2);
+  assert.equal(Number((await q('select count(*) n from bucket_activities'))[0].n),2);
+ });
  await run('idempotency same request, changed payload and plain writes',async()=>{
   const command={op:'create',rows:[row('EXPENSE',100)]},key=crypto.randomUUID();await write(command,key);await write(command,key);
   await rejects('select write_bucket_cash($1,$2)',[key,{op:'create',rows:[row('EXPENSE',200)]}],/Idempotency conflict/);

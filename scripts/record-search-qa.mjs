@@ -34,8 +34,8 @@ await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.
 const browser=await chromium.launch({executablePath:'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',headless:true});
 const errors=[],results=[];
 try{
- for(const route of ['ledger','cashflow'])for(const lang of ['en','th']){
-  const p=await browser.newPage({viewport:{width:1440,height:1000},timezoneId:'Asia/Bangkok'});p.on('pageerror',e=>errors.push(e.message));
+ for(const width of [390,1440])for(const route of ['ledger','cashflow'])for(const lang of ['en','th']){
+  const p=await browser.newPage({viewport:{width,height:1000},timezoneId:'Asia/Bangkok'});p.on('pageerror',e=>errors.push(e.message));
   await p.clock.install({time:new Date('2026-10-25T05:00:00Z')});await p.goto(`${base}/${route}?lang=${lang}`);
   const search=p.getByRole('searchbox');await search.waitFor();
   await search.fill('no-such-transaction');await p.waitForTimeout(100);
@@ -45,7 +45,14 @@ try{
   if(route==='ledger'){assert.ok(await p.locator('[data-ledger-row]').count()>0);assert.equal(await p.locator('[data-ledger-row]').filter({hasText:'Gift'}).count(),0);}
   await search.fill('2026-10');await p.waitForTimeout(100);
   assert.ok((await p.getByRole('status').allTextContents()).some(t=>/matches|รายการที่พบ/.test(t)&&!t.startsWith('0 ')));
-  await search.fill('');await p.screenshot({path:path.join(out,`${route}-${lang}.png`),fullPage:true});results.push({route,lang,passed:true});await p.close();
+  await search.fill('1111');
+  const clear=p.getByRole('button',{name:lang==='th'?'ล้างคำค้น':'Clear search',exact:true});
+  assert.equal(await clear.count(),1);
+  await search.focus();
+  await search.locator('..').screenshot({path:path.join(out,`${route}-${lang}-${width}-filled.png`)});
+  await clear.click();assert.equal(await search.inputValue(),'');
+  assert.equal(await clear.count(),0);assert(await search.evaluate(el=>el===document.activeElement));
+  await p.screenshot({path:path.join(out,`${route}-${lang}-${width}.png`),fullPage:true});results.push({route,lang,width,oneClearButton:true,focusRestored:true,passed:true});await p.close();
  }
  assert.deepEqual(errors,[]);writeFileSync(path.join(out,'results.json'),JSON.stringify(results,null,2));console.log(JSON.stringify(results));
 }finally{await browser.close();server.close();}

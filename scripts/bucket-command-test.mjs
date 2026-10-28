@@ -16,6 +16,7 @@ fail=false;
 await send('owner',{...input,rows:[{...input.rows[0],rate_at_time:36,date:'2026-10-01T12:01:00+07:00'}]});
 assert.deepEqual(calls[1],original,'same ID, original timestamp and FX snapshot');
 await send('owner',input);assert.notEqual(calls[2].request_id,original.request_id,'intentional repeat after success');
+assert.notEqual(calls[2].command.rows[0].id,original.command.rows[0].id,'identical intentional entries use different cash row IDs');
 let release;calls=[];
 send=createBucketCommander(async args=>{calls.push(args);return new Promise(r=>release=r);});
 const first=send('owner',input),second=send('owner',input);release({data:[],error:null});await Promise.all([first,second]);assert.equal(calls.length,1);

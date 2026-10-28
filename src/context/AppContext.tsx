@@ -3773,7 +3773,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if(updates.bucketId!==undefined)patch.bucket_id=updates.bucketId;
     try{const {error}=await db.cashActivities.update(id,patch);if(error)throw error;
       financialSnapshots.invalidate();setFinancialRevision(v=>v+1);return true;
-    }catch(error){addToast(bucketWriteMessage((error as any)?.message||'',language==='th'),'error');return false;}
+    }catch(error){addToast(bucketWriteMessage(error,language==='th'),'error');return false;}
   };
 
   // Bucket data lives only in the dedicated cash-management portfolio.  The
@@ -3795,7 +3795,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if(!id)details.portfolio_id=bucketPortfolioId;
     try{const {error}=await db.bucketWriter.save(saved.request,saved.id,details,saved.rate);if(error)throw error;
       bucketSaveRequests.current.delete(key);financialSnapshots.invalidate();setFinancialRevision(v=>v+1);return true;
-    }catch(error){const e=error as any;if(/^(?:[0-9]{2}|[A-Z][0-9]|XX)[0-9A-Z]{3}$/.test(e?.code||'')||String(e?.code||'').startsWith('PGRST'))bucketSaveRequests.current.delete(key);addToast(bucketWriteMessage(e?.message||'',language==='th'),'error');return false;}
+    }catch(error){const e=error as any;if(/^(?:[0-9]{2}|[A-Z][0-9]|XX)[0-9A-Z]{3}$/.test(e?.code||'')||String(e?.code||'').startsWith('PGRST'))bucketSaveRequests.current.delete(key);addToast(bucketWriteMessage(e,language==='th'),'error');return false;}
   };
   const addMoneyBucket=async(bucket:Omit<MoneyBucket,'id'>)=>saveMoneyBucket(null,bucket);
   const updateMoneyBucket=async(id:string,updates:Partial<MoneyBucket>)=>saveMoneyBucket(id,updates);
@@ -3831,7 +3831,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       financialSnapshots.invalidate();setFinancialRevision(v=>v+1);
       const saved=(data||[]).map((a:any)=>({id:a.id,type:a.type,amountUSD:Number(a.amount),originalAmount:Number(a.original_amount),currency:a.currency,rateAtTime:Number(a.rate_at_time),category:a.category,note:a.note,date:a.date,bucketId:a.bucket_id,isTransfer:a.is_transfer}));
       setCashActivities(prev=>[...prev.filter(a=>!saved.some((b:any)=>a.id===b.id)),...saved]);return saved;
-    }catch(error){addToast(bucketWriteMessage((error as any)?.message||'',language==='th'),'error');return null;}
+    }catch(error){addToast(bucketWriteMessage(error,language==='th'),'error');return null;}
   };
   const addCashActivity=async(activity:Omit<CashActivity,'id'>):Promise<CashActivity|null>=>
     (await addCashActivities([activity],'create'))?.[0]||null;
@@ -3840,7 +3840,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if(!user){addToast('เข้าสู่ระบบก่อนจัดการรายการเงินจริง','warning');return;}
     try{const {error}=await db.cashActivities.delete(id);if(error)throw error;
       financialSnapshots.invalidate();setCashActivities(prev=>prev.filter(a=>a.id!==id));setFinancialRevision(v=>v+1);
-    }catch(error){addToast(bucketWriteMessage((error as any)?.message||'',language==='th'),'error');throw error;}
+    }catch(error){addToast(bucketWriteMessage(error,language==='th'),'error');throw error;}
   };
   const updateAllocation = async (label: string, value: number) => {
     financialSnapshots.invalidate();

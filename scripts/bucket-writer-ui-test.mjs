@@ -49,6 +49,25 @@ try{
   assert.equal(requests.at(-1).command.op,'distribute');assert.deepEqual(requests.at(-1).command.rows.map(r=>r.original_amount),[0.5,0.51]);
   results.push({width,lang,theme,staleBalance:true,uncertainRetry:true,distribution:true});await context.close();await db.close();db=null;
  }
+ // Identical intentional entries after success are distinct payments, not retries.
+ await fresh();
+ const repeatPage=await browser.newPage({viewport:{width:1280,height:900},timezoneId:'Asia/Bangkok'});
+ repeatPage.on('pageerror',e=>errors.push(e.message));
+ await repeatPage.goto(`http://127.0.0.1:${server.address().port}/?lang=th`);
+ await repeatPage.clock.install({time:new Date('2026-10-28T09:00:00Z')});
+ for(let i=0;i<2;i++){
+  await repeatPage.getByRole('button',{name:'QA expense',exact:true}).click();
+  await repeatPage.locator('[data-record-amount]').fill('153');
+  await repeatPage.locator('button[type=submit]').click();
+  await repeatPage.locator('[data-record-amount]').waitFor({state:'hidden'});
+ }
+ assert.equal(requests.length,2);
+ assert.notEqual(requests[0].request_id,requests[1].request_id);
+ assert.notEqual(requests[0].command.rows[0].id,requests[1].command.rows[0].id);
+ assert.equal(Number((await q('select current_amount from money_buckets where id=$1',[bucket]))[0].current_amount),694);
+ assert.equal(Number((await q("select count(*) n from cash_activities where bucket_id=$1 and type='EXPENSE'",[bucket]))[0].n),2);
+ results.push({identicalIntentionalEntries:true,distinctIds:true,balance:694});
+ await repeatPage.close();await db.close();db=null;
  // Real Bucket page: pair is submitted once and remains atomic.
  await fresh();const p=await browser.newPage({viewport:{width:1280,height:1000}});p.on('pageerror',e=>errors.push(e.message));await p.goto(`http://127.0.0.1:${server.address().port}/?bucket`);
  await p.getByRole('button',{name:'โอนระหว่าง Bucket',exact:true}).first().click();

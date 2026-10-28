@@ -15,7 +15,7 @@ function Fixture(){
  const buckets=[{id:bid,name:'QA wallet',currency:'THB',currentAmount:1000,targetPercent:50,color:'#4edea3',icon:'wallet'},{id:'55555555-5555-4555-8555-555555555555',name:'Second wallet',currency:'THB',currentAmount:0,targetPercent:50,color:'#adc6ff',icon:'wallet'}];
  const addCashActivities=async(rows:any[],op:string)=>{
   const command={op,rows:rows.map(a=>({portfolio_id:pid,bucket_id:a.bucketId||null,type:a.type,original_amount:a.originalAmount,currency:a.currency,rate_at_time:a.rateAtTime,date:a.date,category:a.category,note:a.note||null,is_transfer:!!a.isTransfer}))};
-  const result=await execute(owner,command);if(result.error){setToast(bucketWriteMessage(result.error.message,th));return null;}return result.data;
+  const result=await execute(owner,command);if(result.error){setToast(bucketWriteMessage(result.error,th));return null;}return result.data;
  };
  const forbidden=()=>{throw Error('Obsolete split writer called');};
  const app={language,currency:'THB',t:(key:string)=>translations[language][key]||key,formatMoney:(n:number)=>String(n),exchangeRates:{USD:1,THB:35},moneyBuckets:buckets,allMoneyBuckets:buckets,cashActivities:[],bucketActivities:[],customCategories:[],brokerageAccounts:[],allBrokerageAccounts:[],brokerageCashBalances:[],portfolios:[],isDataLoaded:true,activePortfolioId:pid,userProfile:{email:'qa@example.test'},addCashActivities,addToast:setToast,updateMoneyBucket:forbidden,addBucketActivity:forbidden,addCashActivity:forbidden};

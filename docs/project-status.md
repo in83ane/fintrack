@@ -1,5 +1,31 @@
 # FinTrack project status — 28 October 2026
 
+## Later incident recovery — 16:44 Asia/Bangkok
+
+The owner subsequently authorized connecting and completing the Expense-save
+repair, explicitly skipping all backups. Four missing PLAN/writer dependencies
+were installed atomically on Supabase PG17.6, followed by release assertion
+`20261028094429`. Catalog checks pass 18/18; a rolled-back synthetic runtime test
+passes opening/expense/idempotency/overspend/ownership checks; existing financial
+row fingerprints are unchanged. All three REST RPC signatures are now discovered
+and correctly deny anonymous execution. This supersedes the historical
+assistant-connection restriction below for this incident only.
+
+The local app now retains safe error codes and stops repeated schema failures;
+the production-build configuration checks target RPC availability. At the
+initial recovery checkpoint these changes were local and no hosting deployment
+had been performed. The owner later confirmed localhost saving works and
+authorized deployment with the duplicate search-clear fix and identical-entry
+regression checks (writer DB 16, writer UI 10, search browser 8). Use the exact
+GitHub/Vercel deployment status for the release result.
+Legacy cash records (192) remain unlinked and cannot be edited/deleted through
+the writer. Signed-user browser saving, representative-copy/two-session coverage
+and the broader release blockers below are not declared complete. Backup/restore
+was waived for this operation, not verified. Full evidence:
+[bucket writer recovery](bucket-writer-release-readiness.md).
+
+## Historical local-copy status (before the later recovery authorization)
+
 **ผ่านบน local PostgreSQL 18 synthetic schema**: owner-run report `eddd52e6-e1a9-4c96-b921-ba48ebe0e499` passes all three races on PG18.6 after guard fix `83d786a`. **Representative Supabase/PG17 copy validation remains pending; no push was performed.** Bootstrap/runner changes are committed in `ca9f882`, prior evidence/procedure docs in `c6aeb0d`. The preceding audit at HEAD `4aeffc2` is historical. The owner selected a NEW cluster/data directory while preserving the old one. The passing report is not a service/port/database inventory or a complete bootstrap transcript; Step 0 remains owner-run before any future fresh-cluster preparation. If the old cluster serves other needed databases, propose a different port with a separately approved target/guard change. Only the owner may connect/run database commands. Assistant work remains docs/offline mocks only: no SQL execution (including PGlite), database connection, `.env` read, staging, commit or push. See the [dated evidence record](local-postgres-copy-evidence.md).
 
 | Area | Status / next gate |

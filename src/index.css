@@ -352,3 +352,9 @@ input[type="number"]::-webkit-inner-spin-button {
 [data-refreshing] [data-loading-data] { opacity: .6; }
 [data-refresh-shimmer] [data-loading-data] { background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--color-foreground) 7%, transparent), transparent); background-size:200% 100%; animation: sk-shimmer 1.6s linear infinite; }
 @media (prefers-reduced-motion: reduce) { [data-route-page] [data-loading-data] { transition:none; } [data-refresh-shimmer] [data-loading-data] { animation:none; } }
+/* RecordSearch supplies a labeled clear button; suppress the browser's duplicate. */
+.record-search-input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}

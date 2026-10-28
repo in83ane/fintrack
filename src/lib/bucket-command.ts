@@ -2,6 +2,25 @@
  * sessionStorage retains the request across a tab reload. No auth tokens stored.
  * After success, a new identical submission is a new intentional transaction. */
 type Reply={data:any;error:any};
+const writerSchemaErrors=new Set(['PGRST202','PGRST203','PGRST204','PGRST205','42883','42P01','42703']);
+function errorCode(error:unknown):string {
+ const code=error&&typeof error==='object'?(error as {code?:unknown}).code:undefined;
+ return typeof code==='string'&&/^(?:PGRST\d{3}|[0-9A-Z]{5})$/.test(code)?code:'';
+}
+
+/** A schema rejection cannot be repaired by repeating a payment. Stop further
+ * writer RPCs in this page until a reload after the release has been repaired.
+ * Never fall back to direct table writes or change the idempotency payload. */
+export function createBucketWriterTransport(rpc:(name:string,args:any)=>PromiseLike<Reply>){
+ let unavailableCode='';
+ return async(name:string,args:any):Promise<Reply>=>{
+  if(unavailableCode)return {data:null,error:{code:unavailableCode}};
+  const reply=await rpc(name,args);
+  const code=errorCode(reply.error);
+  if(writerSchemaErrors.has(code))unavailableCode=code;
+  return reply;
+ };
+}
 type Pending={owner:string;key:string;request_id:string;command:any;flight?:Promise<Reply>};
 export function createBucketCommander(transport:(args:{request_id:string;command:any})=>Promise<Reply>,storage?:Pick<Storage,'getItem'|'setItem'>){
  const pending=new Map<string,Pending>();const storageKey='fintrack-bucket-pending-v1';
@@ -41,11 +60,16 @@ export function splitBucketMoney(amount:string,weights:number[]):number[]{
  return units.map((w,i)=>{const part=i===last?minor-spent:minor*w/total;spent+=part;return Number(part)/100;});
 }
 
-export function bucketWriteMessage(message:string,th:boolean){
+export function bucketWriteMessage(error:unknown,th:boolean){
+ const message=typeof error==='string'?error:error&&typeof error==='object'&&typeof (error as {message?:unknown}).message==='string'?(error as {message:string}).message:'';
+ const code=errorCode(error);
+ if(writerSchemaErrors.has(code))return (th?'ระบบบันทึกยังไม่พร้อม กรุณาแจ้งผู้ดูแลเพื่อตรวจรุ่นฐานข้อมูล แล้วโหลดหน้าใหม่หลังแก้ไข':'Saving is unavailable. Ask the administrator to check the database release, then reload after the repair.')+` (${code})`;
+ if(['PGRST301','PGRST302','PGRST303','28000','28P01'].includes(code))return (th?'เซสชันหมดอายุหรือไม่ถูกต้อง กรุณาเข้าสู่ระบบใหม่':'Your session has expired or is invalid. Sign in again.')+` (${code})`;
+ if(code==='42501')return (th?'ไม่มีสิทธิ์บันทึกรายการนี้ กรุณาให้ผู้ดูแลตรวจสิทธิ์':'Saving is not permitted. Ask the administrator to check access permissions.')+` (${code})`;
  if(/Pending uncertain/i.test(message))return th?'ยังไม่ทราบผลรายการก่อนหน้า กรุณาลองส่งข้อมูลเดิมอีกครั้งก่อนทำรายการใหม่':'Previous payment status is uncertain. Retry its original details before a new operation.';
  if(/Insufficient/i.test(message))return th?'ยอดเงินไม่พอ รายการนี้ยังไม่ได้บันทึก กรุณาตรวจยอดล่าสุด':'Insufficient funds. Nothing was saved. Check the latest balance.';
  if(/Unlinked|Unresolved|mismatch: audit/i.test(message))return th?'ประวัติเดิมจับคู่ไม่ได้หรือยอดไม่ตรง ต้องตรวจสอบข้อมูลก่อน ระบบยังไม่ได้แก้ยอด':'Legacy records are unlinked, unresolved or inconsistent. Audit required; nothing changed.';
  if(/original source|linked|PLAN/i.test(message))return th?'รายการนี้ผูกกับ PLAN หรือการโอน กรุณาจัดการจากต้นทาง':'Manage this linked record from its original plan or transfer.';
  if(/Use deposit|currency is fixed/i.test(message))return th?'เปลี่ยนยอดด้วยฝาก/ถอนเท่านั้น และเปลี่ยนสกุลเงินของกระเป๋าเดิมไม่ได้':'Use deposit/withdraw to change a balance. Existing wallet currency is fixed.';
- return th?'บันทึกไม่สำเร็จ กรุณาลองใหม่ด้วยข้อมูลเดิม':'Could not save. Retry with the same details.';
+ return (th?'บันทึกไม่สำเร็จ กรุณาลองใหม่ด้วยข้อมูลเดิม':'Could not save. Retry with the same details.')+(code?` (${code})`:'');
 }

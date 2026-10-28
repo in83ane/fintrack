@@ -1,4 +1,4 @@
-import { createBucketCommander } from './bucket-command';
+import { createBucketCommander, createBucketWriterTransport } from './bucket-command';
 import { DATA_RESET_DISABLED_CODE, dataResetCopy } from './data-reset-policy';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseUrl, getSupabaseAnonKey } from './env';
@@ -207,13 +207,14 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
-const executeBucketCommand=createBucketCommander(async args=>await supabase.rpc('write_bucket_cash',args));
+const bucketWriterRpc=createBucketWriterTransport((name,args)=>supabase.rpc(name,args));
+const executeBucketCommand=createBucketCommander(args=>bucketWriterRpc('write_bucket_cash',args));
 
 // Database helper functions
 export const db = {
   bucketWriter: {
     execute: async (owner:string,command:any)=>executeBucketCommand(owner,command),
-    save: async (requestId:string,id:string,details:any,rate?:number)=>await supabase.rpc('save_cash_bucket',{request_id:requestId,bucket_id:id,details,opening_rate:rate??null}),
+    save: async (requestId:string,id:string,details:any,rate?:number)=>await bucketWriterRpc('save_cash_bucket',{request_id:requestId,bucket_id:id,details,opening_rate:rate??null}),
   },
   // Immutable trade ledger. The database is the writer (via trade triggers);
   // clients can only read a bounded, indexed page.

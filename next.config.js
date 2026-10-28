@@ -1,4 +1,6 @@
 import { STALE_TTL } from './src/lib/loading-policy.js';
+import { PHASE_PRODUCTION_BUILD } from 'next/constants.js';
+import { assertBucketWriterApiReady } from './scripts/bucket-writer-build-gate.mjs';
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Keep production validation from replacing chunks used by the running dev server.
@@ -77,4 +79,12 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+export default async function configureNext(phase) {
+  if (phase === PHASE_PRODUCTION_BUILD) {
+    await assertBucketWriterApiReady({
+      url: process.env.NEXT_PUBLIC_SUPABASE_URL,
+      key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    });
+  }
+  return nextConfig;
+}
