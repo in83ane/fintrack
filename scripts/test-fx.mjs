@@ -168,10 +168,10 @@ failPrimary = true; assert.equal((await getRoute()()).body.source, 'open.er-api.
 failAll = true; const offlineRoute = getRoute(); assert.equal((await offlineRoute()).status, 503); assert.equal((await offlineRoute()).body.rate, undefined);
 assert.ok(providers.some(p => p.options.revalidate === 600)); assert.ok(providers.some(p => p.options.revalidate === 3600));
 
-const page = readFileSync(new URL('../src/app/(app)/portfolio/page.tsx', import.meta.url), 'utf8');
+const page = readFileSync(new URL('../src/app/(app)/portfolio/PortfolioView.tsx', import.meta.url), 'utf8');
 const summary = page.slice(page.indexOf('function SummaryCard'), page.indexOf('function AccountCard'));
 assert.match(summary, /useFxRate\(\)/); assert.match(summary, /exactValue=\{total\}/);
 assert.doesNotMatch(summary, /setAppExchangeRate|setRate\(|setDisplay\(|localStorage|addTrade/);
-const settings = readFileSync(new URL('../src/app/(app)/settings/page.tsx', import.meta.url), 'utf8');
+const settings = readFileSync(new URL('../src/app/(app)/settings/SettingsView.tsx', import.meta.url), 'utf8');
 assert.ok(!settings.includes(FX_CACHE_KEY) && !settings.includes(FX_SETTINGS_KEY), 'FX cache must not be exported with ledger');
 console.log('PASS FX: exact half-up, native currency, ledger invariant, auto timers/visibility, cache/stale/backoff, invalid rates, manual race/persistence/reset, unavailable state and card isolation.');

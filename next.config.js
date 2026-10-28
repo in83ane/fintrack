@@ -1,8 +1,11 @@
+import { STALE_TTL } from './src/lib/loading-policy.js';
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Keep production validation from replacing chunks used by the running dev server.
   distDir: process.env.NODE_ENV === 'development' ? '.next-dev' : '.next',
   reactStrictMode: true,
+  // Reuse visited route chunks; financial data has its own user-scoped cache.
+  experimental: { staleTimes: { dynamic: STALE_TTL / 1000, static: STALE_TTL / 1000 } },
   poweredByHeader: false,
   images: {
     formats: ['image/avif', 'image/webp'],

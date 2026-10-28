@@ -1,4 +1,6 @@
 "use client";
+import { GlideGroup, GlidingIndicator } from '@/src/components/GlidingIndicator';
+
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
@@ -551,7 +553,7 @@ const PERIODS: { key: TimePeriod; labelEn: string; labelTh: string }[] = [
 export function PeriodSelector({ selectedPeriod, onChange, language = "en", size = "sm" }: PeriodSelectorProps) {
   const { t } = useApp();
   return (
-    <div className={cn(
+    <GlideGroup><div className={cn(
       "flex gap-1 bg-white/5 rounded-lg p-1",
       size === "md" && "p-1.5"
     )}>
@@ -560,18 +562,18 @@ export function PeriodSelector({ selectedPeriod, onChange, language = "en", size
           key={period.key}
           onClick={() => onChange(period.key)}
           className={cn(
-            "px-2 py-1 font-black uppercase tracking-wide rounded-md transition-all",
+            "relative isolate px-2 py-1 font-black uppercase tracking-wide rounded-md transition-all",
             size === "sm" && "text-[10px]",
             size === "md" && "text-xs px-3 py-1.5",
             selectedPeriod === period.key
-              ? "bg-[#ADC6FF] text-[#00285d]"
+              ? "text-[#00285d]"
               : "text-gray-400 hover:text-white"
           )}
         >
-          {t(`period${period.key}`)}
+          {selectedPeriod === period.key && <GlidingIndicator activeKey={period.key} className="!bg-[#ADC6FF]"/>}{t(`period${period.key}`)}
         </button>
       ))}
-    </div>
+    </div></GlideGroup>
   );
 }
 

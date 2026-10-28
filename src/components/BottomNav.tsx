@@ -4,6 +4,7 @@ import React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { LayoutDashboard, Briefcase, ReceiptText, PiggyBank, CalendarDays } from "lucide-react";
 import { cn } from "@/src/lib/utils";
+import { GlideGroup, GlidingIndicator } from './GlidingIndicator';
 import { motion } from "motion/react";
 
 const NAV_ITEMS = [
@@ -19,7 +20,7 @@ export function BottomNav() {
   const router = useRouter();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 lg:hidden pointer-events-none">
+    <nav className="hidden fixed bottom-0 left-0 right-0 z-50 pointer-events-none">
       <div className="flex justify-center pb-3 px-3">
         <motion.div
           initial={{ y: 60, opacity: 0 }}
@@ -28,7 +29,7 @@ export function BottomNav() {
           className="pointer-events-auto flex items-center justify-around w-full max-w-md bg-[#111114]/95 backdrop-blur-2xl border border-white/[0.06] rounded-2xl px-1 py-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.6)]"
           style={{ paddingBottom: `calc(0.375rem + env(safe-area-inset-bottom, 0px))` }}
         >
-          {NAV_ITEMS.map((item) => {
+          <GlideGroup>{NAV_ITEMS.map((item) => {
             const isActive = pathname?.startsWith(item.path);
             const Icon = item.icon;
 
@@ -36,28 +37,11 @@ export function BottomNav() {
               <button
                 key={item.path}
                 id={`bottom-nav-${item.path.replace("/", "")}`}
-                onClick={() => router.push(item.path)}
-                className="relative flex flex-col items-center justify-center flex-1 py-1.5 group"
+                onClick={() => window.dispatchEvent(new CustomEvent('fintrack:navigate', { detail: item.path }))}
+                className="relative isolate flex flex-col items-center justify-center flex-1 py-1.5 group"
               >
-                {/* Active indicator pill */}
-                {isActive && (
-                  <motion.div
-                    layoutId="bottom-nav-pill"
-                    className="absolute inset-x-2 inset-y-0 rounded-xl"
-                    style={{ backgroundColor: `${item.color}10` }}
-                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                  />
-                )}
-
-                {/* Active top dot */}
-                {isActive && (
-                  <motion.div
-                    layoutId="bottom-nav-dot"
-                    className="absolute -top-0.5 w-4 h-[2px] rounded-full"
-                    style={{ backgroundColor: item.color }}
-                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                  />
-                )}
+                {isActive && <GlidingIndicator activeKey={item.path} className="!inset-x-2 !inset-y-0 !rounded-xl" style={{backgroundColor:`${item.color}10`}}/>}
+                {isActive && <span className="absolute -top-0.5 w-4 h-[2px] rounded-full" style={{backgroundColor:item.color}}/>}
 
                 {/* Icon */}
                 <div className="relative z-10">
@@ -81,7 +65,7 @@ export function BottomNav() {
                 </span>
               </button>
             );
-          })}
+          })}</GlideGroup>
         </motion.div>
       </div>
     </nav>

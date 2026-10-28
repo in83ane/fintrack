@@ -1,0 +1,37 @@
+sequenceDiagram
+    autonumber
+    actor U as ผู้ใช้
+    participant M as AddCashflowModal
+    participant C as AppContext
+    participant D as db helpers / Supabase SDK
+    participant DB as Supabase Data API / PostgreSQL
+    U->>M: กรอกประเภท จำนวน สกุล หมวดหมู่ และ Bucket
+    M->>M: ตรวจจำนวนและ native currency ให้ตรง Bucket
+    alt validation ไม่ผ่าน
+        M-->>U: แสดง error และไม่บันทึก
+    else validation ผ่าน
+        M->>C: addCashActivity(payload)
+        C->>C: ตรวจ portfolio และเพิ่ม optimistic row
+        C->>D: cashActivities.insert(payload)
+        D->>DB: from cash_activities insert select single
+        alt insert ล้มเหลว
+            DB-->>D: error
+            D-->>C: error
+            C->>C: ลบ optimistic row
+            C-->>M: null
+            M-->>U: แสดงข้อผิดพลาด
+        else insert สำเร็จ
+            DB-->>D: saved row
+            D-->>C: saved row
+            C->>C: แทน temporary id ด้วย id จริง
+            C-->>M: savedActivity
+            opt มี Bucket ที่เกี่ยวข้อง
+                M->>C: updateMoneyBucket ด้วย native amount
+                M->>C: addBucketActivity พร้อม original amount และ currency
+                C->>D: UPDATE bucket และ INSERT bucket activity
+                D->>DB: requests แยกกัน
+                Note over M,DB: เส้นทางนี้ไม่ใช่ atomic transaction เดียวจากโค้ด client
+            end
+            M-->>U: จบขั้นตอนฟอร์มตามผลที่ client รับ
+        end
+    end

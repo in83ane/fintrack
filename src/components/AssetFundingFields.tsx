@@ -16,10 +16,10 @@ export function AssetFundingFields({ portfolioId, currency, mode, onModeChange, 
   const accounts = [...new Map([...brokerageAccounts, ...allBrokerageAccounts].map(a => [a.id, a])).values()]
     .filter(a => a.portfolioId === portfolioId && a.kind === 'cash' && a.currency === currency);
   return <div className="space-y-3">
-    <div className="flex gap-2 rounded-xl border border-white/10 bg-white/5 p-1" role="group" aria-label="วิธีเพิ่มสินทรัพย์">
+    <div className="flex gap-2 rounded-xl border border-foreground/10 bg-foreground/5 p-1" role="group" aria-label="วิธีเพิ่มสินทรัพย์">
       {(['IMPORT', 'BUY'] as const).map(value => <button key={value} type="button" aria-pressed={mode === value}
         onClick={() => onModeChange(value)}
-        className={cn('flex-1 rounded-lg px-3 py-2 text-xs font-bold transition-colors', mode === value ? 'bg-[#ADC6FF]/20 text-[#ADC6FF]' : 'text-gray-400 hover:text-white')}>
+        className={cn('flex-1 rounded-lg px-3 py-2 text-xs font-bold transition-colors', mode === value ? 'bg-primary/20 text-primary' : 'text-gray-400 hover:text-foreground')}>
         {value === 'IMPORT' ? 'นำเข้าจากภายนอก' : 'ซื้อ · ตัดเงินจากกระเป๋า'}
       </button>)}
     </div>
@@ -28,8 +28,8 @@ export function AssetFundingFields({ portfolioId, currency, mode, onModeChange, 
       <CustomSelect value={accounts.some(a => a.id === accountId) ? accountId : ''} onChange={onAccountChange}
         placeholder="เลือกกระเป๋าที่ต้องการตัดเงิน"
         items={accounts.map(a => ({ value: a.id, label: `${a.name} · ${(brokerageCashBalances.find(b => b.accountId === a.id)?.balance ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} ${a.currency}` }))} />
-      {!accounts.length && <p className="text-xs text-[#FFB4AB]">ยังไม่มีกระเป๋า {currency} ของโบรกนี้ กรุณาสร้างและเติมเงินในหน้า Portfolio ก่อนซื้อ</p>}
-      <p className="text-[11px] text-gray-500">ตัดเฉพาะกระเป๋าสกุลเดียวกัน หากเงินอยู่ใน Bucket ให้โอนเข้าโบรกก่อน</p>
+      {!accounts.length && <p className="text-xs text-loss">ยังไม่มีกระเป๋า {currency} ของโบรกนี้ กรุณาสร้างและเติมเงินในหน้า Portfolio ก่อนซื้อ</p>}
+      <p className="text-xs text-gray-500">ตัดเฉพาะกระเป๋าสกุลเดียวกัน หากเงินอยู่ใน Bucket ให้โอนเข้าโบรกก่อน</p>
     </>}
   </div>;
 }

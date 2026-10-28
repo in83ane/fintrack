@@ -1,0 +1,38 @@
+sequenceDiagram
+    autonumber
+    actor U as ผู้ใช้
+    participant P as CostBasisPanel
+    participant S as Supabase RPC
+    participant DB as PostgreSQL
+    participant C as AppContext
+    U->>P: ระบุราคา จำนวน fee และบัญชีรับเงิน
+    P->>P: เลือก lot หรือ proportionalCuts
+    Note over P: UI ส่ง method SPECIFIC_LOT พร้อม closeMode และ selections
+    P->>S: cost_basis_preview(port, symbol, sale)
+    S->>DB: อ่าน trades และ sale metadata / replay
+    alt invalid quantity or position
+        S-->>P: Error
+        P-->>U: แสดงข้อผิดพลาด ไม่บันทึก
+    else preview valid
+        S-->>P: before / after / fingerprint
+        P-->>U: Modal จำนวน proceeds และ Realized
+        U->>P: พิมพ์ symbol และยืนยัน
+        P->>P: ตรวจ symbol และล็อกปุ่มระหว่างส่ง
+        P->>S: cost_basis_sell(sale, fingerprint)
+        S->>DB: ตรวจผู้ใช้ พอร์ต และ current fingerprint
+        alt snapshot changed or validation failed
+            S-->>P: Error ให้ preview ใหม่
+            P-->>U: แสดง error
+        else accepted
+            S->>DB: เขียน trades และ cost_basis_sales
+            S->>DB: เขียน cost_basis_revisions
+            Note over S,DB: Trigger effects อ้างอิง SQL ใน repo ต้องยืนยัน deployment จริง
+            S-->>P: Updated snapshot
+            P->>C: fintrack:financial-change
+            C->>DB: โหลด financial state ใหม่ผ่าน Data API
+            DB-->>C: ข้อมูลพอร์ตและเงินสด
+            P->>S: cost_basis_preview เพื่อ reload
+            S-->>P: Current position
+            P-->>U: หุ้นเหลือและ P&L หลังขาย
+        end
+    end

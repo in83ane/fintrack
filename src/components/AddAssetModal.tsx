@@ -193,11 +193,11 @@ export function AddAssetModal({ isOpen, onClose, variant = "search" }: AddAssetM
               value={query}
               onChange={(e) => handleSearch(e.target.value)}
               placeholder={t("searchAssetPlaceholder")}
-              className="w-full pl-12 pr-4 py-4 bg-white/5 border border-border rounded-2xl text-white text-sm font-medium placeholder-gray-500 focus:outline-none focus:border-[#ADC6FF]/50 transition-colors"
+              className="w-full pl-12 pr-4 py-4 bg-foreground/5 border border-border rounded-2xl text-foreground text-sm font-medium placeholder-gray-500   transition-colors"
               autoFocus
             />
             {isSearching && (
-              <Loader2 size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-[#ADC6FF] animate-spin" />
+              <Loader2 size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-info animate-spin" />
             )}
           </div>
 
@@ -208,20 +208,20 @@ export function AddAssetModal({ isOpen, onClose, variant = "search" }: AddAssetM
                 <button
                   key={r.symbol}
                   onClick={() => handleSelect(r.symbol, r.name)}
-                  className="w-full flex items-center justify-between p-4 rounded-xl hover:bg-white/5 transition-colors text-left group"
+                  className="w-full flex items-center justify-between p-4 rounded-xl hover:bg-foreground/5 transition-colors text-left group"
                 >
                   <div>
-                    <span className="text-sm font-black text-white">{r.symbol}</span>
+                    <span className="text-sm font-black text-foreground">{r.symbol}</span>
                     <p className="text-xs text-gray-500 mt-0.5">{r.name}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     {r.exchange === 'SET' && (
-                      <span className="bg-[#E9C349]/20 text-[#E9C349] text-[9px] px-1.5 py-0.5 rounded font-black tracking-widest uppercase" title="Stock Exchange of Thailand">
+                      <span className="bg-warning/20 text-warning text-xs px-1.5 py-0.5 rounded font-black tracking-widest uppercase" title="Stock Exchange of Thailand">
                         THAI
                       </span>
                     )}
-                    <span className="text-[10px] text-gray-600 font-bold uppercase">{r.exchange}</span>
-                    <Plus size={16} className="text-gray-600 group-hover:text-[#ADC6FF] transition-colors" />
+                    <span className="text-xs text-gray-600 font-bold uppercase">{r.exchange}</span>
+                    <Plus size={16} className="text-gray-600 group-hover:text-info transition-colors" />
                   </div>
                 </button>
               ))}
@@ -237,17 +237,17 @@ export function AddAssetModal({ isOpen, onClose, variant = "search" }: AddAssetM
 
           {query.length < 2 && (
             <div className="pt-4">
-              <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3">Popular Assets</p>
+              <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-3">Popular Assets</p>
               <div className="grid grid-cols-2 gap-2">
                 {POPULAR_ASSETS.map((asset) => (
                   <button
                     key={asset.symbol}
                     onClick={() => handleSelect(asset.symbol, asset.name)}
-                    className="flex flex-col text-left p-3 rounded-xl bg-white/5 border border-border hover:bg-white/10 hover:border-[#ADC6FF]/30 transition-all group"
+                    className="flex flex-col text-left p-3 rounded-xl bg-foreground/5 border border-border hover:bg-foreground/10 hover:border-primary/30 transition-all group"
                   >
                     <div className="flex justify-between items-center w-full mb-1">
-                      <span className="text-sm font-black text-white group-hover:text-[#ADC6FF] transition-colors">{asset.symbol}</span>
-                      <span className="text-[9px] font-bold text-gray-500 bg-black/40 px-1.5 py-0.5 rounded uppercase">{asset.exchange}</span>
+                      <span className="text-sm font-black text-foreground group-hover:text-info transition-colors">{asset.symbol}</span>
+                      <span className="text-xs font-bold text-gray-500 bg-black/40 px-1.5 py-0.5 rounded uppercase">{asset.exchange}</span>
                     </div>
                     <span className="text-xs text-gray-500 line-clamp-1">{asset.name}</span>
                   </button>
@@ -260,18 +260,18 @@ export function AddAssetModal({ isOpen, onClose, variant = "search" }: AddAssetM
         /* Step 2: Enter details */
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Selected asset display */}
-          <div className="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-border">
-            <div className="w-12 h-12 bg-[#ADC6FF]/10 rounded-xl flex items-center justify-center text-[#ADC6FF] font-black text-sm">
+          <div className="flex items-center gap-4 p-4 bg-foreground/5 rounded-2xl border border-border">
+            <div className="w-12 h-12 bg-info/10 rounded-xl flex items-center justify-center text-info font-black text-sm">
               {selectedResult?.symbol.slice(0, 3)}
             </div>
             <div className="flex-1">
-              <div className="text-sm font-black text-white">{selectedResult?.symbol}</div>
+              <div className="text-sm font-black text-foreground">{selectedResult?.symbol}</div>
               <div className="text-xs text-gray-500">{selectedResult?.name}</div>
             </div>
             <button
               type="button"
               onClick={() => { setStep("search"); setSelectedResult(null); }}
-              className="text-xs text-[#ADC6FF] font-bold hover:underline"
+              className="text-xs text-primary font-bold hover:underline"
             >
               {t("change")}
             </button>
@@ -293,7 +293,7 @@ export function AddAssetModal({ isOpen, onClose, variant = "search" }: AddAssetM
               value={shares}
               onChange={(e) => setShares(e.target.value)}
               placeholder="0.00"
-              className="w-full px-4 py-4 bg-white/5 border border-border rounded-2xl text-white text-sm font-medium placeholder-gray-600 focus:outline-none focus:border-[#ADC6FF]/50 transition-colors"
+              className="w-full px-4 py-4 bg-foreground/5 border border-border rounded-2xl text-foreground text-sm font-medium placeholder-gray-600   transition-colors"
               required
             />
           </div>
@@ -305,18 +305,18 @@ export function AddAssetModal({ isOpen, onClose, variant = "search" }: AddAssetM
                 {t("avgCostPerUnit")}
               </label>
               {/* THB / USD toggle */}
-              <div className="flex gap-1 p-0.5 bg-white/5 rounded-lg border border-border">
+              <div className="flex gap-1 p-0.5 bg-foreground/5 rounded-lg border border-border">
                 {(['USD', 'THB'] as const).map(cur => (
                   <button
                     key={cur}
                     type="button"
                     onClick={() => setPriceCurrency(cur)}
                     className={cn(
-                      'px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wide transition-all',
+                      'px-2.5 py-1 rounded-md text-xs font-black uppercase tracking-wide transition-all',
                       priceCurrency === cur
                         ? cur === 'THB'
-                          ? 'bg-[#E9C349] text-[#241a00]'
-                          : 'bg-[#ADC6FF] text-[#00285d]'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-primary text-primary-foreground'
                         : 'text-gray-500 hover:text-gray-300'
                     )}
                   >
@@ -333,23 +333,23 @@ export function AddAssetModal({ isOpen, onClose, variant = "search" }: AddAssetM
                 onChange={(e) => setAvgCost(e.target.value)}
                 placeholder="0.00"
                 className={cn(
-                  "w-full px-4 py-4 bg-white/5 border rounded-2xl text-white text-sm font-medium placeholder-gray-600 focus:outline-none transition-colors pr-16",
+                  "w-full px-4 py-4 bg-foreground/5 border rounded-2xl text-foreground text-sm font-medium placeholder-gray-600  transition-colors pr-16",
                   priceCurrency === 'THB'
-                    ? 'border-[#E9C349]/30 focus:border-[#E9C349]/60'
-                    : 'border-border focus:border-[#ADC6FF]/50'
+                    ? 'border-primary/30 '
+                    : 'border-border '
                 )}
                 required
               />
               <span className={cn(
                 'absolute right-4 top-1/2 -translate-y-1/2 font-black text-xs uppercase opacity-90',
-                priceCurrency === 'THB' ? 'text-[#E9C349]' : 'text-[#ADC6FF]'
+                priceCurrency === 'THB' ? 'text-warning' : 'text-info'
               )}>
                 {priceCurrency === 'THB' ? '฿' : '$'}
               </span>
             </div>
             {/* Show USD equivalent when THB selected */}
             {priceCurrency === 'THB' && avgCost && Number(avgCost) > 0 && (
-              <p className="text-[11px] text-gray-500 font-medium">
+              <p className="text-xs text-gray-500 font-medium">
                 ≈ ${avgCostUSD.toFixed(2)} USD per unit
               </p>
             )}
@@ -358,18 +358,18 @@ export function AddAssetModal({ isOpen, onClose, variant = "search" }: AddAssetM
 
           {/* Total preview */}
           {shares && avgCost && (
-            <div className="p-4 bg-[#ADC6FF]/5 border border-[#ADC6FF]/20 rounded-2xl space-y-2">
+            <div className="p-4 bg-info/5 border border-info/20 rounded-2xl space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-400">{t("totalInvestment")}</span>
                 <div className="text-right">
-                  <span className="font-black text-white">
+                  <span className="font-black text-foreground">
                     {priceCurrency === 'THB'
                       ? `฿${(Number(shares) * Number(avgCost)).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                       : `$${(Number(shares) * Number(avgCost)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                     }
                   </span>
                   {priceCurrency === 'THB' && (
-                    <p className="text-[11px] text-gray-500 mt-0.5">≈ ${totalCostUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</p>
+                    <p className="text-xs text-gray-500 mt-0.5">≈ ${totalCostUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</p>
                   )}
                 </div>
               </div>
@@ -377,9 +377,9 @@ export function AddAssetModal({ isOpen, onClose, variant = "search" }: AddAssetM
           )}
 
           {/* Exclude from Net Worth Toggle */}
-          <div className="flex items-center justify-between p-4 bg-white/5 border border-border rounded-2xl">
+          <div className="flex items-center justify-between p-4 bg-foreground/5 border border-border rounded-2xl">
             <div>
-              <p className="text-sm font-bold text-white">Exclude from Net Worth</p>
+              <p className="text-sm font-bold text-foreground">Exclude from Net Worth</p>
               <p className="text-xs text-gray-500 mt-0.5 max-w-[200px]">Asset value will be tracked but won&apos;t be added to your total portfolio balance.</p>
             </div>
             <button
@@ -387,7 +387,7 @@ export function AddAssetModal({ isOpen, onClose, variant = "search" }: AddAssetM
               onClick={() => setExcludeFromTotal(!excludeFromTotal)}
               className={cn(
                 "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
-                excludeFromTotal ? "bg-[#ADC6FF]" : "bg-gray-600"
+                excludeFromTotal ? "bg-primary" : "bg-gray-600"
               )}
             >
               <span
@@ -404,7 +404,7 @@ export function AddAssetModal({ isOpen, onClose, variant = "search" }: AddAssetM
             <button
               type="button"
               onClick={() => { setStep("search"); setSelectedResult(null); }}
-              className="flex-1 py-4 text-gray-500 font-bold text-sm hover:text-white transition-colors"
+              className="flex-1 py-4 text-gray-500 font-bold text-sm hover:text-foreground transition-colors"
             >
               {t("cancel")}
             </button>
@@ -412,7 +412,7 @@ export function AddAssetModal({ isOpen, onClose, variant = "search" }: AddAssetM
               type="submit"
               disabled={isAdding}
               className={cn(
-                "flex-1 py-4 bg-[#ADC6FF] text-[#00285d] rounded-full font-black text-sm uppercase tracking-tight hover:brightness-110 transition-all flex items-center justify-center gap-2",
+                "flex-1 py-4 bg-primary text-primary-foreground rounded-full font-black text-sm uppercase tracking-tight hover:brightness-110 transition-all flex items-center justify-center gap-2",
                 isAdding && "opacity-60"
               )}
             >
@@ -571,11 +571,11 @@ function PortfolioAssetEntryModal({ isOpen, onClose }: Pick<AddAssetModalProps, 
             {PORTFOLIO_MARKETS.map(item => (
               <button key={item.id} type="button" onClick={() => { setMarket(item.id); setCashAccountId(''); }} className={cn(
                 "rounded-full border px-3 py-1.5 text-xs font-bold transition-colors",
-                market === item.id ? "border-[#ADC6FF]/70 bg-[#ADC6FF]/10 text-white" : "border-white/10 text-gray-400 hover:text-white"
+                market === item.id ? "border-primary/70 bg-primary/10 text-foreground" : "border-foreground/10 text-gray-400 hover:text-foreground"
               )}>{item.label}</button>
             ))}
           </div>
-          <p className="mt-2 text-[11px] text-gray-500">ภายหลังสามารถจัดกลุ่มสินทรัพย์นี้ใหม่ได้ในหน้า Portfolio</p>
+          <p className="mt-2 text-xs text-gray-500">ภายหลังสามารถจัดกลุ่มสินทรัพย์นี้ใหม่ได้ในหน้า Portfolio</p>
         </div>
 
         <div>
@@ -590,19 +590,19 @@ function PortfolioAssetEntryModal({ isOpen, onClose }: Pick<AddAssetModalProps, 
         <AssetFundingFields portfolioId={brokerId} currency={currency} mode={entryMode} onModeChange={setEntryMode} accountId={cashAccountId} onAccountChange={setCashAccountId} />
 
         <div className="grid grid-cols-2 gap-3">
-          <label className="space-y-2"><span className="block text-xs font-bold text-gray-400">สัญลักษณ์</span><input value={symbol} onChange={event => setSymbol(event.target.value)} placeholder="NVDA" className="w-full rounded-xl border border-border bg-white/5 px-3 py-3 text-sm font-semibold uppercase text-white placeholder:text-gray-600 focus:border-[#4EDEA3]/50 focus:outline-none" /></label>
-          <label className="space-y-2"><span className="block text-xs font-bold text-gray-400">ชื่อ (ไม่บังคับ)</span><input value={name} onChange={event => setName(event.target.value)} placeholder="NVIDIA" className="w-full rounded-xl border border-border bg-white/5 px-3 py-3 text-sm font-semibold text-white placeholder:text-gray-600 focus:border-[#4EDEA3]/50 focus:outline-none" /></label>
+          <label className="space-y-2"><span className="block text-xs font-bold text-gray-400">สัญลักษณ์</span><input value={symbol} onChange={event => setSymbol(event.target.value)} placeholder="NVDA" className="w-full rounded-xl border border-border bg-foreground/5 px-3 py-3 text-sm font-semibold uppercase text-foreground placeholder:text-gray-600  " /></label>
+          <label className="space-y-2"><span className="block text-xs font-bold text-gray-400">ชื่อ (ไม่บังคับ)</span><input value={name} onChange={event => setName(event.target.value)} placeholder="NVIDIA" className="w-full rounded-xl border border-border bg-foreground/5 px-3 py-3 text-sm font-semibold text-foreground placeholder:text-gray-600  " /></label>
         </div>
 
-        <label className="space-y-2"><span className="block text-xs font-bold text-gray-400">จำนวนหน่วยที่ถือ</span><input inputMode="decimal" value={shares} onChange={event => setShares(event.target.value)} placeholder="0.000000" className="w-full rounded-xl border border-border bg-white/5 px-3 py-3 text-sm font-semibold text-white placeholder:text-gray-600 focus:border-[#4EDEA3]/50 focus:outline-none" /></label>
+        <label className="space-y-2"><span className="block text-xs font-bold text-gray-400">จำนวนหน่วยที่ถือ</span><input inputMode="decimal" value={shares} onChange={event => setShares(event.target.value)} placeholder="0.000000" className="w-full rounded-xl border border-border bg-foreground/5 px-3 py-3 text-sm font-semibold text-foreground placeholder:text-gray-600  " /></label>
 
         <div className="grid grid-cols-2 gap-3">
-          <label className="space-y-2"><span className="block text-xs font-bold text-gray-400">ต้นทุนเฉลี่ย ({currency})</span><input inputMode="decimal" value={avgCost} onChange={event => setAvgCost(event.target.value)} placeholder="0.00" className="w-full rounded-xl border border-border bg-white/5 px-3 py-3 text-sm font-semibold text-white placeholder:text-gray-600 focus:border-[#4EDEA3]/50 focus:outline-none" /></label>
-          <label className="space-y-2"><span className="block text-xs font-bold text-gray-400">ราคาตลาดล่าสุด ({currency})</span><div className={cn("flex min-h-[46px] items-center justify-between rounded-xl border bg-white/5 px-3 py-3 text-sm font-semibold", quoteState === 'unavailable' ? "border-[#FFB4AB]/40 text-[#FFB4AB]" : "border-border text-white")}><span>{quoteState === 'loading' ? 'กำลังดึงราคา…' : quoteState === 'ready' ? marketPrice?.toLocaleString(undefined, { maximumFractionDigits: 4 }) : 'ไม่พบราคาตลาด'}</span><span className="text-[10px] font-black text-[#4EDEA3]">MARKET</span></div></label>
+          <label className="space-y-2"><span className="block text-xs font-bold text-gray-400">ต้นทุนเฉลี่ย ({currency})</span><input inputMode="decimal" value={avgCost} onChange={event => setAvgCost(event.target.value)} placeholder="0.00" className="w-full rounded-xl border border-border bg-foreground/5 px-3 py-3 text-sm font-semibold text-foreground placeholder:text-gray-600  " /></label>
+          <label className="space-y-2"><span className="block text-xs font-bold text-gray-400">ราคาตลาดล่าสุด ({currency})</span><div className={cn("flex min-h-[46px] items-center justify-between rounded-xl border bg-foreground/5 px-3 py-3 text-sm font-semibold", quoteState === 'unavailable' ? "border-loss/40 text-loss" : "border-border text-foreground")}><span>{quoteState === 'loading' ? 'กำลังดึงราคา…' : quoteState === 'ready' ? marketPrice?.toLocaleString(undefined, { maximumFractionDigits: 4 }) : 'ไม่พบราคาตลาด'}</span><span className="text-xs font-black text-gain">MARKET</span></div></label>
         </div>
-        <p className="text-[11px] leading-5 text-gray-500">ดึงราคาตลาดตามสัญลักษณ์โดยอัตโนมัติ และไม่ใช้ต้นทุนเฉลี่ยแทนราคาตลาด</p>
+        <p className="text-xs leading-5 text-gray-500">ดึงราคาตลาดตามสัญลักษณ์โดยอัตโนมัติ และไม่ใช้ต้นทุนเฉลี่ยแทนราคาตลาด</p>
 
-        <button type="button" onClick={save} disabled={!isValid || isSaving} className="flex w-full items-center justify-center rounded-xl bg-[#B8DECA] px-4 py-3.5 text-sm font-bold text-[#14261C] transition hover:bg-[#CEEBDC] disabled:cursor-not-allowed disabled:opacity-40">
+        <button type="button" onClick={save} disabled={!isValid || isSaving} className="flex w-full items-center justify-center rounded-xl bg-primary px-4 py-3.5 text-sm font-bold text-primary-foreground transition hover:bg-[#CEEBDC] disabled:cursor-not-allowed disabled:opacity-40">
           {isSaving ? "กำลังเพิ่มสินทรัพย์…" : "เพิ่มสินทรัพย์"}
         </button>
       </div>

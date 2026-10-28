@@ -258,7 +258,7 @@ export function BrokerLedgerView({
   return (
     <div className={cn("flex min-w-0 flex-col", symbol ? "overflow-hidden rounded-2xl border border-border" : "min-h-screen pb-24 lg:pb-8")}>
       {/* ─── Header ─────────────────────────────────────────────── */}
-      <div className={cn("bg-gradient-to-b from-[#1C1B1B] to-background border-b border-border", !symbol && "sticky top-16 z-40")}>
+      <div className={cn("bg-gradient-to-b from-[#1C1B1B] to-background border-b border-border", !symbol && "sticky top-[var(--topbar-h)] z-40")}>
         <div className="flex min-w-0 items-center justify-between p-3 sm:p-4">
           <DateRangeBar value={dateRange} onChange={setDateRange} className="min-w-0 flex-1" />
         </div>
@@ -485,23 +485,23 @@ export function BrokerLedgerView({
             <div className="space-y-4">
               <label className="block">
                 <span className="mb-1.5 block text-xs font-bold text-gray-400">{language === "th" ? "สัญลักษณ์" : "Symbol"}</span>
-                <input value={editSymbol} onChange={event => setEditSymbol(event.target.value.toUpperCase())} className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm font-bold text-white outline-none focus:border-[#ADC6FF]" />
+                <input value={editSymbol} onChange={event => setEditSymbol(event.target.value.toUpperCase())} className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm font-bold text-white outline-none " />
               </label>
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
                   <span className="mb-1.5 block text-xs font-bold text-gray-400">{language === "th" ? "จำนวนหุ้น" : "Quantity"}</span>
-                  <input type="number" min="0" step="any" value={editQuantity} onChange={event => setEditQuantity(event.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm font-bold text-white outline-none focus:border-[#ADC6FF]" />
+                  <input type="number" min="0" step="any" value={editQuantity} onChange={event => setEditQuantity(event.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm font-bold text-white outline-none " />
                 </label>
                 <label className="block">
                   <span className="mb-1.5 block text-xs font-bold text-gray-400">
                     {language === "th" ? `ราคาต่อหน่วย ณ วันที่ซื้อขาย (${editingTrade.currency})` : `Execution price (${editingTrade.currency})`}
                   </span>
-                  <input type="number" min="0" step="any" value={editPrice} onChange={event => setEditPrice(event.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm font-bold text-white outline-none focus:border-[#ADC6FF]" />
+                  <input type="number" min="0" step="any" value={editPrice} onChange={event => setEditPrice(event.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm font-bold text-white outline-none " />
                 </label>
               </div>
               <label className="block">
                 <span className="mb-1.5 block text-xs font-bold text-gray-400">{language === "th" ? "วันและเวลาที่ซื้อขาย" : "Trade date and time"}</span>
-                <input type="datetime-local" value={editDate} onChange={event => setEditDate(event.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm font-bold text-white outline-none focus:border-[#ADC6FF]" />
+                <input type="datetime-local" value={editDate} onChange={event => setEditDate(event.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm font-bold text-white outline-none " />
               </label>
               <p className="rounded-xl border border-[#ADC6FF]/15 bg-[#ADC6FF]/5 px-3 py-2 text-xs leading-relaxed text-gray-400">
                 {language === "th"

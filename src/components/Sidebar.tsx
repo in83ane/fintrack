@@ -5,18 +5,16 @@ import { LayoutDashboard, Wallet, Settings, HelpCircle, User, PiggyBank, Monitor
 import { cn } from "@/src/lib/utils";
 import { useApp } from "@/src/context/AppContext";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useNavigationPathname } from './PageTransition';
 import { supabase } from "@/src/lib/supabase";
 import { logoutAction } from "@/src/app/actions";
 import { SettingsModal } from "@/src/components/SettingsModal";
-import { LayoutGroup, motion, useReducedMotion } from "motion/react";
+import { motion } from 'motion/react';
+import { GlideGroup, GlidingIndicator } from './GlidingIndicator';
 
-interface SidebarProps {
-  isMobile?: boolean;
-  onClose?: () => void;
-}
+interface SidebarProps { onClose?: () => void; }
 
-export function Sidebar({ isMobile, onClose }: SidebarProps) {
+export function Sidebar({ onClose }: SidebarProps) {
   const { t, language, portfolios, activePortfolio, isAllPortfolios, selectPortfolio, createPortfolio, renamePortfolio } = useApp();
   // Bucket is a cash-management workspace, not an investment broker.  Keep it
   // in the Bucket navigation item and show only tradeable broker portfolios in
@@ -29,9 +27,7 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
     () => portfolios.find((portfolio) => portfolio.kind === "cash_management") || null,
     [portfolios]
   );
-  const pathname = usePathname();
-  const navigationId = React.useId();
-  const reducedMotion = useReducedMotion();
+  const pathname = useNavigationPathname();
   const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
   const [portfolioName, setPortfolioName] = React.useState("");
   const [isAddingPortfolio, setIsAddingPortfolio] = React.useState(false);
@@ -54,19 +50,17 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
   const navItems = [
     { icon: LayoutDashboard, label: t("dashboard"), href: "/dashboard" },
     { icon: Wallet, label: t("portfolio"), href: "/portfolio" },
-    { icon: ReceiptText, label: "Ledger", href: "/ledger" },
-    { icon: ArrowRightLeft, label: language === "th" ? "กระแสเงินสด" : "Cash Flow", href: "/cashflow" },
-    { icon: Monitor, label: "Terminal", href: "/terminal" },
-    { icon: Target, label: "Trade", href: "/trade/plan" },
+    { icon: ReceiptText, label: t("ledger"), href: "/ledger" },
+    { icon: ArrowRightLeft, label: t("cashflow"), href: "/cashflow" },
+    { icon: Monitor, label: t("terminal"), href: "/terminal" },
+    { icon: Target, label: t("trade"), href: "/trade/plan" },
     { icon: PiggyBank, label: t("budgetPage"), href: "/budget" },
+    { icon: CalendarDays, label: "PLAN", href: "/plan" },
     { icon: CalendarDays, label: "History", href: "/history" },
     { icon: Settings, label: t("settings"), href: "/settings" },
   ];
 
-  const sidebarClasses = cn(
-    "flex h-screen flex-col py-6 border-r border-border",
-    isMobile ? "w-full bg-background" : "hidden lg:flex w-64 fixed left-0 top-0 bg-background z-40"
-  );
+  const sidebarClasses = "sidebar-rail fixed left-0 top-0 z-[60] flex h-screen w-[var(--sidebar-w)] flex-col border-r border-border bg-background py-6";
 
   const handleLogout = async () => {
     // Clear all local storage data related to user session to prevent data bleeding
@@ -109,7 +103,7 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
 
   return (
     <aside className={sidebarClasses}>
-      <div className="px-6 mb-8">
+      <div className="sidebar-brand px-6 mb-8">
         <Link href="/dashboard" onClick={onClose} className="flex items-center gap-3 group">
           <div className="w-9 h-9 bg-primary/20 rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 group-hover:scale-105 transition-transform">
             <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="var(--color-primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -126,12 +120,12 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
         </Link>
       </div>
 
-      <div ref={portfolioSectionRef} className={cn("relative mx-4 mb-5", !isMobile && "mx-3")}>
+      <div ref={portfolioSectionRef} className="sidebar-accounts relative mx-3 mb-5">
           <button
             type="button"
             onClick={() => setIsPortfolioSectionOpen(open => !open)}
             className={cn(
-              "flex w-full items-center gap-2.5 rounded-2xl border border-border bg-white/[0.03] px-3 py-2.5 text-left transition-colors hover:bg-white/[0.06]",
+              "flex h-[54px] w-full items-center gap-2.5 rounded-2xl border border-border bg-white/[0.03] px-3 text-left transition-colors hover:bg-white/[0.06]",
               isPortfolioSectionOpen && "border-[#ADC6FF]/40 bg-white/[0.06]"
             )}
             aria-expanded={isPortfolioSectionOpen}
@@ -150,7 +144,7 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
               )}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-[10px] font-semibold uppercase tracking-wide text-gray-500">Investment accounts</span>
+              <span className="block whitespace-nowrap text-[10px] font-semibold uppercase tracking-wide text-gray-500">Investment accounts</span>
               <span className="block truncate text-xs font-bold text-white">
                 {isAllPortfolios ? "All portfolios" : (activePortfolio?.name || "Portfolio")}
               </span>
@@ -239,7 +233,7 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
                   onChange={(event) => setPortfolioName(event.target.value)}
                   maxLength={80}
                   placeholder="New broker"
-                  className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 py-2 text-xs text-white outline-none placeholder:text-gray-600 focus:border-[#ADC6FF]/60"
+                  className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 py-2 text-xs text-white outline-none placeholder:text-gray-600 "
                 />
                 <button
                   type="submit"
@@ -254,11 +248,12 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
           )}
       </div>
 
-      <LayoutGroup id={navigationId}>
-      <motion.nav layoutScroll className="flex-1 space-y-0.5 overflow-y-auto custom-scrollbar">
+      <GlideGroup>
+      <motion.nav layoutScroll className="sidebar-nav flex-1 space-y-0.5 overflow-y-auto overflow-x-hidden custom-scrollbar">
         {navItems.map((item) => {
           const route = item.href === '/trade/plan' ? '/trade' : item.href;
-          const isActive = pathname === route || pathname.startsWith(`${route}/`);
+          const activePath = pathname;
+          const isActive = activePath === route || activePath.startsWith(`${route}/`);
           return (
             <Link
               key={item.href}
@@ -267,28 +262,22 @@ export function Sidebar({ isMobile, onClose }: SidebarProps) {
               onClick={onClose}
               aria-current={isActive ? 'page' : undefined}
               className={cn(
-                "relative isolate flex items-center gap-3 mx-3 py-2.5 px-4 rounded-xl transition-colors duration-200",
+                "sidebar-nav-item relative isolate flex items-center gap-3 mx-3 px-3 rounded-xl transition-colors duration-200",
                 isActive
                   ? "text-primary font-semibold"
                   : "text-gray-500 hover:bg-white/5 hover:text-white"
               )}
             >
-              {isActive && <motion.span
-                layoutId="sidebar-active-item"
-                aria-hidden="true"
-                initial={false}
-                className="pointer-events-none absolute inset-0 -z-10 rounded-xl bg-primary/10"
-                transition={{ type: 'tween', duration: reducedMotion ? 0 : 0.28, ease: [0.22, 1, 0.36, 1] }}
-              />}
-              <item.icon size={18} className={isActive ? "text-primary" : ""} />
-              <span className="text-sm font-medium">{item.label}</span>
+              {isActive && <GlidingIndicator activeKey={item.href}/>}
+              <item.icon size={18} className={isActive ? "shrink-0 text-primary" : "shrink-0"} />
+              <span className="sidebar-label text-sm font-medium">{item.label}</span>
             </Link>
           );
         })}
       </motion.nav>
-      </LayoutGroup>
+      </GlideGroup>
 
-      <div className="px-4 mt-auto space-y-3">
+      <div className="sidebar-footer px-4 mt-auto space-y-3">
 
         <a href="#" className="flex items-center gap-2.5 text-gray-500 px-4 py-2.5 hover:text-white transition-all">
           <HelpCircle size={16} />

@@ -75,23 +75,23 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
       return (
         <div className="min-h-[300px] flex items-center justify-center p-4">
-          <div className="bg-gradient-to-br from-[#1C1B1B] to-black rounded-2xl p-8 border border-[#FFB4AB]/30 max-w-md w-full space-y-6 shadow-xl">
+          <div className="bg-gradient-to-br from-surface to-black rounded-2xl p-8 border border-loss/30 max-w-md w-full space-y-6 shadow-xl">
             {/* Icon */}
-            <div className="w-16 h-16 mx-auto rounded-2xl bg-[#FFB4AB]/10 flex items-center justify-center border border-[#FFB4AB]/20">
-              <AlertCircle size={32} className="text-[#FFB4AB]" />
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-loss/10 flex items-center justify-center border border-loss/20">
+              <AlertCircle size={32} className="text-loss" />
             </div>
 
             {/* Error message */}
             <div className="text-center space-y-2">
-              <h3 className="text-xl font-black text-white">Oops! Something went wrong</h3>
+              <h3 className="text-xl font-black text-foreground">Oops! Something went wrong</h3>
               <p className="text-sm text-gray-400">{errorMessage}</p>
             </div>
 
             {/* Dev-only error details */}
             {isDev && this.state.errorInfo && (
               <div className="bg-black/40 rounded-xl p-4 border border-border max-h-40 overflow-auto">
-                <p className="text-[10px] font-mono text-[#FFB4AB] mb-2 font-bold">STACK TRACE:</p>
-                <p className="text-[10px] font-mono text-gray-400 leading-relaxed whitespace-pre-wrap">
+                <p className="text-xs font-mono text-loss mb-2 font-bold">STACK TRACE:</p>
+                <p className="text-xs font-mono text-gray-400 leading-relaxed whitespace-pre-wrap">
                   {this.state.errorInfo?.componentStack?.substring(0, 500)}...
                 </p>
               </div>
@@ -102,7 +102,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
               <button
                 onClick={this.handleRetry}
                 disabled={!canRetry}
-                className="flex-1 px-4 py-3 rounded-xl bg-[#4EDEA3] text-black font-black text-sm hover:bg-[#3ecf92] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="flex-1 px-4 py-3 rounded-xl bg-primary text-black font-black text-sm hover:bg-[#3ecf92] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 <RotateCcw size={16} />
                 Retry
@@ -110,7 +110,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
               </button>
               <button
                 onClick={() => window.location.href = '/'}
-                className="flex-1 px-4 py-3 rounded-xl bg-white/10 text-white font-black text-sm hover:bg-white/20 transition-colors"
+                className="flex-1 px-4 py-3 rounded-xl bg-foreground/10 text-foreground font-black text-sm hover:bg-foreground/20 transition-colors"
               >
                 Go Home
               </button>

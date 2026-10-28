@@ -1,0 +1,21 @@
+flowchart TB
+    U["ผู้ใช้บัญชีเดียวกัน"] --> W["Web App: Next.js / React — มีในโค้ด"]
+    U -.-> P["PC App — แผนพัฒนาต่อ"]
+    U -.-> M["Mobile App — แผนพัฒนาต่อ"]
+    W --> C["กฎการเงิน: Native Money / Cost Basis / Validation"]
+    P -. "ใช้กฎร่วมผ่าน module หรือ API" .-> C
+    M -. "ใช้กฎร่วมผ่าน module หรือ API" .-> C
+    P -.-> A["Platform adapters — แผน: Session / Storage / Navigation"]
+    M -.-> A
+    W --> S["Supabase client: Auth / Data API / RPC"]
+    A -.-> S
+    C --> S
+    S --> DB[("PostgreSQL: บัญชี พอร์ต และธุรกรรม")]
+    W --> N["Next.js server: Market / FX services"]
+    P -.-> N
+    M -.-> N
+    N --> E["ผู้ให้บริการราคาและอัตราแลกเปลี่ยน"]
+    W --> TV["TradingView embedded chart"]
+    P -. "ต้องทดสอบ integration" .-> TV
+    M -. "ต้องทดสอบ integration" .-> TV
+    Note["เส้นประ = เป้าหมาย ยังไม่ยืนยัน implementation หรือ deployment"]

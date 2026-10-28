@@ -135,13 +135,13 @@ export default function TermsOfServicePage() {
   const t = translations[lang];
 
   return (
-    <div className="min-h-screen bg-[#131313] text-gray-300">
+    <div className="min-h-screen bg-background text-gray-300">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-[#131313]/80 backdrop-blur-md border-b border-border">
+      <header className="sticky top-0 z-50 bg-background/80  border-b border-border">
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center gap-4">
           <Link
             href="/login"
-            className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
+            className="flex items-center gap-2 text-gray-400 hover:text-foreground transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
             <span className="text-sm font-medium">{t.backToLogin}</span>
@@ -150,21 +150,21 @@ export default function TermsOfServicePage() {
             {/* Language Toggle */}
             <motion.button
               onClick={toggleLang}
-              whileHover={{ scale: 1.05 }}
+              whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.95 }}
-              className="flex items-center gap-2 px-4 py-2 mr-4 bg-white/5 backdrop-blur-md border border-border rounded-full text-white text-xs font-bold uppercase tracking-wide hover:bg-white/10 transition-all"
+              className="flex items-center gap-2 px-4 py-2 mr-4 bg-foreground/5  border border-border rounded-full text-foreground text-xs font-bold uppercase tracking-wide hover:bg-foreground/10 transition-all"
             >
               <Globe className="w-4 h-4" />
-              <span className={lang === "th" ? "text-[#4EDEA3]" : "text-gray-500"}>
+              <span className={lang === "th" ? "text-gain" : "text-gray-500"}>
                 TH
               </span>
               <span className="text-gray-600">|</span>
-              <span className={lang === "en" ? "text-[#4EDEA3]" : "text-gray-500"}>
+              <span className={lang === "en" ? "text-gain" : "text-gray-500"}>
                 EN
               </span>
             </motion.button>
 
-            <div className="w-8 h-8 bg-gradient-to-br from-[#4EDEA3] to-[#3DC992] rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-gradient-to-br from-gain to-[#3DC992] rounded-lg flex items-center justify-center">
               <svg
                 width="16"
                 height="16"
@@ -179,7 +179,7 @@ export default function TermsOfServicePage() {
                 <path d="M7 16l4-6 4 4 4-8" />
               </svg>
             </div>
-            <span className="text-white font-bold tracking-wide">FinTrack</span>
+            <span className="text-foreground font-bold tracking-wide">FinTrack</span>
           </div>
         </div>
       </header>
@@ -192,11 +192,11 @@ export default function TermsOfServicePage() {
           transition={{ duration: 0.5 }}
         >
           <div className="text-center mb-12">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-[#4EDEA3]/10 border border-[#4EDEA3]/20 rounded-full mb-6">
-              <Scale className="w-4 h-4 text-[#4EDEA3]" />
-              <span className="text-sm text-[#4EDEA3] font-semibold">{t.legal}</span>
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-gain/10 border border-gain/20 rounded-full mb-6">
+              <Scale className="w-4 h-4 text-gain" />
+              <span className="text-sm text-gain font-semibold">{t.legal}</span>
             </div>
-            <h1 className="text-4xl font-black text-white mb-4">{t.termsOfService}</h1>
+            <h1 className="text-4xl font-black text-foreground mb-4">{t.termsOfService}</h1>
             <p className="text-gray-500">
               {t.lastUpdated}: {lang === "th" ? "11 เมษายน 2568" : "April 11, 2025"}
             </p>
@@ -206,11 +206,11 @@ export default function TermsOfServicePage() {
             {/* Section 1 */}
             <section className="bg-surface rounded-2xl p-8 border border-border">
               <div className="flex items-start gap-4 mb-4">
-                <div className="w-10 h-10 bg-[#4EDEA3]/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <FileText className="w-5 h-5 text-[#4EDEA3]" />
+                <div className="w-10 h-10 bg-gain/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <FileText className="w-5 h-5 text-gain" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-white mb-2">{t.acceptanceOfTerms}</h2>
+                  <h2 className="text-xl font-bold text-foreground mb-2">{t.acceptanceOfTerms}</h2>
                   <p className="text-gray-400 leading-relaxed">{t.acceptanceDesc}</p>
                 </div>
               </div>
@@ -219,11 +219,11 @@ export default function TermsOfServicePage() {
             {/* Section 2 */}
             <section className="bg-surface rounded-2xl p-8 border border-border">
               <div className="flex items-start gap-4 mb-4">
-                <div className="w-10 h-10 bg-[#4EDEA3]/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Shield className="w-5 h-5 text-[#4EDEA3]" />
+                <div className="w-10 h-10 bg-gain/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Shield className="w-5 h-5 text-gain" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-white mb-2">{t.userAccounts}</h2>
+                  <h2 className="text-xl font-bold text-foreground mb-2">{t.userAccounts}</h2>
                   <p className="text-gray-400 leading-relaxed mb-4">{t.userAccountsDesc}</p>
                   <ul className="list-disc list-inside text-gray-400 space-y-2">
                     <li>{t.accountReq1}</li>
@@ -237,11 +237,11 @@ export default function TermsOfServicePage() {
             {/* Section 3 */}
             <section className="bg-surface rounded-2xl p-8 border border-border">
               <div className="flex items-start gap-4 mb-4">
-                <div className="w-10 h-10 bg-[#4EDEA3]/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Lock className="w-5 h-5 text-[#4EDEA3]" />
+                <div className="w-10 h-10 bg-gain/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Lock className="w-5 h-5 text-gain" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-white mb-2">{t.dataSecurity}</h2>
+                  <h2 className="text-xl font-bold text-foreground mb-2">{t.dataSecurity}</h2>
                   <p className="text-gray-400 leading-relaxed">{t.dataSecurityDesc}</p>
                 </div>
               </div>
@@ -249,22 +249,22 @@ export default function TermsOfServicePage() {
 
             {/* Section 4 */}
             <section className="bg-surface rounded-2xl p-8 border border-border">
-              <h2 className="text-xl font-bold text-white mb-4">{t.limitationsOfLiability}</h2>
+              <h2 className="text-xl font-bold text-foreground mb-4">{t.limitationsOfLiability}</h2>
               <p className="text-gray-400 leading-relaxed">{t.limitationsDesc}</p>
             </section>
 
             {/* Section 5 */}
             <section className="bg-surface rounded-2xl p-8 border border-border">
-              <h2 className="text-xl font-bold text-white mb-4">{t.changesToTerms}</h2>
+              <h2 className="text-xl font-bold text-foreground mb-4">{t.changesToTerms}</h2>
               <p className="text-gray-400 leading-relaxed">{t.changesDesc}</p>
             </section>
 
             {/* Section 6 */}
             <section className="bg-surface rounded-2xl p-8 border border-border">
-              <h2 className="text-xl font-bold text-white mb-4">{t.contactUs}</h2>
+              <h2 className="text-xl font-bold text-foreground mb-4">{t.contactUs}</h2>
               <p className="text-gray-400 leading-relaxed">
                 {t.contactDesc}{" "}
-                <a href="mailto:legal@fintrack.com" className="text-[#4EDEA3] hover:underline">
+                <a href="mailto:legal@fintrack.com" className="text-primary hover:underline">
                   legal@fintrack.com
                 </a>
               </p>
@@ -275,7 +275,7 @@ export default function TermsOfServicePage() {
           <div className="mt-12 pt-8 border-t border-border text-center">
             <p className="text-gray-500 text-sm">
               © 2025 FinTrack. {t.allRightsReserved}. |{" "}
-              <Link href="/privacy-policy" className="text-[#4EDEA3] hover:underline">
+              <Link href="/privacy-policy" className="text-primary hover:underline">
                 {t.privacyPolicy}
               </Link>
             </p>

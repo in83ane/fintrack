@@ -148,7 +148,7 @@ export function EditAssetModal({ asset, isOpen, onClose, onDelete }: EditAssetMo
     <Modal isOpen={isOpen} onClose={onClose} title="" assetName={editedName || asset.name} assetSymbol={asset.symbol}>
       <div className="p-6 pb-0">
         <div className="flex items-center gap-3 border-b border-border pb-4">
-          <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center text-[#ADC6FF] font-black text-sm border border-border">
+          <div className="w-10 h-10 rounded-lg bg-foreground/5 flex items-center justify-center text-info font-black text-sm border border-border">
             {asset.symbol.slice(0, 3).toUpperCase()}
           </div>
           <div className="flex items-center gap-2 ml-auto">
@@ -156,7 +156,7 @@ export function EditAssetModal({ asset, isOpen, onClose, onDelete }: EditAssetMo
               onClick={handleToggleFavorite}
               className={cn(
                 "p-2 rounded-lg transition-all",
-                isFavorite ? "text-[#E9C349] bg-[#E9C349]/10" : "text-gray-600 hover:text-gray-400"
+                isFavorite ? "text-primary bg-primary/10" : "text-gray-600 hover:text-gray-400"
               )}
             >
               <Star size={16} fill={isFavorite ? "currentColor" : "none"} />
@@ -170,25 +170,25 @@ export function EditAssetModal({ asset, isOpen, onClose, onDelete }: EditAssetMo
           {/* Quick Stats - Always visible */}
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-surface p-3 rounded-xl border border-border">
-              <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">{t("livePrice")}</p>
-              <p className="text-sm font-bold text-white">
+              <p className="text-xs text-gray-500 font-bold uppercase mb-1">{t("livePrice")}</p>
+              <p className="text-sm font-bold text-foreground">
                 {isThaiAsset ? formatMoney(livePrice, "THB", THB_RATE) : formatMoney(livePrice, "USD", 1)}
               </p>
             </div>
             <div className="bg-surface p-3 rounded-xl border border-border">
-              <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">{t("avgCost")}</p>
-              <p className="text-sm font-bold text-white">
+              <p className="text-xs text-gray-500 font-bold uppercase mb-1">{t("avgCost")}</p>
+              <p className="text-sm font-bold text-foreground">
                 {isThaiAsset ? formatMoney(avgCost, "THB", THB_RATE) : formatMoney(avgCost, "USD", 1)}
               </p>
             </div>
             <div className="bg-surface p-3 rounded-xl border border-border">
-              <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">{t("holdings")}</p>
-              <p className="text-sm font-bold text-white">
+              <p className="text-xs text-gray-500 font-bold uppercase mb-1">{t("holdings")}</p>
+              <p className="text-sm font-bold text-foreground">
                 {isThaiAsset ? formatMoney(asset.valueUSD, "THB", THB_RATE) : formatMoney(asset.valueUSD, "USD", 1)}
               </p>
             </div>
             <div className="bg-surface p-3 rounded-xl border border-border">
-              <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">{t("unrealizedPL")}</p>
+              <p className="text-xs text-gray-500 font-bold uppercase mb-1">{t("unrealizedPL")}</p>
               <p className={cn("text-sm font-bold", getPnLColor(unrealizedPL))}>
                 {formatPnL(unrealizedPL, (v) => formatMoney(v))}
               </p>
@@ -199,14 +199,14 @@ export function EditAssetModal({ asset, isOpen, onClose, onDelete }: EditAssetMo
           <div className="bg-surface p-4 rounded-xl border border-border">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
-                <TrendingUp size={14} className="text-[#ADC6FF]" />
+                <TrendingUp size={14} className="text-info" />
                 <p className="text-xs font-bold text-gray-400 uppercase">{t("realizedPL")}</p>
               </div>
               <p className={cn("text-sm font-black", getPnLColor(realizedPL))}>
                 {formatPnL(realizedPL, (v) => formatMoney(v))}
               </p>
             </div>
-            <p className="text-[10px] text-gray-600 italic">
+            <p className="text-xs text-gray-600 italic">
               * {t("realizedPL")}: กำไร/ขาดทุนที่ขายไปแล้ว (เกิดจาก SELL trades)
               <br />
               * {t("unrealizedPL")}: กำไร/ขาดทุนที่ยังไม่ขาย (ถือครองอยู่)
@@ -222,7 +222,7 @@ export function EditAssetModal({ asset, isOpen, onClose, onDelete }: EditAssetMo
                   type="text"
                   value={editedName}
                   onChange={(e) => setEditedName(e.target.value)}
-                  className="w-full px-4 py-3 bg-white/5 border border-border rounded-xl text-white text-sm focus:outline-none focus:border-[#ADC6FF]/50"
+                  className="w-full px-4 py-3 bg-foreground/5 border border-border rounded-xl text-foreground text-sm  "
                 />
               </div>
 
@@ -234,24 +234,24 @@ export function EditAssetModal({ asset, isOpen, onClose, onDelete }: EditAssetMo
                     step="any"
                     value={editedShares}
                     onChange={(e) => setEditedShares(e.target.value)}
-                    className="w-full px-4 py-3 bg-white/5 border border-border rounded-xl text-white text-sm focus:outline-none focus:border-[#ADC6FF]/50"
+                    className="w-full px-4 py-3 bg-foreground/5 border border-border rounded-xl text-foreground text-sm  "
                   />
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold text-gray-400 uppercase">{t("avgCostPerUnit")}</label>
-                    <div className="flex gap-1 p-0.5 bg-white/5 rounded-lg border border-border">
+                    <div className="flex gap-1 p-0.5 bg-foreground/5 rounded-lg border border-border">
                       {(['USD', 'THB'] as const).map(cur => (
                         <button
                           key={cur}
                           type="button"
                           onClick={() => handleCurrencyChange(cur)}
                           className={cn(
-                            'px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wide transition-all',
+                            'px-2 py-0.5 rounded-md text-xs font-black uppercase tracking-wide transition-all',
                             inputCurrency === cur
                               ? cur === 'THB'
-                                ? 'bg-[#E9C349] text-[#241a00]'
-                                : 'bg-[#ADC6FF] text-[#00285d]'
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-primary text-primary-foreground'
                               : 'text-gray-500 hover:text-gray-300'
                           )}
                         >
@@ -266,11 +266,11 @@ export function EditAssetModal({ asset, isOpen, onClose, onDelete }: EditAssetMo
                       step="any"
                       value={editedAvgCost}
                       onChange={(e) => setEditedAvgCost(e.target.value)}
-                      className="w-full px-4 py-3 bg-white/5 border border-border rounded-xl text-white text-sm focus:outline-none focus:border-[#ADC6FF]/50 pr-12"
+                      className="w-full px-4 py-3 bg-foreground/5 border border-border rounded-xl text-foreground text-sm   pr-12"
                     />
                     <span className={cn(
                       "absolute right-3 top-1/2 -translate-y-1/2 font-bold text-xs uppercase opacity-80",
-                      inputCurrency === 'THB' ? 'text-[#E9C349]' : 'text-[#ADC6FF]'
+                      inputCurrency === 'THB' ? 'text-warning' : 'text-info'
                     )}>
                       {inputCurrency}
                     </span>
@@ -293,14 +293,14 @@ export function EditAssetModal({ asset, isOpen, onClose, onDelete }: EditAssetMo
               {/* Exclude from Net Worth Toggle */}
               <div className="flex items-center justify-between py-2 mt-2">
                 <div>
-                  <p className="text-sm font-bold text-white">Exclude from Net Worth</p>
+                  <p className="text-sm font-bold text-foreground">Exclude from Net Worth</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setEditedExcludeFromTotal(!editedExcludeFromTotal)}
                   className={cn(
                     "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
-                    editedExcludeFromTotal ? "bg-[#ADC6FF]" : "bg-gray-600"
+                    editedExcludeFromTotal ? "bg-primary" : "bg-gray-600"
                   )}
                 >
                   <span
@@ -316,31 +316,31 @@ export function EditAssetModal({ asset, isOpen, onClose, onDelete }: EditAssetMo
             <div className="space-y-3">
               <div className="flex justify-between items-center py-2 border-b border-border">
                 <span className="text-sm text-gray-500">{t("asset")}</span>
-                <span className="text-sm font-bold text-white">{asset.name}</span>
+                <span className="text-sm font-bold text-foreground">{asset.name}</span>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-border">
                 <span className="text-sm text-gray-500">{t("quantitySharesCoins")}</span>
-                <span className="text-sm font-bold text-white">{asset.shares?.toLocaleString() || 0}</span>
+                <span className="text-sm font-bold text-foreground">{asset.shares?.toLocaleString() || 0}</span>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-border">
                 <span className="text-sm text-gray-500">{t("avgCostPerUnit")}</span>
-                <span className="text-sm font-bold text-white">{formatMoney(asset.avgCost || 0)}</span>
+                <span className="text-sm font-bold text-foreground">{formatMoney(asset.avgCost || 0)}</span>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-border">
                 <span className="text-sm text-gray-500">{t("allocation")}</span>
-                <span className="text-sm font-bold text-white">
+                <span className="text-sm font-bold text-foreground">
                   {ALLOCATION_OPTIONS.find(a => a.value === asset.allocation)?.label || asset.allocation}
                 </span>
               </div>
               <div className="flex justify-between items-center py-2">
                 <span className="text-sm text-gray-500">Favorite</span>
-                <span className={cn("text-sm font-bold", isFavorite ? "text-[#E9C349]" : "text-gray-600")}>
+                <span className={cn("text-sm font-bold", isFavorite ? "text-warning" : "text-gray-600")}>
                   {isFavorite ? "Favorited" : "Not Favorited"}
                 </span>
               </div>
               <div className="flex justify-between items-center py-2">
                 <span className="text-sm text-gray-500">Exclude from Net Worth</span>
-                <span className={cn("text-sm font-bold", asset.excludeFromTotal ? "text-[#FFB4AB]" : "text-gray-600")}>
+                <span className={cn("text-sm font-bold", asset.excludeFromTotal ? "text-loss" : "text-gray-600")}>
                   {asset.excludeFromTotal ? "Yes (Excluded)" : "No (Included)"}
                 </span>
               </div>
@@ -353,13 +353,13 @@ export function EditAssetModal({ asset, isOpen, onClose, onDelete }: EditAssetMo
               <div className="flex gap-3">
                 <button
                   onClick={cancelEditing}
-                  className="flex-1 py-3 bg-white/5 border border-border text-white rounded-full font-bold text-xs uppercase hover:bg-white/10 transition-all"
+                  className="flex-1 py-3 bg-foreground/5 border border-border text-foreground rounded-full font-bold text-xs uppercase hover:bg-foreground/10 transition-all"
                 >
                   {t("cancel")}
                 </button>
                 <button
                   onClick={handleSave}
-                  className="flex-1 py-3 bg-[#ADC6FF] text-[#00285d] rounded-full font-black text-xs uppercase hover:brightness-110 transition-all flex items-center justify-center gap-2"
+                  className="flex-1 py-3 bg-primary text-primary-foreground rounded-full font-black text-xs uppercase hover:brightness-110 transition-all flex items-center justify-center gap-2"
                 >
                   <Save size={14} />
                   {t("confirm")}
@@ -369,7 +369,7 @@ export function EditAssetModal({ asset, isOpen, onClose, onDelete }: EditAssetMo
               <div className="flex gap-3">
                 <button
                   onClick={startEditing}
-                  className="flex-1 py-3 bg-white/5 border border-border text-white rounded-full font-bold text-xs uppercase hover:bg-white/10 transition-all"
+                  className="flex-1 py-3 bg-foreground/5 border border-border text-foreground rounded-full font-bold text-xs uppercase hover:bg-foreground/10 transition-all"
                 >
                   {t("editAllocation")}
                 </button>
@@ -378,10 +378,10 @@ export function EditAssetModal({ asset, isOpen, onClose, onDelete }: EditAssetMo
 
             {/* Delete Button - Danger Zone */}
             <div className="pt-4 mt-4 border-t border-border">
-              <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-3">Danger Zone</p>
+              <p className="text-xs font-black text-gray-600 uppercase tracking-widest mb-3">Danger Zone</p>
               <button
                 onClick={handleDelete}
-                className="w-full py-3 bg-[#FFB4AB]/5 border border-[#FFB4AB]/20 text-[#FFB4AB] rounded-xl font-bold text-xs uppercase hover:bg-[#FFB4AB]/10 transition-all flex items-center justify-center gap-2"
+                className="w-full py-3 bg-loss/5 border border-loss/20 text-loss rounded-xl font-bold text-xs uppercase hover:bg-loss/10 transition-all flex items-center justify-center gap-2"
               >
                 <Trash2 size={14} />
                 {t("deleteAsset")}

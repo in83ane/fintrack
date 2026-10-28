@@ -15,18 +15,20 @@ function syncSymbolUrl(symbol: string) {
 }
 
 /** A navigation preference only. Never writes lots, balances or execution data. */
-export function useSharedMarketSymbol(requested: string, fallback = '') {
+export function useSharedMarketSymbol(requested: string, fallback = '', enabled = true) {
   const [symbol, update] = useState(normalizeMarketSymbol(requested));
   const [ready, setReady] = useState(false);
   const select = useCallback((value: string) => {
+    if (!enabled) return;
     const next = normalizeMarketSymbol(value);
     if (!next) return; // Clearing a search box must not forget the selected stock.
     update(next);
     syncSymbolUrl(next);
     try { window.localStorage.setItem(MARKET_SYMBOL_KEY, next); } catch { /* session still works */ }
     window.dispatchEvent(new CustomEvent(EVENT, { detail: next }));
-  }, []);
+  }, [enabled]);
   useEffect(() => {
+    if (!enabled) return;
     const receive = (value: string | null) => {
       const next = normalizeMarketSymbol(value || '');
       if (next) { update(next); syncSymbolUrl(next); }
@@ -36,13 +38,14 @@ export function useSharedMarketSymbol(requested: string, fallback = '') {
     window.addEventListener(EVENT, onLocal);
     window.addEventListener('storage', onStorage);
     return () => { window.removeEventListener(EVENT, onLocal); window.removeEventListener('storage', onStorage); };
-  }, []);
+  }, [enabled]);
   useEffect(() => {
+    if (!enabled) return;
     let saved = '';
     try { saved = window.localStorage.getItem(MARKET_SYMBOL_KEY) || ''; } catch { /* unavailable */ }
     const next = normalizeMarketSymbol(requested || saved || fallback);
     if (next) select(next);
     setReady(true);
-  }, [requested, fallback, select]);
+  }, [requested, fallback, select, enabled]);
   return { symbol, selectSymbol: select, ready };
 }

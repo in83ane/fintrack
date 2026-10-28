@@ -114,13 +114,13 @@ function ResetPasswordContent() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md bg-[#111111]/80 backdrop-blur-xl rounded-3xl border border-border p-8 shadow-2xl relative z-10"
+        className="w-full max-w-md bg-[#111111]/80  rounded-3xl border border-border p-8 shadow-2xl relative z-10"
       >
         <div className="text-center mb-8">
-          <div className="mx-auto w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mb-6 ring-1 ring-white/10 shadow-inner">
+          <div className="mx-auto w-16 h-16 bg-foreground/5 rounded-2xl flex items-center justify-center mb-6 ring-1 ring-white/10 shadow-inner">
             <Lock className="w-8 h-8 text-emerald-400" />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">{t.title}</h1>
+          <h1 className="text-3xl font-bold text-foreground mb-2">{t.title}</h1>
           <p className="text-gray-400">{t.description}</p>
         </div>
 
@@ -158,7 +158,7 @@ function ResetPasswordContent() {
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3.5 bg-black/50 border border-border rounded-2xl text-white placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all duration-300"
+                    className="w-full pl-11 pr-4 py-3.5 bg-black/50 border border-border rounded-2xl text-foreground placeholder:text-gray-600     transition-all duration-300"
                     required
                   />
                 </div>
@@ -176,7 +176,7 @@ function ResetPasswordContent() {
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3.5 bg-black/50 border border-border rounded-2xl text-white placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all duration-300"
+                    className="w-full pl-11 pr-4 py-3.5 bg-black/50 border border-border rounded-2xl text-foreground placeholder:text-gray-600     transition-all duration-300"
                     required
                   />
                 </div>
@@ -186,7 +186,7 @@ function ResetPasswordContent() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white rounded-2xl font-medium transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg hover:shadow-emerald-500/25 active:translate-y-0 active:shadow-none disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-foreground rounded-2xl font-medium transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg hover:shadow-emerald-500/25 active:translate-y-0 active:shadow-none disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : t.submit}
             </button>

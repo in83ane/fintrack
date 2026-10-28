@@ -40,8 +40,9 @@ test('cash, monthly, daily, category and Sankey consumers reconcile exactly incl
   assert.equal(graph.inflowMinor-graph.expenseMinor-graph.investedMinor,graph.netMinor);
   // Integration contract: all three production pages pass native currency to the shared selector.
   for (const name of ['cashflow','ledger','dashboard']) {
-    const page = readFileSync(new URL(`../app/(app)/${name}/page.tsx`,import.meta.url),'utf8');
-    assert.match(page,/getCashflowSummary\(/,name);
+    const viewFile = {cashflow:'CashFlowView',ledger:'LedgerView',dashboard:'DashboardView'}[name];
+    const page = readFileSync(new URL(`../app/(app)/${name}/${viewFile}.tsx`,import.meta.url),'utf8');
+    assert.match(page,name === 'ledger' ? /getLedgerView\(/ : /getCashflowSummary\(/,name);
     assert.match(page,/formatCashflowMoney\(/,name);
   }
 });

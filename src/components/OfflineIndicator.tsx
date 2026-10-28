@@ -52,13 +52,13 @@ export function OfflineIndicator() {
     <div
       className={`fixed bottom-4 right-4 z-50 rounded-lg px-4 py-3 flex items-center gap-3 text-sm font-bold transition-all duration-300 ${
         isOnline
-          ? "bg-[#4EDEA3]/20 border border-[#4EDEA3] text-[#4EDEA3]"
-          : "bg-[#FFB4AB]/20 border border-[#FFB4AB] text-[#FFB4AB]"
+          ? "bg-gain/20 border border-gain text-gain"
+          : "bg-loss/20 border border-loss text-loss"
       }`}
     >
       {isOnline ? (
         <>
-          <div className="w-2 h-2 bg-[#4EDEA3] rounded-full animate-pulse" />
+          <div className="w-2 h-2 bg-gain rounded-full animate-pulse" />
           <span>Back online</span>
         </>
       ) : (

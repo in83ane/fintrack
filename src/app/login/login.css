@@ -1,0 +1,95 @@
+/* Login-only rules. Shared tokens/font remain owned by the app. */
+.ft-auth {
+  --auth-card: color-mix(in srgb, var(--color-background) 96%, var(--color-foreground));
+  --auth-field: var(--field-surface);
+  box-sizing: border-box;
+  min-height: 100dvh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 20px;
+  padding: clamp(32px, 3vw, 48px);
+  color: var(--color-foreground);
+  background: radial-gradient(ellipse at top left, color-mix(in srgb, var(--color-primary) 11%, transparent), transparent 60%), var(--color-background);
+}
+.ft-auth-header, .ft-auth-layout, .ft-auth-footer { width: 100%; max-width: 1200px; margin-inline: auto; min-width: 0; }
+.ft-auth-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.ft-auth-identity { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.ft-auth-logo, .ft-auth-feature-icon { flex: 0 0 auto; display: grid; place-items: center; color: var(--gain); background: color-mix(in srgb, var(--color-primary) 14%, transparent); border-radius: 12px; }
+.ft-auth-logo { width: 38px; height: 38px; }
+.ft-auth-name { font-size: 20px; font-weight: 700; letter-spacing: -.02em; }
+.ft-auth-mobile-tagline { display: none; }
+.ft-auth-language { display: flex; height: 36px; align-items: center; padding: 4px; border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface-2); flex-shrink: 0; }
+.ft-auth-language button { height: 100%; padding: 0 13px; border-radius: 999px; font-size: 10px; font-weight: 700; color: var(--color-muted); cursor: pointer; }
+.ft-auth-language button[aria-pressed=true] { background: var(--gain); color: var(--color-primary-foreground); }
+.ft-auth-layout { display: grid; grid-template-columns: minmax(0, 1fr) 440px; gap: 72px; align-items: center; animation: ft-auth-enter 200ms ease-out both; }
+.ft-auth-intro { min-width: 0; }
+.ft-auth-intro h1 { max-width: 520px; font-size: clamp(44px, 3vw, 48px); line-height: 1.2; font-weight: 600; letter-spacing: -.025em; text-wrap: balance; }
+.ft-auth-description { max-width: 520px; margin-top: 16px; font-size: 17px; line-height: 1.65; color: var(--color-muted); }
+.ft-auth-features { display: grid; gap: 16px; margin-top: 32px; padding: 0; list-style: none; }
+.ft-auth-features li { display: flex; align-items: center; gap: 12px; color: var(--color-muted); font-size: 14px; line-height: 1.5; }
+.ft-auth-feature-icon { width: 36px; height: 36px; border-radius: 10px; }
+.ft-auth-form { width: 440px; max-width: 100%; min-width: 0; }
+.ft-auth-card { padding: 32px; border-radius: 20px; border: 1px solid var(--color-border); background: var(--auth-card); }
+.ft-auth-card-heading { margin-bottom: 20px; }
+.ft-auth-card-heading h2 { font-size: 24px; font-weight: 600; line-height: 1.3; margin: 0; }
+.ft-auth-card-heading p { margin-top: 6px; color: var(--color-muted); font-size: 13px; line-height: 1.5; }
+.ft-auth-card form { display: flex; flex-direction: column; gap: 12px; }
+.ft-auth-card form > * { margin-block: 0; }
+.ft-auth-card label { color: var(--color-muted); font-size: 12px; line-height: 18px; letter-spacing: 0; text-transform: none; }
+.ft-auth-card label[for] { display: block; margin: 0 0 5px; }
+.ft-auth-card input:not([type=checkbox]) { height: 48px; padding-block: 0; color: var(--color-foreground); background: var(--auth-field); border: 0; border-radius: 10px; font-size: 14px; transition: background-color 120ms; }
+.ft-auth-card input:not([type=checkbox]):focus { background: var(--field-menu); outline: none; box-shadow: none; }
+/* Override the app-wide autofill reset only inside this page. Solid inset fill
+   prevents Chrome's white/blue autofill surface in both themes. */
+.ft-auth-card input:-webkit-autofill, .ft-auth-card input:-webkit-autofill:hover, .ft-auth-card input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--auth-field) inset !important;
+  box-shadow: 0 0 0 1000px var(--auth-field) inset !important;
+  -webkit-text-fill-color: var(--color-foreground) !important;
+  caret-color: var(--color-foreground);
+  transition: none !important;
+}
+.ft-auth-card input:-webkit-autofill:focus { --auth-field: var(--field-menu); }
+.ft-auth-card button[type=submit] { height: 48px; padding: 0 12px; font-size: 14px; font-weight: 600; text-transform: none; letter-spacing: 0; background: var(--color-primary); color: var(--color-primary-foreground); }
+.ft-auth-card button:disabled { cursor: not-allowed; }
+.ft-auth-card button, .ft-auth-card a { transition: background-color 120ms, color 120ms; }
+.ft-auth :is(button, a, input[type=checkbox]):focus-visible { outline: 2px solid var(--gain); outline-offset: 3px; }
+.ft-auth-card input[type=checkbox] { accent-color: var(--color-primary); }
+.ft-auth-card .ft-auth-divider { padding-block: 2px; line-height: 16px; }
+.ft-auth-divider span { background: var(--auth-card); }
+.ft-auth-card .ft-auth-terms { text-align: center; font-size: 11px; line-height: 1.6; color: var(--color-muted); }
+.ft-auth-card .ft-auth-terms a { color: inherit; }
+.ft-auth-card :is(.text-gray-400,.text-gray-500,.text-gray-600) { color: var(--color-muted); }
+.ft-auth-card :is(.text-red-400,[role=alert]) { color: var(--loss); }
+.ft-auth-messages > div { margin: 12px 0 0; }
+.ft-auth-messages .text-red-400 { padding: 0; border: 0; background: none; text-align: left; font-weight: 400; }
+.ft-auth-footer { font-size: 11px; line-height: 16px; color: var(--color-muted); }
+@keyframes ft-auth-enter { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .ft-auth-layout { animation: none; } .ft-auth *, .ft-auth *::before, .ft-auth *::after { transition: none !important; animation: none !important; } }
+@media (min-width: 1024px) and (max-height: 760px) {
+  .ft-auth { padding-block: 12px; gap: 8px; }
+  .ft-auth-card { padding: 24px 32px; }
+  .ft-auth-card-heading { margin-bottom: 14px; }
+  .ft-auth-card form { gap: 8px; }
+}
+@media (max-width: 1023px) {
+  .ft-auth { padding: 24px; gap: 24px; }
+  .ft-auth-layout { grid-template-columns: minmax(0, 1fr); gap: 24px; justify-items: center; }
+  .ft-auth-intro { display: contents; }
+  .ft-auth-intro h1, .ft-auth-description { display: none; }
+  .ft-auth-form { grid-row: 1; }
+  .ft-auth-features { grid-row: 2; width: 440px; max-width: 100%; margin: 0; }
+  .ft-auth-mobile-tagline { display: block; color: var(--color-muted); font-size: 11px; line-height: 1.5; }
+}
+@media (max-width: 767px) {
+  .ft-auth { padding: 20px; gap: 20px; }
+  .ft-auth-card { padding: 24px; }
+  .ft-auth-features { display: none; }
+  .ft-auth-name { font-size: 18px; }
+  .ft-auth-logo { width: 34px; height: 34px; }
+  .ft-auth-identity { gap: 8px; }
+}
+@media (max-width: 1023px) and (max-height: 760px) {
+  .ft-auth { padding-block: 16px; gap: 12px; }
+  .ft-auth-card-heading { margin-bottom: 14px; }
+  .ft-auth-card form { gap: 8px; }
+}

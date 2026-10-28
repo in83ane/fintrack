@@ -1,0 +1,39 @@
+flowchart TD
+    Start(["เริ่มใช้งาน"]) --> Session{"เข้าสู่ระบบแล้วหรือไม่"}
+    Session -- "ยังไม่เข้า" --> Login["เข้าสู่ระบบ / สมัครบัญชี"]
+    Login --> Session
+    Session -- "เข้าแล้ว" --> Dashboard["Dashboard"]
+    Dashboard --> Choice{"ต้องการทำอะไร"}
+    Choice --> Portfolio["ดู Portfolio และยอดเงิน"]
+    Choice --> Bucket["จัดการ Bucket / เงินสด"]
+    Choice --> Journal["ดู Ledger / History / Trade Journal"]
+    Choice --> Search["ค้นหาหุ้นใน Terminal หรือ Trade"]
+    Search --> Remember["เก็บ symbol ล่าสุดร่วมกันใน browser"]
+    Remember --> Terminal["Terminal: กราฟหุ้นที่เลือก"]
+    Terminal --> Plan["Trade Plan: symbol เดียวกัน"]
+    Plan --> Analyze["ปุ่มวิเคราะห์หุ้น"]
+    Analyze --> Terminal
+    Plan --> HasPortfolio{"เลือก trading portfolio แล้วหรือไม่"}
+    HasPortfolio -- "ยัง" --> Pick["เลือกพอร์ต"] --> HasPortfolio
+    HasPortfolio -- "แล้ว" --> Action{"ดำเนินการ"}
+    Action --> Draft["เพิ่ม / แก้ draft ไม้ DCA"]
+    Draft --> Buy["ระบุราคา จำนวน ค่าธรรมเนียม และบัญชีเงินสด"]
+    Buy --> Validate{"ข้อมูลและยอดเงินถูกต้อง"}
+    Validate -- "ไม่ผ่าน" --> Buy
+    Validate -- "ผ่าน" --> RecordBuy["ยืนยันบันทึก BUY เข้าพอร์ต"]
+    RecordBuy --> Position["ดูไม้ที่ถืออยู่และ Live P&L"]
+    Action --> Position
+    Position --> Mode{"เลือกไม้เอง / เฉลี่ยตามสัดส่วน"}
+    Mode --> Preview["ตรวจจำนวนขายและ preview ผลลัพธ์"]
+    Preview --> ValidSale{"preview ผ่าน"}
+    ValidSale -- "ไม่ผ่าน" --> Position
+    ValidSale -- "ผ่าน" --> Confirm["ดู modal และพิมพ์ symbol ยืนยัน"]
+    Confirm --> Save["บันทึก SELL ผ่าน RPC"]
+    Save --> Result{"สำเร็จหรือไม่"}
+    Result -- "ข้อมูลเปลี่ยน / error" --> Preview
+    Result -- "สำเร็จ" --> Refresh["โหลดข้อมูลใหม่: หุ้นเหลือ / Realized / เงินสด"]
+    Refresh --> Position
+    Refresh --> Journal
+    Portfolio --> Choice
+    Bucket --> Choice
+    Journal --> Choice

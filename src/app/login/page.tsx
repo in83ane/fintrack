@@ -1,7 +1,7 @@
 "use client";
 
 import React, { Suspense, useState, useEffect, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import "./login.css";
 import {
   Eye,
   EyeOff,
@@ -11,8 +11,10 @@ import {
   CheckCircle,
   Check,
   X,
-  Shield,
-  Loader2,
+  ChartLine,
+  Wallet,
+  ArrowRightLeft,
+  Languages,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -138,6 +140,11 @@ interface TranslationKeys {
   csrfError: string;
   serverError: string;
   passwordsMatch: string;
+  signingIn: string;
+  creatingAccount: string;
+  sendingLink: string;
+  loginDescription: string;
+  registerDescription: string;
 }
 
 interface Translations {
@@ -205,11 +212,16 @@ const translations: Translations = {
     csrfError: "การยืนยันความปลอดภัยล้มเหลว กรุณารีเฟรชหน้า",
     serverError: "เกิดข้อผิดพลาด กรุณาลองใหม่ภายหลัง",
     passwordsMatch: "รหัสผ่านตรงกัน",
+    signingIn: "กำลังเข้าสู่ระบบ…",
+    creatingAccount: "กำลังสร้างบัญชี…",
+    sendingLink: "กำลังส่งลิงก์…",
+    loginDescription: "เข้าสู่ระบบเพื่อดูภาพรวมการเงินของคุณ",
+    registerDescription: "เริ่มดูแลการเงินของคุณในพื้นที่เดียว",
   },
   en: {
     login: "Sign In",
     register: "Sign Up",
-    welcomeBack: "Welcome Back",
+    welcomeBack: "Welcome back",
     createAccount: "Create Account",
     email: "Email",
     password: "Password",
@@ -260,25 +272,11 @@ const translations: Translations = {
     csrfError: "Security verification failed. Please refresh the page",
     serverError: "An error occurred. Please try again later",
     passwordsMatch: "Passwords match",
-  },
-};
-
-// ─── Animation Variants ───────────────────────────────────────────────────────
-
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.08, delayChildren: 0.1 },
-  },
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 15 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { type: "spring" as const, stiffness: 120, damping: 15 },
+    signingIn: "Signing in…",
+    creatingAccount: "Creating account…",
+    sendingLink: "Sending link…",
+    loginDescription: "Sign in to your financial workspace.",
+    registerDescription: "Bring your financial life into one place.",
   },
 };
 
@@ -927,7 +925,7 @@ function LoginContent() {
   const RequirementItem = ({ met, text }: { met: boolean; text: string }) => (
     <div className="flex items-center gap-2 text-xs">
       {met ? (
-        <Check className="w-3.5 h-3.5 text-[#4EDEA3] flex-shrink-0" />
+        <Check className="w-3.5 h-3.5 text-primary flex-shrink-0" />
       ) : (
         <X className="w-3.5 h-3.5 text-gray-600 flex-shrink-0" />
       )}
@@ -936,68 +934,41 @@ function LoginContent() {
   );
 
   return (
-    <div className="min-h-screen bg-[#131313] flex items-center justify-center p-4 sm:p-6 relative">
-      {/* Language Toggle */}
-      <button
-        onClick={toggleLang}
-        className="fixed top-6 right-6 z-50 flex items-center gap-2 px-4 py-2 bg-white/5 backdrop-blur-md border border-border rounded-full text-white text-xs font-bold uppercase tracking-wide hover:bg-white/10 transition-all cursor-pointer shadow-lg pointer-events-auto"
-      >
-        <span className={lang === "th" ? "text-[#4EDEA3]" : "text-gray-500"}>TH</span>
-        <span className="text-gray-600">|</span>
-        <span className={lang === "en" ? "text-[#4EDEA3]" : "text-gray-500"}>EN</span>
-      </button>
-
-      {/* Security Badge */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
-        className="fixed top-6 left-6 z-50 flex items-center gap-2 text-xs text-gray-500 font-bold"
-      >
-        <Shield className="w-4 h-4 text-[#4EDEA3]" />
-        <span className={lang === "th" ? "font-normal" : "uppercase tracking-wide"}>
-          {t.secureConnection}
-        </span>
-      </motion.div>
-
-      <motion.div
-        initial={{ opacity: 1, y: 0 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-        className="w-full max-w-md"
-      >
-        <div className="bg-surface rounded-3xl p-6 sm:p-8 border border-border relative">
-          <div className="absolute inset-0 bg-gradient-to-b from-white/[0.02] to-transparent pointer-events-none rounded-3xl" />
-
-          <div className="relative z-10 w-full mt-2">
+    <div className="ft-auth" lang={lang}>
+      <header className="ft-auth-header">
+        <div className="ft-auth-identity">
+          <div className="ft-auth-logo"><ChartLine size={23} aria-hidden="true"/></div>
+          <div><span className="ft-auth-name">FinTrack</span><p className="ft-auth-mobile-tagline">{lang === 'th' ? 'มองเห็นภาพรวมของเงินคุณ' : 'Your money, in perspective.'}</p></div>
+        </div>
+        <div className="ft-auth-language" role="group" aria-label={lang === 'th' ? 'ภาษา' : 'Language'}>
+          {(['th', 'en'] as const).map(value => <button key={value} type="button" aria-pressed={lang === value} onClick={() => { if (lang !== value) toggleLang(); }}>{value.toUpperCase()}</button>)}
+        </div>
+      </header>
+      <main className="ft-auth-layout">
+        <section className="ft-auth-intro">
+          <h1>{lang === 'th' ? 'มองเห็นภาพรวมของเงินคุณ' : 'A clear view of your financial life.'}</h1>
+          <p className="ft-auth-description">{lang === 'th' ? 'การลงทุน กระแสเงินสด และเป้าหมาย ในพื้นที่เดียวที่เป็นของคุณ' : 'Investments, cash flow and goals. Together in a workspace that is yours.'}</p>
+          <ul className="ft-auth-features">
+            {[{Icon:Wallet, text:lang === 'th' ? 'พอร์ตลงทุนและประวัติรายการ' : 'Portfolio & transaction history'}, {Icon:ArrowRightLeft, text:lang === 'th' ? 'กระแสเงินสดและการจัดสรรเงิน' : 'Cash flow & money allocation'}, {Icon:Languages, text:lang === 'th' ? 'รองรับภาษาไทยและอังกฤษ' : 'Available in Thai & English'}].map(({Icon,text}) => <li key={text}><span className="ft-auth-feature-icon"><Icon size={18} aria-hidden="true"/></span><span>{text}</span></li>)}
+          </ul>
+        </section>
+        <section className="ft-auth-form" aria-labelledby="auth-title">
+          <div className="ft-auth-card">
             {showForgotPassword ? (
               <div key="forgot" className="relative z-10">
                 <button
                   type="button"
                   onClick={() => setShowForgotPassword(false)}
-                  className="flex items-center gap-2 text-gray-400 hover:text-white text-sm font-medium mb-6 transition-colors"
+                  className="flex items-center gap-2 text-gray-400 hover:text-foreground text-sm font-medium mb-6 transition-colors"
                 >
                   <ArrowLeft className="w-4 h-4" />
                   <span className={lang === "th" ? "" : "uppercase tracking-wider text-xs font-bold"}>{t.back}</span>
                 </button>
 
-                <div className="mb-8">
-                  <h2 className="text-2xl font-black text-white tracking-tight mb-2">{t.resetPassword}</h2>
+                <div className="ft-auth-card-heading">
+                  <h2 id="auth-title" className="text-2xl font-black text-foreground tracking-tight mb-2">{t.resetPassword}</h2>
                   <p className="text-sm text-gray-500">{t.resetDescription}</p>
                 </div>
-
-                {error && (
-                  <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-sm text-center">
-                    {error}
-                  </div>
-                )}
-
-                {success && (
-                  <div className="mb-6 p-4 bg-[#4EDEA3]/10 border border-[#4EDEA3]/20 rounded-2xl text-[#4EDEA3] text-sm text-center flex items-center justify-center gap-2">
-                    <CheckCircle className="w-4 h-4" />
-                    {success}
-                  </div>
-                )}
 
                 <form onSubmit={handleForgotPassword} method="POST" className="space-y-3">
                   {/* Honeypot field - invisible to users */}
@@ -1013,13 +984,13 @@ function LoginContent() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className={`text-xs font-semibold text-gray-500 ml-1 ${lang === "th" ? "" : "uppercase tracking-wider"}`}>
+                    <label htmlFor="reset-email" className={`text-xs font-semibold text-gray-500 ml-1 ${lang === "th" ? "" : "uppercase tracking-wider"}`}>
                       {t.email}
                     </label>
-                    <div className={`relative group transition-all duration-300 ${focusedField === "reset-email" ? "transform scale-[1.02]" : ""}`}>
+                    <div className="relative group">
                       <Mail
                         className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors duration-300 ${
-                          fieldErrors.email ? "text-red-400" : focusedField === "reset-email" ? "text-[#4EDEA3]" : "text-gray-500"
+                          fieldErrors.email ? "text-red-400" : focusedField === "reset-email" ? "text-primary" : "text-gray-500"
                         }`}
                       />
                       <input
@@ -1043,10 +1014,10 @@ function LoginContent() {
                         required
                         aria-label={t.email}
                         aria-invalid={!!fieldErrors.email}
-                        className={`w-full bg-white/5 border pl-12 pr-6 py-3.5 text-white outline-none transition-all text-sm disabled:opacity-50 rounded-lg ${
+                        className={`w-full bg-foreground/5 border pl-12 pr-6 py-3.5 text-foreground outline-none transition-all text-sm disabled:opacity-50 rounded-lg ${
                           fieldErrors.email
-                            ? "border-red-500/50 focus:border-red-500 focus:bg-red-500/5"
-                            : "border-border focus:border-[#4EDEA3]/50 focus:bg-white/[0.07]"
+                            ? "border-red-500/50  focus:bg-red-500/5"
+                            : "border-border  focus:bg-foreground/[0.07]"
                         }`}
                       />
                     </div>
@@ -1060,67 +1031,33 @@ function LoginContent() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-3.5 bg-[#4EDEA3] text-[#0E0E0E] rounded-xl font-black text-sm uppercase tracking-wider hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-4"
+                    className="w-full py-3.5 bg-primary text-primary-foreground rounded-xl font-black text-sm uppercase tracking-wider hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-4"
                   >
-                    {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-                    {t.sendResetLink}
+                    {loading ? t.sendingLink : t.sendResetLink}
                   </button>
                 </form>
+                <div className="ft-auth-messages" aria-live="polite" aria-atomic="true">
+                {error && (
+                  <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-sm text-center">
+                    {error}
+                  </div>
+                )}
+
+                {success && (
+                  <div className="mb-6 p-4 bg-primary/10 border border-gain/20 rounded-2xl text-primary text-sm text-center flex items-center justify-center gap-2">
+                    <CheckCircle className="w-4 h-4" />
+                    {success}
+                  </div>
+                )}
+
+                </div>
+
               </div>
             ) : (
               <div key="auth" className="relative z-10 w-full">
-                {/* Logo Section */}
-                <div className="text-center mb-6">
-                  <div className="w-14 h-14 bg-gradient-to-br from-[#4EDEA3] to-[#3DC992] rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-[#4EDEA3]/20">
-                    <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M3 3v18h18" />
-                      <path d="M7 16l4-6 4 4 4-8" />
-                    </svg>
-                  </div>
-                  <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-wide mb-2">FinTrack</h1>
-                  <p className="text-sm text-gray-500">{isRegister ? t.createAccount : t.welcomeBack}</p>
-                </div>
-
-                {/* Error/Success Messages */}
-                <div>
-                  {accountLocked && (
-                    <div className="mb-6 overflow-hidden">
-                      <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-2xl text-orange-400 text-sm text-center">
-                        <div className="font-bold mb-1">{t.accountLocked}</div>
-                        <div className="text-xs">
-                          {t.accountLockedDesc}
-                          <br />
-                          {lockoutTimer > 0 && (
-                            <span className="font-mono mt-1 inline-block">
-                              {Math.floor(lockoutTimer / 60)}:{String(lockoutTimer % 60).padStart(2, "0")}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {error && !accountLocked && (
-                    <div className="mb-6 overflow-hidden">
-                      <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-sm text-center">
-                        <div className="font-bold">{error}</div>
-                        {errorCode && (
-                          <div className="text-xs uppercase tracking-wider text-red-400/70 mt-1.5 font-mono">
-                            Ref: {errorCode}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {success && (
-                    <div className="mb-6 overflow-hidden">
-                      <div className="p-4 bg-[#4EDEA3]/10 border border-[#4EDEA3]/20 rounded-2xl text-[#4EDEA3] text-sm text-center flex items-center justify-center gap-2">
-                        <CheckCircle className="w-4 h-4" />
-                        {success}
-                      </div>
-                    </div>
-                  )}
+                <div className="ft-auth-card-heading">
+                  <h2 id="auth-title">{isRegister ? t.createAccount : t.welcomeBack}</h2>
+                  <p>{isRegister ? t.registerDescription : t.loginDescription}</p>
                 </div>
 
                 <form onSubmit={handleEmailAuth} method="POST" className="space-y-4 relative z-20">
@@ -1140,10 +1077,10 @@ function LoginContent() {
                     <label htmlFor="email" className={`text-xs font-semibold text-gray-500 ml-1 ${lang === "th" ? "" : "uppercase tracking-wider"}`}>
                       {t.email}
                     </label>
-                    <div className={`relative group transition-all duration-300 ${focusedField === "email" ? "transform scale-[1.02]" : ""}`}>
+                    <div className="relative group">
                       <Mail
                         className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors duration-300 ${
-                          fieldErrors.email ? "text-red-400" : focusedField === "email" ? "text-[#4EDEA3]" : "text-gray-500"
+                          fieldErrors.email ? "text-red-400" : focusedField === "email" ? "text-primary" : "text-gray-500"
                         }`}
                       />
                       <input
@@ -1167,10 +1104,10 @@ function LoginContent() {
                         aria-label={t.email}
                         aria-invalid={!!fieldErrors.email}
                         aria-describedby={fieldErrors.email ? "email-error" : undefined}
-                        className={`w-full bg-white/5 border pl-12 pr-6 py-3.5 text-white outline-none transition-all text-sm disabled:opacity-50 rounded-lg ${
+                        className={`w-full bg-foreground/5 border pl-12 pr-6 py-3.5 text-foreground outline-none transition-all text-sm disabled:opacity-50 rounded-lg ${
                           fieldErrors.email
-                            ? "border-red-500/50 focus:border-red-500 focus:bg-red-500/5"
-                            : "border-border focus:border-[#4EDEA3]/50 focus:bg-white/[0.07]"
+                            ? "border-red-500/50  focus:bg-red-500/5"
+                            : "border-border  focus:bg-foreground/[0.07]"
                         }`}
                       />
                     </div>
@@ -1186,10 +1123,10 @@ function LoginContent() {
                       {t.password}
                     </label>
                     <div className="relative">
-                      <div className={`relative group transition-all duration-300 ${focusedField === "password" ? "transform scale-[1.02]" : ""}`}>
+                      <div className="relative group">
                         <Lock
                           className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors duration-300 ${
-                            fieldErrors.password ? "text-red-400" : focusedField === "password" ? "text-[#4EDEA3]" : "text-gray-500"
+                            fieldErrors.password ? "text-red-400" : focusedField === "password" ? "text-primary" : "text-gray-500"
                           }`}
                         />
                         <input
@@ -1219,10 +1156,10 @@ function LoginContent() {
                           aria-label={t.password}
                           aria-invalid={!!fieldErrors.password}
                           aria-describedby={fieldErrors.password ? "password-error" : "password-requirements"}
-                          className={`w-full bg-white/5 border pl-12 pr-12 py-3.5 text-white outline-none transition-all text-sm disabled:opacity-50 rounded-lg ${
+                          className={`w-full bg-foreground/5 border pl-12 pr-12 py-3.5 text-foreground outline-none transition-all text-sm disabled:opacity-50 rounded-lg ${
                             fieldErrors.password
-                              ? "border-red-500/50 focus:border-red-500 focus:bg-red-500/5"
-                              : "border-border focus:border-[#4EDEA3]/50 focus:bg-white/[0.07]"
+                              ? "border-red-500/50  focus:bg-red-500/5"
+                              : "border-border  focus:bg-foreground/[0.07]"
                           }`}
                         />
                         <button
@@ -1231,7 +1168,7 @@ function LoginContent() {
                              e.preventDefault();
                              setShowPassword(!showPassword);
                           }}
-                          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors z-[60] bg-transparent border-none cursor-pointer w-8 h-8 flex items-center justify-center p-0 outline-none"
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-foreground transition-colors z-[60] bg-transparent border-none cursor-pointer w-8 h-8 flex items-center justify-center p-0 outline-none"
                           title={showPassword ? t.hidePassword : t.showPassword}
                           aria-label={showPassword ? t.hidePassword : t.showPassword}
                         >
@@ -1287,10 +1224,10 @@ function LoginContent() {
                       <label htmlFor="confirmPassword" className={`text-xs font-semibold text-gray-500 ml-1 ${lang === "th" ? "" : "uppercase tracking-wider"}`}>
                         {t.confirmPassword}
                       </label>
-                      <div className={`relative group transition-all duration-300 ${focusedField === "confirmPassword" ? "transform scale-[1.02]" : ""}`}>
+                      <div className="relative group">
                         <Lock
                           className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors duration-300 ${
-                            fieldErrors.confirmPassword ? "text-red-400" : focusedField === "confirmPassword" ? "text-[#4EDEA3]" : "text-gray-500"
+                            fieldErrors.confirmPassword ? "text-red-400" : focusedField === "confirmPassword" ? "text-primary" : "text-gray-500"
                           }`}
                         />
                         <input
@@ -1313,10 +1250,10 @@ function LoginContent() {
                           aria-label={t.confirmPassword}
                           aria-invalid={!!fieldErrors.confirmPassword}
                           aria-describedby={fieldErrors.confirmPassword ? "confirm-password-error" : undefined}
-                          className={`w-full bg-white/5 border pl-12 pr-12 py-3.5 text-white outline-none transition-all text-sm disabled:opacity-50 rounded-lg ${
+                          className={`w-full bg-foreground/5 border pl-12 pr-12 py-3.5 text-foreground outline-none transition-all text-sm disabled:opacity-50 rounded-lg ${
                             fieldErrors.confirmPassword
-                              ? "border-red-500/50 focus:border-red-500 focus:bg-red-500/5"
-                              : "border-border focus:border-[#4EDEA3]/50 focus:bg-white/[0.07]"
+                              ? "border-red-500/50  focus:bg-red-500/5"
+                              : "border-border  focus:bg-foreground/[0.07]"
                           }`}
                         />
                         <button
@@ -1325,7 +1262,7 @@ function LoginContent() {
                              e.preventDefault();
                              setShowConfirmPassword(!showConfirmPassword);
                           }}
-                          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors z-[60] bg-transparent border-none cursor-pointer w-8 h-8 flex items-center justify-center p-0 outline-none"
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-foreground transition-colors z-[60] bg-transparent border-none cursor-pointer w-8 h-8 flex items-center justify-center p-0 outline-none"
                           title={showConfirmPassword ? t.hidePassword : t.showPassword}
                           aria-label={showConfirmPassword ? t.hidePassword : t.showPassword}
                         >
@@ -1349,11 +1286,11 @@ function LoginContent() {
                             checked={rememberMe}
                             onChange={(e) => setRememberMe(e.target.checked)}
                             disabled={loading || accountLocked}
-                            className="peer appearance-none w-4 h-4 border border-gray-600 rounded cursor-pointer checked:bg-[#4EDEA3] checked:border-[#4EDEA3] transition-colors focus:ring-2 focus:ring-[#4EDEA3]/30 focus:outline-none"
+                            className="peer appearance-none w-4 h-4 border border-gray-600 rounded cursor-pointer checked:bg-primary checked:border-primary transition-colors   "
                           />
-                          <Check className="absolute w-3 h-3 text-[#0E0E0E] opacity-0 peer-checked:opacity-100 pointer-events-none transition-opacity" strokeWidth={3} />
+                          <Check className="absolute w-3 h-3 text-primary-foreground opacity-0 peer-checked:opacity-100 pointer-events-none transition-opacity" strokeWidth={3} />
                         </div>
-                        <span className="text-xs text-gray-400 group-hover:text-white transition-colors select-none">{t.rememberMe}</span>
+                        <span className="text-xs text-gray-400 group-hover:text-foreground transition-colors select-none">{t.rememberMe}</span>
                       </label>
 
                       <button
@@ -1364,7 +1301,7 @@ function LoginContent() {
                           setSuccess(null);
                         }}
                         disabled={loading || accountLocked}
-                        className="text-xs text-[#4EDEA3] hover:text-[#3DC992] transition-colors bg-transparent border-none p-0 cursor-pointer w-auto relative z-[60]"
+                        className="text-xs text-primary hover:text-[#3DC992] transition-colors bg-transparent border-none p-0 cursor-pointer w-auto relative z-[60]"
                       >
                         {t.forgotPassword}
                       </button>
@@ -1374,13 +1311,12 @@ function LoginContent() {
                   <button
                     type="submit"
                     disabled={loading || accountLocked}
-                    className="w-full py-3.5 bg-[#4EDEA3] text-[#0E0E0E] rounded-xl font-black text-sm uppercase tracking-wider hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-6 relative z-[60]"
+                    className="w-full py-3.5 bg-primary text-primary-foreground rounded-xl font-black text-sm uppercase tracking-wider hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-6 relative z-[60]"
                   >
-                    {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-                    {isRegister ? t.registerNow : t.loginNow}
+                    {loading ? (isRegister ? t.creatingAccount : t.signingIn) : (isRegister ? t.registerNow : t.loginNow)}
                   </button>
 
-                  <div className="relative py-4 z-10">
+                  <div className="ft-auth-divider relative z-10">
                     <div className="absolute inset-0 flex items-center">
                       <div className="w-full border-t border-border"></div>
                     </div>
@@ -1394,9 +1330,9 @@ function LoginContent() {
                       type="button"
                       onClick={handleGoogleLogin}
                       disabled={loading || accountLocked}
-                      className="w-full py-3.5 bg-white/5 text-white border border-border rounded-xl font-semibold text-sm hover:bg-white/10 hover:border-white/20 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed group"
+                      className="w-full py-3.5 bg-foreground/5 text-foreground border border-border rounded-xl font-semibold text-sm hover:bg-foreground/10 hover:border-foreground/20 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed group"
                     >
-                      <svg className="w-5 h-5 transition-transform group-hover:scale-110" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5" viewBox="0 0 24 24">
                         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
                         <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
                         <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
@@ -1412,29 +1348,73 @@ function LoginContent() {
                     <button
                       type="button"
                       onClick={switchMode}
-                      className="text-[#4EDEA3] hover:text-[#3DC992] cursor-pointer bg-transparent border-none p-0 font-semibold underline underline-offset-2 relative z-[60]"
+                      className="text-primary hover:text-[#3DC992] cursor-pointer bg-transparent border-none p-0 font-semibold underline underline-offset-2 relative z-[60]"
                     >
                       {isRegister ? t.loginNow : t.registerNow}
                     </button>
                   </p>
 
                   {/* Terms */}
-                  <p className="text-center text-xs text-gray-600 pt-2">
+                  <p className="ft-auth-terms">
                     {t.termsText}{" "}
-                    <a href="/terms-of-service" className="text-gray-500 hover:text-[#4EDEA3] transition-colors relative z-[60]">
+                    <a href="/terms-of-service" className="text-gray-500 hover:text-primary transition-colors relative z-[60]">
                       {t.termsLink}
                     </a>{" "}
                     {t.and}{" "}
-                    <a href="/privacy-policy" className="text-gray-500 hover:text-[#4EDEA3] transition-colors relative z-[60]">
+                    <a href="/privacy-policy" className="text-gray-500 hover:text-primary transition-colors relative z-[60]">
                       {t.privacyLink}
                     </a>
                   </p>
                 </form>
+                {/* Error/Success Messages */}
+                <div className="ft-auth-messages" aria-live="polite" aria-atomic="true">
+                  {accountLocked && (
+                    <div className="mb-6 overflow-hidden">
+                      <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-2xl text-orange-400 text-sm text-center">
+                        <div className="font-bold mb-1">{t.accountLocked}</div>
+                        <div className="text-xs">
+                          {t.accountLockedDesc}
+                          <br />
+                          {lockoutTimer > 0 && (
+                            <span className="font-mono mt-1 inline-block">
+                              {Math.floor(lockoutTimer / 60)}:{String(lockoutTimer % 60).padStart(2, "0")}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {error && !accountLocked && (
+                    <div className="mb-6 overflow-hidden">
+                      <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-sm text-center">
+                        <div className="font-bold">{error}</div>
+                        {errorCode && (
+                          <div className="text-xs uppercase tracking-wider text-red-400/70 mt-1.5 font-mono">
+                            Ref: {errorCode}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {success && (
+                    <div className="mb-6 overflow-hidden">
+                      <div className="p-4 bg-primary/10 border border-gain/20 rounded-2xl text-primary text-sm text-center flex items-center justify-center gap-2">
+                        <CheckCircle className="w-4 h-4" />
+                        {success}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+
               </div>
             )}
           </div>
-        </div>
-      </motion.div>
+        </section>
+      </main>
+      <footer className="ft-auth-footer">{lang === 'th' ? 'การเงินส่วนบุคคล ในมุมมองที่ชัดเจน' : 'Personal finance, in perspective.'}</footer>
     </div>
   );
 }
@@ -1443,17 +1423,17 @@ function LoginContent() {
 
 function LoginSkeleton() {
   return (
-    <div className="min-h-screen bg-[#131313] flex items-center justify-center p-6">
+    <div className="min-h-dvh bg-background flex items-center justify-center p-6">
       <div className="w-full max-w-md bg-surface rounded-[2.5rem] p-10 border border-border">
         <div className="flex flex-col items-center space-y-4">
-          <div className="w-16 h-16 bg-white/5 rounded-[1.5rem] animate-pulse" />
-          <div className="w-32 h-8 bg-white/5 rounded-lg animate-pulse" />
-          <div className="w-48 h-4 bg-white/5 rounded-lg animate-pulse" />
+          <div className="w-16 h-16 bg-foreground/5 rounded-[1.5rem] animate-pulse" />
+          <div className="w-32 h-8 bg-foreground/5 rounded-lg animate-pulse" />
+          <div className="w-48 h-4 bg-foreground/5 rounded-lg animate-pulse" />
         </div>
         <div className="mt-8 space-y-4">
-          <div className="h-14 bg-white/5 rounded-2xl animate-pulse" />
-          <div className="h-14 bg-white/5 rounded-2xl animate-pulse" />
-          <div className="h-12 bg-white/5 rounded-2xl animate-pulse" />
+          <div className="h-14 bg-foreground/5 rounded-2xl animate-pulse" />
+          <div className="h-14 bg-foreground/5 rounded-2xl animate-pulse" />
+          <div className="h-12 bg-foreground/5 rounded-2xl animate-pulse" />
         </div>
       </div>
     </div>

@@ -1,7 +1,15 @@
 "use client";
+// แก้ layout หน้านี้ ต้องแก้ AssetSkeleton ด้วย
+import { useLoadingGate } from '@/src/hooks/useLoadingGate';
+import AssetSkeleton from './AssetSkeleton';
+import { Sk } from '@/src/components/skeleton';
+import {AssetChartFooter,JOURNEY_TITLE,AssetHeader,AssetChartToolbar,ASSET_METRICS,ASSET_PERIODS,PERIOD_CONFIG,VALID_PERIODS,StatCard,type TimePeriod} from './AssetChrome';
+import { layout } from './skeleton-layout';
+
 
 import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { useParams, useSearchParams, useRouter } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
+import { usePageRouter as useRouter } from '@/src/components/PageTransition';
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -28,7 +36,7 @@ import { useApp } from "@/src/context/AppContext";
 import { cn } from "@/src/lib/utils";
 import { VerticalTimeline, TimelineItem } from "@/src/components/VerticalTimeline";
 
-type TimePeriod = "1d" | "5d" | "1m" | "6m" | "ytd" | "1y" | "5y";
+
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -37,85 +45,13 @@ interface PricePoint {
   price: number;
 }
 
-interface PeriodMeta {
-  label: string;
-  labelTh: string;
-  interval: string;
-  yahooInterval: string;
-  yahooRange: string;
-  changeLabel: string;
-  changeLabelTh: string;
-}
+
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const VALID_PERIODS: TimePeriod[] = ["1d", "5d", "1m", "6m", "ytd", "1y", "5y"];
 
-const PERIOD_CONFIG: Record<TimePeriod, PeriodMeta> = {
-  "1d":  {
-    label: "1D",
-    labelTh: "1วัน",
-    interval: "1min",
-    yahooInterval: "1m",
-    yahooRange: "1d",
-    changeLabel: "Today",
-    changeLabelTh: "วันนี้"
-  },
-  "5d":  {
-    label: "5D",
-    labelTh: "5วัน",
-    interval: "15min",
-    yahooInterval: "15m",
-    yahooRange: "5d",
-    changeLabel: "5 days",
-    changeLabelTh: "5 วันย้อนหลัง"
-  },
-  "1m":  {
-    label: "1M",
-    labelTh: "1ด.",
-    interval: "1day",
-    yahooInterval: "1d",
-    yahooRange: "1mo",
-    changeLabel: "1 month",
-    changeLabelTh: "1 เดือนย้อนหลัง"
-  },
-  "6m":  {
-    label: "6M",
-    labelTh: "6ด.",
-    interval: "1day",
-    yahooInterval: "1d",
-    yahooRange: "6mo",
-    changeLabel: "6 months",
-    changeLabelTh: "6 เดือนย้อนหลัง"
-  },
-  "ytd": {
-    label: "YTD",
-    labelTh: "YTD",
-    interval: "1day",
-    yahooInterval: "1d",
-    yahooRange: "ytd",
-    changeLabel: "Year to date",
-    changeLabelTh: "ตั้งแต่ต้นปี"
-  },
-  "1y":  {
-    label: "1Y",
-    labelTh: "1ปี",
-    interval: "1day",
-    yahooInterval: "1d",
-    yahooRange: "1y",
-    changeLabel: "1 year",
-    changeLabelTh: "1 ปีย้อนหลัง"
-  },
-  "5y":  {
-    label: "5Y",
-    labelTh: "5ปี",
-    interval: "1day",
-    yahooInterval: "1d",
-    yahooRange: "5y",
-    changeLabel: "5 years",
-    changeLabelTh: "5 ปีย้อนหลัง"
-  },
-};
+
+
 
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -222,7 +158,7 @@ function DeleteConfirmModal({ assetName, assetSymbol, onConfirm, onCancel }: Del
           value={confirmText}
           onChange={(e) => setConfirmText(e.target.value)}
           placeholder={`พิมพ์ ${required}`}
-          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm font-mono placeholder:text-gray-600 focus:outline-none focus:border-[#FFB4AB]/50 transition-colors mb-4"
+          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm font-mono placeholder:text-gray-600   transition-colors mb-4"
           autoFocus
         />
 
@@ -714,7 +650,7 @@ export default function AssetDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { assets, removeAsset, reorderAssets, t, formatMoney, language, currency, exchangeRates } = useApp();
+  const { isDataLoaded, assets, removeAsset, reorderAssets, t, formatMoney, language, currency, exchangeRates } = useApp();
   const THB_RATE = exchangeRates.THB;
 
   const symbol = params.symbol as string;
@@ -727,6 +663,7 @@ export default function AssetDetailPage() {
 
   const [chartData, setChartData] = useState<PricePoint[]>([]);
   const [isLoadingChart, setIsLoadingChart] = useState(false);
+  const showChartSkeleton = useLoadingGate(isLoadingChart);
   const [error, setError] = useState<string | null>(null);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [fetchedLivePrice, setFetchedLivePrice] = useState<number | null>(null);
@@ -830,15 +767,7 @@ export default function AssetDetailPage() {
     }
   };
 
-  const periods: { key: TimePeriod; label: string; labelTh: string }[] = [
-    { key: "1d",  label: "1D",  labelTh: "1วัน" },
-    { key: "5d",  label: "5D",  labelTh: "5วัน" },
-    { key: "1m",  label: "1M",  labelTh: "1ด."  },
-    { key: "6m",  label: "6M",  labelTh: "6ด."  },
-    { key: "ytd", label: "YTD", labelTh: "YTD"  },
-    { key: "1y",  label: "1Y",  labelTh: "1ปี"  },
-    { key: "5y",  label: "5Y",  labelTh: "5ปี"  },
-  ];
+  const periods: { key: TimePeriod; label: string; labelTh: string }[] = ASSET_PERIODS;
 
   const dataToShow = chartData;
   const latestPoint = dataToShow[dataToShow.length - 1];
@@ -886,13 +815,8 @@ export default function AssetDetailPage() {
     : "";
 
   // Show skeleton while Supabase is still loading assets (assets=[] on first render)
-  if (!asset && assets.length === 0) {
-    return (
-      <div className="p-6 lg:p-8 max-w-[1600px] mx-auto h-[calc(100vh-64px)] flex flex-col items-center justify-center gap-4">
-        <Loader2 className="w-10 h-10 text-[#ADC6FF] animate-spin" />
-        <span className="text-gray-500 text-sm">{language === "th" ? "กำลังโหลดข้อมูล..." : "Loading asset..."}</span>
-      </div>
-    );
+  if (!asset && !isDataLoaded) {
+    return <AssetSkeleton/>;
   }
 
   if (!asset) {
@@ -923,24 +847,9 @@ export default function AssetDetailPage() {
         )}
       </AnimatePresence>
 
-      <div className="p-6 lg:p-8 max-w-[1600px] mx-auto h-[calc(100vh-64px)] flex flex-col">
+      <div className={layout.root}>
         {/* Header */}
-        <section className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-          <div className="flex items-center gap-4">
-            <Link href="/portfolio" className="p-3 bg-white/5 border border-white/10 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-all">
-              <ArrowLeft size={20} />
-            </Link>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handlePreviousAsset}
-                disabled={!canGoPrevious}
-                className={cn("p-2 rounded-lg transition-all", canGoPrevious ? "bg-white/5 text-gray-400 hover:text-white hover:bg-white/10" : "text-gray-600 cursor-not-allowed")}
-              >
-                <ChevronLeft size={20} />
-              </button>
-
-              <div className="flex items-center gap-3 px-4">
+        <AssetHeader identity={<div className="flex items-center gap-3 px-4">
                 <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center relative overflow-hidden border border-white/5">
                   <AssetLogo symbol={asset.symbol} name={asset.name} />
                 </div>
@@ -948,24 +857,7 @@ export default function AssetDetailPage() {
                   <h1 className="text-2xl font-black text-white">{asset.name}</h1>
                   <p className="text-gray-500 font-medium">{asset.symbol}</p>
                 </div>
-              </div>
-
-              <button
-                onClick={handleNextAsset}
-                disabled={!canGoNext}
-                className={cn("p-2 rounded-lg transition-all", canGoNext ? "bg-white/5 text-gray-400 hover:text-white hover:bg-white/10" : "text-gray-600 cursor-not-allowed")}
-              >
-                <ChevronRight size={20} />
-              </button>
-
-              <Link href={`/terminal?symbol=${encodeURIComponent(asset.symbol)}`} replace={false} className="ml-2 px-4 py-2 bg-[#ADC6FF] text-[#00285d] font-bold text-xs rounded-xl uppercase tracking-wide flex items-center gap-2 hover:brightness-110 transition-all">
-                <Activity size={16} /> {language === "th" ? "วิเคราะห์เทรด" : "Trade Assistant"}
-              </Link>
-            </div>
-          </div>
-
-          {/* Price Display */}
-          <div className="flex flex-col items-end">
+              </div>} price={<div className="flex flex-col items-end">
             <AnimatePresence mode="wait">
               <motion.div
                 key={hoveredIndex ?? 'latest'}
@@ -992,19 +884,18 @@ export default function AssetDetailPage() {
               <span className="text-sm text-gray-500 mt-1 font-medium">{t("approx")} {formatMoney(livePrice, "USD", 1 / THB_RATE)}</span>
             )}
             {dateLabel && <span className="text-xs text-gray-500 mt-0.5">{dateLabel}</span>}
-          </div>
-        </section>
+          </div>} symbol={asset.symbol} handlePreviousAsset={handlePreviousAsset} handleNextAsset={handleNextAsset} canGoPrevious={canGoPrevious} canGoNext={canGoNext}/>
 
         {/* Main Content */}
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0">
+        <div className={layout.grid}>
           {/* Left Side - Chart & Stats */}
           <div className="lg:col-span-2 space-y-6 overflow-y-auto">
 
             {/* ── 4-Card Stats Grid (separated) ── */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className={layout.metrics}>
               {/* Price */}
               <StatCard
-                label={t("livePrice")}
+                label={t(ASSET_METRICS.price.key)}
                 icon={TrendingUp}
                 isActive={hoveredIndex === null}
               >
@@ -1032,7 +923,7 @@ export default function AssetDetailPage() {
               </StatCard>
 
               {/* Avg Cost */}
-              <StatCard label={t("avgCost")} icon={DollarSign}>
+              <StatCard label={t(ASSET_METRICS.cost.key)} icon={DollarSign}>
                 <div className="text-base font-black text-white truncate">
                   {isThaiAsset ? formatMoney(avgCost, "THB", THB_RATE) : formatMoney(avgCost, "USD", 1)}
                 </div>
@@ -1045,7 +936,7 @@ export default function AssetDetailPage() {
               </StatCard>
 
               {/* Holdings */}
-              <StatCard label={t("holdings")} icon={BarChart3}>
+              <StatCard label={t(ASSET_METRICS.holdings.key)} icon={BarChart3}>
                 <div className="text-base font-black text-white truncate">
                   {isThaiAsset ? formatMoney(totalValue, "THB", THB_RATE) : formatMoney(totalValue, "USD", 1)}
                 </div>
@@ -1060,7 +951,7 @@ export default function AssetDetailPage() {
 
               {/* Unrealized P&L */}
               <StatCard
-                label={t("totalReturn")}
+                label={t(ASSET_METRICS.returns.key)}
                 icon={isProfit ? ArrowUpRight : ArrowDownRight}
                 isPositive={isProfit}
               >
@@ -1117,38 +1008,11 @@ export default function AssetDetailPage() {
 
             {/* Chart */}
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-[#1C1B1B] rounded-[1.5rem] border border-white/5 p-6">
-              <div className="flex flex-wrap justify-between items-start gap-4 mb-6">
-                <p className="text-sm font-bold text-white">{t("performanceTitle")}</p>
-                <div className="flex gap-1 bg-white/5 rounded-lg p-1">
-                  {periods.map((period) => (
-                    <Link
-                      key={period.key}
-                      href={`/portfolio/${asset.symbol}?period=${period.key}`}
-                      onClick={() => setSelectedPeriod(period.key)}
-                      className={cn(
-                        "px-2 py-1 text-[10px] font-black uppercase tracking-wide rounded-md transition-all",
-                        selectedPeriod === period.key ? "bg-[#ADC6FF] text-[#00285d]" : "text-gray-400 hover:text-white"
-                      )}
-                    >
-                      {t(`period${period.key.toLowerCase()}`)}
-                    </Link>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 mb-4 text-sm text-gray-500">
-                <Clock size={14} />
-                <span>{language === "th" ? PERIOD_CONFIG[selectedPeriod].changeLabelTh : PERIOD_CONFIG[selectedPeriod].changeLabel}</span>
-                {dataToShow.length > 0 && <span className="text-gray-600">• {dataToShow.length} {t("dataPoints")}</span>}
-              </div>
-
+              <AssetChartToolbar symbol={asset.symbol} selectedPeriod={selectedPeriod} setSelectedPeriod={setSelectedPeriod} count={dataToShow.length}/>
               <div className="h-[400px] w-full relative">
                 <AnimatePresence mode="wait">
-                  {isLoadingChart ? (
-                    <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full h-full flex flex-col items-center justify-center gap-3">
-                      <Loader2 className="w-8 h-8 text-[#ADC6FF] animate-spin" />
-                      <span className="text-gray-500 text-sm">{t("loadingChartData")}</span>
-                    </motion.div>
+                  {showChartSkeleton ? (
+                    <Sk.Chart height={400}/>
                   ) : error ? (
                     <motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full h-full flex flex-col items-center justify-center text-center px-4">
                       <div className="text-[#FFB4AB] mb-2"><Activity size={32} /></div>
@@ -1172,13 +1036,7 @@ export default function AssetDetailPage() {
                 </AnimatePresence>
               </div>
 
-              <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/5">
-                <div className="flex items-center gap-4 text-xs text-gray-500">
-                  <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-[#4EDEA3]" /><span>{t("uptrend")}</span></div>
-                  <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-[#FFB4AB]" /><span>{t("downtrend")}</span></div>
-                </div>
-                <div className="text-xs text-gray-600">{t("hoverToSeePrice")}</div>
-              </div>
+              <AssetChartFooter/>
             </motion.div>
           </div>
 
@@ -1189,7 +1047,7 @@ export default function AssetDetailPage() {
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-bold text-white flex items-center gap-2">
                   <Target className="text-[#ADC6FF]" size={20} />
-                  {isEditMode ? (language === "th" ? "จัดการ Portfolio" : "Manage Portfolio") : t("investmentJourney")}
+                  {isEditMode ? (language === "th" ? "จัดการ Portfolio" : "Manage Portfolio") : t(JOURNEY_TITLE)}
                 </h2>
 
                 {/* Edit / Done button */}
@@ -1300,34 +1158,3 @@ const AssetLogo = ({ symbol, name, className }: { symbol: string; name: string; 
 };
 
 // ─── StatCard (refactored to accept children) ─────────────────────────────────
-
-interface StatCardProps {
-  label: string;
-  icon: React.ElementType;
-  isPositive?: boolean;
-  isActive?: boolean;
-  children: React.ReactNode;
-}
-
-function StatCard({ label, icon: Icon, isPositive, isActive, children }: StatCardProps) {
-  const positive = isPositive ?? true;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={cn(
-        "bg-[#1C1B1B] p-4 rounded-2xl border transition-all duration-300",
-        isActive ? "border-[#ADC6FF]/30 shadow-lg shadow-[#ADC6FF]/5" : "border-white/5 hover:border-white/10"
-      )}
-    >
-      <div className="flex items-start justify-between mb-2">
-        <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">{label}</span>
-        <div className={cn("p-1.5 rounded-lg transition-colors", positive ? "bg-[#4EDEA3]/10" : "bg-white/5")}>
-          <Icon size={14} className={positive ? "text-[#4EDEA3]" : "text-gray-400"} />
-        </div>
-      </div>
-      {children}
-    </motion.div>
-  );
-}

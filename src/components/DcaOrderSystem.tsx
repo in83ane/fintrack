@@ -568,12 +568,12 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
 
   const getAdvisoryMessage = () => {
     if (activeEntries.length === 0) return { text: "กรุณาระบุข้อมูลไม้ 1 เพื่อเริ่มคำนวณ", color: "text-gray-400" };
-    if (pnlPercent > 0.2) return { text: "ผ่าน break-even แล้ว กำลังทำกำไร พิจารณา take profit", color: "text-[#4EDEA3]" };
-    if (pnlPercent > 0) return { text: "ใกล้คืนทุน รออีกนิด ให้ผ่าน break-even ก่อนขาย", color: "text-[#E9C349]" };
-    if (pnlPercent > -1) return { text: "ราคาอ่อนตัว ถ้ามีแผน DCA พิจารณาเปิดไม้ 2", color: "text-[#ADC6FF]" };
-    if (pnlPercent > -2) return { text: "ราคาลงมาถึงโซนไม้ 2 เพิ่มไม้เพื่อลดต้นทุนเฉลี่ย", color: "text-[#ADC6FF]" };
-    if (pnlPercent > -4) return { text: "โซนไม้ 3 การเพิ่มไม้จะดึงราคาเฉลี่ยลงมาได้มาก", color: "text-[#FFB4AB]" };
-    return { text: "⏳ ราคาอยู่ต่ำกว่าทุนเฉลี่ย — พิจารณาเพิ่มไม้ตามแผนและความเสี่ยงที่ตั้งไว้", color: "text-[#FFB4AB]" };
+    if (pnlPercent > 0.2) return { text: "ผ่าน break-even แล้ว กำลังทำกำไร พิจารณา take profit", color: "text-gain" };
+    if (pnlPercent > 0) return { text: "ใกล้คืนทุน รออีกนิด ให้ผ่าน break-even ก่อนขาย", color: "text-warning" };
+    if (pnlPercent > -1) return { text: "ราคาอ่อนตัว ถ้ามีแผน DCA พิจารณาเปิดไม้ 2", color: "text-info" };
+    if (pnlPercent > -2) return { text: "ราคาลงมาถึงโซนไม้ 2 เพิ่มไม้เพื่อลดต้นทุนเฉลี่ย", color: "text-info" };
+    if (pnlPercent > -4) return { text: "โซนไม้ 3 การเพิ่มไม้จะดึงราคาเฉลี่ยลงมาได้มาก", color: "text-loss" };
+    return { text: "⏳ ราคาอยู่ต่ำกว่าทุนเฉลี่ย — พิจารณาเพิ่มไม้ตามแผนและความเสี่ยงที่ตั้งไว้", color: "text-loss" };
   };
 
   const advisory = getAdvisoryMessage();
@@ -821,9 +821,9 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
 
   if (!activePortfolioId || activePortfolioId === 'all' || activePortfolio?.kind !== 'trading') {
     return (
-      <div className="flex flex-col items-center justify-center p-10 bg-surface rounded-3xl border border-border mt-4 h-full">
-        <AlertTriangle size={48} className="text-[#FFB4AB] mb-4" />
-        <h3 className="text-lg font-black text-[#FFB4AB] mb-2">Trade ใช้กับพอร์ตลงทุนเท่านั้น</h3>
+      <div className="flex flex-col items-center justify-center p-10 bg-surface rounded-2xl border border-border mt-4 h-full">
+        <AlertTriangle size={48} className="text-loss mb-4" />
+        <h3 className="text-lg font-black text-loss mb-2">Trade ใช้กับพอร์ตลงทุนเท่านั้น</h3>
         <p className="text-gray-500 text-sm text-center mb-6">เลือกพอร์ตลงทุนที่จะใช้วางแผนและบันทึกการเทรด โดย Bucket จะยังเป็นพื้นที่สำหรับจัดการเงินสด</p>
         {tradingPortfolios.length > 0 ? (
           <CustomSelect
@@ -850,18 +850,18 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
       
       {/* The Trade page supplies the primary heading; this shows live plan context. */}
       {!compact && (portalTarget ? createPortal(
-        <div className="flex items-center gap-4 bg-white/5 border border-border rounded-full px-4 py-1.5 ml-2 hover:bg-white/10 transition-colors">
+        <div className="flex items-center gap-4 bg-foreground/5 border border-border rounded-full px-4 py-1.5 ml-2 hover:bg-foreground/10 transition-colors">
            <div className="flex items-center gap-2">
-             <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest hidden sm:inline">Asset</span>
-             <span className="text-xs font-black text-white">{symbol || "NO SYMBOL"}</span>
+             <span className="text-xs font-black text-gray-500 uppercase tracking-widest hidden sm:inline">Asset</span>
+             <span className="text-xs font-black text-foreground">{symbol || "NO SYMBOL"}</span>
            </div>
-           <div className="w-px h-3 bg-white/10"></div>
+           <div className="w-px h-3 bg-foreground/10"></div>
            <div className="flex items-center gap-2">
-             <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest hidden sm:inline">MKT</span>
+             <span className="text-xs font-black text-gray-500 uppercase tracking-widest hidden sm:inline">MKT</span>
              {isMarketPriceLoading ? (
-               <span className="h-3 w-12 animate-pulse rounded bg-white/10" aria-label="Loading market price" />
+               <span className="h-3 w-12 animate-pulse rounded bg-foreground/10" aria-label="Loading market price" />
              ) : (
-               <span className={cn("text-xs font-black", currentMarketPrice > 0 ? "text-[#4EDEA3]" : "text-gray-500")}>
+               <span className={cn("text-xs font-black", currentMarketPrice > 0 ? "text-gain" : "text-gray-500")}>
                  {currentMarketPrice > 0 ? formatVal(currentMarketPrice) : "—"}
                </span>
              )}
@@ -869,14 +869,14 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
         </div>,
         portalTarget
       ) : (
-        <div className="bg-gradient-to-r from-[#1C1B1B] to-black rounded-3xl p-6 border border-border flex justify-between items-center sticky top-4 z-50 shadow-2xl shadow-black/50 backdrop-blur-xl">
+        <div className="bg-gradient-to-r from-surface to-black rounded-2xl p-6 border border-border flex justify-between items-center sticky top-4 z-50 shadow-2xl shadow-black/50 ">
            <div>
-             <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Trading Asset</p>
-             <h2 className="text-3xl font-black text-white tracking-tighter leading-none">{symbol || "NO SYMBOL"}</h2>
+             <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-1">Trading Asset</p>
+             <h2 className="text-3xl font-black text-foreground tracking-tighter leading-none">{symbol || "NO SYMBOL"}</h2>
            </div>
            <div className="text-right">
-             <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Current Market Price</p>
-             {isMarketPriceLoading ? <div className="ml-auto h-8 w-28 animate-pulse rounded-lg bg-white/10" /> : <h2 className="text-3xl font-black text-[#4EDEA3] leading-none">{currentMarketPrice > 0 ? formatVal(currentMarketPrice) : "—"}</h2>}
+             <p className="text-xs font-black text-gray-500 uppercase tracking-widest mb-1">Current Market Price</p>
+             {isMarketPriceLoading ? <div className="ml-auto h-8 w-28 animate-pulse rounded-lg bg-foreground/10" /> : <h2 className="text-3xl font-black text-gain leading-none">{currentMarketPrice > 0 ? formatVal(currentMarketPrice) : "—"}</h2>}
            </div>
         </div>
       ))}
@@ -884,15 +884,15 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
       {compact && (
         <div className="flex items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-wider text-gray-500">Trade plan</p>
-            <h2 className="text-lg font-black text-white">{symbol || 'NO SYMBOL'}</h2>
+            <p className="text-xs font-black uppercase tracking-wider text-gray-500">Trade plan</p>
+            <h2 className="text-lg font-black text-foreground">{symbol || 'NO SYMBOL'}</h2>
           </div>
           <div className="flex items-center gap-3">
             <div className="text-right">
-              <p className="text-[10px] font-bold uppercase text-gray-500">MKT Price</p>
-              {isMarketPriceLoading ? <span className="ml-auto mt-1 block h-3 w-14 animate-pulse rounded bg-white/10" /> : <p className="text-sm font-black text-[#4EDEA3]">{currentMarketPrice > 0 ? formatVal(currentMarketPrice) : "—"}</p>}
+              <p className="text-xs font-bold uppercase text-gray-500">MKT Price</p>
+              {isMarketPriceLoading ? <span className="ml-auto mt-1 block h-3 w-14 animate-pulse rounded bg-foreground/10" /> : <p className="text-sm font-black text-gain">{currentMarketPrice > 0 ? formatVal(currentMarketPrice) : "—"}</p>}
             </div>
-            {onClose && <button onClick={onClose} className="rounded-xl p-2 text-gray-400 hover:bg-white/5 hover:text-white"><X size={18} /></button>}
+            {onClose && <button onClick={onClose} className="rounded-xl p-2 text-gray-400 hover:bg-foreground/5 hover:text-foreground"><X size={18} /></button>}
           </div>
         </div>
       )}
@@ -903,12 +903,12 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
         {/* Left Col: Entries */}
         <div className="xl:col-span-1 space-y-4">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="font-black text-white flex items-center gap-2"><Target size={18} className="text-[#ADC6FF]" /> ไม้เข้าซื้อ (DCA Entries)</h3>
-            <span className="text-xs font-bold text-gray-500 bg-white/5 px-2 py-1 rounded">มี {activeEntries.length} ไม้</span>
+            <h3 className="font-black text-foreground flex items-center gap-2"><Target size={18} className="text-info" /> ไม้เข้าซื้อ (DCA Entries)</h3>
+            <span className="text-xs font-bold text-gray-500 bg-foreground/5 px-2 py-1 rounded">มี {activeEntries.length} ไม้</span>
           </div>
 
-          <div className="flex items-center justify-between rounded-xl border border-border bg-white/5 px-3 py-2">
-            <span className="text-[10px] font-black uppercase tracking-wide text-gray-500">พอร์ตลงทุน (Portfolio)</span>
+          <div className="flex items-center justify-between rounded-xl border border-border bg-foreground/5 px-3 py-2">
+            <span className="text-xs font-black uppercase tracking-wide text-gray-500">พอร์ตลงทุน (Portfolio)</span>
             <CustomSelect
               value={activePortfolioId || ''}
               onChange={(val) => selectPortfolio(val)}
@@ -921,9 +921,9 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
             />
           </div>
           
-          <div className="flex items-center justify-between rounded-xl border border-[#ADC6FF]/20 bg-[#ADC6FF]/5 px-3 py-2">
-            <span className="text-[10px] font-black uppercase tracking-wide text-gray-500">สินทรัพย์ที่กำลังซื้อ (Symbol)</span>
-            <span className="text-xs font-black text-[#ADC6FF]">{symbol || 'เลือกสัญลักษณ์ด้านบน'}</span>
+          <div className="flex items-center justify-between rounded-xl border border-info/20 bg-info/5 px-3 py-2">
+            <span className="text-xs font-black uppercase tracking-wide text-gray-500">สินทรัพย์ที่กำลังซื้อ (Symbol)</span>
+            <span className="text-xs font-black text-info">{symbol || 'เลือกสัญลักษณ์ด้านบน'}</span>
           </div>
           
           <div className="space-y-3">
@@ -935,19 +935,19 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-xs font-black", 
-                      entry.active ? "bg-[#ADC6FF] text-[#00285d]" : "bg-white/10 text-gray-500"
+                      entry.active ? "bg-info text-primary-foreground" : "bg-foreground/10 text-gray-500"
                     )}>
                       {idx + 1}
                     </div>
-                    <span className="font-bold text-sm text-white">ไม้ {idx + 1} {idx === 0 ? '(แรก)' : '(ถัว)'}</span>
+                    <span className="font-bold text-sm text-foreground">ไม้ {idx + 1} {idx === 0 ? '(แรก)' : '(ถัว)'}</span>
                   </div>
                   {(entries.length > 1 || entry.executed) && (
                     <>
                       {confirmRemoveEntryId === entry.id ? (
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] text-[#FFB4AB] font-bold">{entry.executed ? 'ลบรายการซื้อและคืนเงิน?' : 'ลบไม้?'}</span>
-                          <button onClick={confirmRemoveEntry} className="text-[10px] font-black px-2 py-1 rounded-lg bg-[#FFB4AB] text-black hover:opacity-80 transition-opacity">ยืนยัน</button>
-                          <button onClick={() => setConfirmRemoveEntryId(null)} className="text-[10px] font-bold px-2 py-1 rounded-lg text-gray-400 hover:text-white transition-colors">ยกเลิก</button>
+                          <span className="text-xs text-loss font-bold">{entry.executed ? 'ลบรายการซื้อและคืนเงิน?' : 'ลบไม้?'}</span>
+                          <button onClick={confirmRemoveEntry} className="text-xs font-black px-2 py-1 rounded-lg bg-loss text-black hover:opacity-80 transition-opacity">ยืนยัน</button>
+                          <button onClick={() => setConfirmRemoveEntryId(null)} className="text-xs font-bold px-2 py-1 rounded-lg text-gray-400 hover:text-foreground transition-colors">ยกเลิก</button>
                         </div>
                       ) : (
                         <button 
@@ -955,7 +955,7 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
                           disabled={postedLots.some(l=>tradeLotEntryId(l.trade)===entry.id && l.remaining<l.quantity)}
                           title="มีประวัติปิดแล้ว ลบไม่ได้"
                           style={postedLots.some(l=>tradeLotEntryId(l.trade)===entry.id && l.remaining<l.quantity)?{opacity:0.4}:undefined}
-                          className="text-xs font-bold px-2 py-1 rounded-lg text-[#FFB4AB] bg-[#FFB4AB]/5 hover:bg-[#FFB4AB]/10 transition-colors"
+                          className="text-xs font-bold px-2 py-1 rounded-lg text-loss bg-loss/5 hover:bg-loss/10 transition-colors"
                         >
                           ลบไม้
                         </button>
@@ -967,33 +967,33 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
                 {(entry.active || entry.executed) && (
                   <div className="grid grid-cols-3 gap-2 sm:gap-3">
                     <div className="min-w-0">
-                      <label className="mb-1 flex min-h-7 flex-col justify-end text-[9px] font-black uppercase leading-3 text-gray-500">
+                      <label className="mb-1 flex min-h-7 flex-col justify-end text-xs font-black uppercase leading-3 text-gray-500">
                         <span>ราคา</span><span>(Price)</span>
                       </label>
                       <input 
                         type="number" step="any" disabled={entry.executed}
                         value={(entry.executed ? postedLots.find(l=>tradeLotEntryId(l.trade)===entry.id)?.trade.pricePerUnit : entry.price) || ''} onChange={e => handleEntryChange(entry.id, 'price', +e.target.value)}
-                        className={cn("h-10 min-w-0 w-full rounded-lg border border-border bg-black/40 px-2 text-sm font-bold text-white outline-none focus:border-[#ADC6FF] sm:px-3", entry.executed && "opacity-50 cursor-not-allowed")}
+                        className={cn("h-10 min-w-0 w-full rounded-lg border border-border bg-black/40 px-2 text-sm font-bold text-foreground outline-none  sm:px-3", entry.executed && "opacity-50 cursor-not-allowed")}
                       />
                     </div>
                     <div className="min-w-0">
-                      <label className="mb-1 flex min-h-7 flex-col justify-end text-[9px] font-black uppercase leading-3 text-gray-500">
+                      <label className="mb-1 flex min-h-7 flex-col justify-end text-xs font-black uppercase leading-3 text-gray-500">
                         <span>จำนวนหุ้น</span><span>(Qty)</span>
                       </label>
                       <input 
                         type="number" step="any" disabled={entry.executed}
                         value={(entry.executed ? postedLots.find(l=>tradeLotEntryId(l.trade)===entry.id)?.quantity : entry.quantity) || ''} onChange={e => handleEntryChange(entry.id, 'quantity', +e.target.value)}
-                        className={cn("h-10 min-w-0 w-full rounded-lg border border-border bg-black/40 px-2 text-sm font-bold text-white outline-none focus:border-[#ADC6FF] sm:px-3", entry.executed && "opacity-50 cursor-not-allowed")}
+                        className={cn("h-10 min-w-0 w-full rounded-lg border border-border bg-black/40 px-2 text-sm font-bold text-foreground outline-none  sm:px-3", entry.executed && "opacity-50 cursor-not-allowed")}
                       />
                     </div>
                     <div className="min-w-0">
-                      <label className="mb-1 flex min-h-7 flex-col justify-end text-[9px] font-black uppercase leading-3 text-gray-500">
+                      <label className="mb-1 flex min-h-7 flex-col justify-end text-xs font-black uppercase leading-3 text-gray-500">
                         <span>จำนวนเงิน</span><span>(Amount)</span>
                       </label>
                       <input 
                         type="number" step="any" disabled={entry.executed}
                         value={(entry.executed ? postedLots.find(l=>tradeLotEntryId(l.trade)===entry.id)?.trade.amountUSD : entry.amount) || ''} onChange={e => handleEntryChange(entry.id, 'amount', +e.target.value)}
-                        className={cn("h-10 min-w-0 w-full rounded-lg border border-border bg-black/40 px-2 text-sm font-bold text-white outline-none focus:border-[#ADC6FF] sm:px-3", entry.executed && "opacity-50 cursor-not-allowed")}
+                        className={cn("h-10 min-w-0 w-full rounded-lg border border-border bg-black/40 px-2 text-sm font-bold text-foreground outline-none  sm:px-3", entry.executed && "opacity-50 cursor-not-allowed")}
                       />
                     </div>
                   </div>
@@ -1006,7 +1006,7 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
                         setEntryMode('BUY');
                         setExecuteModal({ entryId: entry.id, brokerageAccountId: '' });
                       }}
-                      className="text-[10px] font-bold px-3 py-1.5 rounded-lg bg-[#ADC6FF] text-[#00285d] hover:opacity-80 transition-opacity flex items-center gap-1"
+                      className="text-xs font-bold px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:opacity-80 transition-opacity flex items-center gap-1"
                     >
                       <Check size={12} /> ยืนยันการซื้อ (Execute)
                     </button>
@@ -1014,12 +1014,12 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
                 )}
                 {entry.executed && (
                   <div className="mt-3 flex justify-end">
-                    <span className="mr-auto text-[10px] text-gray-500 self-center">{(() => {const l=postedLots.find(l=>tradeLotEntryId(l.trade)===entry.id);return l&&l.remaining<l.quantity?(l.remaining===0?'ปิดครบแล้ว':`ปิดแล้ว ${l.quantity-l.remaining} · เหลือ ${l.remaining}`):'';})()}</span>
-                    <button className="mr-3 text-xs text-[#ADC6FF]" onClick={() => {
+                    <span className="mr-auto text-xs text-gray-500 self-center">{(() => {const l=postedLots.find(l=>tradeLotEntryId(l.trade)===entry.id);return l&&l.remaining<l.quantity?(l.remaining===0?'ปิดครบแล้ว':`ปิดแล้ว ${l.quantity-l.remaining} · เหลือ ${l.remaining}`):'';})()}</span>
+                    <button className="mr-3 text-xs text-primary" onClick={() => {
                       const lot = postedLots.find(item => tradeLotEntryId(item.trade) === entry.id);
                       if (lot) setEditingLot(lot.trade.id);
                     }}>แก้ไขไม้นี้</button>
-                    <span className="text-[10px] font-bold px-3 py-1.5 rounded-lg bg-[#4EDEA3]/10 text-[#4EDEA3] flex items-center gap-1">
+                    <span className="text-xs font-bold px-3 py-1.5 rounded-lg bg-gain/10 text-gain flex items-center gap-1">
                       <Check size={12} /> ซื้อเข้าพอร์ตแล้ว
                     </span>
                   </div>
@@ -1030,11 +1030,11 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
                      <div className="mb-3"><AssetFundingFields portfolioId={activePortfolioId || ''} currency={marketCurrency} mode={entryMode} onModeChange={setEntryMode} accountId={executeModal.brokerageAccountId} onAccountChange={id => setExecuteModal({ ...executeModal, brokerageAccountId: id })} /></div>
                      <div className="flex gap-2 justify-end">
                        <div className="flex-1 space-y-2 text-xs text-gray-400">
-                         <label className="block">ค่าธรรมเนียม ({marketCurrency})<input aria-label="ค่าธรรมเนียมซื้อ" className="mt-1 w-full rounded border border-white/10 bg-black/20 p-2" type="number" min="0" step="any" value={executionFee} onChange={e => setExecutionFee(e.target.value)} /></label>
-                         <label className="block">1 USD = กี่ THB ณ วันซื้อ<input className="mt-1 w-full rounded border border-white/10 bg-black/20 p-2" type="number" min="0" step="any" value={executionFx} onChange={e => setExecutionFx(e.target.value)} /></label>
+                         <label className="block">ค่าธรรมเนียม ({marketCurrency})<input aria-label="ค่าธรรมเนียมซื้อ" className="mt-1 w-full rounded border border-foreground/10 bg-black/20 p-2" type="number" min="0" step="any" value={executionFee} onChange={e => setExecutionFee(e.target.value)} /></label>
+                         <label className="block">1 USD = กี่ THB ณ วันซื้อ<input className="mt-1 w-full rounded border border-foreground/10 bg-black/20 p-2" type="number" min="0" step="any" value={executionFx} onChange={e => setExecutionFx(e.target.value)} /></label>
                        </div>
-                       <button onClick={() => setExecuteModal(null)} className="px-3 py-1.5 text-[10px] font-bold text-gray-400 hover:text-white transition-colors">ยกเลิก</button>
-                       <button disabled={isExecuting} onClick={() => executeEntry(entry.id, executeModal.brokerageAccountId)} className="px-3 py-1.5 text-[10px] font-black bg-[#ADC6FF] text-[#00285d] rounded-lg hover:opacity-80 transition-opacity disabled:opacity-40">
+                       <button onClick={() => setExecuteModal(null)} className="px-3 py-1.5 text-xs font-bold text-gray-400 hover:text-foreground transition-colors">ยกเลิก</button>
+                       <button disabled={isExecuting} onClick={() => executeEntry(entry.id, executeModal.brokerageAccountId)} className="px-3 py-1.5 text-xs font-black bg-primary text-primary-foreground rounded-lg hover:opacity-80 transition-opacity disabled:opacity-40">
                          ยืนยันรายการ
                        </button>
                      </div>
@@ -1046,13 +1046,13 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
 
           <button
             onClick={addEntry}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[#ADC6FF]/40 py-3 text-xs font-black text-[#ADC6FF] transition-colors hover:bg-[#ADC6FF]/10"
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-primary/40 py-3 text-xs font-black text-primary transition-colors hover:bg-primary/10"
           >
             <Plus size={15} /> เพิ่มไม้ DCA
           </button>
 
           <div className="mt-4 rounded-2xl border border-border bg-surface p-4">
-            <label className="mb-1 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wide text-gray-500"><CircleDollarSign size={12} /> เงินทุนแผนนี้ (Portfolio Budget)</label>
+            <label className="mb-1 flex items-center gap-1.5 text-xs font-black uppercase tracking-wide text-gray-500"><CircleDollarSign size={12} /> เงินทุนแผนนี้ (Portfolio Budget)</label>
             <input
               type="number"
               min="0"
@@ -1060,9 +1060,9 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
               value={portfolioBudget || ''}
               onChange={event => setPortfolioBudget(Number(event.target.value) || 0)}
               placeholder="0.00"
-              className="w-full rounded-xl border border-border bg-black/40 px-3 py-2 text-sm font-black text-white outline-none focus:border-[#ADC6FF]"
+              className="w-full rounded-xl border border-border bg-black/40 px-3 py-2 text-sm font-black text-foreground outline-none "
             />
-            <p className="mt-2 text-[10px] font-bold text-gray-500">ใช้ DCA แล้ว {formatVal(dcaTotalInvestment)}{portfolioBudget > 0 ? ` · คงเหลือ ${formatVal(Math.max(0, portfolioBudget - dcaTotalInvestment))}` : ''}</p>
+            <p className="mt-2 text-xs font-bold text-gray-500">ใช้ DCA แล้ว {formatVal(dcaTotalInvestment)}{portfolioBudget > 0 ? ` · คงเหลือ ${formatVal(Math.max(0, portfolioBudget - dcaTotalInvestment))}` : ''}</p>
           </div>
 
           <div className="mt-6 flex flex-col gap-3">
@@ -1074,20 +1074,20 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
               const totalJournalPnL = journal.reduce((sum, t) => sum + t.netProfit, 0);
               return (
                 <>
-                  <div className="bg-gradient-to-br from-[#1C1B1B] to-black p-5 rounded-2xl border border-border relative overflow-hidden">
-                     <p className="text-[10px] font-black text-gray-500 uppercase mb-2 relative z-10">Win Rate</p>
-                     <p className="text-3xl font-black text-white relative z-10">{winRate.toFixed(0)}%</p>
+                  <div className="bg-gradient-to-br from-surface to-black p-5 rounded-2xl border border-border relative overflow-hidden">
+                     <p className="text-xs font-black text-gray-500 uppercase mb-2 relative z-10">Win Rate</p>
+                     <p className="text-3xl font-black text-foreground relative z-10">{winRate.toFixed(0)}%</p>
                      <p className="text-xs text-gray-500 font-bold mt-2 relative z-10">ชนะ {winningTrades} จาก {totalTrades} เทรด</p>
                   </div>
-                  <div className="bg-gradient-to-br from-[#1C1B1B] to-black p-5 rounded-2xl border border-border relative overflow-hidden">
-                     <p className="text-[10px] font-black text-gray-500 uppercase mb-2 relative z-10">Total Net P&L</p>
-                     <p className={cn("text-3xl font-black relative z-10", totalJournalPnL >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
+                  <div className="bg-gradient-to-br from-surface to-black p-5 rounded-2xl border border-border relative overflow-hidden">
+                     <p className="text-xs font-black text-gray-500 uppercase mb-2 relative z-10">Total Net P&L</p>
+                     <p className={cn("text-3xl font-black relative z-10", totalJournalPnL >= 0 ? "text-gain" : "text-loss")}>
                        {totalJournalPnL >= 0 ? '+' : ''}{formatVal(totalJournalPnL)}
                      </p>
                   </div>
-                  <div className="bg-gradient-to-br from-[#1C1B1B] to-black p-5 rounded-2xl border border-border relative overflow-hidden">
-                     <p className="text-[10px] font-black text-gray-500 uppercase mb-2 relative z-10">Total Trades</p>
-                     <p className="text-3xl font-black text-white relative z-10">{totalTrades}</p>
+                  <div className="bg-gradient-to-br from-surface to-black p-5 rounded-2xl border border-border relative overflow-hidden">
+                     <p className="text-xs font-black text-gray-500 uppercase mb-2 relative z-10">Total Trades</p>
+                     <p className="text-3xl font-black text-foreground relative z-10">{totalTrades}</p>
                      <p className="text-xs text-gray-500 font-bold mt-2 relative z-10">ออเดอร์ทั้งหมด</p>
                   </div>
                 </>
@@ -1098,9 +1098,9 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
           {/* Donut Chart */}
           {activeEntries.length > 0 && (
             <div className="bg-surface rounded-2xl p-5 border border-border mt-6 shadow-xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-24 bg-[#4EDEA3]/5 rounded-full blur-[80px] pointer-events-none" />
-              <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-4 flex items-center gap-2 relative z-10">
-                <Target size={12} className="text-[#ADC6FF]" /> สัดส่วนการลงทุน
+              <div className="absolute top-0 right-0 p-24 bg-gain/5 rounded-full blur-[80px] pointer-events-none" />
+              <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-4 flex items-center gap-2 relative z-10">
+                <Target size={12} className="text-info" /> สัดส่วนการลงทุน
               </h4>
               <div className="h-48 w-full relative z-10">
                 <ResponsiveContainer width="100%" height="100%">
@@ -1140,25 +1140,25 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
 
           
           {/* Average Info Card */}
-          <div className="bg-gradient-to-br from-[#1C1B1B] to-black rounded-3xl p-4 sm:p-5 border border-border relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-32 bg-[#ADC6FF]/5 rounded-full blur-[100px] pointer-events-none" />
+          <div className="bg-gradient-to-br from-surface to-black rounded-2xl p-4 sm:p-5 border border-border relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-32 bg-info/5 rounded-full blur-[100px] pointer-events-none" />
             
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4 relative z-10">
               <div>
-                <p className="text-[10px] font-black text-gray-500 uppercase mb-1">ราคาเฉลี่ยพอร์ต (Portfolio Avg)</p>
-                <p className="text-2xl font-black text-white">{formatVal(avgEntryPrice)}</p>
+                <p className="text-xs font-black text-gray-500 uppercase mb-1">ราคาเฉลี่ยพอร์ต (Portfolio Avg)</p>
+                <p className="text-2xl font-black text-foreground">{formatVal(avgEntryPrice)}</p>
               </div>
               <div>
-                <p className="text-[10px] font-black text-[#4EDEA3] uppercase mb-1">Break-Even Point</p>
-                <p className="text-2xl font-black text-[#4EDEA3]">{formatVal(breakEvenPrice)}</p>
+                <p className="text-xs font-black text-gain uppercase mb-1">Break-Even Point</p>
+                <p className="text-2xl font-black text-gain">{formatVal(breakEvenPrice)}</p>
               </div>
               <div>
-                <p className="text-[10px] font-black text-gray-500 uppercase mb-1">ต้นทุนรวมพอร์ต (Total Cost)</p>
-                <p className="text-xl font-bold text-white">{formatVal(totalInvestment)}</p>
+                <p className="text-xs font-black text-gray-500 uppercase mb-1">ต้นทุนรวมพอร์ต (Total Cost)</p>
+                <p className="text-xl font-bold text-foreground">{formatVal(totalInvestment)}</p>
               </div>
               <div>
-                <p className="text-[10px] font-black text-gray-500 uppercase mb-1">จำนวนรวม (Total Qty)</p>
-                <p className="text-xl font-bold text-white">{totalQuantity.toLocaleString(undefined, { maximumFractionDigits: 5 })}</p>
+                <p className="text-xs font-black text-gray-500 uppercase mb-1">จำนวนรวม (Total Qty)</p>
+                <p className="text-xl font-bold text-foreground">{totalQuantity.toLocaleString(undefined, { maximumFractionDigits: 5 })}</p>
               </div>
             </div>
 
@@ -1179,36 +1179,36 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
           <PriceLadder entries={activeEntries} market={currentMarketPrice} average={avgEntryPrice} analysis={signalData} format={formatVal} rate={marketCurrency === 'USD' ? 1 : exchangeRates[marketCurrency as keyof typeof exchangeRates] || 1} />
 
           {/* Target Table */}
-          <div className="bg-surface rounded-3xl p-6 border border-border">
-            <h3 className="font-black text-white flex items-center gap-2 mb-4"><Calculator size={18} className="text-[#ADC6FF]" /> แผนทำกำไร (Targets by Avg Price)</h3>
+          <div className="bg-surface rounded-2xl p-6 border border-border">
+            <h3 className="font-black text-foreground flex items-center gap-2 mb-4"><Calculator size={18} className="text-info" /> แผนทำกำไร (Targets by Avg Price)</h3>
             
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="p-3 text-[10px] font-black text-gray-500 uppercase">ระดับ (Level)</th>
-                    <th className="p-3 text-[10px] font-black text-gray-500 uppercase">% จากทุนเฉลี่ย</th>
-                    <th className="p-3 text-[10px] font-black text-gray-500 uppercase">ราคาเป้าหมาย</th>
-                    <th className="p-3 text-[10px] font-black text-gray-500 uppercase text-right">กำไรสุทธิ</th>
+                    <th className="p-3 text-xs font-black text-gray-500 uppercase">ระดับ (Level)</th>
+                    <th className="p-3 text-xs font-black text-gray-500 uppercase">% จากทุนเฉลี่ย</th>
+                    <th className="p-3 text-xs font-black text-gray-500 uppercase">ราคาเป้าหมาย</th>
+                    <th className="p-3 text-xs font-black text-gray-500 uppercase text-right">กำไรสุทธิ</th>
                   </tr>
                 </thead>
                 <tbody>
                   {[
                     { label: 'Break-even (คืนทุน)', pct: 0.2, color: 'text-gray-400' },
-                    { label: 'Scalp (สั้นๆ)', pct: 0.5, color: 'text-[#ADC6FF]' },
-                    { label: 'เป้าหมาย 1 (Target 1)', pct: 1.0, color: 'text-[#4EDEA3]' },
-                    { label: 'เป้าหมาย 2 (Target 2)', pct: 2.0, color: 'text-[#4EDEA3]' },
-                    { label: 'เป้าหมาย 3 (Target 3)', pct: 3.0, color: 'text-[#4EDEA3]' },
+                    { label: 'Scalp (สั้นๆ)', pct: 0.5, color: 'text-info' },
+                    { label: 'เป้าหมาย 1 (Target 1)', pct: 1.0, color: 'text-gain' },
+                    { label: 'เป้าหมาย 2 (Target 2)', pct: 2.0, color: 'text-gain' },
+                    { label: 'เป้าหมาย 3 (Target 3)', pct: 3.0, color: 'text-gain' },
                   ].map((t, i) => {
                     const targetPrice = avgEntryPrice * (1 + t.pct / 100);
                     const gross = targetPrice * totalQuantity;
                     const net = gross - totalInvestment;
                     return (
-                      <tr key={i} className="border-b border-border last:border-0 hover:bg-white/5">
-                        <td className="p-3 text-xs font-bold text-white">{t.label}</td>
+                      <tr key={i} className="border-b border-border last:border-0 hover:bg-foreground/5">
+                        <td className="p-3 text-xs font-bold text-foreground">{t.label}</td>
                         <td className={cn("p-3 text-xs font-black", t.color)}>+{t.pct}%</td>
-                        <td className="p-3 text-sm font-black text-white">{formatVal(targetPrice)}</td>
-                        <td className={cn("p-3 text-sm font-black text-right", net > 0 ? "text-[#4EDEA3]" : "text-gray-500")}>
+                        <td className="p-3 text-sm font-black text-foreground">{formatVal(targetPrice)}</td>
+                        <td className={cn("p-3 text-sm font-black text-right", net > 0 ? "text-gain" : "text-gray-500")}>
                           {net > 0 ? '+' : ''}{formatVal(net)}
                         </td>
                       </tr>
@@ -1220,17 +1220,17 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
           </div>
 
           {/* Recovery Simulator */}
-          <div className="bg-surface rounded-3xl p-6 border border-border">
-             <h3 className="font-black text-white flex items-center gap-2 mb-4"><TrendingUp size={18} className="text-[#E9C349]" /> Recovery Simulator (จำลองกำไรหากราคากลับมา)</h3>
+          <div className="bg-surface rounded-2xl p-6 border border-border">
+             <h3 className="font-black text-foreground flex items-center gap-2 mb-4"><TrendingUp size={18} className="text-warning" /> Recovery Simulator (จำลองกำไรหากราคากลับมา)</h3>
              
              <div className="flex flex-col sm:flex-row gap-4 items-center">
                <div className="flex-1 w-full">
-                 <label className="text-[10px] font-black text-gray-500 uppercase mb-2 block">ระบุราคาเป้าหมายที่คาดว่าจะกลับไป</label>
+                 <label className="text-xs font-black text-gray-500 uppercase mb-2 block">ระบุราคาเป้าหมายที่คาดว่าจะกลับไป</label>
                  <div className="relative">
                     <input 
                       type="number" step="any"
                       value={simulatedPrice || ''} onChange={e => setSimulatedPrice(+e.target.value)}
-                      className="w-full bg-black/40 border border-border rounded-xl px-4 py-3 text-[#E9C349] font-black text-xl outline-none focus:border-[#E9C349]"
+                      className="w-full bg-black/40 border border-border rounded-xl px-4 py-3 text-primary font-black text-xl outline-none "
                    />
                  </div>
                </div>
@@ -1238,8 +1238,8 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
                <ArrowRight className="hidden sm:block text-gray-600 rotate-90 sm:rotate-0" size={24} />
 
                <div className="flex-1 w-full bg-black/20 rounded-xl p-4 border border-border">
-                  <div className="text-[10px] font-black text-gray-500 uppercase mb-1">ผลลัพธ์ (Net Profit)</div>
-                  <div className={cn("text-2xl font-black", simNetPnL >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
+                  <div className="text-xs font-black text-gray-500 uppercase mb-1">ผลลัพธ์ (Net Profit)</div>
+                  <div className={cn("text-2xl font-black", simNetPnL >= 0 ? "text-gain" : "text-loss")}>
                     {simNetPnL >= 0 ? '+' : ''}{formatVal(simNetPnL)}
                   </div>
                   <div className="text-xs font-bold text-gray-400 mt-1">
@@ -1249,7 +1249,7 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
              </div>
 
              {firstHeldPrice > 0 && avgEntryPrice > 0 && avgEntryPrice < firstHeldPrice && (
-               <div className="mt-4 p-3 rounded-lg bg-[#E9C349]/10 text-[#E9C349] border border-[#E9C349]/20 text-xs font-bold flex items-start gap-2">
+               <div className="mt-4 p-3 rounded-lg bg-warning/10 text-warning border border-warning/20 text-xs font-bold flex items-start gap-2">
                  <Info size={16} className="shrink-0" />
                  <p>ราคาเฉลี่ยของคุณ ({formatVal(avgEntryPrice)}) ต่ำกว่าไม้แรกที่ยังถืออยู่ ({formatVal(firstHeldPrice)}) อยู่ {((firstHeldPrice - avgEntryPrice)/firstHeldPrice * 100).toFixed(1)}% ดังนั้นแม้ราคายังไม่กลับไปจุดเดิม คุณก็สามารถทำกำไรได้เมื่อราคาผ่าน {formatVal(breakEvenPrice)}</p>
                </div>
@@ -1262,13 +1262,13 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
       {/* Trade Journal Section */}
         <div className="space-y-6 mt-6">
 
-          <div className="bg-surface rounded-3xl p-6 border border-border">
-            <h3 className="font-black text-white flex items-center gap-2 mb-4"><History size={18} className="text-[#ADC6FF]" /> ประวัติการเทรด (Trade Journal)</h3>
+          <div className="bg-surface rounded-2xl p-6 border border-border">
+            <h3 className="font-black text-foreground flex items-center gap-2 mb-4"><History size={18} className="text-info" /> ประวัติการเทรด (Trade Journal)</h3>
             <p className="mb-4 text-xs text-gray-400">ทุกสัญลักษณ์ในพอร์ตที่เลือก · ไม้ที่ถืออยู่และสรุปเทรดที่ปิดแล้ว · สถิติด้านบนนับเฉพาะสรุปที่ปิดแล้ว</p>
             <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-border text-[10px] font-black text-gray-500 uppercase">
+                <tr className="border-b border-border text-xs font-black text-gray-500 uppercase">
                   <th className="p-3">วันที่ (Date)</th>
                   <th className="p-3">Symbol</th>
                   <th className="p-3">จำนวนไม้</th>
@@ -1285,29 +1285,29 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
                   const unrealized = lot.remaining === 0 ? 0 : quote && quote > 0 ? (quote - lot.price) * lot.remaining : null;
                   return <tr key={`open-${lot.trade.id}`} className="border-b border-border text-xs">
                   <td className="p-3 text-gray-400">{new Date(lot.trade.date).toLocaleString('th-TH')}</td>
-                  <td className="p-3 font-bold">{lot.trade.asset}<span className="block text-[#4EDEA3]">{lot.remaining > 0 ? `ถืออยู่ ${lot.remaining} หน่วย` : 'ปิดครบแล้ว'}</span><span className="block text-gray-400">ขายแล้ว {lot.quantity - lot.remaining} หน่วย</span></td>
+                  <td className="p-3 font-bold">{lot.trade.asset}<span className="block text-gain">{lot.remaining > 0 ? `ถืออยู่ ${lot.remaining} หน่วย` : 'ปิดครบแล้ว'}</span><span className="block text-gray-400">ขายแล้ว {lot.quantity - lot.remaining} หน่วย</span></td>
                   <td className="p-3">1 ไม้</td><td className="p-3">{formatVal(lot.price)}<span className="block text-gray-500">ค่าธรรมเนียม {formatVal(lot.trade.fees || 0)}<br />{lot.trade.fxRateTHB ? `1 USD = ${lot.trade.fxRateTHB} THB` : 'ไม่ระบุเรท USD/THB'}</span></td>
-                  <td className="p-3">{lot.sales.length ? lot.sales.map(sale => <div key={sale.trade.id} className="mb-2"><span>{new Date(sale.trade.date).toLocaleString('th-TH')}</span><br />{sale.quantity} หน่วย @ {formatVal(sale.trade.pricePerUnit || 0)}<br /><span className={sale.pnl >= 0 ? 'text-[#4EDEA3]' : 'text-[#FFB4AB]'}>กำไรสุทธิ {formatVal(sale.pnl)}</span></div>) : 'ยังไม่มีรายการขาย'}</td>
-                  <td className="p-3 text-right"><div className={lot.realized >= 0 ? 'text-[#4EDEA3]' : 'text-[#FFB4AB]'}>ขายแล้ว {formatVal(lot.realized)}</div><div className="mt-2 text-gray-400">ยังไม่ขาย {unrealized === null ? 'รอราคาตลาด' : formatVal(unrealized)}</div><span className="text-[10px] text-gray-500">ยังไม่หักค่าธรรมเนียมขายในอนาคต</span></td>
-                  <td className="p-3 text-center"><button onClick={() => setHistoryLot({ symbol: lot.trade.asset, id: lot.trade.id })} className="text-[#ADC6FF]">แก้ไข / ลบไม้</button></td>
+                  <td className="p-3">{lot.sales.length ? lot.sales.map(sale => <div key={sale.trade.id} className="mb-2"><span>{new Date(sale.trade.date).toLocaleString('th-TH')}</span><br />{sale.quantity} หน่วย @ {formatVal(sale.trade.pricePerUnit || 0)}<br /><span className={sale.pnl >= 0 ? 'text-gain' : 'text-loss'}>กำไรสุทธิ {formatVal(sale.pnl)}</span></div>) : 'ยังไม่มีรายการขาย'}</td>
+                  <td className="p-3 text-right"><div className={lot.realized >= 0 ? 'text-gain' : 'text-loss'}>ขายแล้ว {formatVal(lot.realized)}</div><div className="mt-2 text-gray-400">ยังไม่ขาย {unrealized === null ? 'รอราคาตลาด' : formatVal(unrealized)}</div><span className="text-xs text-gray-500">ยังไม่หักค่าธรรมเนียมขายในอนาคต</span></td>
+                  <td className="p-3 text-center"><button onClick={() => setHistoryLot({ symbol: lot.trade.asset, id: lot.trade.id })} className="text-primary">แก้ไข / ลบไม้</button></td>
                 </tr>; })}
                 {journal.map(trade => (
-                  <tr key={trade.id} className="border-b border-border hover:bg-white/5">
+                  <tr key={trade.id} className="border-b border-border hover:bg-foreground/5">
                     <td className="p-3 text-xs text-gray-400">{new Date(trade.date).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}</td>
-                    <td className="p-3 font-black text-white">{trade.symbol}</td>
+                    <td className="p-3 font-black text-foreground">{trade.symbol}</td>
                     <td className="p-3 text-xs font-bold text-gray-400">{trade.entriesCount} ไม้</td>
-                    <td className="p-3 text-xs font-bold text-white">{formatVal(trade.avgPrice)}</td>
-                    <td className="p-3 text-xs font-bold text-white">{formatVal(trade.sellPrice)}</td>
+                    <td className="p-3 text-xs font-bold text-foreground">{formatVal(trade.avgPrice)}</td>
+                    <td className="p-3 text-xs font-bold text-foreground">{formatVal(trade.sellPrice)}</td>
                     <td className="p-3 text-right">
-                      <div className={cn("text-sm font-black", trade.netProfit >= 0 ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
+                      <div className={cn("text-sm font-black", trade.netProfit >= 0 ? "text-gain" : "text-loss")}>
                         {trade.netProfit >= 0 ? '+' : ''}{formatVal(trade.netProfit)}
                       </div>
-                      <div className="text-[10px] font-bold text-gray-500">
+                      <div className="text-xs font-bold text-gray-500">
                         {trade.profitPercent >= 0 ? '+' : ''}{trade.profitPercent.toFixed(2)}%
                       </div>
                     </td>
                     <td className="p-3 text-center">
-                      <button onClick={() => deleteJournal(trade.id)} className="text-gray-500 hover:text-[#FFB4AB] transition-colors p-1">
+                      <button onClick={() => deleteJournal(trade.id)} className="text-gray-500 hover:text-loss transition-colors p-1">
                         <Trash2 size={14} />
                       </button>
                     </td>

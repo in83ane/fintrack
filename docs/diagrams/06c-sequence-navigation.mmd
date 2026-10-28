@@ -1,0 +1,27 @@
+sequenceDiagram
+    autonumber
+    actor U as ผู้ใช้
+    participant Trade as Trade Plan
+    participant Pref as Shared symbol hook
+    participant Local as localStorage
+    participant Router as Next.js router / Browser history
+    participant Terminal as Terminal
+    participant TV as TradingView widget
+    U->>Trade: ค้นหา NVDA
+    Trade->>Pref: selectSymbol(NVDA)
+    Pref->>Local: เก็บ symbol ล่าสุด
+    Pref->>Router: replace query ของหน้าปัจจุบัน รักษา history state
+    U->>Trade: กดวิเคราะห์หุ้น
+    Trade->>Router: Link /terminal?symbol=NVDA แบบ push
+    Router->>Terminal: Mount Terminal
+    Terminal->>Pref: อ่าน explicit query ก่อน saved preference
+    Pref-->>Terminal: NVDA
+    Terminal->>TV: render chart symbol NVDA
+    U->>Terminal: ค้นหาหุ้นตัวใหม่
+    Terminal->>Pref: selectSymbol(newSymbol)
+    Pref->>Local: อัปเดตหุ้นล่าสุด
+    Pref->>Router: อัปเดต query
+    Terminal->>TV: เปลี่ยนกราฟ
+    U->>Terminal: เปิด Trade Plan
+    Terminal->>Router: push /trade/plan?symbol=newSymbol
+    Router->>Trade: หุ้นตัวเดียวกับ Terminal

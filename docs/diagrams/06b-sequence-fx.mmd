@@ -1,0 +1,31 @@
+sequenceDiagram
+    autonumber
+    participant Views as Topbar / Portfolio / AppContext
+    participant Store as Shared FX store
+    participant Cache as localStorage FX cache
+    participant API as Valuation API
+    participant Provider as FX providers
+    Views->>Store: subscribe and start
+    Store->>Cache: อ่าน quote และ Auto/Manual preference
+    Cache-->>Store: cached settings
+    alt Manual
+        Store-->>Views: เรทที่ผู้ใช้กำหนดชุดเดียวกัน
+    else Auto
+        Store->>API: GET /api/exchange-rate/valuation
+        API->>Provider: Wise เมื่อ configured มิฉะนั้น fallback chain
+        alt quote valid
+            Provider-->>API: rate and provider metadata
+            API-->>Store: quote
+            Store->>Cache: บันทึก FX cache เท่านั้น
+            Store-->>Views: snapshot เดียวกัน
+        else providers unavailable
+            API-->>Store: 503
+            Store-->>Views: ใช้ cache พร้อม stale status หรือไม่มีเรท
+        end
+        loop ตามรอบ refresh เมื่อ tab มองเห็นและพ้น backoff
+            Store->>API: refresh shared quote
+            API-->>Store: quote or error
+            Store-->>Views: notify subscribers
+        end
+    end
+    Note over Views,Store: แปลงเฉพาะมูลค่าแสดงผล ไม่ rewrite historical FX หรือ native money

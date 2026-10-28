@@ -1,0 +1,4 @@
+export const supabase={from:(table:string)=>{
+ let operation='select',body:any=null,filters:any[]=[],orders:any[]=[],range=[0,999],selectOptions:any={};
+ const b:any={select:(_:any,options:any)=>{selectOptions=options||{};return b;},order:(key:string,options:any)=>{orders.push([key,options]);return b;},limit:(n:number)=>{range=[0,n-1];return b;},range:(a:number,z:number)=>{range=[a,z];return b;},eq:(key:string,value:any)=>{filters.push(['eq',key,value]);return b;},gte:(key:string,value:any)=>{filters.push(['gte',key,value]);return b;},lte:(key:string,value:any)=>{filters.push(['lte',key,value]);return b;},insert:(v:any)=>{operation='insert';body=v;return b;},update:(v:any)=>{operation='update';body=v;return b;},delete:()=>{operation='delete';return b;},then:(yes:any,no:any)=>fetch('/qa-db',{method:'POST',body:JSON.stringify({table,operation,body,filters,orders,range,selectOptions})}).then(r=>r.json()).then(yes,no)};return b;
+}};

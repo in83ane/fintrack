@@ -1,332 +1,181 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import { motion, AnimatePresence } from "motion/react";
-import { Bell, Plus, Trash2, TrendingUp, TrendingDown, Target, X, AlertTriangle, Check, Eye } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { Plus, Trash2, TrendingUp, TrendingDown, Eye } from "lucide-react";
 import { useApp } from "@/src/context/AppContext";
 import { Modal } from "@/src/components/Modal";
+import { CustomSelect } from "@/src/components/CustomSelect";
 import { cn } from "@/src/lib/utils";
+import { PRICE_ALERT_EVENT, parsePriceAlerts } from '@/src/lib/price-alerts';
+import { supabase } from '@/src/lib/supabase';
+import { usePriceEmailAlerts } from '@/src/hooks/usePriceEmailAlerts';
+export type { PriceAlert } from '@/src/lib/price-alerts';
 
-export interface PriceAlert {
-  id: string;
-  symbol: string;
-  name: string;
-  targetPrice: number;
-  direction: "above" | "below"; // trigger when price goes above or below target
-  isActive: boolean;
-  createdAt: string;
-  triggeredAt?: string;
-  currentPrice?: number;
-  note?: string;
-}
-
-const ALERTS_STORAGE_KEY = "fintrack-price-alerts";
-
-function loadAlerts(): PriceAlert[] {
-  if (typeof window === "undefined") return [];
-  try {
-    return JSON.parse(localStorage.getItem(ALERTS_STORAGE_KEY) || "[]");
-  } catch {
-    return [];
-  }
-}
-
-function saveAlerts(alerts: PriceAlert[]) {
-  localStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify(alerts));
-}
-
+const LEGACY_KEY = 'fintrack-price-alerts';
 export function PriceAlertManager() {
-  const { t, language, formatMoney, assets, addNotification, addToast, moneyBuckets } = useApp();
-  const [alerts, setAlerts] = useState<PriceAlert[]>([]);
+  const app = useApp();
+  const { language, currency, assets, addNotification, addToast, moneyBuckets, isDataLoaded, userProfile } = app;
+  const th = language === 'th';
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newAlert, setNewAlert] = useState({ symbol: "", targetPrice: "", direction: "below" as "above" | "below", note: "" });
-  const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const notifiedBucketsRef = useRef<Set<string>>(new Set());
+  const emailAlerts = usePriceEmailAlerts(isModalOpen, userProfile?.email);
+  const [emailError, setEmailError] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [newAlert, setNewAlert] = useState({ symbol: '', targetPrice: '', direction: 'below' as 'above' | 'below', note: '', currency: currency === 'THB' ? 'THB' : 'USD' });
+  const storageKey = userProfile?.email ? `${LEGACY_KEY}:${encodeURIComponent(userProfile.email)}` : '';
+  const current = useRef({ app, storageKey });
+  current.current = { app, storageKey };
+  const notifiedBucketsRef = useRef(new Set<string>());
+  const priceText = (value: number, code = 'USD') => new Intl.NumberFormat(th ? 'th-TH' : 'en-US', { style: 'currency', currency: code, maximumFractionDigits: 4 }).format(value);
 
-  // Budget Goal Notification (#N4)
+  // Preserve the existing bucket-goal notifications.
   useEffect(() => {
+    if(!storageKey||!isDataLoaded)return;
     moneyBuckets.forEach(bucket => {
-      if (bucket.targetAmount && bucket.targetAmount > 0 && bucket.currentAmount >= bucket.targetAmount) {
-        if (!notifiedBucketsRef.current.has(bucket.id)) {
-          notifiedBucketsRef.current.add(bucket.id);
-          addNotification(
-            `${language === 'th' ? 'ถึงเป้าแล้ว!' : 'Goal Reached!'}: ${bucket.name}`,
-            `${bucket.name} ${language === 'th' ? 'เก็บเงินครบเป้า' : 'has reached its target'} ${formatMoney(bucket.targetAmount)}`,
-            'system'
-          );
-        }
+      const goalKey=`${storageKey}:goal:${bucket.id}:${bucket.targetAmount}`;
+      try{if(localStorage.getItem(goalKey))return;}catch{/* memory fallback */}
+      if (bucket.targetAmount && bucket.currentAmount >= bucket.targetAmount && !notifiedBucketsRef.current.has(bucket.id)) {
+        notifiedBucketsRef.current.add(bucket.id);
+        try{localStorage.setItem(goalKey,'1');}catch{/* memory fallback */}
+        addNotification(`${th ? 'ถึงเป้าแล้ว!' : 'Goal reached!'}: ${bucket.name}`, `${bucket.name}: ${app.formatMoney(bucket.targetAmount)}`, 'system');
       }
     });
-  }, [moneyBuckets, addNotification, language, formatMoney]);
+  }, [moneyBuckets, addNotification, th, app.formatMoney, storageKey, isDataLoaded]);
 
-  // Load alerts on mount
   useEffect(() => {
-    setAlerts(loadAlerts());
-  }, []);
+    const open=()=>{setNewAlert(a=>({...a,currency:current.current.app.currency==='THB'?'THB':'USD'}));setEmailError(false);setIsModalOpen(true);};
+    window.addEventListener(PRICE_ALERT_EVENT,open);
+    return()=>window.removeEventListener(PRICE_ALERT_EVENT,open);
+  },[]);
 
-  // Save alerts whenever they change
-  useEffect(() => {
-    if (alerts.length > 0) saveAlerts(alerts);
-  }, [alerts]);
-
-  // Check price alerts periodically
-  const checkAlerts = useCallback(() => {
-    setAlerts((prevAlerts) => {
-      let changed = false;
-      const updated = prevAlerts.map((alert) => {
-        if (!alert.isActive) return alert;
-
-        // Find matching asset
-        const asset = assets.find((a) => a.symbol.toUpperCase() === alert.symbol.toUpperCase());
-        if (!asset) return alert;
-
-        const currentPrice = asset.currentPrice || (asset.shares && asset.shares > 0 ? asset.valueUSD / asset.shares : 0);
-        if (currentPrice <= 0) return alert;
-
-        // Update current price
-        const updatedAlert = { ...alert, currentPrice };
-
-        // Check if triggered
-        const triggered =
-          (alert.direction === "above" && currentPrice >= alert.targetPrice) ||
-          (alert.direction === "below" && currentPrice <= alert.targetPrice);
-
-        if (triggered) {
-          changed = true;
-          addNotification(
-            `${language === "th" ? "แจ้งเตือนราคา" : "Price Alert"}: ${alert.symbol}`,
-            `${alert.symbol} ${alert.direction === "above" ? "↑" : "↓"} ${formatMoney(currentPrice)} (${language === "th" ? "เป้าหมาย" : "Target"}: ${formatMoney(alert.targetPrice)})`,
-            "price"
-          );
-          addToast(
-            `${alert.symbol} ${language === "th" ? "ถึงแนวรับ/ต้าน" : "hit target"} ${formatMoney(alert.targetPrice)}`,
-            "success"
-          );
-          return { ...updatedAlert, isActive: false, triggeredAt: new Date().toISOString() };
+  // Move existing device alerts to account monitoring. A stable source key makes retries safe.
+  useEffect(()=>{
+    if(!storageKey||!isDataLoaded)return;
+    let stopped=false;
+    const migrate=async()=>{
+      const work=async()=>{
+        const old=parsePriceAlerts(localStorage.getItem(storageKey));
+        for(const alert of old.filter(a=>a.isActive)) {
+          if(stopped)return;
+          const {error}=await supabase.from('price_email_alerts').insert({symbol:alert.symbol.toUpperCase(),target_price:alert.targetPrice,currency:alert.currency||'USD',direction:alert.direction,note:alert.note||'',locale:language,source_key:`device:${alert.id}`});
+          if(error&&error.code!=='23505'){setEmailError(true);break;}
+          localStorage.setItem(storageKey,JSON.stringify(parsePriceAlerts(localStorage.getItem(storageKey)).filter(a=>a.id!==alert.id)));
         }
-
-        return updatedAlert;
-      });
-
-      return changed || updated.some((a, i) => a.currentPrice !== prevAlerts[i]?.currentPrice) ? updated : prevAlerts;
-    });
-  }, [assets, addNotification, addToast, formatMoney, language]);
-
-  // Run check every 30 seconds
-  useEffect(() => {
-    checkAlerts(); // Initial check
-    checkIntervalRef.current = setInterval(checkAlerts, 30000);
-    return () => {
-      if (checkIntervalRef.current) clearInterval(checkIntervalRef.current);
+      };
+      try {if(navigator.locks)await navigator.locks.request(storageKey,work);else await work();}catch{setEmailError(true);}
     };
-  }, [checkAlerts]);
+    void migrate();return()=>{stopped=true;};
+  },[storageKey,isDataLoaded,language]);
 
-  const handleAddAlert = () => {
-    if (!newAlert.symbol || !newAlert.targetPrice) return;
-
-    const alert: PriceAlert = {
-      id: Date.now().toString(),
-      symbol: newAlert.symbol.toUpperCase(),
-      name: newAlert.symbol.toUpperCase(),
-      targetPrice: parseFloat(newAlert.targetPrice),
-      direction: newAlert.direction,
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      note: newAlert.note,
-    };
-
-    setAlerts((prev) => {
-      const updated = [alert, ...prev];
-      saveAlerts(updated);
-      return updated;
-    });
-    setNewAlert({ symbol: "", targetPrice: "", direction: "below", note: "" });
-    setIsModalOpen(false);
-    addToast(language === "th" ? "เพิ่มการแจ้งเตือนแล้ว" : "Alert created", "success");
-  };
-
-  const removeAlert = (id: string) => {
-    setAlerts((prev) => {
-      const updated = prev.filter((a) => a.id !== id);
-      saveAlerts(updated);
-      return updated;
-    });
-  };
-
-  const activeAlerts = alerts.filter((a) => a.isActive);
-  const triggeredAlerts = alerts.filter((a) => !a.isActive && a.triggeredAt);
-
+  const validTarget = Number.isFinite(Number(newAlert.targetPrice)) && Number(newAlert.targetPrice) > 0 && Number(newAlert.targetPrice) < 1e12;
+  const validSymbol = /^[A-Z0-9.^=/-]{1,32}$/i.test(newAlert.symbol.trim());
+  async function handleAddAlert() {
+    if (saving || !validSymbol || !validTarget || !storageKey) return;
+    setSaving(true);
+    const symbol = newAlert.symbol.trim().toUpperCase();
+    try {
+      setEmailError(false);
+      await emailAlerts.create({symbol,targetPrice:Number(newAlert.targetPrice),currency:newAlert.currency,direction:newAlert.direction,note:newAlert.note.trim(),locale:language});
+      setNewAlert(a=>({...a,symbol:'',targetPrice:'',note:''}));
+      addToast(th?'บันทึกแล้ว แจ้งเตือนจะเก็บไว้ในบัญชีแม้ปิดเว็บ':'Saved. Alerts will be kept in your account, even while the app is closed.','success');
+    }catch{setEmailError(true);}finally{setSaving(false);}
+  }
   return (
     <>
-      {/* Floating Alert Button */}
-      <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={() => setIsModalOpen(true)}
-        className="hidden sm:flex fixed bottom-24 right-6 z-40 w-14 h-14 rounded-2xl bg-gradient-to-br from-[#E9C349] to-[#D4A017] text-[#1C1B1B] shadow-lg shadow-[#E9C349]/20 items-center justify-center"
-      >
-        <Bell size={22} />
-        {activeAlerts.length > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-[#FFB4AB] text-[#1C1B1B] rounded-full text-[9px] font-bold flex items-center justify-center border-2 border-[#0E0E0E]">
-            {activeAlerts.length}
-          </span>
-        )}
-      </motion.button>
-
       {/* Alert Manager Modal */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={language === "th" ? "แจ้งเตือนราคา" : "Price Alerts"}>
         <div className="w-full max-w-lg space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-bold text-white">
-                {language === "th" ? "แจ้งเตือนราคา" : "Price Alerts"}
-              </h2>
-              <p className="text-xs text-gray-500 mt-0.5">
-                {language === "th" ? "รับแจ้งเตือนเมื่อถึงแนวรับหรือแนวต้าน" : "Get notified when assets hit support/resistance"}
-              </p>
-            </div>
+          <div className="space-y-2 text-xs text-muted">
+            <p>{th?'ตรวจราคาบนเซิร์ฟเวอร์ประมาณทุก 1 นาที แม้ปิดเว็บ ราคาตลาดอาจล่าช้า':'Prices are checked on the server about every minute, even with the app closed. Market quotes may be delayed.'}</p>
+            <p>{th?'เมื่อถึงเป้า จะแจ้งครั้งเดียวและเก็บในกระดิ่งจนกว่าจะอ่าน ประวัติไม่ถูกลบอัตโนมัติ ไม่มีการส่งอีเมล':'Each target fires once. Unread alerts wait in the bell; history is retained. No email is sent.'}</p>
+            {(!emailAlerts.status?.ready||emailAlerts.error)&&<button onClick={()=>void emailAlerts.refresh()} className="text-warning underline">{th?'กำลังตรวจระบบเบื้องหลัง / กดลองอีกครั้ง':'Checking background monitoring / Retry'}</button>}
           </div>
 
           {/* Add New Alert */}
           <div className="bg-background rounded-2xl p-4 border border-border space-y-3">
-            <span className="text-[10px] font-bold text-[#ADC6FF] uppercase tracking-wide">
+            <span className="text-xs font-bold text-info uppercase tracking-wide">
               {language === "th" ? "เพิ่มการแจ้งเตือนใหม่" : "New Alert"}
             </span>
             <div className="grid grid-cols-2 gap-3">
+              <label className="space-y-1 text-xs text-muted">{th ? 'หุ้น / สัญลักษณ์' : 'Stock / symbol'}
               <input
+                list="price-alert-holdings"
                 type="text"
-                placeholder={language === "th" ? "สัญลักษณ์ (เช่น BTC)" : "Symbol (e.g. BTC)"}
+                placeholder={language === "th" ? "เช่น AAPL" : "e.g. AAPL"}
                 value={newAlert.symbol}
                 onChange={(e) => setNewAlert({ ...newAlert, symbol: e.target.value })}
-                className="bg-white/5 rounded-xl px-3 py-2.5 text-sm text-white border border-border focus:border-[#ADC6FF]/30 outline-none"
+                className="w-full bg-foreground/5 rounded-xl px-3 py-2.5 text-sm text-foreground border border-border  outline-none"
               />
-              <input
+              <datalist id="price-alert-holdings">{[...new Set(assets.map(a => a.symbol))].map(symbol => <option key={symbol} value={symbol}/>)}</datalist>
+              </label>
+              <label className="space-y-1 text-xs text-muted">{th ? 'ราคาเป้าหมาย' : 'Target price'}
+              <input min="0" step="any"
                 type="number"
                 placeholder={language === "th" ? "ราคาเป้าหมาย" : "Target Price"}
                 value={newAlert.targetPrice}
                 onChange={(e) => setNewAlert({ ...newAlert, targetPrice: e.target.value })}
-                className="bg-white/5 rounded-xl px-3 py-2.5 text-sm text-white border border-border focus:border-[#ADC6FF]/30 outline-none"
+                className="w-full bg-foreground/5 rounded-xl px-3 py-2.5 text-sm text-foreground border border-border  outline-none"
               />
+              </label>
             </div>
+            <label className="block space-y-1 text-xs text-muted">{th ? 'สกุลเงินของราคาเป้าหมาย' : 'Target currency'}
+              <CustomSelect aria-label={th ? 'สกุลเงินของราคาเป้าหมาย' : 'Target currency'} value={newAlert.currency} onChange={value => setNewAlert(a => ({ ...a, currency: value }))} items={['USD', 'THB'].map(code => ({ value: code, label: code }))}/>
+            </label>
             <div className="flex gap-2">
-              <button
+              <button aria-pressed={newAlert.direction === 'below'}
                 onClick={() => setNewAlert({ ...newAlert, direction: "below" })}
                 className={cn(
                   "flex-1 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all border",
                   newAlert.direction === "below"
-                    ? "bg-[#4EDEA3]/10 text-[#4EDEA3] border-[#4EDEA3]/20"
-                    : "bg-white/5 text-gray-500 border-border"
+                    ? "bg-primary/10 text-primary border-primary/20"
+                    : "bg-foreground/5 text-muted border-border"
                 )}
               >
-                <TrendingDown size={14} /> {language === "th" ? "แนวรับ (ต่ำกว่า)" : "Below (Support)"}
+                <TrendingDown size={14} /> {language === "th" ? "ราคาลงถึง (≤)" : "At or below (≤)"}
               </button>
-              <button
+              <button aria-pressed={newAlert.direction === 'above'}
                 onClick={() => setNewAlert({ ...newAlert, direction: "above" })}
                 className={cn(
                   "flex-1 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all border",
                   newAlert.direction === "above"
-                    ? "bg-[#FFB4AB]/10 text-[#FFB4AB] border-[#FFB4AB]/20"
-                    : "bg-white/5 text-gray-500 border-border"
+                    ? "bg-primary/10 text-primary border-primary/20"
+                    : "bg-foreground/5 text-muted border-border"
                 )}
               >
-                <TrendingUp size={14} /> {language === "th" ? "แนวต้าน (สูงกว่า)" : "Above (Resistance)"}
+                <TrendingUp size={14} /> {language === "th" ? "ราคาขึ้นถึง (≥)" : "At or above (≥)"}
               </button>
             </div>
-            <input
+            <input maxLength={240}
               type="text"
               placeholder={language === "th" ? "หมายเหตุ (ไม่บังคับ)" : "Note (optional)"}
               value={newAlert.note}
               onChange={(e) => setNewAlert({ ...newAlert, note: e.target.value })}
-              className="w-full bg-white/5 rounded-xl px-3 py-2.5 text-sm text-white border border-border focus:border-[#ADC6FF]/30 outline-none"
+              className="w-full bg-foreground/5 rounded-xl px-3 py-2.5 text-sm text-foreground border border-border  outline-none"
             />
+            {emailError && <p role="alert" className="text-xs text-loss">{th ? 'บันทึกไม่สำเร็จ ตรวจการเชื่อมต่อ (ติดตามพร้อมกันได้สูงสุด 20 รายการ)' : 'Could not save alert. Check the connection or the limit of 20 active alerts.'}</p>}
             <button
               onClick={handleAddAlert}
-              disabled={!newAlert.symbol || !newAlert.targetPrice}
-              className="w-full py-2.5 bg-[#ADC6FF] text-[#00285d] rounded-xl font-bold text-xs hover:brightness-110 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              disabled={(!emailAlerts.status?.ready) || saving || !validSymbol || !validTarget || !storageKey}
+              className="w-full py-2.5 bg-primary text-primary-foreground rounded-xl font-bold text-xs hover:brightness-110 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               <Plus size={14} /> {language === "th" ? "เพิ่มการแจ้งเตือน" : "Add Alert"}
             </button>
           </div>
 
-          {/* Active Alerts */}
-          {activeAlerts.length > 0 && (
-            <div className="space-y-2">
-              <span className="text-[10px] font-bold text-[#E9C349] uppercase tracking-wide">
-                {language === "th" ? `กำลังติดตาม (${activeAlerts.length})` : `Watching (${activeAlerts.length})`}
-              </span>
-              {activeAlerts.map((alert) => (
-                <motion.div
-                  key={alert.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="flex items-center justify-between p-3 bg-background rounded-xl border border-border group hover:border-border transition-all"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={cn(
-                      "w-8 h-8 rounded-lg flex items-center justify-center",
-                      alert.direction === "below" ? "bg-[#4EDEA3]/10 text-[#4EDEA3]" : "bg-[#FFB4AB]/10 text-[#FFB4AB]"
-                    )}>
-                      {alert.direction === "below" ? <TrendingDown size={14} /> : <TrendingUp size={14} />}
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold text-white">{alert.symbol}</div>
-                      <div className="text-[10px] text-gray-500">
-                        {alert.direction === "below" ? "≤" : "≥"} {formatMoney(alert.targetPrice)}
-                        {alert.currentPrice && (
-                          <span className="ml-1.5 text-gray-600">
-                            ({language === "th" ? "ปัจจุบัน" : "Now"}: {formatMoney(alert.currentPrice)})
-                          </span>
-                        )}
-                      </div>
-                      {alert.note && <div className="text-[9px] text-gray-600 mt-0.5">{alert.note}</div>}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => removeAlert(alert.id)}
-                    className="p-1.5 text-gray-600 hover:text-[#FFB4AB] opacity-0 group-hover:opacity-100 transition-all"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </motion.div>
-              ))}
-            </div>
-          )}
-
-          {/* Triggered (History) */}
-          {triggeredAlerts.length > 0 && (
-            <div className="space-y-2">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">
-                {language === "th" ? `แจ้งเตือนแล้ว (${triggeredAlerts.length})` : `Triggered (${triggeredAlerts.length})`}
-              </span>
-              {triggeredAlerts.slice(0, 5).map((alert) => (
-                <div
-                  key={alert.id}
-                  className="flex items-center justify-between p-3 bg-background/50 rounded-xl border border-border opacity-60"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-[#4EDEA3]/10 flex items-center justify-center text-[#4EDEA3]">
-                      <Check size={14} />
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold text-white">{alert.symbol}</div>
-                      <div className="text-[10px] text-gray-500">
-                        {language === "th" ? "ถูกแจ้งเตือน" : "Triggered"} @ {formatMoney(alert.targetPrice)}
-                      </div>
-                    </div>
-                  </div>
-                  <button onClick={() => removeAlert(alert.id)} className="p-1.5 text-gray-600 hover:text-[#FFB4AB] transition-all">
-                    <X size={12} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {alerts.length === 0 && (
+          {emailAlerts.alerts.length > 0 && <section className="space-y-2" aria-label={th ? 'รายการแจ้งเตือน' : 'Saved alerts'}>
+            <h3 className="text-xs font-bold text-foreground">{th ? 'รายการแจ้งเตือน' : 'Alerts'} ({emailAlerts.alerts.length})</h3>
+            {emailAlerts.alerts.map(alert=><div key={alert.id} className="flex items-start justify-between gap-3 rounded-xl border border-border p-3">
+              <div className="min-w-0 space-y-1"><p className="text-sm font-bold text-foreground">{alert.symbol} <span className="text-xs font-normal text-muted">{alert.direction==='above'?'≥':'≤'} {priceText(alert.target_price,alert.currency)}</span></p>
+              <p className="text-xs text-muted">{({active:th?'กำลังติดตามบนเซิร์ฟเวอร์':'Monitoring on server',triggered:th?'บันทึกในกระดิ่งแล้ว':'Saved in notification inbox',pending:th?'ถึงเป้าแล้ว':'Target reached',sent:th?'ผู้ให้บริการรับอีเมลแล้ว':'Accepted by email provider',failed:th?'ส่งไม่สำเร็จ':'Delivery failed',skipped:th?'ข้ามการส่ง — ถึงขีดจำกัดฟรี':'Skipped — free limit reached'})[alert.status]}</p>
+              {alert.last_error && <p className="text-xs text-muted">{['quote_unavailable','fx_or_currency_unavailable'].includes(alert.last_error) ? (th?'ราคา/อัตราแลกเปลี่ยนยังไม่พร้อม จะลองใหม่':'Price/FX unavailable; retrying') : alert.status==='failed' ? (th?'ตรวจการเชื่อมต่อก่อนสร้างเงื่อนไขใหม่':'Check the connection before creating a new alert') : ''}</p>}
+              {(alert.triggered_at||alert.sent_at) && <p className="text-[11px] text-muted">{new Date((alert.triggered_at||alert.sent_at)!).toLocaleString(th?'th-TH':'en-US')}</p>}</div>
+              <button type="button" aria-label={`${th?'ลบเงื่อนไขแจ้งเตือน':'Delete alert'} ${alert.symbol}`} className="p-2 text-muted hover:text-loss" onClick={async()=>{try{await emailAlerts.remove(alert.id);}catch{setEmailError(true);}}}><Trash2 size={14}/></button>
+            </div>)}
+          </section>}
+          {emailAlerts.alerts.length === 0 && (
             <div className="text-center py-8">
               <Eye size={32} className="text-gray-700 mx-auto mb-3" />
-              <p className="text-sm text-gray-500">{language === "th" ? "ยังไม่มีการแจ้งเตือน" : "No alerts yet"}</p>
-              <p className="text-xs text-gray-600 mt-1">{language === "th" ? "เพิ่มสัญลักษณ์ที่คุณสนใจด้านบน" : "Add a symbol above to start watching"}</p>
+              <p className="text-sm text-muted">{language === "th" ? "ยังไม่มีการแจ้งเตือน" : "No alerts yet"}</p>
+              <p className="text-xs text-muted mt-1">{language === "th" ? "เพิ่มสัญลักษณ์ที่คุณสนใจด้านบน" : "Add a symbol above to start watching"}</p>
             </div>
           )}
         </div>

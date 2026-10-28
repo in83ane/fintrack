@@ -1,0 +1,35 @@
+flowchart LR
+    Visitor["Actor: ผู้เยี่ยมชม"]
+    Investor["Actor: ผู้ใช้ที่เข้าสู่ระบบ"]
+    Auth["External: Supabase Auth"]
+    Market["External: ผู้ให้บริการราคาตลาด"]
+    FX["External: ผู้ให้บริการ FX"]
+    subgraph System["System boundary: FinTrack"]
+      SignIn(["สมัคร / เข้าสู่ระบบ"])
+      Manage(["จัดการพอร์ตและบัญชีเงินสด"])
+      View(["ดูมูลค่าพอร์ตและ P&L"])
+      Cash(["บันทึกฝากถอน / รายรับรายจ่าย / โอน"])
+      Research(["ค้นหาและวิเคราะห์หุ้น"])
+      Plan(["วางแผน DCA"])
+      Buy(["บันทึกซื้อหุ้น"])
+      Sell(["บันทึกขายบางส่วน / ทั้งหมด"])
+      Preview(["ตรวจสอบ preview และยืนยัน symbol"])
+      History(["ดูประวัติ / แก้ไขรายการที่อนุญาต"])
+      Settings(["เลือกภาษา / สกุลแสดงผล / เรท"])
+    end
+    Visitor --- SignIn
+    Auth --- SignIn
+    Investor --- Manage
+    Investor --- View
+    Investor --- Cash
+    Investor --- Research
+    Investor --- Plan
+    Investor --- Buy
+    Investor --- Sell
+    Investor --- History
+    Investor --- Settings
+    Sell -. "include" .-> Preview
+    Market --- Research
+    Market --- View
+    FX --- View
+    FX --- Settings

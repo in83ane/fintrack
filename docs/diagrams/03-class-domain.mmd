@@ -1,0 +1,105 @@
+classDiagram
+    direction LR
+    class BuyLot {
+      <<TypeScriptType>>
+      +string id
+      +string symbol
+      +string date
+      +string price
+      +string qty
+      +string fee
+    }
+    class SellTransaction {
+      <<TypeScriptType>>
+      +string id
+      +string symbol
+      +string date
+      +string price
+      +string qty
+      +string fee
+      +Method method
+      +Selection[] selections
+    }
+    class Selection {
+      <<ConceptualValueObject>>
+      +string lotId
+      +string qty
+    }
+    class Position {
+      <<TypeScriptType>>
+      +BuyLot buy
+      +Decimal remaining
+      +Decimal cost
+    }
+    class LotAllocation {
+      <<TypeScriptType>>
+      +string sellId
+      +string lotId
+      +Decimal qtyClosed
+      +Decimal costPerShare
+      +Decimal cost
+      +Decimal sellFee
+      +Decimal realizedPnl
+    }
+    class Ledger {
+      <<TypeScriptType>>
+      +Position[] lots
+      +LotAllocation[] allocations
+      +Decimal invested
+      +Decimal realized
+    }
+    class Decimal {
+      +from(value) Decimal$
+      +add(value) Decimal
+      +sub(value) Decimal
+      +mul(value) Decimal
+      +div(value) Decimal
+      +cmp(value) number
+      +toFixed(places) string
+    }
+    class CostBasisModule {
+      <<FunctionalModule>>
+      +replay(events) Ledger
+      +mark(state, market)
+      +proportionalCuts(lots, quantity)
+      +previewCorrection(events, lotId, patch)
+      +assertDeletable(events, lotId)
+      +recoverOriginalQty(remaining, closed, complete)
+    }
+    class NativeMoney {
+      <<TypeScriptType>>
+      +amount
+      +currency
+    }
+    class FxQuote {
+      <<TypeScriptType>>
+      +string rate
+      +number fetchedAt
+      +string source
+      +string providerDate
+    }
+    class FxStore {
+      <<FactoryReturnedObject>>
+      +getSnapshot()
+      +subscribe(listener)
+      +start()
+      +setManual(rate)
+      +resetAuto()
+    }
+    class FxModule {
+      <<FunctionalModule>>
+      +convertNativeMoney(money, target, rate)
+      +sumNativeMoney(items, target, rate)
+      +valuePortfolio(items, currency, rate)
+    }
+    SellTransaction "1" *-- "0..*" Selection
+    Position --> BuyLot
+    Ledger "1" *-- "0..*" Position
+    Ledger "1" *-- "0..*" LotAllocation
+    LotAllocation --> BuyLot : lotId
+    LotAllocation --> SellTransaction : sellId
+    CostBasisModule ..> Ledger
+    CostBasisModule ..> Decimal
+    FxModule ..> NativeMoney
+    FxModule ..> Decimal
+    FxStore --> FxQuote : current quote

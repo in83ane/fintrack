@@ -4,6 +4,8 @@ import "../index.css";
 import { AppProvider } from "@/src/context/AppContext";
 import { ErrorBoundary } from "@/src/components/ErrorBoundary";
 import { PageTransition } from "@/src/components/PageTransition";
+import { MotionSettings } from '@/src/components/MotionSettings';
+import { LedgerActions } from '@/src/components/LedgerActions';
 
 const notoSansThai = Noto_Sans_Thai({
   subsets: ["latin", "thai"],
@@ -44,7 +46,7 @@ export default function RootLayout({
       </head>
       <body suppressHydrationWarning className={`${notoSansThai.className} bg-[#131313] text-[#e5e2e1] min-h-screen min-w-0 antialiased`}>
         <AppProvider>
-          <PageTransition>{children}</PageTransition>
+          <MotionSettings><LedgerActions><PageTransition>{children}</PageTransition></LedgerActions></MotionSettings>
         </AppProvider>
       </body>
     </html>

@@ -60,12 +60,13 @@ export function playChart(root: Root, replay = false) {
     if (s.timer)
         clearTimeout(s.timer);
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches, spark = root.getBoundingClientRect().height <= 45, duration = reduced ? 150 : replay ? 500 : spark ? 700 : 1300, delay = reduced || replay ? 0 : Math.min(order++, 8) * 80;
+    const multiplier = reduced ? 1 : Number(getComputedStyle(document.documentElement).getPropertyValue('--m')) || 1;
     clearTimeout(reset);
     reset = window.setTimeout(() => { order = 0; }, 100);
     root.dataset.chartAnimating = 'true';
     root.dataset.chartRevealed = 'true';
     root.dataset.chartRun = String(Number(root.dataset.chartRun || 0) + 1);
-    const animate = (el: Element, frames: Keyframe[], options: KeyframeAnimationOptions = {}) => { s.animations.push(el.animate(frames, { duration, delay, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards', ...options })); };
+    const animate = (el: Element, frames: Keyframe[], options: KeyframeAnimationOptions = {}) => { s.animations.push(el.animate(frames, { easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards', ...options, duration:Number(options.duration ?? duration)*multiplier, delay:Number(options.delay ?? delay)*multiplier })); };
     if (reduced)
         animate(root, [{ opacity: .75 }, { opacity: 1 }], { easing: 'linear' });
     else if (root.dataset.chart === 'donut' || root.querySelector('.recharts-pie')) {
@@ -91,7 +92,7 @@ export function playChart(root: Root, replay = false) {
             animate(plot, [{ d: `path("${old}")` }, { d: `path("${next}")` }], { duration: 300, easing: 'linear' }); animate(plot, [{ clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0 0 0)' }], { delay: delay + (replay ? 0 : bars.length ? 300 : 100) + (replay ? 0 : Math.min(index, 3) * 120), duration: replay ? 400 : spark ? 600 : 1200 }); });
         const line = plots.find(p => p instanceof SVGPathElement && p.getAttribute('fill') === 'none') as SVGPathElement | undefined;
         if (line && !spark && !nodes.length)
-            head(root, line, s, replay ? 400 : 1200, delay + 100);
+            head(root, line, s, (replay ? 400 : 1200)*multiplier, (delay + 100)*multiplier);
         if (!plots.length && !bars.length && !cells.length && !rings.length && !nodes.length)
             animate(root, [{ clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0 0 0)' }]);
     }
@@ -107,7 +108,7 @@ export function playChart(root: Root, replay = false) {
     } }, finishAt);
 }
 export function registerChart(root: Root) {
-    if (states.has(root))
+    if (root.closest('[data-chart-owned]') || states.has(root))
         return;
     states.set(root, { seen: false, visible: false, signature: signature(root), animations: [], paths: paths(root) });
     registered.add(root);

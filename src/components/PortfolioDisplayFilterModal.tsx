@@ -140,27 +140,27 @@ export function PortfolioDisplayFilterModal({
       title="ตัวกรองและแสดงผล (ยอดทั้งหมด)"
       contentClassName="p-5 sm:p-6 space-y-6"
       footer={
-        <div className="flex items-center justify-between w-full px-6 py-4 bg-[#141414] border-t border-border">
+        <div className="flex items-center justify-between w-full px-6 py-4 bg-background border-t border-border">
           <button
             type="button"
             onClick={onReset}
             disabled={!isCustomized}
-            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <RotateCcw size={13} />
             <span>รีเซ็ตเป็นค่าเริ่มต้น</span>
           </button>
           <div className="flex items-center gap-3">
             <div className="text-right hidden sm:block">
-              <span className="text-[11px] text-gray-500 block leading-tight">ยอดรวมที่คำนวณ</span>
-              <span className="text-sm font-bold text-white tabular-nums">
+              <span className="text-xs text-gray-500 block leading-tight">ยอดรวมที่คำนวณ</span>
+              <span className="text-sm font-bold text-foreground tabular-nums">
                 {currencySymbol}{nf(calculatedTotal)}
               </span>
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2 rounded-xl bg-[#4EDEA3] text-[#003822] font-bold text-xs hover:bg-[#68efb6] transition-colors shadow-lg shadow-[#4EDEA3]/20"
+              className="px-5 py-2 rounded-xl bg-primary text-primary-foreground font-bold text-xs hover:bg-[#68efb6] transition-colors shadow-lg shadow-[#4EDEA3]/20"
             >
               เสร็จสิ้น
             </button>
@@ -172,7 +172,7 @@ export function PortfolioDisplayFilterModal({
         {/* Description & Quick Presets */}
         <div className="space-y-3">
           <p className="text-xs text-gray-400 leading-relaxed">
-            เลือกสิ่งที่คุณต้องการให้นับรวมใน <strong className="text-white font-semibold">มูลค่าสินทรัพย์ทั้งหมด</strong> และแสดงบนหน้าพอร์ต
+            เลือกสิ่งที่คุณต้องการให้นับรวมใน <strong className="text-foreground font-semibold">มูลค่าสินทรัพย์ทั้งหมด</strong> และแสดงบนหน้าพอร์ต
           </p>
 
           <div className="flex flex-wrap gap-2 pt-1">
@@ -182,8 +182,8 @@ export function PortfolioDisplayFilterModal({
               className={cn(
                 "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border",
                 !isCustomized
-                  ? "bg-[#4EDEA3]/20 text-[#4EDEA3] border-[#4EDEA3]/40"
-                  : "bg-white/[0.04] text-gray-400 border-white/10 hover:text-white hover:bg-white/[0.08]"
+                  ? "bg-primary/20 text-primary border-primary/40"
+                  : "bg-foreground/[0.04] text-gray-400 border-foreground/10 hover:text-foreground hover:bg-foreground/[0.08]"
               )}
             >
               เลือกทั้งหมด
@@ -195,7 +195,7 @@ export function PortfolioDisplayFilterModal({
                 "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border",
                 !filter.includeBucket && filter.includeCash && Object.values(filter.includeMarkets).every(Boolean) && filter.excludedBrokerIds.length === 0
                   ? "bg-[#E8B84A]/20 text-[#F6D783] border-[#E8B84A]/40"
-                  : "bg-white/[0.04] text-gray-400 border-white/10 hover:text-white hover:bg-white/[0.08]"
+                  : "bg-foreground/[0.04] text-gray-400 border-foreground/10 hover:text-foreground hover:bg-foreground/[0.08]"
               )}
             >
               พอร์ตลงทุนเท่านั้น (ไม่รวม Bucket)
@@ -206,8 +206,8 @@ export function PortfolioDisplayFilterModal({
               className={cn(
                 "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border",
                 !filter.includeBucket && !filter.includeCash && Object.values(filter.includeMarkets).every(Boolean)
-                  ? "bg-[#ADC6FF]/20 text-[#ADC6FF] border-[#ADC6FF]/40"
-                  : "bg-white/[0.04] text-gray-400 border-white/10 hover:text-white hover:bg-white/[0.08]"
+                  ? "bg-primary/20 text-primary border-primary/40"
+                  : "bg-foreground/[0.04] text-gray-400 border-foreground/10 hover:text-foreground hover:bg-foreground/[0.08]"
               )}
             >
               เฉพาะสินทรัพย์ (ไม่รวมเงินสด)
@@ -231,8 +231,8 @@ export function PortfolioDisplayFilterModal({
               className={cn(
                 "flex w-full items-center justify-between p-3.5 rounded-2xl border text-left transition-all",
                 filter.includeBucket
-                  ? "bg-[#4EDEA3]/10 border-[#4EDEA3]/30"
-                  : "bg-white/[0.02] border-white/[0.06] opacity-60 hover:opacity-100"
+                  ? "bg-primary/10 border-primary/30"
+                  : "bg-foreground/[0.02] border-foreground/[0.06] opacity-60 hover:opacity-100"
               )}
             >
               <div className="flex items-center gap-3 min-w-0">
@@ -247,8 +247,8 @@ export function PortfolioDisplayFilterModal({
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-white">เงินใน Bucket</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-gray-400">
+                    <span className="text-sm font-bold text-foreground">เงินใน Bucket</span>
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-foreground/10 text-gray-400">
                       เงินพักนอกโบรกเกอร์
                     </span>
                   </div>
@@ -266,8 +266,8 @@ export function PortfolioDisplayFilterModal({
                   className={cn(
                     "w-6 h-6 rounded-lg flex items-center justify-center transition-colors border",
                     filter.includeBucket
-                      ? "bg-[#4EDEA3] border-[#4EDEA3] text-[#003822]"
-                      : "bg-black/40 border-white/20 text-transparent"
+                      ? "bg-gain border-gain text-primary-foreground"
+                      : "bg-black/40 border-foreground/20 text-transparent"
                   )}
                 >
                   <Check size={14} strokeWidth={3} />
@@ -284,8 +284,8 @@ export function PortfolioDisplayFilterModal({
               className={cn(
                 "flex w-full items-center justify-between p-3.5 rounded-2xl border text-left transition-all",
                 filter.includeCash
-                  ? "bg-[#ADC6FF]/10 border-[#ADC6FF]/30"
-                  : "bg-white/[0.02] border-white/[0.06] opacity-60 hover:opacity-100"
+                  ? "bg-primary/10 border-primary/30"
+                  : "bg-foreground/[0.02] border-foreground/[0.06] opacity-60 hover:opacity-100"
               )}
             >
               <div className="flex items-center gap-3 min-w-0">
@@ -300,8 +300,8 @@ export function PortfolioDisplayFilterModal({
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-white">เงินสดในโบรกเกอร์</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-gray-400">
+                    <span className="text-sm font-bold text-foreground">เงินสดในโบรกเกอร์</span>
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-foreground/10 text-gray-400">
                       THB / USD
                     </span>
                   </div>
@@ -319,8 +319,8 @@ export function PortfolioDisplayFilterModal({
                   className={cn(
                     "w-6 h-6 rounded-lg flex items-center justify-center transition-colors border",
                     filter.includeCash
-                      ? "bg-[#ADC6FF] border-[#ADC6FF] text-[#00285d]"
-                      : "bg-black/40 border-white/20 text-transparent"
+                      ? "bg-info border-info text-primary-foreground"
+                      : "bg-black/40 border-foreground/20 text-transparent"
                   )}
                 >
                   <Check size={14} strokeWidth={3} />
@@ -355,8 +355,8 @@ export function PortfolioDisplayFilterModal({
                   className={cn(
                     "flex w-full items-center justify-between p-3 rounded-xl border text-left transition-all",
                     checked
-                      ? "bg-white/[0.04] border-white/15"
-                      : "bg-white/[0.01] border-white/[0.05] opacity-50 hover:opacity-90"
+                      ? "bg-foreground/[0.04] border-foreground/15"
+                      : "bg-foreground/[0.01] border-foreground/[0.05] opacity-50 hover:opacity-90"
                   )}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
@@ -366,18 +366,18 @@ export function PortfolioDisplayFilterModal({
                     >
                       <Icon size={14} />
                     </div>
-                    <span className="text-xs font-bold text-white truncate">{label}</span>
+                    <span className="text-xs font-bold text-foreground truncate">{label}</span>
                   </div>
                   <div className="flex items-center gap-2 shrink-0 ml-2">
-                    <span className="text-[11px] font-semibold tabular-nums text-gray-400">
+                    <span className="text-xs font-semibold tabular-nums text-gray-400">
                       {currencySymbol}{nf(val)}
                     </span>
                     <div
                       className={cn(
                         "w-5 h-5 rounded-md flex items-center justify-center transition-colors border",
                         checked
-                          ? "bg-white/90 border-white text-black"
-                          : "bg-black/30 border-white/20 text-transparent"
+                          ? "bg-foreground/90 border-foreground text-black"
+                          : "bg-black/30 border-foreground/20 text-transparent"
                       )}
                     >
                       <Check size={12} strokeWidth={3} />
@@ -410,8 +410,8 @@ export function PortfolioDisplayFilterModal({
                     className={cn(
                       "flex w-full items-center justify-between p-2.5 rounded-xl border text-left transition-all",
                       checked
-                        ? "bg-white/[0.03] border-white/10"
-                        : "bg-white/[0.01] border-white/[0.04] opacity-50 hover:opacity-90"
+                        ? "bg-foreground/[0.03] border-foreground/10"
+                        : "bg-foreground/[0.01] border-foreground/[0.04] opacity-50 hover:opacity-90"
                     )}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
@@ -419,7 +419,7 @@ export function PortfolioDisplayFilterModal({
                         className="w-2.5 h-2.5 rounded-full shrink-0"
                         style={{ backgroundColor: broker.color }}
                       />
-                      <span className="text-xs font-bold text-white truncate">{broker.name}</span>
+                      <span className="text-xs font-bold text-foreground truncate">{broker.name}</span>
                     </div>
 
                     <div className="flex items-center gap-2.5 shrink-0 ml-2">
@@ -430,8 +430,8 @@ export function PortfolioDisplayFilterModal({
                         className={cn(
                           "w-5 h-5 rounded-md flex items-center justify-center transition-colors border",
                           checked
-                            ? "bg-white/90 border-white text-black"
-                            : "bg-black/30 border-white/20 text-transparent"
+                            ? "bg-foreground/90 border-foreground text-black"
+                            : "bg-black/30 border-foreground/20 text-transparent"
                         )}
                       >
                         <Check size={12} strokeWidth={3} />

@@ -5,13 +5,15 @@ import { marketCache, generateCacheKey, queryDeduplicator } from '@/src/lib/cach
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const symbolsParam = searchParams.get('symbols');
+  const quotesOnly = searchParams.get('quotesOnly') === '1';
 
   if (!symbolsParam) {
     return NextResponse.json({ error: 'Missing symbols parameter' }, { status: 400 });
   }
 
-  const symbols = symbolsParam.split(',').filter(Boolean);
-  const cacheKey = generateCacheKey('market', { symbols: symbols.sort().join(',') });
+  const symbols = [...new Set(symbolsParam.split(',').map(s => s.trim().toUpperCase()).filter(Boolean))];
+  if (quotesOnly && symbols.length > 40) return NextResponse.json({ error: 'Maximum 40 symbols per request' }, { status: 400 });
+  const cacheKey = generateCacheKey('market', { symbols: symbols.sort().join(','), quotesOnly });
 
   // Check cache first
   const cached = marketCache.get(cacheKey);
@@ -29,7 +31,7 @@ export async function GET(request: Request) {
         try {
           const [dailyRes, intradayRes] = await Promise.allSettled([
             fetch(
-              `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=1mo&interval=1d&_=${timestamp}`,
+              `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${quotesOnly ? '1d&interval=1m' : '1mo&interval=1d'}&_=${timestamp}`,
               {
                 headers: {
                   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -38,8 +40,8 @@ export async function GET(request: Request) {
                 signal: AbortSignal.timeout(8000) // 8 second timeout
               }
             ),
-            fetch(
-              `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=1d&interval=5m&_=${timestamp}`,
+            quotesOnly ? Promise.resolve(null) : fetch(
+              `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=5m&_=${timestamp}`,
               {
                 headers: {
                   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -60,6 +62,12 @@ export async function GET(request: Request) {
           if (!result?.meta) return null;
 
           const meta = result.meta;
+          if (quotesOnly) {
+            // Alerts must not treat a fallback previous close or cost basis as a live quote.
+            if (!Number.isFinite(meta.regularMarketPrice) || meta.regularMarketPrice <= 0 || !meta.currency) return null;
+            return { symbol: meta.symbol || symbol, price: meta.regularMarketPrice,
+              quoteCurrency: meta.currency, quoteTimestamp: meta.regularMarketTime ? meta.regularMarketTime * 1000 : undefined };
+          }
           const price = meta.regularMarketPrice || meta.previousClose || 0;
           const prevClose = meta.chartPreviousClose || meta.previousClose || price;
           const changePercent = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;

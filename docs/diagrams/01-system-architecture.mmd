@@ -1,0 +1,55 @@
+flowchart TB
+    User["ผู้ใช้งานผ่าน Browser"] --> UI
+    subgraph Browser["Client: React 19"]
+      UI["Next.js pages: Dashboard / Portfolio / Ledger / Bucket / Trade / Terminal"]
+      Context["AppContext: shared state and financial operations"]
+      SDK["Supabase client and db helpers"]
+      FX["useFxRate: shared singleton"]
+      Symbol["useSharedMarketSymbol"]
+      Local["localStorage: preferences, FX cache, draft fallback"]
+      Chart["TradingView embedded chart"]
+      CB["CostBasisPanel"]
+      UI --> Context
+      Context --> SDK
+      UI --> FX
+      Context --> FX
+      UI --> Symbol
+      Symbol --> Local
+      FX --> Local
+      UI --> Chart
+      UI --> CB
+      CB --> SDK
+      Context -. "legacy cache and preferences" .-> Local
+    endw
+    subgraph Next["Next.js 15 server"]
+      API["Market / Chart / Analysis route handlers and actions"]
+      FXAPI["Exchange-rate valuation API and cache"]
+      Gate["Middleware: route access checks"]
+    end
+    User --> Gate
+    Gate --> UI
+    UI --> API
+    FX --> FXAPI
+    subgraph External["External services"]
+      Market["Yahoo Finance market endpoints"]
+      TV["TradingView"]
+      Wise["Wise: only if server token configured"]
+      Backup["Frankfurter / ExchangeRate-API fallback"]
+    end
+    API --> Market
+    Chart --> TV
+    FXAPI --> Wise
+    FXAPI --> Backup
+    subgraph Supabase["Supabase"]
+      Auth["Auth"]
+      Data["Data API and PostgreSQL RPC"]
+      DB[("PostgreSQL tables")]
+      Rules["Functions / triggers / RLS: definitions in repository"]
+      Auth --> Data
+      Data --> Rules
+      Rules --> DB
+    end
+    SDK --> Auth
+    SDK --> Data
+    Note["Deployment / enabled policies / applied migrations not verified live"]
+    Note -.-> Supabase

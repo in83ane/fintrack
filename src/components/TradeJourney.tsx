@@ -30,8 +30,8 @@ export function TradeJourney({ asset }: TradeJourneyProps) {
         desc: `${t("boughtShares")?.replace("{shares}", firstTrade.shares?.toString() || "0").replace("{price}", formatMoney(firstTrade.amountUSD / (firstTrade.shares || 1)))}`,
         date: firstTrade.date,
         icon: <TrendingUp size={14} />,
-        color: "text-[#4EDEA3]",
-        bg: "bg-[#4EDEA3]/10",
+        color: "text-gain",
+        bg: "bg-gain/10",
       });
     }
 
@@ -48,8 +48,8 @@ export function TradeJourney({ asset }: TradeJourneyProps) {
           : `Sold ${tr.shares} at ${formatMoney(tr.amountUSD / (tr.shares || 1))}`,
         date: tr.date,
         icon: isBuy ? <TrendingUp size={14} /> : <TrendingDown size={14} />,
-        color: isBuy ? "text-[#4EDEA3]" : "text-[#FFB4AB]",
-        bg: isBuy ? "bg-[#4EDEA3]/10" : "bg-[#FFB4AB]/10",
+        color: isBuy ? "text-gain" : "text-loss",
+        bg: isBuy ? "bg-gain/10" : "bg-loss/10",
       });
     });
 
@@ -69,8 +69,8 @@ export function TradeJourney({ asset }: TradeJourneyProps) {
           desc: t("firstMilestone") || "First major profit milestone reached",
           date: new Date().toISOString(),
           icon: <Flag size={14} />,
-          color: "text-[#E9C349]",
-          bg: "bg-[#E9C349]/10",
+          color: "text-warning",
+          bg: "bg-warning/10",
         });
       }
       
@@ -82,8 +82,8 @@ export function TradeJourney({ asset }: TradeJourneyProps) {
           desc: t("strongPerformance") || "Strong performance milestone",
           date: new Date().toISOString(),
           icon: <CheckCircle2 size={14} />,
-          color: "text-[#E9C349]",
-          bg: "bg-[#E9C349]/10",
+          color: "text-warning",
+          bg: "bg-warning/10",
         });
       }
 
@@ -99,7 +99,7 @@ export function TradeJourney({ asset }: TradeJourneyProps) {
         date: null,
         icon: <CircleDot size={14} />,
         color: "text-gray-500",
-        bg: "bg-white/5",
+        bg: "bg-foreground/5",
       });
     }
 
@@ -111,21 +111,21 @@ export function TradeJourney({ asset }: TradeJourneyProps) {
   return (
     <div className="bg-surface p-5 rounded-2xl border border-border space-y-4">
       <div className="flex items-center gap-2 mb-2">
-        <Flag size={16} className="text-[#ADC6FF]" />
-        <h3 className="text-sm font-bold text-white">{t("investmentJourney") || "Investment Journey"}</h3>
+        <Flag size={16} className="text-info" />
+        <h3 className="text-sm font-bold text-foreground">{t("investmentJourney") || "Investment Journey"}</h3>
       </div>
       
       <div className="relative pl-3 space-y-4 before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-white/10 before:to-transparent">
         {milestones.map((item, idx) => (
           <div key={item.id} className="relative flex items-start gap-4">
-            <div className={cn("w-6 h-6 rounded-full flex items-center justify-center shrink-0 z-10 border border-[#1C1B1B]", item.bg, item.color)}>
+            <div className={cn("w-6 h-6 rounded-full flex items-center justify-center shrink-0 z-10 border border-surface", item.bg, item.color)}>
               {item.icon}
             </div>
             <div className="flex-1 pb-4">
-              <h4 className={cn("text-xs font-bold", item.type === "target" ? "text-gray-500" : "text-white")}>{item.title}</h4>
-              <p className="text-[10px] text-gray-500 mt-0.5">{item.desc}</p>
+              <h4 className={cn("text-xs font-bold", item.type === "target" ? "text-gray-500" : "text-foreground")}>{item.title}</h4>
+              <p className="text-xs text-gray-500 mt-0.5">{item.desc}</p>
               {item.date && (
-                <p className="text-[9px] text-gray-600 font-medium uppercase mt-1">
+                <p className="text-xs text-gray-600 font-medium uppercase mt-1">
                   {format(new Date(item.date), "MMM dd, yyyy")}
                 </p>
               )}

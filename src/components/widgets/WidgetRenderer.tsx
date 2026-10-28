@@ -1,5 +1,6 @@
 "use client";
 
+import { AllocationSurface } from '@/src/components/AllocationSurface';
 import { FinanceIcon } from "@/src/components/FinanceIcon";
 import React, { useMemo } from "react";
 import { useApp, WidgetType, Asset } from "@/src/context/AppContext";
@@ -67,7 +68,7 @@ function EquityCurveWidget() {
 
 // ─── Allocation Pie Widget ─────────────────────────────────────────────────────
 function AllocationPieWidget() {
-  const { t, assets, formatMoney, allocations } = useApp();
+  const { t, assets, formatMoney, allocations, isDataLoaded } = useApp();
   const totalValue = assets.reduce((acc, a) => acc + a.valueUSD, 0);
 
   const segments = useMemo(() => {
@@ -94,10 +95,10 @@ function AllocationPieWidget() {
   if (assets.some(a => !isFxCurrency(a.currency))) return <EmptyWidget label="unresolved: asset currency" />;
 
   return (
-    <div className="h-full flex flex-col">
+    <AllocationSurface identity="dashboard-allocation" ready={isDataLoaded && segments.length > 0} className="h-full flex flex-col">
       <span className="text-[10px] font-black text-gray-500 uppercase tracking-wide mb-2">{t("widgetAllocationPie")}</span>
       <div className="flex-1 flex items-center gap-3 min-h-0">
-        <svg data-chart="donut" viewBox="0 0 100 100" className="w-20 h-20 flex-shrink-0">
+        <svg data-allocation-donut viewBox="0 0 100 100" className="w-20 h-20 flex-shrink-0">
           {segments.map((seg, i) => {
             let pct = Math.max(seg.value, 0.5);
             if (pct >= 100) pct = 99.99;
@@ -123,20 +124,20 @@ function AllocationPieWidget() {
             );
           })}
           <circle cx={C} cy={C} r={22} fill="#0f1115" />
-          <text x={C} y={C + 1} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize="10" fontWeight="bold">
+          <text data-allocation-label x={C} y={C + 1} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize="10" fontWeight="bold">
             {assets.length}
           </text>
         </svg>
         <div className="space-y-1 overflow-y-auto max-h-full">
           {segments.map((seg, i) => (
-            <div key={i} className="flex items-center gap-1.5">
+            <div data-allocation-label key={i} className="flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: seg.color }} />
               <span className="text-[10px] text-gray-400 font-medium truncate">{seg.label} {seg.value.toFixed(0)}%</span>
             </div>
           ))}
         </div>
       </div>
-    </div>
+    </AllocationSurface>
   );
 }
 
