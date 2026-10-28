@@ -137,7 +137,7 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
       const anchor = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>('a[href]') : null;
       if (!anchor || anchor.download || (anchor.target && anchor.target !== '_self') || anchor.getAttribute('href')?.startsWith('#')) return null;
       const url = new URL(anchor.href, location.href);
-      return url.origin === location.origin && /^\/(dashboard|portfolio|ledger|cashflow|terminal|trade|budget|history|settings|calendar|trader-hub|transactions)(\/|$)/.test(url.pathname) ? url : null;
+      return url.origin === location.origin && /^\/(dashboard|portfolio|ledger|cashflow|terminal|trade|budget|history|settings|calendar|trader-hub|transactions|plan)(\/|$)/.test(url.pathname) ? url : null;
     };
     const warm = (event: Event) => {
       const url = localAnchor(event);

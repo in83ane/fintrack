@@ -3,6 +3,9 @@ import CashFlow from '../src/app/(app)/cashflow/CashFlowView';
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { createRoot } from 'react-dom/client';
 import Ledger from '../src/app/(app)/ledger/page';
+import Settings from '../src/app/(app)/settings/SettingsView';
+import {Sidebar} from '../src/components/Sidebar';
+import {TopBar} from '../src/components/TopBar';
 import { LedgerActions } from '../src/components/LedgerActions';
 import { transitionTheme } from '../src/lib/theme-transition';
 // Supplied by the runner from the real dictionary (not a duplicate translation).
@@ -31,6 +34,9 @@ function Fixture(){
     (app as any).brokerageCashBalances=[{accountId:'a',balance:25.5}];
     (app as any).portfolios=[{id:'broker-a',name:'Broker A'},{id:'broker-b',name:'Broker B'}];
   }
-  return <App.Provider value={app}><Navigation.Provider value={{pathname,push,replace:push,prefetch:()=>{}}}><LedgerActions>{pathname==='/cashflow'?<CashFlow/>:<Ledger/>}</LedgerActions></Navigation.Provider></App.Provider>;
+  Object.assign(app,{notifPreferences:{priceAlerts:true,rebalanceAlerts:true,weeklyReport:false},setNotifPreferences:()=>{},darkMode:dark,setDarkMode:setDark,trades:[],allocations:[],bucketActivities:[]});
+  // Exercise the desktop shell; narrow viewports isolate the search controls.
+  const shell=matchMedia('(min-width:768px)').matches;
+  return <App.Provider value={app}><Navigation.Provider value={{pathname,push,replace:push,prefetch:()=>{}}}><div className="flex min-h-screen min-w-0">{shell&&<Sidebar/>}<div className={`relative min-w-0 flex-1 ${shell?'ml-[var(--sidebar-w)]':''}`}>{shell&&<TopBar/>}<main data-page-content><LedgerActions>{pathname==='/settings'?<Settings/>:pathname==='/cashflow'?<CashFlow/>:<Ledger/>}</LedgerActions></main></div></div></Navigation.Provider></App.Provider>;
 }
 createRoot(document.getElementById('root')!).render(<Fixture/>);

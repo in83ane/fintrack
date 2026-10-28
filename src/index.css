@@ -193,6 +193,7 @@ body {
 
 html {
   min-width: 0;
+  scrollbar-gutter: stable;
   overflow-x: hidden;
   overflow-x: clip;
 }
@@ -353,8 +354,14 @@ input[type="number"]::-webkit-inner-spin-button {
 [data-refresh-shimmer] [data-loading-data] { background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--color-foreground) 7%, transparent), transparent); background-size:200% 100%; animation: sk-shimmer 1.6s linear infinite; }
 @media (prefers-reduced-motion: reduce) { [data-route-page] [data-loading-data] { transition:none; } [data-refresh-shimmer] [data-loading-data] { animation:none; } }
 /* RecordSearch supplies a labeled clear button; suppress the browser's duplicate. */
-.record-search-field:focus-within { background-color:var(--field-menu); }
-.record-search-input { background:transparent; }
+.record-search-field { height:50px; }
+.record-search-field:focus-within { border-color:var(--color-primary); }
+.record-search-field > input.record-search-input {
+  appearance:none; height:48px; min-height:0; padding-block:0;
+  border:0; border-radius:0; background:transparent; outline:none; box-shadow:none;
+}
+.settings-page { animation:page-enter 180ms ease-out both; }
+@media(prefers-reduced-motion:reduce) { .settings-page { animation:none; } }
 .record-search-input::-webkit-search-cancel-button {
   -webkit-appearance: none;
   appearance: none;

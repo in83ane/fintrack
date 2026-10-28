@@ -85,21 +85,18 @@ export default function SettingsPage() {
 
 
   return (
-    <div className="app-page-container space-y-12 py-8 lg:py-12">
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
+    <div className="settings-page app-page-container space-y-12 py-8 lg:py-12">
+      <div>
         <span className="text-[#ADC6FF] uppercase tracking-wide text-xs font-black mb-2 block">{t("settings")}</span>
         <h1 className="text-5xl font-black tracking-tighter text-white leading-tight">
           {t("systemPreferences").split(" ")[0]} <span className="text-[#4EDEA3]">{t("systemPreferences").split(" ").slice(1).join(" ") || t("settings")}</span>
         </h1>
-      </motion.div>
+      </div>
 
       <div className="space-y-8">
         {/* Profile Card (#23) */}
         <section>
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-gradient-to-br from-[#1C1B1B] to-[#141414] p-6 rounded-3xl border border-border relative overflow-hidden">
+          <div className="bg-gradient-to-br from-[#1C1B1B] to-[#141414] p-6 rounded-3xl border border-border relative overflow-hidden">
             <div className="absolute -right-8 -top-8 w-32 h-32 bg-[#ADC6FF]/5 blur-3xl rounded-full" />
             <div className="flex items-center gap-4 relative z-10">
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#ADC6FF] to-[#4D8EFF] flex items-center justify-center text-xl font-bold text-white shadow-lg">
@@ -115,7 +112,7 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
-          </motion.div>
+          </div>
         </section>
 
         {/* Regional Settings */}

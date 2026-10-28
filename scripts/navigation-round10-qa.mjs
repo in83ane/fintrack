@@ -19,7 +19,7 @@ let dictionary;function visit(n){if(ts.isVariableDeclaration(n)&&n.name.getText(
 write('package.json',JSON.stringify({private:true,scripts:{dev:'next dev'}}));
 write('tsconfig.json',JSON.stringify({compilerOptions:{target:'ES2020',lib:['dom','esnext'],jsx:'preserve',module:'esnext',moduleResolution:'bundler',esModuleInterop:true,skipLibCheck:true,baseUrl:'.',paths:{'@/src/context/AppContext':['./context.tsx'],'@/src/hooks/useFxRate':['./fx.ts'],'@/src/components/SettingsModal':['./settings.tsx'],'@/src/lib/supabase':['./supabase.ts'],'@/src/app/actions':['./actions.ts'],'@/src/*':[path.join(repo,'src/*')]}},include:['**/*.ts','**/*.tsx']}));
 write('next.config.mjs',`export default {experimental:{staleTimes:{dynamic:${STALE_TTL/1000},static:${STALE_TTL/1000}}},reactStrictMode:true,devIndicators:false,webpack(config){Object.assign(config.resolve.alias,${JSON.stringify({'@/src/context/AppContext$':path.join(dir,'context.tsx'),'@/src/hooks/useFxRate$':path.join(dir,'fx.ts'),'@/src/components/SettingsModal$':path.join(dir,'settings.tsx'),'@/src/lib/supabase$':path.join(dir,'supabase.ts'),'@/src/app/actions$':path.join(dir,'actions.ts'),'@/src':path.join(repo,'src')})});return config;}};`);
-write('context.tsx',`'use client';import React from 'react';const empty=[];const defaults={assets:empty,trades:empty,cashActivities:empty,bucketActivities:empty,moneyBuckets:empty,allMoneyBuckets:empty,brokerageAccounts:empty,allBrokerageAccounts:empty,brokerageCashBalances:empty,brokerageCashEntries:empty,netWorthHistory:empty,allocations:empty,customCategories:empty,marketQuotes:{},netWorthSettings:{},notifPreferences:{priceAlerts:true,rebalanceAlerts:true,weeklyReport:false},exchangeRates:{USD:1,THB:33.723},activePortfolioId:null,totalInvested:0,totalUnrealizedPL:0,totalRealizedPL:0,totalDividends:0,formatMoney:v=>String(v),selectPortfolio:()=>{},addToast:()=>{},setNetWorthSettings:()=>{}};const translations=${dictionary};let readyState=true;const listeners=new Set();const subscribe=fn=>{listeners.add(fn);return()=>listeners.delete(fn);};export function useApp(){const ready=React.useSyncExternalStore(subscribe,()=>readyState,()=>true);React.useEffect(()=>{window.__qaSetReady=value=>{readyState=value;listeners.forEach(fn=>fn());};},[]);return {...defaults,language:'en',t:k=>translations.en[k]||k,isDataLoaded:ready,dataLoadError:null,portfolios:empty,activePortfolio:null,isAllPortfolios:true,notifications:[],userProfile:null,currency:'THB',setCurrency:()=>{},setLanguage:()=>{}};}`);
+write('context.tsx',`'use client';import React from 'react';const empty=[];const defaults={assets:empty,trades:empty,cashActivities:empty,bucketActivities:empty,moneyBuckets:empty,allMoneyBuckets:empty,brokerageAccounts:empty,allBrokerageAccounts:empty,brokerageCashBalances:empty,brokerageCashEntries:empty,netWorthHistory:empty,netWorthScope:{portfolioId:null,settings:{},exchangeRates:{USD:1,THB:33.723},assets:empty,trades:empty,cashActivities:empty,buckets:empty,accounts:empty,balances:empty,brokerEntries:empty},allocations:empty,customCategories:empty,marketQuotes:{},netWorthSettings:{},notifPreferences:{priceAlerts:true,rebalanceAlerts:true,weeklyReport:false},exchangeRates:{USD:1,THB:33.723},activePortfolioId:null,totalInvested:0,totalUnrealizedPL:0,totalRealizedPL:0,totalDividends:0,formatMoney:v=>String(v),selectPortfolio:()=>{},addToast:()=>{},setNetWorthSettings:()=>{}};const translations=${dictionary};let readyState=true;const listeners=new Set();const subscribe=fn=>{listeners.add(fn);return()=>listeners.delete(fn);};export function useApp(){const ready=React.useSyncExternalStore(subscribe,()=>readyState,()=>true);React.useEffect(()=>{window.__qaSetReady=value=>{readyState=value;listeners.forEach(fn=>fn());};},[]);return {...defaults,language:'en',t:k=>translations.en[k]||k,isDataLoaded:ready,dataLoadError:null,portfolios:empty,activePortfolio:null,isAllPortfolios:true,notifications:[],userProfile:null,currency:'THB',setCurrency:()=>{},setLanguage:()=>{}};}`);
 write('fx.ts',`export const useFxRate=()=>({rate:33.723,mode:'auto',stale:false,quote:{fetchedAt:'2026-10-26T02:00:00Z'}});`);
 write('settings.tsx',`export const SettingsModal=()=>null;`);
 write('supabase.ts',`export const db={};export const supabase={auth:{signOut:async()=>{},getSession:async()=>({data:{session:null}})}};`);
@@ -31,7 +31,7 @@ write('postcss.config.mjs',`export default {plugins:{'@tailwindcss/postcss':{}}}
 write('app/(app)/layout.tsx',`import React from 'react';import {Sidebar} from '@/src/components/Sidebar';import {TopBar} from '@/src/components/TopBar';import {RouteViewport} from '@/src/components/RouteContent';export default function Layout({children}){return <><Sidebar/><div style={{marginLeft:'var(--sidebar-w)'}}><TopBar/><main data-page-content><RouteViewport>{children}</RouteViewport></main></div></>}`);
 write('app/(app)/template.tsx',readFileSync('src/app/(app)/template.tsx','utf8'));
 write('app/(app)/error.tsx',readFileSync('src/app/(app)/error.tsx','utf8'));
-const routes=['dashboard','portfolio','ledger','cashflow','terminal','trade/plan','budget','history','settings'];
+const routes=['dashboard','portfolio','ledger','cashflow','terminal','trade/plan','budget','history','settings','plan'];
 for(const route of routes)write(`app/(app)/${route}/page.tsx`,`export const dynamic='force-dynamic';export default async function Page(){await new Promise(r=>setTimeout(r,1200));return <div className="app-page-container py-8"><h1>${route}</h1><section className="border border-border rounded-2xl bg-surface p-5 h-[420px]">${route} content ready</section></div>}`);
 write('app/(app)/fault/page.tsx',`export const dynamic='force-dynamic';export default async function Page(){throw new Error('Intentional QA route failure')}`);
 // The fixture uses the production shell, template and transitions, with isolated
@@ -58,7 +58,7 @@ try {
  // External instrumentation works in production, where app diagnostics are off.
  await p.evaluate(()=>{
   window.__qaFade=[];window.__navEvents=[];
-  document.addEventListener('click',e=>{const a=e.target.closest('a[href]');if(a)window.__navEvents.push({t:performance.now(),href:a.getAttribute('href')});},true);
+  document.addEventListener('click',e=>{const a=e.target.closest('a[href]');if(a)window.__navEvents.push({t:performance.now(),href:a.getAttribute('href'),transitionCaptured:e.defaultPrevented});},true);
   const sample=()=>{
    const wrapper=document.querySelector('[data-page-wrapper]');
    const nodes=wrapper?[wrapper]:[document.querySelector('[data-transition-state]'),document.querySelector('[data-route-entered]')].filter(Boolean);
@@ -67,9 +67,11 @@ try {
   };sample();
  });
  const navigate=async route=>{
+  const clickCount=await p.evaluate(()=>window.__navEvents.length);
   await p.locator(`.sidebar-nav a[href="/${route}"]`).click();
   await p.waitForFunction(route=>document.querySelector('[data-route-entered] h1')?.textContent===route,route,{timeout:90000});
   await p.waitForTimeout(250);
+  assert(await p.evaluate(({clickCount,route})=>window.__navEvents.slice(clickCount).some(e=>e.href===`/${route}`&&e.transitionCaptured),{clickCount,route}),`${route}: must use shared transition`);
  };
  if(baseline) {
   for(const route of ['portfolio','ledger','cashflow','dashboard','portfolio','ledger','cashflow','dashboard'])await navigate(route);
