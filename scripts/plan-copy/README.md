@@ -2,7 +2,7 @@
 
 **Assistant work is offline only; no assistant database connection or SQL execution is authorized.**
 The owner has supplied seven failed local harness reports; no real three-round
-pass is recorded. The latest offline audit passed **110/110 (86 runner + 24 bootstrap)**.
+pass is recorded. The recorded baseline audit passed **110/110 (86 runner + 24 bootstrap)**.
 See [evidence and limitations](../../docs/local-postgres-copy-evidence.md).
 Offline tests validate JavaScript guards, mocked orchestration and top-level SQL
 grammar with a PostgreSQL 18 raw parser. They do not validate function bodies,
@@ -59,7 +59,7 @@ disable jobs nor modify financial data. Do not copy a production connection URL
 into this README or into logs.
 
 ```sql
-select current_database(), session_user, inet_server_addr(), inet_server_port();
+select current_database(), session_user, host(inet_server_addr()) as server_addr, inet_server_port();
 select to_regclass('cron.job') as cron_jobs,
        to_regclass('net.http_request_queue') as outbound_queue,
        to_regclass('vault.decrypted_secrets') as vault_view;
@@ -177,12 +177,18 @@ $env:PLAN_COPY_EXPECTED_HOST = '<independently-verified-copy-host>'
 $env:PLAN_COPY_EXPECTED_PORT = '5432'
 $env:PLAN_COPY_EXPECTED_DATABASE = '<copy-database-name>'
 $env:PLAN_COPY_EXPECTED_LOGIN_ROLE = '<copy-admin-login>'
-$env:PLAN_COPY_EXPECTED_SERVER_ADDRS = '<inet_server_addr-from-copy>'
+$env:PLAN_COPY_EXPECTED_SERVER_ADDRS = '<host(inet_server_addr())-from-copy>'
 $env:PLAN_COPY_ID = '<same-manually-created-copy-uuid-v4>'
 $env:PLAN_COPY_CONFIRM = 'I_UNDERSTAND_THIS_IS_A_DISPOSABLE_COPY'
 ```
 
-Multiple expected IP addresses may be comma-separated, with no wildcard. Server
+Use `select host(inet_server_addr());` in the owner's read-only inspection to
+obtain an IP without a netmask. Expected IPs may be comma-separated, but must be
+bare addresses: no wildcard or CIDR, including `/32` and `/128`. For the server
+response only, the guard strips IPv4 `/32` or IPv6 `/128` before exact comparison;
+other masks (such as `/24` or `/64`) are rejected, never treated as ranges.
+The existing IPv4-mapped IPv6 normalization is retained. Port values are converted
+to numbers before comparison. There is no bypass flag. Server
 address/port, database and login role are checked after connection; URL host/port,
 database, role, known production project and confirmation are checked **before**
 connection. Hosted TLS requires certificate verification; only loopback hosts
@@ -264,5 +270,58 @@ References: [node-postgres transactions](https://node-postgres.com/features/tran
 See [local setup](../../docs/local-postgres-copy-setup.md). `local-bootstrap.mjs` is an offline SQL-bundle generator, never a database runner. `--plan` lists checksums; `--emit --copy-id <UUIDv4>` creates a new ignored report directory for manual review. Do not run generated SQL until the owner verifies the isolated instance and explicit guards. Existing cloud instructions above remain applicable only to cloud mode.
 
 Set `PLAN_COPY_MODE=local-synthetic` only for approved `127.0.0.1:5432/fintrack_local_test`, `fintrack_tester`, PG18, with explicit `PLAN_COPY_MANIFEST_SHA256` and the operator-created marker. Other endpoints/roles/versions fail closed. Omitted mode remains `supabase-copy`. No `.env` or application credentials are loaded. The runner is non-superuser; provisioning is an explicitly separate admin step.
+
+These local settings extend the original cloud-only harness in commit `92bb583`.
+Local mode still checks every connection's database, login/current role, exact
+server address and numeric port before any fixture is allocated. It additionally
+checks PG18, runner privileges, installed capabilities and the bootstrap marker.
+The shared identity checks also apply in `supabase-copy` mode.
+
+`PLAN_COPY_MANIFEST_SHA256` is required in local mode as 64 lowercase hex characters.
+Copy the top-level `sha256` from the reviewed bundle's `manifest.json`; Preflight
+compares it with `plan_copy_guard.bootstrap.manifest_sha256`. It is not a hash of
+the runner, the whole repository, the generated `.psql` files, or the live schema.
+The separate copy marker must also match `PLAN_COPY_ID`.
+
+`local-manifest.mjs` explicitly orders 34 included sources: root schemas
+`supabase_schema.sql` and `trade_journal_schema.sql`; migrations 002-016, 018-023
+and the six listed PLAN/writer migrations; and five local SQL files (auth bootstrap,
+observed-schema prerequisite, empty-legacy guard, baseline grants, runner grants).
+Migration 017 and five notification/outbound migrations are excluded; 017's corrupt
+raw bytes are checked separately against a pinned hash. `recovery-inventory.psql`
+is not an included source.
+
+For each included file, the manifest records `path`, `sha256` of strictly decoded,
+BOM-removed, LF-normalized SQL, `encoding`, `bomRemoved` and `rawSha256` of its
+original bytes. The overall hash is SHA256 of `JSON.stringify(entries)` in that
+exact order. Raw-byte or encoding changes can therefore change the hash even when
+normalized SQL is unchanged. Exclusion metadata is not part of that aggregate.
+
+To inspect the current source hash offline from the repository root (prints only;
+does not set env, write a bundle, connect, or execute SQL):
+
+```powershell
+node scripts/plan-copy/local-bootstrap.mjs --plan
+```
+
+The address/error-code fix changes only the guard, its tests and this README,
+so it does not change the manifest hash. Do not overwrite the env or database
+marker to hide a mismatch; review the source/bundle first. This fix does not
+authorize rerunning a failed database or bypassing the fresh-instance procedure.
+
+### Live identity error codes (both modes)
+
+| Code | Meaning |
+|---|---|
+| `LIVE_SERVER_ADDR_MISMATCH` | Server host address is invalid, has a non-host mask, or is not an exact allowlist member. |
+| `LIVE_SERVER_PORT_MISMATCH` | Numeric server port differs from the expected port. |
+| `LIVE_DATABASE_MISMATCH` | Connected database differs from the expected database. |
+| `LIVE_ROLE_MISMATCH` | Login role or current role differs from the expected login. |
+
+These replace the combined `LIVE_SERVER_MISMATCH` / `LIVE_IDENTITY_MISMATCH`
+codes for new runs. Historical reports keep their old codes. Errors expose only
+the code, never the actual or expected address, port, database or role. All four
+checks stop before fixtures or write queries. Read-only/role-membership, marker,
+manifest, scheduler and other existing checks remain in force.
 
 Missing cron/net/Vault is reported `absent-not-exercised`, not passed. Local tests cannot certify Supabase Auth/JWT/PostgREST or production grants/PG17 behavior. Never weaken a guard to reuse a populated database. Keep fixtures/reports; no automatic cleanup.

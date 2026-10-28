@@ -16,6 +16,15 @@ export function safeError(error) {
   return { code: sqlstate === '40P01' ? 'DEADLOCK' : 'DATABASE_OR_TRANSPORT_FAILURE', sqlstate };
 }
 const address = value => value.replace(/^::ffff:/i, '');
+// inet::text may include a host netmask. Never interpret a network as a host.
+const serverAddress = value => {
+  if (typeof value !== 'string') return null;
+  const [host, mask, extra] = value.split('/');
+  const family = isIP(host);
+  if (!family || extra !== undefined) return null;
+  if (mask !== undefined && mask !== (family === 4 ? '32' : '128')) return null;
+  return address(host);
+};
 const hostName = value => value.replace(/^\[|\]$/g, '').toLowerCase();
 
 /** Pure, synchronous guard. Must finish BEFORE importing pg/constructing clients. */
@@ -128,8 +137,10 @@ select exists(select from (values ('identity'),('bootstrap')) t(name)
  where has_table_privilege(r.name,'plan_copy_guard.'||t.name,'INSERT,UPDATE,DELETE,TRUNCATE')) unsafe`;
 
 export function checkIdentity(row, config) {
-  requireSafe(row?.db === config.database && row.login_role === config.user && row.current_role === config.user, 'LIVE_IDENTITY_MISMATCH');
-  requireSafe(config.serverAddresses.includes(address(row.server_addr || '')) && Number(row.server_port) === config.port, 'LIVE_SERVER_MISMATCH');
+  requireSafe(row?.db === config.database, 'LIVE_DATABASE_MISMATCH');
+  requireSafe(row.login_role === config.user && row.current_role === config.user, 'LIVE_ROLE_MISMATCH');
+  requireSafe(config.serverAddresses.includes(serverAddress(row.server_addr)), 'LIVE_SERVER_ADDR_MISMATCH');
+  requireSafe(Number(row.server_port) === config.port, 'LIVE_SERVER_PORT_MISMATCH');
   requireSafe(row.read_only === 'on' && row.can_assume_authenticated === true, 'LIVE_ROLE_OR_READ_ONLY_MISMATCH');
   requireSafe(Number.isInteger(row.pid) && row.pid > 0, 'INVALID_BACKEND_PID');
   return row.pid;

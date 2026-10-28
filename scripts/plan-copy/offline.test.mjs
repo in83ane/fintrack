@@ -39,8 +39,8 @@ function mockPg(fault = {}) {
       if (this.ended) throw new Error('closed');
       assertSqlSyntax(sql, 'runner-query');
       const rows = value => ({ rows: value });
-      if (sql.includes('copy:identity')) return rows([{ db: fault.database || (fault.local ? 'fintrack_local_test' : 'fintrack_copy'), login_role: fault.local ? 'fintrack_tester' : 'qa_admin', current_role: fault.local ? 'fintrack_tester' : 'qa_admin',
-        server_addr: fault.address || '127.0.0.1', server_port: 5432, pid: fault.samePid ? 1 : this.pid,
+      if (sql.includes('copy:identity')) return rows([{ db: fault.database || (fault.local ? 'fintrack_local_test' : 'fintrack_copy'), login_role: fault.loginRole ?? (fault.local ? 'fintrack_tester' : 'qa_admin'), current_role: fault.currentRole ?? (fault.local ? 'fintrack_tester' : 'qa_admin'),
+        server_addr: fault.address ?? '127.0.0.1', server_port: fault.serverPort ?? 5432, pid: fault.samePid ? 1 : this.pid,
         read_only: fault.writable ? 'off' : 'on', can_assume_authenticated: !fault.roleDenied }]);
       if (sql.includes('copy:marker-acl')) return rows([{ unsafe: !!fault.markerWritable }]);
       if (sql.includes('copy:marker')) return rows([{ copy_id: fault.marker || env().PLAN_COPY_ID, database_name: fault.local ? 'fintrack_local_test' : 'fintrack_copy',
@@ -265,7 +265,7 @@ test('local protocol mock retains all three races and reports PG18 limitations',
 });
 for(const serverAddress of ['192.0.2.1','::1','mismatch']) test(`local live backend ${serverAddress} must match explicit allowlist before fixtures`,async()=>{
  const m=mockPg({local:true,absent:true,address:serverAddress});const r=await execute(localEnv(),{Client:m.Client});
- assert.equal(r.error.code,'LIVE_SERVER_MISMATCH');assert.equal(m.state.fixtureWrites,0);
+ assert.equal(r.error.code,'LIVE_SERVER_ADDR_MISMATCH');assert.equal(m.state.fixtureWrites,0);
  assert.equal(r.fixtures.length,0);assert.equal(r.connectionsClosed,true);
 });
 for(const fault of ['oldVersion','superuser','bypass','ownerMember','serviceMember','extraExtension','outboundSchema','foreignServer','subscription','badHash','localMarkerWritable']) {
@@ -278,3 +278,45 @@ test('local rejects installed outbound extensions; no fallback to Supabase mode'
  const m=mockPg({local:true});const r=await execute(localEnv(),{Client:m.Client});
  assert.equal(r.error.code,'LOCAL_UNEXPECTED_CAPABILITIES');assert.equal(m.state.fixtureWrites,0);
 });
+
+for (const local of [false, true]) {
+ for (const [name, fault, expectedAddress, code] of [
+  ['IPv4 host mask', {address:'127.0.0.1/32'}, '127.0.0.1', null],
+  ['different host', {address:'127.0.0.2'}, '127.0.0.1', 'LIVE_SERVER_ADDR_MISMATCH'],
+  ['network range', {address:'10.0.0.0/24'}, '127.0.0.1', 'LIVE_SERVER_ADDR_MISMATCH'],
+  ['matching host with network mask', {address:'127.0.0.1/24'}, '127.0.0.1', 'LIVE_SERVER_ADDR_MISMATCH'],
+  ['integer port', {serverPort:5432}, '127.0.0.1', null],
+  ['different port', {serverPort:5433}, '127.0.0.1', 'LIVE_SERVER_PORT_MISMATCH'],
+  ['IPv6 host mask', {address:'::1/128'}, '::1', null],
+  ['IPv6 network mask', {address:'::1/64'}, '::1', 'LIVE_SERVER_ADDR_MISMATCH'],
+  ['invalid family mask', {address:'127.0.0.1/128'}, '127.0.0.1', 'LIVE_SERVER_ADDR_MISMATCH'],
+  ['extra mask', {address:'127.0.0.1/32/32'}, '127.0.0.1', 'LIVE_SERVER_ADDR_MISMATCH'],
+  ['different database', {database:'unexpected_database'}, '127.0.0.1', 'LIVE_DATABASE_MISMATCH'],
+  ['different login', {loginRole:'unexpected_login'}, '127.0.0.1', 'LIVE_ROLE_MISMATCH'],
+  ['different current role', {currentRole:'unexpected_role'}, '127.0.0.1', 'LIVE_ROLE_MISMATCH'],
+ ]) test(`${local ? 'local-synthetic' : 'supabase-copy'} live identity: ${name}`, async () => {
+  const config = {...(local ? localEnv() : env()), PLAN_COPY_EXPECTED_SERVER_ADDRS:expectedAddress};
+  assert.equal(config.PLAN_COPY_EXPECTED_PORT, '5432');
+  const m = mockPg({local, absent:local, ...fault});
+  const r = await execute(config, {Client:m.Client});
+  assert.equal(r.connectionsClosed, true);
+  if (!code) { assert.equal(r.passed, true); assert.equal(r.rounds.length, 3); return; }
+  assert.equal(r.passed, false);
+  assert.deepEqual(r.error, {code}); // No actual endpoint/database/role in errors.
+  assert.deepEqual(r.fixtures, []); assert.deepEqual(r.rounds, []);
+  assert.equal(m.state.fixtureWrites, 0);
+  assert.ok(m.state.events.length > 0);
+  assert.ok(m.state.events.every(e => e.sql.startsWith('/* copy:identity */')));
+  for (const value of Object.values(fault).filter(v => typeof v === 'string')) assert.ok(!JSON.stringify(r).includes(value));
+ });
+}
+
+for (const expected of ['127.0.0.1/32', '10.0.0.0/24', '::1/128', '*']) {
+ test('expected server addresses reject masks/ranges/wildcards before any client', async () => {
+  const m = mockPg();
+  await assert.rejects(() => execute({...env(), PLAN_COPY_EXPECTED_SERVER_ADDRS:expected}, {Client:m.Client}),
+   error => error instanceof GuardError && error.code === 'INVALID_SERVER_ADDRESSES');
+  assert.equal(m.state.clients.length, 0); assert.equal(m.state.connects, 0);
+  assert.equal(m.state.events.length, 0);
+ });
+}
