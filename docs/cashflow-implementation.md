@@ -69,7 +69,7 @@ The browser harness bundles the **production page and chart components** with an
 
 Twenty screenshots cover 1440/390 × dark/light × populated/loading/empty/partial/error. Automated checks cover exact money, investment inclusion, no page overflow, table toggle, privacy, currency replay, ordinary rerenders, reduced motion, the 35% viewport threshold and data updates during animation. Representative populated, empty, partial and error screenshots were also visually reviewed. The harness requires Playwright and esbuild installed in the temporary `fintrack-cashflow-qa` package directory and uses local Microsoft Edge; application dependencies were not changed.
 
-Evidence: [result manifest](../output/cashflow-qa/results.json), [desktop dark](../output/cashflow-qa/cashflow-1440-dark-populated.png), [mobile light](../output/cashflow-qa/cashflow-390-light-populated.png). All state images are beside the manifest.
+Evidence: QA screenshots and results in `output/cashflow-qa/` are kept locally and are not tracked in Git. Regenerate them with `node scripts/cashflow-browser-qa.mjs`; the script creates the output directory automatically.
 
 ## Data-model limits and remaining verification
 
@@ -84,4 +84,4 @@ Evidence: [result manifest](../output/cashflow-qa/results.json), [desktop dark](
 - Money: `src/lib/cashflow-selectors.ts`, `src/lib/cashflow-selectors.test.mjs`; shared summary consumers in `src/app/(app)/cashflow/page.tsx`, `ledger/page.tsx`, `dashboard/page.tsx`; existing `src/context/AppContext.tsx` dictionaries.
 - Cash Flow: `src/components/cashflow/ChartFrame.tsx`, `src/components/cashflow/charts.tsx`, page above; compact prompt support in `src/components/AIFinancialAdvisor.tsx`.
 - Motion: `src/lib/chart-motion.ts`, `src/components/ChartReveal.tsx`, `src/app/(app)/layout.tsx`, scoped additions in `src/index.css`; chart markers in Budget, Calendar, Portfolio, portfolio symbol, Trade analysis, Trader Hub, StockChart, DcaOrderSystem, AIFinancialAdvisor and widgets/WidgetRenderer.
-- Evidence: `scripts/cashflow-browser-qa.mjs`, `scripts/cashflow-qa-fixture.tsx`, `output/cashflow-qa/*.png`, `output/cashflow-qa/results.json`, this document.
+- Evidence: `scripts/cashflow-browser-qa.mjs`, `scripts/cashflow-qa-fixture.tsx`, and this document are tracked. QA screenshots/results stay local and untracked under `output/cashflow-qa/` and can be regenerated with `node scripts/cashflow-browser-qa.mjs`.
