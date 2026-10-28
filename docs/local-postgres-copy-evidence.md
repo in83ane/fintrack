@@ -16,27 +16,32 @@ Both named test commands ran from scripts/plan-copy. npm run check --prefix scri
 
 The audit's combined process replaced net.Socket.prototype.connect, net.connect, net.createConnection and tls.connect with a counter/throw function before importing the two test files, and synchronized builtin ESM exports. Its final output was **AUDIT_TCP_TLS_CONNECTION_ATTEMPTS=0**, with 110 passing tests. This is evidence for those test invocations, not an OS-wide network audit. Tests inject MockClient instead of a real pg.Client and keep report saves in memory. libpg-query parses text offline; it does not execute SQL or resolve database objects.
 
-## Retained failed owner-run reports
+## Archived failed owner-run reports
 
-All times below are **28 October 2026, Asia/Bangkok (UTC+07)**, converted from each report's UTC startedAt. All seven reports have passed=false, connectionsClosed=true and zero rounds. Every report uses copyId b7c6a6af-aa6b-4a61-8846-3f46bd655757.
+All times below are **28 October 2026, Asia/Bangkok (UTC+07)**, converted from each report's UTC startedAt. All eight reports have passed=false, connectionsClosed=true and zero rounds. The original seven use copyId b7c6a6af-aa6b-4a61-8846-3f46bd655757; d4db2735-e653-4b43-83c5-36bccae8c8e2 uses copyId a9498705-9893-4bd1-8318-6a88e83d4216.
 
-| Run ID / original local report | Time | Reported mode | Error code / SQLSTATE | Fixture descriptors | Rounds |
+External backup: **fintrack-plan-copy-evidence-2026-10-28.zip** in the owner's Documents folder, SHA256 **`b70817f0c8308152cf23a461bf051cccddda7a2ca1f91ee5919fa9d95b69bd4a`**. The archive was opened and all 21 file names and content hashes matched reports/, including the passing report. Under the approved sequence, local removal happens only after documentation approval and commit; after that removal, these eight failed JSON originals are available in this external archive and no longer in the working tree. Their IDs below are plain text so there are no broken local-report links.
+
+| Run ID / archived JSON basename | Time | Reported mode | Error code / SQLSTATE | Fixture descriptors | Rounds |
 |---|---|---|---|---:|---:|
-| [c18ad8e7-81fd-4fbb-8f5a-33b1e226e58e](../scripts/plan-copy/reports/c18ad8e7-81fd-4fbb-8f5a-33b1e226e58e.json) | 06:44:00 | supabase-copy | LIVE_SERVER_MISMATCH | 0 | 0 |
-| [25bc420e-bba7-4911-9c76-c71b7f2c7ca1](../scripts/plan-copy/reports/25bc420e-bba7-4911-9c76-c71b7f2c7ca1.json) | 06:44:26 | supabase-copy | LIVE_SERVER_MISMATCH | 0 | 0 |
-| [9cfc7936-8f92-4c82-87b6-30b59a280120](../scripts/plan-copy/reports/9cfc7936-8f92-4c82-87b6-30b59a280120.json) | 06:45:09 | local-synthetic | LIVE_SERVER_MISMATCH | 0 | 0 |
-| [bf9fc334-eac5-464f-8dfb-1ce7fc230cec](../scripts/plan-copy/reports/bf9fc334-eac5-464f-8dfb-1ce7fc230cec.json) | 06:46:09 | local-synthetic | LIVE_SERVER_MISMATCH | 0 | 0 |
-| [4b9eb5fe-a52b-4c40-83cc-c2fd169360f7](../scripts/plan-copy/reports/4b9eb5fe-a52b-4c40-83cc-c2fd169360f7.json) | 06:47:34 | local-synthetic | LIVE_SERVER_MISMATCH | 0 | 0 |
-| [1666b326-e44b-4cd9-88c6-5d2ad7c10492](../scripts/plan-copy/reports/1666b326-e44b-4cd9-88c6-5d2ad7c10492.json) | 06:48:03 | local-synthetic | LIVE_SERVER_MISMATCH | 0 | 0 |
-| [27a69be8-e8be-4993-a948-6b088b882163](../scripts/plan-copy/reports/27a69be8-e8be-4993-a948-6b088b882163.json) | 06:49:18 | local-synthetic | DATABASE_OR_TRANSPORT_FAILURE / 42601 | 1 | 0 |
+| c18ad8e7-81fd-4fbb-8f5a-33b1e226e58e | 06:44:00 | supabase-copy | LIVE_SERVER_MISMATCH | 0 | 0 |
+| 25bc420e-bba7-4911-9c76-c71b7f2c7ca1 | 06:44:26 | supabase-copy | LIVE_SERVER_MISMATCH | 0 | 0 |
+| 9cfc7936-8f92-4c82-87b6-30b59a280120 | 06:45:09 | local-synthetic | LIVE_SERVER_MISMATCH | 0 | 0 |
+| bf9fc334-eac5-464f-8dfb-1ce7fc230cec | 06:46:09 | local-synthetic | LIVE_SERVER_MISMATCH | 0 | 0 |
+| 4b9eb5fe-a52b-4c40-83cc-c2fd169360f7 | 06:47:34 | local-synthetic | LIVE_SERVER_MISMATCH | 0 | 0 |
+| 1666b326-e44b-4cd9-88c6-5d2ad7c10492 | 06:48:03 | local-synthetic | LIVE_SERVER_MISMATCH | 0 | 0 |
+| 27a69be8-e8be-4993-a948-6b088b882163 | 06:49:18 | local-synthetic | DATABASE_OR_TRANSPORT_FAILURE / 42601 | 1 | 0 |
+| d4db2735-e653-4b43-83c5-36bccae8c8e2 | 07:31:28 | local-synthetic | LIVE_SERVER_MISMATCH | 0 | 0 |
 
 The first six stop at the live-server guard before fixtures. LIVE_SERVER_MISMATCH could represent address or port mismatch; those reports omit actual values and cannot independently distinguish the cause of each attempt. The owner subsequently supplied an IPv4 server address with a /32 host netmask: comparing that text directly with the expected host caused the address mismatch. Commit **83d786a** normalizes only host masks (IPv4 /32, IPv6 /128), compares ports numerically, and splits address/port/database/role mismatch codes without exposing actual identities. Exact host matching and the remaining guards stay enforced. The first two reports use the default supabase-copy mode; this does not prove they contacted a cloud server. These reports do not independently record enough endpoint identity to reconstruct every connection.
+
+The additional d4db2735-e653-4b43-83c5-36bccae8c8e2 report also stops at LIVE_SERVER_MISMATCH before fixtures. It has no Preflight identity or runner source hash; it does not independently establish the exact mismatch or certify cluster freshness.
 
 Run 27a69be8-e8be-4993-a948-6b088b882163 records server 18.6, three backend PIDs, bootstrap manifest SHA256 68db0e44d9154ba79f1047009ddc757488f3bb988eb0ae804d031fd51deb4ef0, and cron/pgNet/Vault as absent-not-exercised. It passes its recorded Preflight and stops during fixture setup with SQLSTATE 42601, day=null and plan=null. UUIDs are allocated before seed writes; one fixture descriptor is not evidence that rows were inserted. The report does not confirm rollback success or the current state of the database. It also lacks a runner source hash, so its Preflight result cannot certify the current runner revision.
 
 ### Raw report fingerprints
 
-SHA256 values below were computed from the retained file bytes during this documentation update. They identify these artifacts, not the server that produced them or a signed attestation. Raw JSON reports remain gitignored under scripts/plan-copy/reports; links work only where those local files are retained. Do not force-add reports or bundles to the proposed commits.
+SHA256 values below identify the failed JSON bytes preserved in the verified external ZIP above. They identify artifacts, not the server that produced them or a signed attestation. The original seven fingerprints are unchanged; the additional d4db2735 fingerprint was calculated during archive preparation. The matching ZIP entries preserve verification after local removal. The passing report remains local and linked below. reports/ remains gitignored; do not force-add reports or bundles.
 
 | File | SHA256 |
 |---|---|
@@ -47,6 +52,7 @@ SHA256 values below were computed from the retained file bytes during this docum
 | 4b9eb5fe-a52b-4c40-83cc-c2fd169360f7.json | `a8da84be17432a233718f473cec371218913d1bd4afc0067423f6af4e2dcf255` |
 | 1666b326-e44b-4cd9-88c6-5d2ad7c10492.json | `8525e9127fbf4e5ccc730c49040a996e084124e0dbae5efae6c31fba714b2169` |
 | 27a69be8-e8be-4993-a948-6b088b882163.json | `add1c34259fb8e0a271609911f3de59f03a33692f9a4eaa78664f445ade1aad3` |
+| d4db2735-e653-4b43-83c5-36bccae8c8e2.json | `c5f2d93137badf7b3965959e1ea6305baf44245133301931372afce61b7c19e5` |
 
 ## Passing owner-run local synthetic result
 
@@ -75,13 +81,24 @@ Round 2's first snapshot has no wait event, no blocker and no ungranted B lock; 
 
 Scope: Auth is emulated; no signed JWT, PostgREST or GoTrue is exercised. Preflight records cron, pgNet and Vault as **absent-not-exercised**. Migration 017 is replaced by the approved fresh-local empty-table guard, and five notification migration files are skipped. The prerequisite DDL is a **reconstruct**, not a certification of original DDL. Broker/transfer/edit/undo concurrency, actual Supabase grants/RLS and role audits, representative-copy migration runtime/locks, and PG17 behavior remain untested by this run. The result does not close the release blockers, including Delete All Data deployment/purge controls.
 
+## Local-bootstrap retention
+
+Both bundle directories are included in the external ZIP and remain in the working tree; neither is covered by the ten individual-file removal paths. Deleting any bundle requires the owner to name it separately.
+
+| Directory under reports/local-bootstrap/ | Local files retained |
+|---|---|
+| a9498705-9893-4bd1-8318-6a88e83d4216 | 01-admin-create.psql, 02-admin-apply.psql, 03-admin-marker.psql, manifest.json, and **apply-output.txt** (irreplaceable execution evidence; must keep) |
+| b7c6a6af-aa6b-4a61-8846-3f46bd655757 | 01-admin-create.psql, 02-admin-apply.psql, 03-admin-marker.psql, manifest.json, verification.json; awaits an explicit bundle decision |
+
+The passing eddd52e6-e1a9-4c96-b921-ba48ebe0e499.json stays at the reports/ root. Only the eight failed JSONs above and local-bootstrap-git-status.txt / local-bootstrap-review.diff are scheduled for post-commit removal. All ten are backed up; no database or fixture cleanup is included.
+
 ## Earlier bootstrap failures and runner correction
 
 | Evidence | Finding | Limit |
 |---|---|---|
 | Owner message: bundle 45261baf-a75a-40c7-8502-065535d09267, apply line 360 | UTF-16LE trade_journal_schema.sql decoded as UTF-8; confirmed by byte inspection in the earlier turn | Original message did not provide SQLSTATE; old bundle is no longer present in the audited bundle directory |
 | Owner message: bundle c95d11ea-04f9-4aaa-8f2f-208471a7a2f5, apply line 1610 | Source migration 017 contains only ASCII 3, joined to the next SET ROLE | Original message did not provide SQLSTATE; no recovered original 017 SQL |
-| Retained b7c6a6af-aa6b-4a61-8846-3f46bd655757 bundle | 34 included sources; six exclusions; historical verification.json records 106 tests at generation time | No complete admin-script transcript; do not rewrite the historical verification as 110 |
+| b7c6a6af-aa6b-4a61-8846-3f46bd655757 bundle (still local; deletion not authorized) | 34 included sources; six exclusions; historical verification.json records 106 tests at generation time | No complete admin-script transcript; do not rewrite the historical verification as 110 |
 | Fixture/actor date query | Bare ::date::text day fails PostgreSQL 18 raw parsing; ::date::text AS day parses | Offline reproduction identifies a concrete code defect; it is not a successful live rerun |
 
 The runner correction is in [fixture.mjs](../scripts/plan-copy/fixture.mjs) and [competitors.mjs](../scripts/plan-copy/competitors.mjs): both use BANGKOK_TODAY_SQL with explicit AS day. [offline.test.mjs](../scripts/plan-copy/offline.test.mjs) parses every query submitted to the mock and checks all nine seed/A/B date calls across three rounds. [guard.mjs](../scripts/plan-copy/guard.mjs) again checks actual server address against the configured allowlist as well as the port. A previous working-tree version had omitted the address comparison; the restored comparison matches the baseline guard intent. The failure reports alone cannot establish which code revision ran or who changed it.
