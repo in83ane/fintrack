@@ -34,13 +34,22 @@ await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.
 const browser=await chromium.launch({executablePath:'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',headless:true});
 const errors=[],results=[];
 try{
- for(const width of [390,1440])for(const route of ['ledger','cashflow'])for(const lang of ['en','th']){
+ for(const width of [390,768,1440])for(const route of ['ledger','cashflow'])for(const lang of ['en','th']){
   const p=await browser.newPage({viewport:{width,height:1000},timezoneId:'Asia/Bangkok'});p.on('pageerror',e=>errors.push(e.message));
   await p.clock.install({time:new Date('2026-10-25T05:00:00Z')});await p.goto(`${base}/${route}?lang=${lang}`);
   const search=p.getByRole('searchbox');await search.waitFor();
+  const geometry=()=>search.evaluate(el=>{
+   const field=el.parentElement,root=field.parentElement,status=root.querySelector('[role="status"]');
+   const box=node=>{const r=node.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};};
+   return {root:box(root),field:box(field),input:box(el),status:box(status),nextTop:root.nextElementSibling?.getBoundingClientRect().top};
+  });
+  const emptyGeometry=await geometry();
+  const assertStable=async state=>assert.deepEqual(await geometry(),emptyGeometry,`${route}/${lang}/${width}: ${state} must not move search or the following content`);
   await search.fill('no-such-transaction');await p.waitForTimeout(100);
+  await assertStable('no matches');
   assert.ok((await p.getByRole('status').allTextContents()).some(t=>t.includes('0 ')));
   await search.fill('Food');await p.waitForTimeout(100);
+  await assertStable('matching query');
   assert.ok((await p.getByRole('status').allTextContents()).some(t=>/matches|รายการที่พบ/.test(t)&&!t.startsWith('0 ')));
   if(route==='ledger'){assert.ok(await p.locator('[data-ledger-row]').count()>0);assert.equal(await p.locator('[data-ledger-row]').filter({hasText:'Gift'}).count(),0);}
   await search.fill('2026-10');await p.waitForTimeout(100);
@@ -51,8 +60,9 @@ try{
   await search.focus();
   await search.locator('..').screenshot({path:path.join(out,`${route}-${lang}-${width}-filled.png`)});
   await clear.click();assert.equal(await search.inputValue(),'');
+  await assertStable('cleared query');
   assert.equal(await clear.count(),0);assert(await search.evaluate(el=>el===document.activeElement));
-  await p.screenshot({path:path.join(out,`${route}-${lang}-${width}.png`),fullPage:true});results.push({route,lang,width,oneClearButton:true,focusRestored:true,passed:true});await p.close();
+  await p.screenshot({path:path.join(out,`${route}-${lang}-${width}.png`),fullPage:true});results.push({route,lang,width,oneClearButton:true,focusRestored:true,stableGeometry:true,passed:true});await p.close();
  }
  assert.deepEqual(errors,[]);writeFileSync(path.join(out,'results.json'),JSON.stringify(results,null,2));console.log(JSON.stringify(results));
 }finally{await browser.close();server.close();}
