@@ -1,8 +1,12 @@
 # PLAN copy-only two-session harness
 
-**Prepared offline only. No database execution has been authorized or performed.**
-Offline tests validate the JavaScript guards and mocked orchestration, not SQL,
-PostgreSQL locks, deployed grants, JWT integration, or a production schema.
+**Assistant work is offline only; no assistant database connection or SQL execution is authorized.**
+The owner has supplied seven failed local harness reports; no real three-round
+pass is recorded. The latest offline audit passed **110/110 (86 runner + 24 bootstrap)**.
+See [evidence and limitations](../../docs/local-postgres-copy-evidence.md).
+Offline tests validate JavaScript guards, mocked orchestration and top-level SQL
+grammar with a PostgreSQL 18 raw parser. They do not validate function bodies,
+SQL execution, PostgreSQL locks, deployed grants, JWT integration, or a production schema.
 Do not run the integration command until the owner supplies a disposable copy
 and explicitly authorizes connections to it. Never use production credentials.
 
@@ -13,7 +17,10 @@ identities; `competitors.mjs` defines the operations; `observe.mjs` proves waiti
 `assertions.mjs` checks financial results. These seams can support future races,
 but goal completion/Phase 3/purge/FX are not implemented here.
 
-`pg` is pinned to **8.23.1** in this directory's package and lockfile only.
+`pg` is pinned to **8.23.1** and the offline WASM parser `libpg-query` to **18.2.1**
+in this directory's package and lockfile only. The parser does not execute SQL or
+connect to a database. Bundle generation refuses malformed source SQL and checks
+assembled SQL after removing generated psql directives and substituting the prompt variable for parsing only.
 Commands below for installation/tests do not connect to a database:
 
 ```powershell
@@ -27,6 +34,9 @@ node run.mjs --help
 Installation contacts the npm registry, not a database. Offline tests do not
 import `pg`: they inject a mock `pg.Client`, including assertions that invalid
 env/URL/endpoints cause **zero connect calls and zero client constructions**.
+Every SQL statement sent through that mock is parsed offline before the mocked
+response, including fixture, actor, preflight and result queries. Mock success
+still does not establish runtime SQL behavior or database state.
 No command reads application `.env` files. Do not install at the app root.
 
 ## Prepare the copy manually — not automated by this harness
@@ -188,7 +198,7 @@ financial writes use `SET LOCAL ROLE authenticated` and the synthetic user's
 claims, checked by `current_user`/`auth.uid()` before mutations. This does not
 test signed JWTs/PostgREST. No automatic retry after uncertain commit results.
 
-## Integration command — connects and writes synthetic fixtures; NOT RUN YET
+## Integration command — connects and writes synthetic fixtures; no passing real run recorded
 
 ```powershell
 # MUTATES THE APPROVED COPY: creates fixtures and exercises the financial writer.
@@ -249,3 +259,10 @@ these other release gates, and passing it does not unlock paused feature work.
 References: [node-postgres transactions](https://node-postgres.com/features/transactions),
 [PostgreSQL monitoring](https://www.postgresql.org/docs/current/monitoring-stats.html),
 [pg_net](https://supabase.com/docs/guides/database/extensions/pg_net).
+## Local PostgreSQL alternative (operator-run only)
+
+See [local setup](../../docs/local-postgres-copy-setup.md). `local-bootstrap.mjs` is an offline SQL-bundle generator, never a database runner. `--plan` lists checksums; `--emit --copy-id <UUIDv4>` creates a new ignored report directory for manual review. Do not run generated SQL until the owner verifies the isolated instance and explicit guards. Existing cloud instructions above remain applicable only to cloud mode.
+
+Set `PLAN_COPY_MODE=local-synthetic` only for approved `127.0.0.1:5432/fintrack_local_test`, `fintrack_tester`, PG18, with explicit `PLAN_COPY_MANIFEST_SHA256` and the operator-created marker. Other endpoints/roles/versions fail closed. Omitted mode remains `supabase-copy`. No `.env` or application credentials are loaded. The runner is non-superuser; provisioning is an explicitly separate admin step.
+
+Missing cron/net/Vault is reported `absent-not-exercised`, not passed. Local tests cannot certify Supabase Auth/JWT/PostgREST or production grants/PG17 behavior. Never weaken a guard to reuse a populated database. Keep fixtures/reports; no automatic cleanup.

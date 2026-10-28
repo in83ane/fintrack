@@ -1,5 +1,9 @@
 # Checklist: ผู้ใช้รันทดสอบสอง session บน Supabase สำเนา
 
+> **ทางเลือก local ที่อนุมัติเพิ่ม:** ใช้ [คู่มือ PostgreSQL ในเครื่อง](local-postgres-copy-setup.md) สำหรับ instance แยก PG18 และข้อมูลสังเคราะห์เท่านั้น คู่มือด้านล่างยังเป็นขั้นตอน Supabase cloud เดิม ไม่ต้องสร้าง project ref ปลอมสำหรับ local และห้ามนำคำสั่งแก้ scheduler ของ cloud ไปใช้เพื่อข้าม guard local ผล local ไม่ครอบคลุม Supabase Auth/JWT/PostgREST หรือ extension ที่ไม่มี
+
+> **สถานะ 28 ตุลาคม 2026:** มี [หลักฐาน owner-run ที่ล้มเหลว 7 ครั้ง](local-postgres-copy-evidence.md) และ offline tests ผ่าน 110/110; ยังไม่มีผลจริงครบสามรอบผ่าน ผู้ใช้เลือก cluster/data directory ใหม่พอร์ต 5432 เก็บของเก่าไว้ และจะตรวจขั้น 0 เอง หาก cluster เดิมมีฐานอื่นที่ต้องใช้ ให้หยุดแผนสลับพอร์ต 5432 และเสนอพอร์ตใหม่เพื่อขออนุมัติแก้ target/guards ก่อน ผู้ช่วยยังไม่ได้รับอนุญาตให้เชื่อมต่อฐาน
+
 สถานะ: คู่มือเตรียมแบบ offline เท่านั้น ไม่มีการรัน SQL/เชื่อมต่อฐานจากการจัดทำเอกสารนี้ ผู้ใช้เป็นผู้ดำเนินการเองบน **Supabase cloud project แยก + direct connection** เท่านั้น ไม่ใช้ pooler ไม่อ่าน `.env` ของแอป ไม่แก้ production และไม่เริ่ม goal completion/Phase 3/purge/FX
 
 ใช้ SQL Editor เป็นเส้นทางหลักสำหรับตรวจ/แก้/audit และ PowerShell 7 + Node สำหรับ harness; psql เป็นทางเลือกท้ายเอกสาร ช่อง `<...>` และ `________` ต้องกรอกเองในสำเนาเอกสารส่วนตัว **อย่า commit หรือส่งเอกสารที่กรอก credentials แล้ว** ตัวเลข 1000/800/200, ชื่อ object, error code และ sentinel เป็นสเปคของเครื่องมือ ไม่ใช่ข้อมูลผู้ใช้

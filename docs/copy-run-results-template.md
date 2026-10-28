@@ -2,6 +2,8 @@
 
 แม่แบบนี้ยังไม่มีผลทดสอบจริง ใช้คู่กับ [checklist](copy-run-checklist.md) กรอก PASS / FAIL / NOT RUN / UNKNOWN ตามจริง ช่องว่างไม่ใช่ศูนย์ ไม่เติมผลที่คาดเป็นผลที่วัดได้
 
+ผลย้อนหลังอยู่ใน [บันทึกหลักฐาน](local-postgres-copy-evidence.md): offline 110/110 และ owner-run 7 ครั้งล้มเหลวทั้งหมด ไม่กรอกผลย้อนหลังเหล่านั้นเป็น PASS ในแม่แบบสำหรับ run ใหม่ ต้องใช้ cluster/copy ID ใหม่ตามคู่มือและเก็บรายงานเดิมไว้
+
 ## 1. ข้อมูลการรันที่ส่งได้
 
 | รายการ | ผลจริง |
@@ -17,6 +19,23 @@
 | ถ้าไม่มี JSON: ขั้นที่หยุด / sanitized code | ________ |
 
 ไม่ต้องส่ง hostname/IP/project ref/database login จริง ใช้ alias สำเนาที่ไม่มีข้อมูลระบุตัวตน: ________ เก็บค่าที่ใช้เทียบตัวตนไว้ส่วนตัว
+
+## Local synthetic supplement (กรอกเมื่อใช้ PG18 ในเครื่อง)
+
+| รายการ | ผลจริง |
+|---|---|
+| Mode (`local-synthetic` / `supabase-copy`) | ________ |
+| Actual server version (แยกจาก psql client version) | ________ |
+| Manifest SHA256 / bundle copyId / รายการ skipped | ________ |
+| Bootstrap ครบหรือหยุดที่ source ใด / sanitized SQLSTATE | ________ |
+| cron / pgNet / Vault capability statuses | ________ |
+| DDL prerequisite เป็น reconstruct; ยืนยันเฉพาะโครงสร้างที่แจกแจง ไม่รับรองตรงต้นฉบับทุกบรรทัด | ยืนยัน / ________ |
+| PG18 ต่างจาก PG17; Auth emulation/observer grants ไม่ใช่ Supabase จริง | รับทราบ / ________ |
+| ยืนยัน instance แยก + ฐานใหม่ + fixture สังเคราะห์ ไม่มีข้อมูลจริง | ________ |
+| ขั้น 0: service/data directory/ผู้ใช้พอร์ต 5432 และมีฐานอื่นที่ยังต้องใช้หรือไม่ | ________ |
+| เก็บ cluster เก่าโดยไม่ลบ + Copy ID ใหม่ + ผล checkpoint แต่ละขั้น | ________ |
+
+สำหรับ local ให้ใช้ identity/marker gates ในคู่มือ local แทน project-ref/restore gates ด้านล่าง ทำเครื่องหมาย cloud-only ว่า **N/A—not exercised** ห้ามติ๊กว่าผ่าน บันทึก 3 รอบและ audit ตามตารางเดิม; lock snapshot เฉพาะ PID ทดสอบ ไม่มี connection string/password/token/ข้อมูลผู้ใช้จริง
 
 ## 2. คำรับรองก่อนรัน
 
