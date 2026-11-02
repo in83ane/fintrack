@@ -7,11 +7,12 @@ import { layout } from './skeleton-layout';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import Papa from 'papaparse';
-import { Check, Download, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { Check, Download, ArrowDownLeft, ArrowUpRight, ArrowDownUp } from 'lucide-react';
 import { Wallet } from 'lucide-react';
 import { useApp } from '@/src/context/AppContext';
 import { FinanceIcon } from '@/src/components/FinanceIcon';
 import { AddCashflowModal } from '@/src/components/AddCashflowModal';
+import { LedgerTransferModal } from '@/src/components/LedgerTransferModal';
 import { DateRangeBar, type DateRangeState } from '@/src/components/DateRangeBar';
 import { TransitionOverlay } from '@/src/components/TransitionOverlay';
 import { useLedgerActions } from '@/src/components/LedgerActions';
@@ -51,6 +52,7 @@ export default function LedgerView({loading:forceLoading=false}:{loading?:boolea
   const [range,setRange] = useState<DateRangeState>(()=>{const d=localCashflowDay(new Date().toISOString());return {mode:'month',year:Number(d.slice(0,4)),month:Number(d.slice(5,7))-1};});
   const [wallet,setWallet]=useState('all'),[filter,setFilter]=useState<LedgerFilter>('cash');
   const [addType,setAddType]=useState<'INCOME'|'EXPENSE'>('INCOME');
+  const [showTransfer,setShowTransfer]=useState(false);
   const [selecting,setSelecting]=useState(false),[selected,setSelected]=useState<Set<string>>(new Set());
   const [detail,setDetail]=useState<LedgerRow|null>(null),[drawerOpen,setDrawerOpen]=useState(false),[showAdd,setShowAdd]=useState(false);
   const [confirm,setConfirm]=useState<LedgerRow[]>([]),[confirmOpen,setConfirmOpen]=useState(false);
@@ -106,7 +108,7 @@ export default function LedgerView({loading:forceLoading=false}:{loading?:boolea
     <div className="ledger-toolbar">
       <section className="ledger-filters" style={{'--i':0} as React.CSSProperties}>
         <DateRangeBar value={range} onChange={setRange} wrap hideCurrentMonthBadge className="ledger-date-range"/>
-        <div className="ledger-record-actions"><button className={`${control} ledger-income`} onClick={()=>{setAddType('INCOME');setShowAdd(true);}}><ArrowDownLeft size={16}/>{t('income')}</button><button className={`${control} ledger-expense`} onClick={()=>{setAddType('EXPENSE');setShowAdd(true);}}><ArrowUpRight size={16}/>{t('expense')}</button></div>
+        <div className="ledger-record-actions"><button className={`${control} ledger-income`} onClick={()=>{setAddType('INCOME');setShowAdd(true);}}><ArrowDownLeft size={16}/>{t('income')}</button><button className={`${control} ledger-expense`} onClick={()=>{setAddType('EXPENSE');setShowAdd(true);}}><ArrowUpRight size={16}/>{t('expense')}</button><button className={control} disabled={!isDataLoaded} onClick={()=>setShowTransfer(true)}><ArrowDownUp size={16}/>{text('Transfer','โอนเงิน')}</button></div>
       </section>
       <div className="ledger-wallets" style={{'--i':1} as React.CSSProperties} aria-label={t('wallet')}>
         <button className="ledger-wallet" aria-pressed={wallet==='all'} onClick={()=>setWallet('all')}><span className="ledger-wallet-copy"><span>{t('allWallets')}</span><span data-wallet-balance>{isDataLoaded?formatCashflowMoney(toMinor(totalAllWallets),currency):<Sk.Block className="block h-3 w-16"/>}</span></span></button>
@@ -141,5 +143,6 @@ export default function LedgerView({loading:forceLoading=false}:{loading?:boolea
     </TransitionOverlay>
     <TransitionOverlay open={confirmOpen} onClose={()=>setConfirmOpen(false)} title={t('confirmDeleteRecord')} footer={<div className="flex justify-end gap-2"><button className={control} onClick={()=>setConfirmOpen(false)}>{t('cancel')}</button><button className={`${control} danger`} onClick={()=>{actions.schedule(confirm);setConfirmOpen(false);setDrawerOpen(false);cancelSelection();}}>{t('delete')}</button></div>}><p className="text-sm">{confirm.length===1?`${t('delete')} ${title(confirm[0])} ${native(confirm[0])} · ${fullDate(confirm[0])}?`:t('ledgerDeleteQuestion').replace('{n}',String(confirm.length)).replace('{amount}',deleteAmount)}</p><p className="mt-3 text-xs text-muted">{t('ledgerPending')}</p></TransitionOverlay>
     <AddCashflowModal isOpen={showAdd} onClose={()=>setShowAdd(false)} presetType={addType} presetBucketId={wallet==='all'||wallet.startsWith('broker:')?undefined:wallet==='unassigned'?'<no-bucket>':wallet}/>
+    {showTransfer&&<LedgerTransferModal key={activePortfolioId} initialWalletId={wallet} onClose={()=>setShowTransfer(false)} onSaved={()=>{setShowTransfer(false);setFilter('transfer');setWallet('all');setQuery('');const day=localCashflowDay(new Date().toISOString());setRange({mode:'month',year:Number(day.slice(0,4)),month:Number(day.slice(5,7))-1});}}/>}
   </div>;
 }

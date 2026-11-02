@@ -85,7 +85,7 @@ html.light-mode { --scrim:rgba(20,26,40,.35); }
 .ledger-filters { display:flex; min-width:0; align-items:center; flex-wrap:wrap; justify-content:space-between; gap:12px; }
 .ledger-toolbar { display:flex; flex-direction:column; gap:16px; margin-bottom:16px; container-type:inline-size; }
 .ledger-date-range { flex:1 1 700px; width:auto; }
-.ledger-record-actions { display:flex; gap:8px; margin-left:auto; }
+.ledger-record-actions { display:flex; flex-wrap:wrap; gap:8px; margin-left:auto; }
 .ledger-type-row { display:flex; align-items:center; gap:12px; min-width:0; }
 .ledger-type-actions { display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-left:auto; min-width:0; }
 .ledger-export-icon { width:40px; padding:0; flex:none; }
