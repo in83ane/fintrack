@@ -49,13 +49,13 @@ export function Modal({ isOpen, onClose, title, assetName, assetSymbol, children
         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-4">
           {/* Backdrop */}
           <div
-            ref={dialog} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}
             onClick={onClose}
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
           />
           
           {/* Modal Container */}
           <div
+            ref={dialog} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}
             className="relative w-full sm:max-w-lg max-h-[90dvh] bg-background sm:border sm:border-border rounded-t-[2rem] sm:rounded-[2rem] shadow-2xl overflow-hidden flex flex-col"
           >
             {/* Mobile Drag Handle Indicator */}
