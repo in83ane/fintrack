@@ -20,7 +20,7 @@ const fund={brokerId:'dime',market:'FUND'};
 assert.deepEqual(holdingGroupPlacement(fund,['stocks','custom'],groups,'funds'),['custom','funds']);
 assert.deepEqual(holdingGroupPlacement(fund,[],groups,'funds'),[],'removing a table placement must survive live price refresh');
 assert.deepEqual(holdingGroupPlacement(fund,undefined,groups,'funds'),['funds']);
-const {parseFundQuote,fetchFundQuote,fundChartRange}=await import(moduleUrl('../src/lib/fund-market.ts'));
+const {parseFundQuote,fetchFundQuote,fundChartRange}=await import(moduleUrl('../src/lib/fund-market.ts', {"'./data/x-space-nav.json'":'data:text/javascript;base64,'+Buffer.from('export default '+readFileSync(new URL('../src/lib/data/x-space-nav.json',import.meta.url),'utf8')).toString('base64')}));
 const latest={status:true,data:{short_code:'X-SPACE',currency:'THB',value:6.4021,date:'2026-10-29T00:00:00Z',d_change:-0.17}};
 const history={status:true,data:{short_code:'X-SPACE',navs:[{date:'2026-10-29',value:6.4021},{date:'2026-10-28',value:6.4132},{date:'2026-10-27',value:6.3524},{date:'2026-10-26',value:null}]}};
 const quote=parseFundQuote('X-SPACE',latest,history);
@@ -44,6 +44,8 @@ assert.equal(projectNativeLotPosition([{...buys[0],currency:'USD'}],'dime','X-SP
 const normalized={...buys[0],asset:'CRWD',currency:'USD',rateAtTime:1,shares:0.213885,amountUSD:20.95001616,fees:0.03};
 const lot=projectTradeLots([normalized],'dime','CRWD')[0];
 assert.equal(lot.remaining,0.213885);assert.ok(Math.abs(lot.price*lot.remaining-20.98001616)<1e-10);
+const offline=await fetchFundQuote('X-SPACE',async()=>{throw Error('upstream unavailable');});
+assert.ok(offline && offline.chartData.length>1 && offline.quoteSource.includes('cached') && offline.quoteAsOf==='2026-10-29');
 if (process.argv.includes('--live')) {
   const live=await fetchFundQuote('X-SPACE');
   assert.ok(live && live.price>0 && live.chartData.length>2 && live.quoteCurrency==='THB');

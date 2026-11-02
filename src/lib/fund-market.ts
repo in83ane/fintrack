@@ -1,5 +1,6 @@
 // Public NAV service used by Finnomena's fund detail page. NAVs are dated
 // end-of-day valuations, never intraday quotes or the underlying ETF price.
+import xSpaceSnapshot from './data/x-space-nav.json';
 const FUNDS: Record<string, {id:string; name:string}> = {
   'X-SPACE': {id:'F00002JR2F',name:'กองทุนเปิดเอ็กซ์สปริง สเปซ อินโนเวเตอร์ อิควิตี้'},
 };
@@ -31,14 +32,20 @@ export function parseFundQuote(symbol:string, latest:any, history:any) {
     chartData:points,intradayData:[]};
 }
 
-export async function fetchFundQuote(symbol:string) {
+export async function fetchFundQuote(symbol:string, fetcher:typeof fetch=fetch) {
   const info=FUNDS[symbol];
   if (!info) return null;
   const base=`https://www.finnomena.com/fn3/api/fund/v2/public/funds/${info.id}`;
   const responses=await Promise.allSettled(['latest','nav/q?range=1Y'].map(async suffix => {
-    const response=await fetch(`${base}/${suffix}`,{signal:AbortSignal.timeout(8000),next:{revalidate:1800}});
+    const response=await fetcher(`${base}/${suffix}`,{signal:AbortSignal.timeout(8000),next:{revalidate:1800}});
     if (!response.ok) throw Error('Fund NAV unavailable');
     return response.json();
   }));
-  return parseFundQuote(symbol,responses[0].status==='fulfilled'?responses[0].value:null,responses[1].status==='fulfilled'?responses[1].value:null);
+  const snapshot=symbol==='X-SPACE'?xSpaceSnapshot:null;
+  const live=parseFundQuote(symbol,responses[0].status==='fulfilled'?responses[0].value:null,responses[1].status==='fulfilled'?responses[1].value:snapshot?.history);
+  if(live)return live;
+  // Some upstream regions reject server requests. Preserve verified dated NAVs
+  // instead of losing the fund/history; never label the snapshot as a live quote.
+  const fallback=parseFundQuote(symbol,snapshot?.latest,snapshot?.history);
+  return fallback?{...fallback,quoteSource:`${fallback.quoteSource} (cached ${fallback.quoteAsOf})`}:null;
 }
