@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
+import { createPortal } from 'react-dom';
 import { lockDocumentScroll } from "@/src/lib/scroll-lock";
-import { motion, AnimatePresence } from "motion/react";
 import { X } from "lucide-react";
 
 interface ModalProps {
@@ -17,16 +17,39 @@ interface ModalProps {
 }
 
 export function Modal({ isOpen, onClose, title, assetName, assetSymbol, children, contentClassName = 'p-8', footer }: ModalProps) {
+  const [mounted,setMounted]=React.useState(false);
+  const dialog=React.useRef<HTMLDivElement>(null),close=React.useRef(onClose);
+  const titleId=React.useId();
+  close.current=onClose;
+  React.useEffect(()=>setMounted(true),[]);
   React.useLayoutEffect(() => {
     if (isOpen) return lockDocumentScroll();
   }, [isOpen]);
+  React.useLayoutEffect(()=>{
+    if(!isOpen||!mounted)return;
+    const previous=document.activeElement as HTMLElement|null;
+    dialog.current?.focus({preventScroll:true});
+    const keyboard=(event:KeyboardEvent)=>{
+      if(event.key==='Escape'){event.preventDefault();close.current();}
+      if(event.key!=='Tab')return;
+      const nodes=[...(dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),a[href],[tabindex="0"]') || [])].filter(node=>node.getClientRects().length);
+      const first=nodes[0],last=nodes.at(-1);
+      if(!first){event.preventDefault();return;}
+      if(event.shiftKey&&(document.activeElement===first||document.activeElement===dialog.current)){event.preventDefault();last?.focus();}
+      else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+    };
+    document.addEventListener('keydown',keyboard);
+    return()=>{document.removeEventListener('keydown',keyboard);if(previous?.isConnected)previous.focus({preventScroll:true});};
+  },[isOpen,mounted]);
 
-  return (
+  if(!mounted)return null;
+  return createPortal(
     <React.Fragment>
       {isOpen && (
         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-4">
           {/* Backdrop */}
           <div
+            ref={dialog} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}
             onClick={onClose}
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
           />
@@ -46,13 +69,14 @@ export function Modal({ isOpen, onClose, title, assetName, assetSymbol, children
               <div className="flex items-center gap-3">
                 {assetName && (
                   <>
-                    <h3 className="text-lg font-black text-white tracking-tight">{assetName}</h3>
+                    <h3 id={titleId} className="text-lg font-black text-white tracking-tight">{assetName}</h3>
                     {assetSymbol && <span className="text-sm font-medium text-gray-500">{assetSymbol}</span>}
                   </>
                 )}
-                {!assetName && <h3 className="text-xl font-black text-white tracking-tight">{title}</h3>}
+                {!assetName && <h3 id={titleId} className="text-xl font-black text-white tracking-tight">{title}</h3>}
               </div>
               <button
+                aria-label="Close dialog" type="button"
                 onClick={onClose}
                 className="p-2 hover:bg-white/5 rounded-full text-gray-400 hover:text-white transition-colors"
               >
@@ -67,6 +91,6 @@ export function Modal({ isOpen, onClose, title, assetName, assetSymbol, children
           </div>
         </div>
       )}
-    </React.Fragment>
+    </React.Fragment>,document.body
   );
 }

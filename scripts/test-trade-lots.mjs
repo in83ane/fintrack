@@ -5,7 +5,7 @@ import ts from 'typescript';
 const source = readFileSync(new URL('../src/lib/trade-lots.ts', import.meta.url), 'utf8');
 const engine = ts.transpileModule(readFileSync(new URL('../src/lib/cost-basis-ledger.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText.replace("'./cost-basis-ledger'", JSON.stringify(`data:text/javascript;base64,${Buffer.from(engine).toString('base64')}`));
-const { projectTradeLots, projectLotPosition } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
+const { projectTradeLots, projectLotPosition, projectLotExits } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
 const buy = (id, shares, price, tag) => ({ id, portfolioId: 'p1', asset: 'NVDA', type: 'BUY', shares, pricePerUnit: price, amountUSD: shares * price, tag, date: '2026-10-12T00:00:00Z' });
 const first = buy(1, 2, 100, 'DCA entry 1');
 const second = buy(2, 3, 200, 'DCA entry 2');
@@ -42,6 +42,16 @@ assert.equal(proportionalPosition.cost,337.5);
 assert.equal(proportionalPosition.invested,450);
 assert.ok(Math.abs(proportionalPosition.realized-78.85)<1e-8);
 console.log('Proportional allocation Portfolio projection passed.');
+const importedBuys=[{...buy(101,1,100),type:'IMPORT',tag:'Excel import',dbId:'buy-one'}, {...buy(102,3,200),type:'IMPORT',tag:'Excel import',dbId:'buy-two'}];
+const importedSale={...buy(103,2,300),type:'SELL',tag:'Excel import',dbId:'sale-one',costMethod:'SPECIFIC_LOT',closeMode:'PROPORTIONAL',lotSelections:[{lotId:'buy-one',qty:'0.5'},{lotId:'buy-two',qty:'1.5'}]};
+const importedLots=project([...importedBuys,importedSale]);
+assert.deepEqual(importedLots.map(l=>[l.quantity,l.remaining]),[[1,.5],[3,1.5]],'each imported purchase retains original and remaining quantity');
+const importedExits=projectLotExits(importedLots);
+assert.deepEqual(importedExits.map(e=>[e.entryId,e.quantity,e.pnl]),[[-101,.5,100],[-102,1.5,150]],'proportional imported sale appears under each purchase');
+assert.equal(new Set(importedExits.map(e=>e.id)).size,2,'allocation exit keys remain distinct');
+const laterSpecificSale={...buy(104,.25,400),type:'SELL',tag:'Cost basis ledger',costMethod:'SPECIFIC_LOT',lotSelections:[{lotId:'buy-two',qty:'0.25'}]};
+assert.deepEqual(project([...importedBuys,importedSale,laterSpecificSale]).map(l=>l.remaining),[.5,1.25],'remaining imported lots can be selected individually for a later sale');
+console.log('PASS: imported rows remain separate selectable lots; proportional exits retain per-lot history and P/L.');
 for (const qty of [39.279381, 8.230735, 10.553298, 1.116084]) {
   for (const type of ['BUY', 'IMPORT']) {
     const trade = { ...buy(80, qty, 116.48), type, amountUSD: 4575.2637, fees: 0.013 };

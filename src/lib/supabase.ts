@@ -25,6 +25,11 @@ export interface Asset {
   name: string;
   symbol: string;
   asset_type: string | null;
+  currency?: string | null;
+  native_price?: number | null;
+  native_day_change?: number | null;
+  quote_as_of?: string | null;
+  quote_source?: string | null;
   value_usd: number;
   quantity: number;
   avg_purchase_price: number | null;

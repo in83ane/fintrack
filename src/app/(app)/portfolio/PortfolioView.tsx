@@ -43,7 +43,8 @@ import { CustomSelect } from "@/src/components/CustomSelect";
 import { AssetFundingFields, type AssetEntryMode } from '@/src/components/AssetFundingFields';
 import { InvestmentTransferModal } from "@/src/components/InvestmentTransferModal";
 import { TradeLotEditor } from "@/src/components/TradeLotEditor";
-import { projectLotPosition } from "@/src/lib/trade-lots";
+import { projectLotPosition, projectNativeLotPosition } from "@/src/lib/trade-lots";
+import { assetAllocation, portfolioCashCards, holdingGroupPlacement } from '@/src/lib/instrument-metadata';
 import { useFxRate } from "@/src/hooks/useFxRate";
 import { useExecutionFxInput } from '@/src/hooks/useExecutionFxInput';
 import { decimal, formatAmount, formatMoney as formatFxMoney, valuePortfolio, isFxCurrency, sumNativeMoney, type ValuationItem } from "@/src/lib/fx";
@@ -90,6 +91,8 @@ interface Holding {
   sortOrder?: number;
   dayChangePercent?: number | null;
   dayChange?: number | null;
+  quoteAsOf?: string;
+  quoteSource?: string;
   id: string;
   brokerId: string;
   market: Market;
@@ -402,7 +405,7 @@ function sanitize(raw: unknown): PortfolioState {
     const saved = Array.isArray(savedMemberships[holding.id])
       ? (savedMemberships[holding.id] as unknown[]).filter((id): id is string => typeof id === "string" && validGroupIds.has(id))
       : [];
-    holdingGroupIds[holding.id] = saved.length ? Array.from(new Set(saved)) : [defaultHoldingGroupId(holding.brokerId, holding.market)];
+    holdingGroupIds[holding.id] = holdingGroupPlacement(holding, Array.isArray(savedMemberships[holding.id]) ? Array.from(new Set(saved)) : undefined, holdingGroups, defaultHoldingGroupId(holding.brokerId, holding.market));
   });
   return {
     brokers: o.brokers,
@@ -423,8 +426,8 @@ function usePortfolioStore(persist = true) {
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = sanitize(JSON.parse(raw));
+      {
+        const parsed = raw ? sanitize(JSON.parse(raw)) : makeInitialState();
         // Reset rate on refresh so it always starts with fresh auto rate from API
         // Keep the legacy key byte-for-byte as the snapshot. Monetary projections
         // are rebuilt from the shared native source, never rehydrated as facts.
@@ -535,11 +538,11 @@ function usePortfolioStore(persist = true) {
             .filter((group) => !group.isDefault && nextBrokers.some((broker) => broker.id === (idMap.get(group.brokerId) || group.brokerId)))
             .map((group) => ({ ...group, brokerId: idMap.get(group.brokerId) || group.brokerId })),
         ],
-        holdingGroupIds: Object.fromEntries(current.holdings.map((holding) => {
+        holdingGroupIds: { ...current.holdingGroupIds, ...Object.fromEntries(current.holdings.map((holding) => {
           const nextHolding = { ...holding, brokerId: idMap.get(holding.brokerId) || holding.brokerId };
           const ids = current.holdingGroupIds[holding.id] || [defaultHoldingGroupId(nextHolding.brokerId, nextHolding.market)];
           return [holding.id, ids.map((id) => idMap.get(holding.brokerId) ? id.replace(`${holding.brokerId}:group:`, `${nextHolding.brokerId}:group:`) : id)];
-        })),
+        })) },
       };
     });
   }, []);
@@ -568,13 +571,12 @@ function usePortfolioStore(persist = true) {
         ...current.holdingGroups,
         ...missingBrokerIds.flatMap((brokerId) => defaultHoldingGroups(brokerId)),
       ];
-      const nextGroupIds = Object.fromEntries(nextHoldings.map((holding) => {
+      const nextGroupIds = { ...current.holdingGroupIds, ...Object.fromEntries(nextHoldings.map((holding) => {
         const previousHolding = current.holdings.find(item => item.brokerId === holding.brokerId && item.symbol === holding.symbol);
-        const previous = current.holdingGroupIds[holding.id] || (previousHolding ? current.holdingGroupIds[previousHolding.id] : []) || [];
-        const valid = previous.filter((id) => groups.some((group) => group.id === id && group.brokerId === holding.brokerId));
-        return [holding.id, valid.length ? valid : [defaultHoldingGroupId(holding.brokerId, holding.market)]];
-      }));
-      const unchanged = current.holdings.length === nextHoldings.length
+        const previous = current.holdingGroupIds[holding.id] ?? (previousHolding ? current.holdingGroupIds[previousHolding.id] : undefined);
+        return [holding.id, holdingGroupPlacement(holding, previous, groups, defaultHoldingGroupId(holding.brokerId, holding.market))];
+      })) };
+      const unchanged = JSON.stringify(current.holdingGroupIds) === JSON.stringify(nextGroupIds) && current.holdings.length === nextHoldings.length
         && current.holdings.every((holding, index) => {
           const next = nextHoldings[index];
           return holding.id === next?.id && holding.brokerId === next?.brokerId
@@ -584,7 +586,7 @@ function usePortfolioStore(persist = true) {
             && Object.is(holding.realizedPL, next?.realizedPL) && Object.is(holding.dividends, next?.dividends)
             && Object.is(holding.investedCost, next?.investedCost)
             && holding.isFavorite === next?.isFavorite && holding.sortOrder === next?.sortOrder
-            && holding.dayChange === next?.dayChange && holding.dayChangePercent === next?.dayChangePercent;
+            && holding.dayChange === next?.dayChange && holding.dayChangePercent === next?.dayChangePercent && holding.quoteAsOf === next?.quoteAsOf && holding.quoteSource === next?.quoteSource;
         });
       return unchanged ? current : { ...current, holdings: nextHoldings, holdingGroups: groups, holdingGroupIds: nextGroupIds };
     });
@@ -639,7 +641,7 @@ function usePortfolioStore(persist = true) {
     setState((s) => {
       const holding = s.holdings.find((item) => item.id === holdingId);
       const group = s.holdingGroups.find((item) => item.id === groupId);
-      if (!holding || !group || holding.brokerId !== group.brokerId) return s;
+      if (!holding || !group || holding.brokerId !== group.brokerId || (group.isDefault && group.market !== holding.market)) return s;
       const current = s.holdingGroupIds[holdingId] || [];
       return current.includes(groupId) ? s : { ...s, holdingGroupIds: { ...s.holdingGroupIds, [holdingId]: [...current, groupId] } };
     });
@@ -2162,7 +2164,7 @@ function HoldingTableRow({ holding: h, color, total, rate, groupName, onEdit, on
       </button>
       </div>
     </td>
-    <td className="px-3 py-5 tabular-nums"><span className="block font-semibold text-white">{text(h.price, h.currency)}</span><span className="mt-1.5 block whitespace-nowrap text-[11px] text-gray-400">Avg {text(h.avgCost, h.currency)}</span></td>
+    <td className="px-3 py-5 tabular-nums"><span className="block font-semibold text-white">{h.market === 'FUND' && !hidden ? `${nf(h.price,4)} ${h.currency}` : text(h.price, h.currency)}</span>{h.quoteAsOf && <span className="mt-1 block text-[10px] text-gray-400" title={h.quoteSource}>NAV {h.quoteAsOf}</span>}<span className="mt-1.5 block whitespace-nowrap text-[11px] text-gray-400">Avg {text(h.avgCost, h.currency)}</span></td>
     <td className="px-3 py-5 text-right tabular-nums"><span className="block whitespace-nowrap text-base font-bold text-white">{text(value, h.currency)}</span><span className="mt-1.5 block whitespace-nowrap text-[11px] font-normal text-gray-400">≈ {text(convert(value, h.currency, h.currency === 'USD' ? 'THB' : 'USD', rate), h.currency === 'USD' ? 'THB' : 'USD')}</span></td>
     <td className={cn('px-3 py-5 text-right tabular-nums whitespace-nowrap', profitColor(h.dayChangePercent ?? 0))} title="ราคาล่าสุดเทียบราคาปิดวันซื้อขายก่อนหน้า × จำนวนหุ้นที่ถือปัจจุบัน ไม่รวมผลจากการซื้อขายระหว่างวัน">
       <span className={cn('inline-block rounded-md px-2 py-1 font-bold', !hidden && moneyDisplaySign(h.dayChangePercent ?? 0) > 0 ? 'bg-[#4EDEA3]/10' : !hidden && moneyDisplaySign(h.dayChangePercent ?? 0) < 0 ? 'bg-[#FFB4AB]/10' : 'bg-white/5')}>{hidden ? MASK : h.dayChangePercent == null ? '—' : `${moneyDisplaySign(h.dayChangePercent) > 0 ? '+' : ''}${nf(moneyDisplaySign(h.dayChangePercent) === 0 ? 0 : h.dayChangePercent)}%`}</span>
@@ -2520,31 +2522,7 @@ export default function PortfolioView({ loading: forceLoading = false }: { loadi
     return allBrokerageAccounts.length > 0 ? allBrokerageAccounts : brokerageAccounts;
   }, [activePortfolio, brokerageAccounts, allBrokerageAccounts]);
 
-  const cashCards = useMemo(() => {
-    const balances = new Map(brokerageCashBalances.map((item) => [item.accountId, item.balance]));
-    const groups = new Map<string, typeof effectiveBrokerageAccounts>();
-    effectiveBrokerageAccounts
-      .filter((account) => account.kind === "cash" && (account.currency === "THB" || account.currency === "USD"))
-      .forEach((account) => {
-        const key = `${account.portfolioId}:${account.currency}`;
-        groups.set(key, [...(groups.get(key) || []), account]);
-      });
-
-    return Array.from(groups.values()).map((accounts) => {
-      const account = [...accounts].sort((a, b) => {
-        const aStandard = a.name.trim() === `เงินสด ${a.currency}` ? 0 : 1;
-        const bStandard = b.name.trim() === `เงินสด ${b.currency}` ? 0 : 1;
-        return aStandard - bStandard || a.name.localeCompare(b.name, "th");
-      })[0];
-      return {
-        id: account.id,
-        brokerId: account.portfolioId,
-        name: `เงินสด ${account.currency}`,
-        currency: account.currency as Cur,
-        balance: balances.get(account.id) || 0,
-      };
-    });
-  }, [effectiveBrokerageAccounts, brokerageCashBalances]);
+  const cashCards = useMemo(() => portfolioCashCards(effectiveBrokerageAccounts, brokerageCashBalances), [effectiveBrokerageAccounts, brokerageCashBalances]);
 
   useEffect(() => {
     syncAccounts(cashCards);
@@ -2643,22 +2621,25 @@ export default function PortfolioView({ loading: forceLoading = false }: { loadi
     return [...positions.values()]
       .filter((position) => position.shares > 0 && sidebarBrokers.some((broker) => broker.id === position.portfolioId))
       .map((position) => {
-        // This is a USD valuation projection, NOT a claim about the asset's
-        // native denomination. amountUSD / priceUSD and AppContext's legacy
-        // avgCost/currentPrice are explicitly USD-normalized by their writers.
-        // Keep them in USD here; the display layer converts once, just as on
-        // Dashboard. Missing native asset metadata must not invalidate a
-        // known USD valuation or require an unrelated cash/Bucket account.
-        const allocation = position.asset?.allocation;
+        // Stocks retain the shared USD projection. Thai mutual funds replay
+        // each lot in its original currency so NAV and P/L do not acquire an
+        // artificial FX gain from converting historical cost at today's rate.
+        const allocation = assetAllocation(position.asset?.allocation, undefined, position.symbol);
         const market: Market = allocation === 'Gold' ? 'GOLD'
           : allocation === 'Funds' ? 'FUND'
           : position.asset?.currency === 'THB' ? 'TH' : 'US';
-        const holdingCurrency: Cur = 'USD';
+        const nativeTrades = trades.filter(t => t.portfolioId === position.portfolioId && t.asset.toUpperCase() === position.symbol);
+        const useNativeTHB = market === 'FUND' && nativeTrades.length > 0 && nativeTrades.every(t => t.currency === 'THB');
+        const holdingCurrency: Cur = useNativeTHB ? 'THB' : 'USD';
+        const nativePosition = useNativeTHB ? projectNativeLotPosition(nativeTrades,position.portfolioId,position.symbol,'THB') : null;
+        const valuedPosition = nativePosition || position;
+        const quote = marketQuotes[position.symbol];
+        const displayRate = useNativeTHB ? exchangeRates.THB : 1;
         const preferences = position.asset || assets.find(asset => asset.symbol.toUpperCase() === position.symbol)?.portfolioPreferences?.[position.portfolioId];
-        const avgCostUsd = position.shares > 0 ? position.cost / position.shares : 0;
-        const livePriceUsd = marketQuotes[position.symbol]?.priceUSD || Number(position.asset?.currentPrice)
-          || (position.shares > 0 ? Number(position.asset?.valueUSD) / position.shares : 0)
-          || avgCostUsd;
+        const displayAvgCost = position.shares > 0 ? valuedPosition.cost / position.shares : 0;
+        const displayPrice = useNativeTHB
+          ? (quote?.currency === 'THB' ? quote.nativePrice : undefined) || position.asset?.nativePrice || (Number(position.asset?.currentPrice) * displayRate) || displayAvgCost
+          : quote?.priceUSD || Number(position.asset?.currentPrice) || (position.shares > 0 ? Number(position.asset?.valueUSD) / position.shares : 0) || displayAvgCost;
         return {
           id: position.asset?.id || `${position.portfolioId}:${position.symbol}`,
           brokerId: position.portfolioId,
@@ -2666,19 +2647,21 @@ export default function PortfolioView({ loading: forceLoading = false }: { loadi
           symbol: position.symbol,
           name: position.name,
           shares: position.shares,
-          avgCost: avgCostUsd,
-          price: livePriceUsd,
+          avgCost: displayAvgCost,
+          price: displayPrice,
           currency: holdingCurrency,
-          realizedPL: position.realized,
-          dividends: position.dividends,
-          investedCost: position.invested,
+          realizedPL: valuedPosition.realized,
+          dividends: useNativeTHB ? nativeTrades.filter(t => t.type === 'DIVIDEND').reduce((sum,t) => sum+(t.amountUSD-(t.fees || 0))*t.rateAtTime,0) : position.dividends,
+          investedCost: valuedPosition.invested,
           isFavorite: preferences?.isFavorite,
           sortOrder: preferences?.sortOrder,
-          dayChange: marketQuotes[position.symbol]?.dayChangeUSD ?? null,
-          dayChangePercent: marketQuotes[position.symbol]?.dayChangePercent ?? null,
+          dayChange: useNativeTHB ? quote?.dayChangeNative ?? position.asset?.dayChangeNative ?? null : quote?.dayChangeUSD ?? null,
+          dayChangePercent: quote?.dayChangePercent ?? (position.asset?.quoteAsOf ? position.asset.change : null),
+          quoteAsOf: quote?.quoteAsOf || position.asset?.quoteAsOf,
+          quoteSource: quote?.quoteSource || position.asset?.quoteSource,
         };
       });
-  }, [activePortfolio?.id, assets, marketQuotes, sidebarBrokers, trades]);
+  }, [activePortfolio?.id, assets, marketQuotes, sidebarBrokers, trades, exchangeRates.THB]);
 
   useEffect(() => {
     // Once the shared ledger has loaded it is authoritative, even when its
@@ -3005,7 +2988,7 @@ export default function PortfolioView({ loading: forceLoading = false }: { loadi
         brokerageAccountId: holding.entryMode === 'BUY' ? account?.id : undefined,
         portfolioId: holding.brokerId,
         tag: 'Added from Portfolio',
-      });
+      }, {name:holding.name, allocation:holding.market === 'FUND' ? 'Funds' : holding.market === 'GOLD' ? 'Gold' : 'Equities',currency:holding.currency,currentPrice:holding.price / (holding.currency === 'THB' ? exchangeRates.THB : 1)});
     if (saved) saveHolding(holding);
     return saved;
   }, [addTrade, addToast, allBrokerageAccounts, effectiveBrokerageAccounts, exchangeRates.THB, saveHolding]);
@@ -3242,6 +3225,7 @@ export default function PortfolioView({ loading: forceLoading = false }: { loadi
                     {visibleHoldingGroups.map((group) => <HoldingGroupBoard key={group.id} group={group} sort={tableSort} onSort={setTableSort} search={holdingSearch} favoritesFirst={favoritesFirst} onFavorite={changeFavorite} onReorder={reorderHolding} availableHoldings={trayHoldings} brokerName={broker === "all" ? brokerById.get(group.brokerId)?.name : undefined} holdings={holdingsByGroup.get(group.id) || []} total={trayHoldingTotalTHB} rate={rate} onDropHolding={(holdingId) => {
                       const holding = state.holdings.find((item) => item.id === holdingId);
                       if (holding && holding.brokerId !== group.brokerId) { setToast("ลากสินทรัพย์ไปได้เฉพาะหัวข้อของโบรกเกอร์เดียวกัน"); return; }
+                      if (holding && group.isDefault && group.market !== holding.market) { setToast("ประเภทสินทรัพย์ไม่ตรงกับตารางนี้ ใช้หัวข้อที่สร้างเองเพื่อจัดกลุ่มเพิ่มเติมได้"); return; }
                       placeHoldingInGroup(holdingId, group.id);
                     }} onRemoveHolding={(holdingId) => removeHoldingFromGroup(holdingId, group.id)} onEditHolding={(holding) => setHoldingModal({ holding })} onDeleteGroup={() => removeHoldingGroup(group.id)} />)}
                   </div>}

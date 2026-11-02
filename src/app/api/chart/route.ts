@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { chartCache, generateCacheKey, queryDeduplicator } from '@/src/lib/cache';
+import { fetchFundQuote, fundChartRange, isSupportedFund } from '@/src/lib/fund-market';
 
 interface ChartCacheData {
   symbol: string;
@@ -14,7 +15,7 @@ interface ChartCacheData {
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const symbol = searchParams.get('symbol');
+  const symbol = searchParams.get('symbol')?.trim().toUpperCase();
   const interval = searchParams.get('interval');
   const range = searchParams.get('range');
 
@@ -36,6 +37,12 @@ export async function GET(request: Request) {
       const timestamp = new Date().getTime();
       const finalRange = range || '1d';
       const finalInterval = interval || '1m';
+
+      if (isSupportedFund(symbol)) {
+        const quote=await fetchFundQuote(symbol);
+        if (!quote) throw Error('Fund NAV unavailable');
+        return {...quote,chartData:fundChartRange(quote.chartData,finalRange),period:finalRange,range:finalRange,interval:'1d'};
+      }
 
       const response = await fetch(
         `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=${finalRange}&interval=${finalInterval}&_=${timestamp}`,

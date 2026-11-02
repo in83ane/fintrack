@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import ts from 'typescript';
+import * as XLSX from 'xlsx';
+const source = readFileSync(new URL('../src/lib/trade-import.ts', import.meta.url),'utf8');
+const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
+const {importCalendarDate,tradeHistoryPayload}=await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
+for(const day of ['2025-04-16','2026-10-15','2024-02-29']) assert.equal(importCalendarDate(day),day);
+assert.equal(importCalendarDate(45763),'2025-04-16');
+assert.equal(importCalendarDate(new Date(2025,3,16)),'2025-04-16');
+for(const invalid of ['',null,'2025-02-29','2025-04-31','04/16/2025',Infinity]) assert.equal(importCalendarDate(invalid),null);
+const row={row:5,symbol:'NVDA',date:'2025-04-16',type:'BUY',shares:0.8466936,price:106.04,fees:0.14,currency:'USD'};
+assert.deepEqual(tradeHistoryPayload([row],33.7)[0],{row:5,symbol:'NVDA',date:'2025-04-16',type:'BUY',quantity:'0.8466936',price:'106.04',fees:'0.14',currency:'USD',rate:'1'});
+assert.equal(tradeHistoryPayload([{...row,currency:'THB'}],33.7)[0].rate,'33.7');
+assert.throws(()=>tradeHistoryPayload([{...row,currency:'THB'}],NaN));
+for(const patch of [{shares:0},{price:-1},{fees:-1},{shares:Infinity},{type:'DIVIDEND',shares:1}]) assert.throws(()=>tradeHistoryPayload([{...row,...patch}],33.7));
+assert.equal(tradeHistoryPayload([{...row,type:'DIVIDEND',shares:0}],33.7)[0].quantity,'0');
+// Verify the XLSX numeric-date path, including ExcelJS-generated workbooks.
+const book=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet([['Trade_Date'],[45763]]),'Trades');
+const imported=XLSX.read(XLSX.write(book,{type:'buffer',bookType:'xlsx'}),{type:'buffer',cellDates:false});
+assert.equal(importCalendarDate(imported.Sheets.Trades.A2.v),'2025-04-16');
+console.log('PASS: calendar dates, XLSX round trip, native currency payloads, dividend and invalid input validation.');

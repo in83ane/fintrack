@@ -47,3 +47,24 @@ export function projectLotPosition(trades: Trade[], portfolioId: string, symbol:
   // subtracting independently rounded per-share costs creates phantom cents.
   return { shares, cost, invested, realized: sales.length ? proceeds - (invested - cost) : 0 };
 }
+
+/** Replay native-currency fund costs at each trade's execution FX, not today's.
+ * Selections and quantities are unchanged, so partial sales consume the same lots.
+ */
+export function projectNativeLotPosition(trades: Trade[], portfolioId:string, symbol:string, currency:string) {
+  const scoped=trades.filter(t => t.portfolioId===portfolioId && t.asset.toUpperCase()===symbol.toUpperCase());
+  if (!scoped.length || scoped.some(t => t.currency!==currency || !Number.isFinite(t.rateAtTime) || t.rateAtTime<=0)) return null;
+  return projectLotPosition(scoped.map(t => ({...t,amountUSD:t.amountUSD*t.rateAtTime,fees:(t.fees || 0)*t.rateAtTime,pricePerUnit:(t.pricePerUnit || 0)*t.rateAtTime})),portfolioId,symbol);
+}
+
+/** One exit per allocated purchase, including Excel imports and live sales. */
+export function projectLotExits(lots: ReturnType<typeof projectTradeLots>) {
+  return lots.flatMap(lot => lot.sales.map(sale => ({
+    id: `${sale.trade.dbId || sale.trade.id}:${lot.trade.dbId || lot.trade.id}`,
+    entryId: tradeLotEntryId(lot.trade),
+    quantity: sale.quantity,
+    price: sale.trade.pricePerUnit || 0,
+    pnl: sale.pnl,
+    closedAt: sale.trade.date,
+  })));
+}

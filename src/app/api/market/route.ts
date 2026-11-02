@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import { dailyMove } from '@/src/lib/holding-order';
 import { marketCache, generateCacheKey, queryDeduplicator } from '@/src/lib/cache';
+import { fetchFundQuote, isSupportedFund } from '@/src/lib/fund-market';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const symbolsParam = searchParams.get('symbols');
   const quotesOnly = searchParams.get('quotesOnly') === '1';
+  const fundSymbols = new Set((searchParams.get('funds') || '').toUpperCase().split(',').filter(Boolean));
 
   if (!symbolsParam) {
     return NextResponse.json({ error: 'Missing symbols parameter' }, { status: 400 });
@@ -13,7 +15,7 @@ export async function GET(request: Request) {
 
   const symbols = [...new Set(symbolsParam.split(',').map(s => s.trim().toUpperCase()).filter(Boolean))];
   if (quotesOnly && symbols.length > 40) return NextResponse.json({ error: 'Maximum 40 symbols per request' }, { status: 400 });
-  const cacheKey = generateCacheKey('market', { symbols: symbols.sort().join(','), quotesOnly });
+  const cacheKey = generateCacheKey('market', { symbols: symbols.sort().join(','), funds:[...fundSymbols].sort().join(','), quotesOnly });
 
   // Check cache first
   const cached = marketCache.get(cacheKey);
@@ -29,6 +31,9 @@ export async function GET(request: Request) {
       // Fetch individual charts in parallel with Promise.allSettled for better error handling
       const fetchPromises = symbols.map(async (symbol) => {
         try {
+          if (isSupportedFund(symbol)) return quotesOnly ? null : await fetchFundQuote(symbol);
+          // An unsupported mutual fund must never resolve to a stock ticker.
+          if (fundSymbols.has(symbol)) return null;
           const [dailyRes, intradayRes] = await Promise.allSettled([
             fetch(
               `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${quotesOnly ? '1d&interval=1m' : '1mo&interval=1d'}&_=${timestamp}`,

@@ -13,6 +13,9 @@ import { AddAssetModal } from "@/src/components/AddAssetModal";
 import { AddCashflowModal } from "@/src/components/AddCashflowModal";
 import { Modal } from "@/src/components/Modal";
 import * as XLSX from "xlsx";
+import { supabase } from "@/src/lib/supabase";
+import { importCalendarDate, tradeHistoryPayload } from "@/src/lib/trade-import";
+import { StockSplitReview, type SplitReviewValue } from '@/src/components/StockSplitReview';
 import { formatPnL, getPnLColor, formatPercent, formatFixed } from "@/src/lib/format";
 import { NetWorthSparkline } from '@/src/components/NetWorthSparkline';
 import { getNetWorthChange } from '@/src/lib/net-worth-series';
@@ -56,9 +59,9 @@ function normaliseImportHeader(value: unknown) {
 }
 
 function readImportNumber(value: unknown) {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : NaN;
   const parsed = Number(String(value ?? '').replace(/,/g, '').trim());
-  return Number.isFinite(parsed) ? parsed : 0;
+  return Number.isFinite(parsed) ? parsed : NaN;
 }
 
 function readImportText(row: Record<string, unknown>, aliases: string[]) {
@@ -75,17 +78,7 @@ function readImportValue(row: Record<string, unknown>, aliases: string[]) {
   return '';
 }
 
-function readImportDate(value: unknown) {
-  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString();
-  if (typeof value === 'number') {
-    const parsed = XLSX.SSF.parse_date_code(value);
-    if (parsed) return new Date(Date.UTC(parsed.y, parsed.m - 1, parsed.d)).toISOString();
-  }
-  const text = String(value ?? '').trim();
-  if (!text) return null;
-  const parsed = new Date(text);
-  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
-}
+const readImportDate = importCalendarDate;
 
 function normaliseTradeAction(value: string): StockImportRow['type'] | null {
   const action = value.trim().toUpperCase();
@@ -96,7 +89,7 @@ function normaliseTradeAction(value: string): StockImportRow['type'] | null {
 }
 
 function parseStockImport(buffer: ArrayBuffer): { rows: StockImportRow[]; errors: string[] } {
-  const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+  const workbook = XLSX.read(buffer, { type: 'array', cellDates: false });
   const holdingsSheet = workbook.SheetNames.find(name => normaliseImportHeader(name) === 'holdings') || workbook.SheetNames[0];
   if (!holdingsSheet) throw new Error('ไม่พบชีตสำหรับนำเข้า');
 
@@ -120,7 +113,11 @@ function parseStockImport(buffer: ArrayBuffer): { rows: StockImportRow[]; errors
     const sheetRow = headerIndex + index + 2;
 
     if (!hasAnyValue) return [];
-    if (!symbol || !date || !type || price <= 0 || (type !== 'DIVIDEND' && shares <= 0)) {
+    if (currencyValue && !['USD','THB'].includes(currencyValue)) {
+      errors.push(`แถว ${sheetRow}: Currency รองรับ USD หรือ THB เท่านั้น`);
+      return [];
+    }
+    if (!symbol || !date || !type || !Number.isFinite(price) || !Number.isFinite(shares) || !Number.isFinite(fees) || fees < 0 || price <= 0 || (type !== 'DIVIDEND' && shares <= 0) || (type === 'DIVIDEND' && shares !== 0)) {
       errors.push(`แถว ${sheetRow}: ต้องมี Trade_Date, Ticker, Action และ Price ที่ถูกต้อง (Quantity จำเป็นสำหรับ Buy/Sell)`);
       return [];
     }
@@ -152,9 +149,8 @@ export default function DashboardView({loading:forceLoading=false}:{loading?:boo
     t, formatMoney, currency, exchangeRates, trades, assets, language, marketQuotes,
     cashActivities, moneyBuckets, bucketActivities,
     totalInvested, totalUnrealizedPL, totalRealizedPL, totalDividends,
-    fetchAssetMarketData, addAsset, addTrade,
     netWorthHistory, netWorthScope, netWorthSettings, addToast, activePortfolio, activePortfolioId, isAllPortfolios, isDataLoaded:appDataLoaded,
-    portfolios, createPortfolio, selectPortfolio,
+    portfolios, createPortfolio,
   } = useApp();
   const isDataLoaded=appDataLoaded&&!forceLoading;
   const rangeInteracted = useRef(false);
@@ -166,6 +162,10 @@ export default function DashboardView({loading:forceLoading=false}:{loading?:boo
   const [importRows, setImportRows] = useState<StockImportRow[]>([]);
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [importFileName, setImportFileName] = useState('');
+  const [confirmImportSales, setConfirmImportSales] = useState(false);
+  const [splitReview,setSplitReview] = useState<SplitReviewValue>({splits:[],ready:false});
+  const splitSymbols=useMemo(()=>[...new Set(importRows.filter(r=>r.type!=='DIVIDEND').map(r=>r.symbol))].sort().map(symbol=>({symbol,from:importRows.filter(r=>r.symbol===symbol).map(r=>r.date).sort()[0]})),[importRows]);
+  const importLock = useRef(false);
   const [isTemplateDownloading, setIsTemplateDownloading] = useState(false);
   const tradingPortfolios = useMemo(() => portfolios.filter(portfolio => portfolio.kind === 'trading'), [portfolios]);
 
@@ -174,6 +174,8 @@ export default function DashboardView({loading:forceLoading=false}:{loading?:boo
     setImportRows([]);
     setImportErrors([]);
     setImportFileName('');
+    setConfirmImportSales(false);
+    setSplitReview({splits:[],ready:false});
   };
 
   const handleStockFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -181,11 +183,13 @@ export default function DashboardView({loading:forceLoading=false}:{loading?:boo
     if (!file) return;
     try {
       const { rows, errors } = parseStockImport(await file.arrayBuffer());
+      setConfirmImportSales(false);
+      setSplitReview({splits:[],ready:false});
       setImportRows(rows);
       setImportErrors(errors);
       setImportFileName(file.name);
       setImportStatus(rows.length > 0
-        ? { type: 'ready', message: `พบ ${rows.length} รายการ พร้อมตรวจสอบก่อนบันทึก` }
+        ? { type: 'ready', message: language==='th'?`พบ ${rows.length} รายการ พร้อมตรวจสอบก่อนบันทึก`:`Found ${rows.length} trades. Review before importing.` }
         : { type: 'error', message: 'ไม่พบรายการที่พร้อมนำเข้า' });
     } catch {
       setImportRows([]);
@@ -315,114 +319,58 @@ export default function DashboardView({loading:forceLoading=false}:{loading?:boo
   };
 
   const importStocks = async () => {
-    if (importRows.length === 0) return;
-
-    setImportStatus({ type: 'importing', message: 'กำลังบันทึกรายการลงทุน…' });
-    let imported = 0;
-    let failed = 0;
-    let missingBroker = 0;
-    const importedRows: StockImportRow[] = [];
-    const brokerPortfolios = new Map(tradingPortfolios.map(portfolio => [portfolio.name.trim().toLocaleLowerCase(), portfolio]));
-    const createdBrokerNames = new Set<string>();
+    if (importLock.current || !importRows.length || importErrors.length || !splitReview.ready) return;
+    if (importRows.some(row => row.type === 'SELL') && !confirmImportSales) return;
     const fallbackBrokerName = activePortfolio?.kind === 'trading' ? activePortfolio.name : '';
-    const marketDataBySymbol = new Map<string, { price?: number; name?: string; changePercent?: number; quoteCurrency?: string; chartData?: { time: number; price: number }[] } | null>();
-    for (const item of importRows) {
-      const brokerName = item.broker?.trim() || fallbackBrokerName;
-      if (!brokerName) {
-        missingBroker++;
-        continue;
-      }
-      try {
-        const brokerKey = brokerName.toLocaleLowerCase();
-        let targetPortfolio = brokerPortfolios.get(brokerKey);
-        if (!targetPortfolio) {
-          const createdPortfolio = await createPortfolio(brokerName);
-          if (!createdPortfolio) throw new Error('Could not create the new broker portfolio');
-          targetPortfolio = createdPortfolio;
-          brokerPortfolios.set(brokerKey, createdPortfolio);
-          createdBrokerNames.add(createdPortfolio.name);
-        }
-        if (!marketDataBySymbol.has(item.symbol)) {
-          try {
-            marketDataBySymbol.set(item.symbol, await fetchAssetMarketData(item.symbol));
-          } catch (marketError) {
-            console.warn(`Could not refresh ${item.symbol}; using the imported price as its initial value.`, marketError);
-            marketDataBySymbol.set(item.symbol, null);
-          }
-        }
-        const rate = item.currency === 'THB' ? (exchangeRates.THB || 1) : 1;
-        const priceUSD = item.price / rate;
-        const amountLocal = item.type === 'DIVIDEND' ? item.price : item.price * item.shares;
-        const saved = await addTrade({
-          asset: item.symbol,
-          // File imports describe external history, not a new cash purchase.
-          type: item.type === 'BUY' ? 'IMPORT' : item.type,
-          amountUSD: amountLocal / rate,
-          originalAmount: amountLocal,
-          date: item.date,
-          rateAtTime: rate,
-          currency: item.currency,
-          shares: item.shares,
-          pricePerUnit: priceUSD,
-          fees: item.fees / rate,
-          tag: 'Excel import',
-          portfolioId: targetPortfolio.id,
-        });
-        if (!saved) { failed++; continue; }
-        importedRows.push({ ...item, portfolioId: targetPortfolio.id });
-        imported++;
-      } catch (error) {
-        console.error(`Failed to import ${item.symbol}:`, error);
-        failed++;
-      }
+    if (importRows.some(row => !(row.broker?.trim() || fallbackBrokerName))) {
+      setImportStatus({ type: 'error', message: 'กรุณาระบุ Broker ทุกแถว หรือเลือกโบรกเกอร์ก่อนนำเข้า' });
+      return;
     }
-    const importedPositions = Array.from(new Set(importedRows.map(item => `${item.portfolioId}::${item.symbol}`)));
-    for (const importedPosition of importedPositions) {
-      const [portfolioId, symbol] = importedPosition.split('::');
-      const combinedTrades = [
-        ...trades.filter(trade => trade.portfolioId === portfolioId && trade.asset.toUpperCase() === symbol),
-        ...importedRows.filter(item => item.portfolioId === portfolioId && item.symbol === symbol).map(item => {
-          const rate = item.currency === 'THB' ? (exchangeRates.THB || 1) : 1;
-          const amountLocal = item.type === 'DIVIDEND' ? item.price : item.price * item.shares;
-          return { type: item.type, shares: item.shares, amountUSD: amountLocal / rate, fees: item.fees / rate, date: item.date };
-        }),
-      ].sort((a, b) => a.date.localeCompare(b.date));
-      const position = combinedTrades.reduce((current, trade) => {
-        const quantity = trade.shares || 0;
-        if (trade.type === 'BUY' || trade.type === 'IMPORT') {
-          current.cost += trade.amountUSD + (trade.fees || 0);
-          current.quantity += quantity;
-        } else if (trade.type === 'SELL' && current.quantity > 0) {
-          const sold = Math.min(quantity, current.quantity);
-          current.cost -= (sold / current.quantity) * current.cost;
-          current.quantity -= sold;
+    importLock.current = true;
+    setImportStatus({ type: 'importing', message: language === 'th' ? 'กำลังตรวจและบันทึกประวัติ…' : 'Checking and importing history…' });
+    let imported = 0, skipped = 0;
+    const failures: string[] = [];
+    try {
+      const { data: auth, error: authError } = await supabase.auth.getUser();
+      if (authError || !auth.user) throw new Error(language === 'th' ? 'เข้าสู่ระบบก่อนนำเข้าประวัติซื้อขาย' : 'Sign in to import trade history.');
+      // Validate the whole file before creating portfolios or writing any trades.
+      tradeHistoryPayload(importRows, exchangeRates.THB);
+      const groups = new Map<string, { name: string; rows: StockImportRow[] }>();
+      for (const row of importRows) {
+        const name = row.broker?.trim() || fallbackBrokerName, key = name.toLocaleLowerCase();
+        const group = groups.get(key) || { name, rows: [] };
+        group.rows.push(row); groups.set(key, group);
+      }
+      for (const group of groups.values()) {
+        try {
+          const portfolio = tradingPortfolios.find(p => p.name.trim().toLocaleLowerCase() === group.name.toLocaleLowerCase())
+            || await createPortfolio(group.name);
+          if (!portfolio) throw new Error('Could not create the broker portfolio');
+          const { data, error } = await supabase.rpc('import_trade_history_with_splits', {
+            p_port: portfolio.id,
+            p_rows: tradeHistoryPayload(group.rows, exchangeRates.THB,splitReview.basisDate),
+            p_sale_mode: confirmImportSales ? 'PROPORTIONAL' : null,
+            p_splits: splitReview.splits.filter(split=>group.rows.some(row=>row.symbol===split.symbol)),
+          });
+          if (error) throw error;
+          if (!data || typeof data.imported !== 'number' || typeof data.skipped !== 'number') throw new Error('Invalid import result');
+          imported += data.imported; skipped += data.skipped;
+        } catch (error) {
+          failures.push(`${group.name}: ${(error as Error).message}`);
         }
-        return current;
-      }, { quantity: 0, cost: 0 });
-      if (position.quantity <= 0) continue;
-      const marketData = marketDataBySymbol.get(symbol) || null;
-      const isThai = marketData?.quoteCurrency === 'THB' || symbol.endsWith('.BK') || symbol.endsWith('.TH');
-      const currentPriceUSD = marketData?.price ? (isThai ? marketData.price / (exchangeRates.THB || 1) : marketData.price) : position.cost / position.quantity;
-      await addAsset({
-        name: marketData?.name || symbol,
-        symbol,
-        valueUSD: currentPriceUSD * position.quantity,
-        change: marketData?.changePercent || 0,
-        allocation: ['BTC', 'ETH', 'SOL', 'USDT', 'DOGE', 'XRP'].includes(symbol) ? 'Alternatives' : 'Equities',
-        shares: position.quantity,
-        avgCost: position.cost / position.quantity,
-        currency: isThai ? 'THB' : 'USD',
-        chartData: marketData?.chartData,
-        portfolioId,
-      });
-    }
-    selectPortfolio(activePortfolioId);
-    if (imported > 0) {
-      const summary = `นำเข้า ${imported} รายการ${createdBrokerNames.size ? ` · สร้าง ${createdBrokerNames.size} โบรกเกอร์ใหม่` : ''}${missingBroker ? ` · ข้าม ${missingBroker} รายการที่ไม่ระบุโบรกเกอร์` : ''}${failed ? ` · ไม่สำเร็จ ${failed} รายการ` : ''}`;
-      setImportStatus({ type: 'success', message: summary });
-      addToast(summary, failed ? 'warning' : 'success');
-    } else {
-      setImportStatus({ type: 'error', message: missingBroker ? 'กรุณาระบุ Broker ในไฟล์ หรือเลือกโบรกเกอร์ก่อนนำเข้า' : 'ยังไม่มีรายการใดถูกบันทึก กรุณาลองใหม่อีกครั้ง' });
+      }
+      // Refresh server projections; never overwrite them with a stale client sum.
+      window.dispatchEvent(new Event('fintrack:financial-change'));
+      const summary = language === 'th'
+        ? `นำเข้า ${imported} รายการ · ข้าม ${skipped} รายการที่มีอยู่แล้ว`
+        : `Imported ${imported} · skipped ${skipped} existing rows`;
+      setImportStatus({ type: failures.length ? 'error' : 'success',
+        message: summary + (failures.length ? ` · ${failures.join(' · ')}` : '') });
+      addToast(summary + (failures.length ? (language === 'th' ? ' · บางโบรกเกอร์ไม่สำเร็จ ดูรายละเอียดในหน้าต่างนำเข้า' : ' · Some brokers failed; see import details.') : ''), failures.length ? 'warning' : 'success');
+    } catch (error) {
+      setImportStatus({ type: 'error', message: (error as Error).message });
+    } finally {
+      importLock.current = false;
     }
   };
 
@@ -745,8 +693,8 @@ export default function DashboardView({loading:forceLoading=false}:{loading?:boo
       <AddAssetModal variant="portfolio" isOpen={isAddAssetOpen} onClose={() => setIsAddAssetOpen(false)} />
             <AddCashflowModal isOpen={isAddCashflowOpen} onClose={() => setIsAddCashflowOpen(false)} />
 
-      <Modal isOpen={isImportOpen} onClose={() => { setIsImportOpen(false); resetImport(); }} title={language === 'th' ? 'นำเข้าหุ้นจาก Excel' : 'Import investments from Excel'}>
-        <p className="mb-3 text-xs text-gray-400">นำเข้าข้อมูลจากภายนอก: รายการซื้อในไฟล์บันทึกเป็นสินทรัพย์ที่ถืออยู่แล้ว โดยไม่ตัดเงินจากกระเป๋า</p>
+      <Modal isOpen={isImportOpen} onClose={() => { if (importLock.current) return; setIsImportOpen(false); resetImport(); }} title={language === 'th' ? 'นำเข้าหุ้นจาก Excel' : 'Import investments from Excel'}>
+        <p className="mb-3 text-xs text-gray-400">{language === 'th' ? 'นำเข้าประวัติซื้อขายโดยไม่เปลี่ยนยอดเงินสด บันทึกทั้งชุดต่อโบรกเกอร์ และข้ามรายการที่เคยนำเข้าแล้ว' : 'Import trade history without changing cash balances. Each broker is saved atomically; previously imported rows are skipped.'}</p>
         <div className="space-y-5">
           <div className="rounded-2xl border border-border bg-white/[0.03] p-4">
             <div className="flex items-start gap-3">
@@ -769,7 +717,7 @@ export default function DashboardView({loading:forceLoading=false}:{loading?:boo
             <Upload size={25} className="text-gray-500" />
             <span className="text-sm font-bold text-white">{language === 'th' ? 'เลือกไฟล์ Excel เพื่อพรีวิว' : 'Choose an Excel file to preview'}</span>
             <span className="text-[11px] text-gray-500">XLSX, XLSM, XLS</span>
-            <input type="file" accept={IMPORT_FILE_TYPES} onChange={handleStockFile} className="hidden" />
+            <input type="file" accept={IMPORT_FILE_TYPES} onChange={handleStockFile} disabled={importStatus.type === 'importing'} className="hidden" />
           </label>
 
           {importFileName && (
@@ -783,15 +731,21 @@ export default function DashboardView({loading:forceLoading=false}:{loading?:boo
             </div>
           )}
 
-          {importErrors.length > 0 && <div className="rounded-xl border border-[#FFB4AB]/20 bg-[#FFB4AB]/5 p-3 text-xs text-[#FFB4AB]"><div className="flex items-center gap-1.5 font-bold"><CircleAlert size={14} />{language === 'th' ? 'รายการที่ข้าม' : 'Rows skipped'}</div><ul className="mt-1.5 space-y-1 text-[11px]">{importErrors.slice(0, 3).map(error => <li key={error}>{error}</li>)}</ul></div>}
+          {importRows.length>0&&<StockSplitReview key={importFileName+JSON.stringify(splitSymbols)} symbols={splitSymbols} language={language} importing disabled={importStatus.type==='importing'} onChange={setSplitReview} />}
+          {importRows.some(row => row.type === 'SELL') && <label className="flex items-start gap-3 rounded-xl border border-border p-3 text-xs text-gray-300">
+            <input type="checkbox" checked={confirmImportSales} disabled={importStatus.type === 'importing'} onChange={e => setConfirmImportSales(e.target.checked)} className="mt-0.5" />
+            <span>{language === 'th' ? 'คำนวณต้นทุนรายการขายตามสัดส่วนทุกไม้ที่ถือในวันขาย และบันทึกกำไร/ขาดทุนย้อนหลัง โดยไม่เพิ่มเงินสด' : 'Allocate imported sales proportionally across lots held on the sale date and record historical P/L without adding cash.'}</span>
+          </label>}
+          <p className="text-xs text-gray-400">{language === 'th' ? 'จำนวนหุ้นจัดเก็บทศนิยม 6 ตำแหน่ง รายการ THB ใช้อัตราแลกเปลี่ยนปัจจุบันสำหรับแสดงมูลค่า USD' : 'Shares are stored to 6 decimal places. THB entries use the current exchange rate for USD valuation.'}</p>
+          {importErrors.length > 0 && <div className="rounded-xl border border-[#FFB4AB]/20 bg-[#FFB4AB]/5 p-3 text-xs text-[#FFB4AB]"><div className="flex items-center gap-1.5 font-bold"><CircleAlert size={14} />{language === 'th' ? 'แก้ข้อมูลเหล่านี้ก่อนนำเข้า' : 'Fix these rows before importing'}</div><ul className="mt-1.5 space-y-1 text-[11px]">{importErrors.slice(0, 3).map(error => <li key={error}>{error}</li>)}</ul></div>}
 
           {importStatus.type !== 'idle' && <div className={cn("flex items-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-semibold", importStatus.type === 'success' ? 'border-[#4EDEA3]/20 bg-[#4EDEA3]/5 text-[#4EDEA3]' : importStatus.type === 'error' ? 'border-[#FFB4AB]/20 bg-[#FFB4AB]/5 text-[#FFB4AB]' : 'border-border bg-white/[0.03] text-gray-300')}>
             {importStatus.type === 'success' && <CheckCircle2 size={15} />}{importStatus.message}
           </div>}
 
           <div className="flex gap-3 pt-1">
-            <button onClick={() => { setIsImportOpen(false); resetImport(); }} className="flex-1 rounded-xl border border-border px-4 py-3 text-sm font-bold text-gray-300 transition hover:bg-white/5">{language === 'th' ? 'ยกเลิก' : 'Cancel'}</button>
-            <button onClick={importStocks} disabled={importRows.length === 0 || importStatus.type === 'importing'} className="flex-[1.5] rounded-xl bg-[#4EDEA3] px-4 py-3 text-sm font-bold text-[#062c25] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40">{importStatus.type === 'importing' ? (language === 'th' ? 'กำลังนำเข้า…' : 'Importing…') : (language === 'th' ? `ยืนยัน ${importRows.length || ''} รายการ` : `Import ${importRows.length || ''} items`)}</button>
+            <button disabled={importStatus.type === 'importing'} onClick={() => { setIsImportOpen(false); resetImport(); }} className="flex-1 rounded-xl border border-border px-4 py-3 text-sm font-bold text-gray-300 transition hover:bg-white/5 disabled:opacity-40">{language === 'th' ? 'ยกเลิก' : 'Cancel'}</button>
+            <button onClick={importStocks} disabled={importRows.length === 0 || importErrors.length > 0 || !splitReview.ready || importStatus.type === 'importing' || (importRows.some(row => row.type === 'SELL') && !confirmImportSales)} className="flex-[1.5] rounded-xl bg-[#4EDEA3] px-4 py-3 text-sm font-bold text-[#062c25] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40">{importStatus.type === 'importing' ? (language === 'th' ? 'กำลังนำเข้า…' : 'Importing…') : (language === 'th' ? `ยืนยัน ${importRows.length || ''} รายการ` : `Import ${importRows.length || ''} items`)}</button>
           </div>
           <p className="text-center text-[10px] leading-4 text-gray-600">{language === 'th' ? 'ไฟล์ XLSM จะอ่านเฉพาะข้อมูลในชีตและจะไม่เรียกใช้ macro' : 'XLSM files are read as worksheet data only; macros are never run.'}</p>
         </div>

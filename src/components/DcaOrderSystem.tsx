@@ -14,7 +14,7 @@ import { CustomSelect } from '@/src/components/CustomSelect';
 import { PriceLadder } from '@/src/components/PriceLadder';
 import { TradeLotEditor } from '@/src/components/TradeLotEditor';
 import { CostBasisPanel } from '@/src/components/CostBasisPanel';
-import { projectTradeLots, tradeLotEntryId } from '@/src/lib/trade-lots';
+import { projectTradeLots, projectLotExits, tradeLotEntryId } from '@/src/lib/trade-lots';
 
 export interface DcaEntry {
   id: number;
@@ -528,12 +528,7 @@ export function DcaOrderSystem({ initialSymbol = '', initialPrice = 0, marketCur
     // available, but never recreate an executed transaction from draft data.
     const next = reconciled.length ? reconciled : createDefaultEntries();
     if (JSON.stringify(next) !== JSON.stringify(entries)) setEntries(next);
-    const exits: PartialExit[] = trades.filter(trade => trade.portfolioId === activePortfolioId && trade.asset.toUpperCase() === symbol.toUpperCase() && trade.type === 'SELL' && /^DCA partial exit from entry -?\d+$/.test(trade.tag || '')).map(trade => {
-      const entryId = Number(trade.tag!.split(' ').at(-1));
-      const buy = posted.find(lot => tradeLotEntryId(lot.trade) === entryId);
-      const quantity = Number(trade.shares) || 0;
-      return { id: trade.dbId || String(trade.id), entryId, quantity, price: trade.pricePerUnit || 0, pnl: trade.amountUSD - (trade.fees || 0) - quantity * (buy?.price || 0), closedAt: trade.date };
-    });
+    const exits: PartialExit[] = projectLotExits(posted);
     setPartialExits(previous => JSON.stringify(previous) === JSON.stringify(exits) ? previous : exits);
   }, [activePortfolioId, entries, isDataLoaded, postedLots, symbol, trades]);
 

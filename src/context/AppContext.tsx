@@ -17,6 +17,7 @@ import { bucketNativeAmount, getNativeLeg, nativeBucketBalance } from '@/src/lib
 import { decimal, isFxCurrency } from '@/src/lib/fx';
 import { useNotificationInbox } from '@/src/hooks/useNotificationInbox';
 import { useFxRate } from '@/src/hooks/useFxRate';
+import { assetAllocation } from '@/src/lib/instrument-metadata';
 
 export type Language = "en" | "th";
 export type Currency = "USD" | "THB" | "JPY" | "EUR";
@@ -206,9 +207,18 @@ export interface Asset {
   is_active?: boolean;
   currentPrice?: number;
   currency?: string;
+  nativePrice?: number;
+  quoteAsOf?: string;
+  quoteSource?: string;
+  dayChangeNative?: number | null;
   excludeFromTotal?: boolean;
   portfolioId?: string;
   brokerageAccountId?: string;
+}
+
+export interface MarketQuote {
+  priceUSD: number; updatedAt: number; dayChangeUSD?: number | null; dayChangePercent?: number | null;
+  nativePrice?: number; currency?: string; quoteAsOf?: string; quoteSource?: string; dayChangeNative?: number | null;
 }
 
 export interface Portfolio {
@@ -308,7 +318,7 @@ interface AppState {
   allocations: Allocation[];
   updateAllocation: (label: string, value: number) => void;
   assets: Asset[];
-  marketQuotes: Record<string, { priceUSD: number; updatedAt: number; dayChangeUSD?: number | null; dayChangePercent?: number | null }>;
+  marketQuotes: Record<string, MarketQuote>;
   saveAssetPreferences: (portfolioId: string, symbol: string, preferences: { isFavorite?: boolean; sortOrder?: number }) => Promise<boolean>;
   portfolios: Portfolio[];
   activePortfolioId: string | null;
@@ -1780,7 +1790,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [trades, setTrades] = useState<Trade[]>(defaultTrades);
   const [allocations, setAllocations] = useState<Allocation[]>(defaultAllocations);
   const [assets, setAssets] = useState<Asset[]>(defaultAssets);
-  const [marketQuotes, setMarketQuotes] = useState<Record<string, { priceUSD: number; updatedAt: number; dayChangeUSD?: number | null; dayChangePercent?: number | null }>>({});
+  const [marketQuotes, setMarketQuotes] = useState<Record<string, MarketQuote>>({});
   const assetsRef = React.useRef<Asset[]>(assets);
   useEffect(() => {
     assetsRef.current = assets;
@@ -2358,12 +2368,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 name: a.name,
                 symbol: a.symbol,
                 valueUSD: (() => {
-                  if (a.current_price && quantity) return a.current_price * quantity;
+                  if (currentPrice && quantity) return currentPrice * quantity;
                   if (a.avg_purchase_price && quantity) return a.avg_purchase_price * quantity;
                   return a.value_usd || 0;
                 })(),
                 change: a.change_percentage || 0,
-                allocation: a.asset_type || 'Equities',
+                allocation: assetAllocation(a.allocation, a.asset_type, a.symbol),
+                currency: a.currency || undefined, nativePrice: a.native_price || undefined,
+                quoteAsOf: a.quote_as_of || undefined, quoteSource: a.quote_source || undefined,
+                dayChangeNative: a.native_day_change ?? null,
                 shares: quantity,
                 avgCost: a.avg_purchase_price || 0,
                 currentPrice,
@@ -2984,7 +2997,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           valueUSD: s.totalCost,
           currentPrice: s.shares > 0 ? s.totalCost / s.shares : 0,
           change: 0,
-          allocation: autoAlloc,
+          allocation: assetAllocation(autoAlloc, undefined, symbol),
           shares: s.shares,
           avgCost: s.shares > 0 ? s.totalCost / s.shares : 0,
           realizedPL: s.realizedPL,
@@ -2999,6 +3012,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [activePortfolioId, dataPortfolioId, trades, dcaPositions, isDataLoaded]);
 
   const marketQuotesRef = useRef(marketQuotes);
+  const fundSymbolKey = React.useMemo(() => assets.filter(a => a.allocation === 'Funds').map(a => a.symbol.toUpperCase()).sort().join(','), [assets]);
   marketQuotesRef.current = marketQuotes;
 
   // Fetch Live Market Data and persist prices to Supabase.  Depend on the
@@ -3010,6 +3024,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   );
   useEffect(() => {
     if (!isDataLoaded || dataPortfolioId !== activePortfolioId) return;
+
+    // Revalue saved native NAVs when FX loads/changes, even while the quote
+    // itself is cached. A fund's THB price must not move with USD/THB.
+    setAssets(previous => previous.map(asset => {
+      const rate = exchangeRates[asset.currency as Currency];
+      if (!(asset.nativePrice && Number.isFinite(rate) && rate > 0)) return asset;
+      const currentPrice = asset.nativePrice / rate;
+      return currentPrice === asset.currentPrice ? asset : {...asset,currentPrice,valueUSD:currentPrice*(asset.shares || 0)};
+    }));
+    setMarketQuotes(previous => Object.fromEntries(Object.entries(previous).map(([symbol,quote]) => {
+      const rate=exchangeRates[quote.currency as Currency];
+      return [symbol,quote.nativePrice && Number.isFinite(rate) && rate>0 ? {...quote,priceUSD:quote.nativePrice/rate,dayChangeUSD:quote.dayChangeNative == null ? null : quote.dayChangeNative/rate} : quote];
+    })));
 
     let mounted = true;
     let inFlight = false;
@@ -3036,7 +3063,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       inFlight = true;
 
       try {
-        const res = await fetch(`/api/market?symbols=${encodeURIComponent(symbolsQuery)}`, {
+        const res = await fetch(`/api/market?symbols=${encodeURIComponent(symbolsQuery)}&funds=${encodeURIComponent(fundSymbolKey)}`, {
           cache: 'no-store',
           signal: controller.signal,
           headers: { 'Cache-Control': 'no-cache' }
@@ -3045,7 +3072,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const data = await res.json();
         if (!data?.results || !Array.isArray(data.results) || !mounted) return;
 
-        const validQuotes = data.results.filter((quote: any) => Number.isFinite(Number(quote.price)) && Number(quote.price) > 0);
+        const validQuotes = data.results.filter((quote: any) => Number.isFinite(Number(quote.price)) && Number(quote.price) > 0 && isFxCurrency(quote.quoteCurrency) && Number.isFinite(exchangeRates[quote.quoteCurrency as Currency]) && exchangeRates[quote.quoteCurrency as Currency] > 0);
         const usdPrice = (quote: any) => Number(quote.price) / (exchangeRates[quote.quoteCurrency as Currency] || 1);
         setMarketQuotes(previous => {
           const next = { ...previous };
@@ -3055,6 +3082,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               const quoteRate = exchangeRates[quote.quoteCurrency as Currency];
               next[symbol] = {
                 priceUSD: usdPrice(quote), updatedAt: data.timestamp || Date.now(),
+                nativePrice: Number(quote.price), currency: quote.quoteCurrency, quoteAsOf: quote.quoteAsOf, quoteSource: quote.quoteSource, dayChangeNative: quote.dayChange ?? null,
                 dayChangePercent: typeof quote.dayChangePercent === 'number' && Number.isFinite(quote.dayChangePercent) ? quote.dayChangePercent : null,
                 dayChangeUSD: typeof quote.dayChange === 'number' && Number.isFinite(quote.dayChange) && Number.isFinite(quoteRate) && quoteRate > 0 ? quote.dayChange / quoteRate : null,
               };
@@ -3073,8 +3101,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             change: Number(liveData.changePercent.toFixed(2)),
             valueUSD: asset.shares ? asset.shares * usdPrice(liveData) : asset.valueUSD,
             currentPrice: usdPrice(liveData),
+            nativePrice: Number(liveData.price), currency: liveData.quoteCurrency, quoteAsOf: liveData.quoteAsOf, quoteSource: liveData.quoteSource, dayChangeNative: liveData.dayChange ?? null,
             name: liveData.name || asset.name,
-            chartData: liveData.chartData || asset.chartData,
+            chartData: liveData.chartData?.map((point: {time:number;price:number}) => ({...point,price:point.price/(exchangeRates[liveData.quoteCurrency as Currency] || 1)})) || asset.chartData,
             intradayData: liveData.intradayData || asset.intradayData,
           };
         }));
@@ -3092,6 +3121,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               const newValueUSD = a.shares ? a.shares * usdPrice(liveData) : a.valueUSD;
               const updatePayload = {
                 current_price: usdPrice(liveData),
+                native_price: Number(liveData.price), currency: liveData.quoteCurrency, quote_as_of: liveData.quoteAsOf || null, quote_source: liveData.quoteSource || 'Yahoo Finance', native_day_change: liveData.dayChange ?? null,
                 value_usd: newValueUSD,
                 change_24h: Number((liveData.price - liveData.price / (1 + liveData.changePercent / 100)).toFixed(2)),
                 change_percentage: liveData.changePercent,
@@ -3132,7 +3162,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener('focus', fetchMarketData);
       document.removeEventListener('visibilitychange', fetchMarketData);
     };
-  }, [activePortfolioId, dataPortfolioId, exchangeRates, isDataLoaded, marketSymbolKey, user]);
+  }, [activePortfolioId, dataPortfolioId, exchangeRates, isDataLoaded, marketSymbolKey, fundSymbolKey, user]);
 
 
   const fetchAssetMarketData = async (symbol: string) => {
@@ -3328,7 +3358,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
       if (user) {
         try {
-          const { error } = afterFinancialWrite(await supabase.from('assets').update({ name: metadata.name, allocation: metadata.allocation, current_price: metadata.currentPrice, exclude_from_total: metadata.excludeFromTotal ?? false })
+          const { error } = afterFinancialWrite(await supabase.from('assets').update({ name: metadata.name, allocation: metadata.allocation, asset_type: metadata.allocation, currency: metadata.currency, current_price: metadata.currentPrice, exclude_from_total: metadata.excludeFromTotal ?? false })
             .eq('user_id', user.id).eq('portfolio_id', targetPortfolioId).eq('symbol', tradeData.asset));
           if (error) throw error;
         } catch {

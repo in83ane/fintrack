@@ -33,6 +33,8 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
 import { useApp } from "@/src/context/AppContext";
+import { projectNativeLotPosition } from "@/src/lib/trade-lots";
+import { StockSplitButton } from '@/src/components/StockSplitButton';
 import { cn } from "@/src/lib/utils";
 import { VerticalTimeline, TimelineItem } from "@/src/components/VerticalTimeline";
 
@@ -650,12 +652,15 @@ export default function AssetDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { isDataLoaded, assets, removeAsset, reorderAssets, t, formatMoney, language, currency, exchangeRates } = useApp();
+  const { isDataLoaded, assets, trades, activePortfolioId, removeAsset, reorderAssets, t, formatMoney, language, currency, exchangeRates } = useApp();
   const THB_RATE = exchangeRates.THB;
 
   const symbol = params.symbol as string;
   const assetIndex = assets.findIndex(a => a.symbol.toUpperCase() === symbol.toUpperCase());
   const asset = assets[assetIndex];
+  const isFund = asset?.allocation === 'Funds';
+  const fundPortfolioId = asset?.portfolioId || activePortfolioId;
+  const nativeFundPosition = isFund && fundPortfolioId ? projectNativeLotPosition(trades,fundPortfolioId,symbol,'THB') : null;
 
   const rawPeriod = searchParams.get("period") as TimePeriod;
   const initialPeriod: TimePeriod = VALID_PERIODS.includes(rawPeriod) ? rawPeriod : "1m";
@@ -679,7 +684,9 @@ export default function AssetDetailPage() {
   }, [assets, isEditMode]);
 
   useEffect(() => {
-    if (!symbol || !asset) return;
+    if (!symbol || !asset || (isFund && !(THB_RATE>0))) return;
+    let active = true;
+    const normalize = (points:PricePoint[]) => isFund ? points.map(point => ({...point,price:point.price/THB_RATE})) : points;
 
     const fetchData = async () => {
       // Don't clear existing data while loading - show old data until new data arrives
@@ -689,16 +696,16 @@ export default function AssetDetailPage() {
         // Fetch 1d data first for live price (faster)
         if (selectedPeriod !== "1d") {
           fetchChartData(symbol, "1d", true).then((priceData) => {
-            if (priceData.length > 0) {
-              const last = priceData[priceData.length - 1].price;
+            if (active && priceData.length > 0) {
+              const last = normalize(priceData).at(-1)!.price;
               if (last > 0) setFetchedLivePrice(last);
             }
           }).catch(() => {});
         }
 
         // Fetch selected period data with cache
-        const data = await fetchChartData(symbol, selectedPeriod, true);
-        if (data.length > 0) {
+        const data = normalize(await fetchChartData(symbol, selectedPeriod, true));
+        if (active && data.length > 0) {
           setChartData(data);
           const last = data[data.length - 1].price;
           if (last > 0) setFetchedLivePrice(prev => prev ?? last);
@@ -706,14 +713,15 @@ export default function AssetDetailPage() {
       } catch (err: any) {
         console.debug("Chart fetch error (using cached):", err.message);
         // Don't show error if we have cached data
-        if (chartData.length === 0) {
+        if (active && chartData.length === 0) {
           setError(err.message);
         }
       }
     };
 
     fetchData();
-  }, [symbol, selectedPeriod, asset]);
+    return () => { active = false; };
+  }, [symbol, selectedPeriod, asset, isFund, THB_RATE]);
 
   // Fallback to asset's cached data if chartData is empty
   useEffect(() => {
@@ -767,7 +775,7 @@ export default function AssetDetailPage() {
     }
   };
 
-  const periods: { key: TimePeriod; label: string; labelTh: string }[] = ASSET_PERIODS;
+  const periods: { key: TimePeriod; label: string; labelTh: string }[] = isFund ? ASSET_PERIODS.filter(p => p.key!=='1d' && p.key!=='5y') : ASSET_PERIODS;
 
   const dataToShow = chartData;
   const latestPoint = dataToShow[dataToShow.length - 1];
@@ -785,14 +793,14 @@ export default function AssetDetailPage() {
   // Use freshly fetched price; fall back to chart latest, then context value
   const contextPrice = shares > 0 ? (asset!.valueUSD / shares) : 0;
   const livePrice = fetchedLivePrice ?? (currentPrice > 0 ? currentPrice : contextPrice);
-  const avgCost = asset?.avgCost || livePrice;
+  const avgCost = nativeFundPosition && shares>0 && THB_RATE>0 ? nativeFundPosition.cost/shares/THB_RATE : asset?.avgCost || livePrice;
   const totalCost = avgCost * shares;
   const totalValue = livePrice * shares;
   const profit = totalValue - totalCost;
   const profitPercent = totalCost > 0 ? (profit / totalCost) * 100 : 0;
   const isProfit = profit >= 0;
 
-  const isThaiAsset = asset?.symbol.toUpperCase().endsWith('.BK') || asset?.symbol.toUpperCase().endsWith('.TH');
+  const isThaiAsset = isFund || asset?.symbol.toUpperCase().endsWith('.BK') || asset?.symbol.toUpperCase().endsWith('.TH');
 
   const periodStats = useMemo(() => {
     if (dataToShow.length < 2) return null;
@@ -807,8 +815,16 @@ export default function AssetDetailPage() {
 
   const timelineItems = useMemo(() => {
     if (!asset) return [];
+    if (isFund) {
+      return trades.filter(trade => trade.asset.toUpperCase()===symbol.toUpperCase() && (!fundPortfolioId || trade.portfolioId===fundPortfolioId))
+        .sort((a,b)=>a.date.localeCompare(b.date)).map(trade => ({
+          id:trade.dbId || String(trade.id),date:trade.date,label:trade.type==='IMPORT' ? (language==='th'?'นำเข้ารายการซื้อ':'Imported purchase') : trade.type,
+          description:`${(trade.shares || 0).toLocaleString(undefined,{maximumFractionDigits:6})} ${t('units')} · ${formatMoney(trade.amountUSD,trade.currency as 'THB'|'USD',trade.rateAtTime)}`,
+          value:trade.amountUSD,status:'completed' as const,type:trade.type==='SELL'?'sell' as const:trade.type==='DIVIDEND'?'dividend' as const:'buy' as const,
+        }));
+    }
     return generateTimelineItems(asset, t, formatMoney);
-  }, [asset, t, formatMoney]);
+  }, [asset, t, formatMoney, isFund, trades, symbol, fundPortfolioId, language]);
 
   const dateLabel = displayPoint
     ? `${t("priceAsOf")}: ${language === "th" ? formatFullThaiDate(displayPoint.time, selectedPeriod) : formatFullEnglishDate(displayPoint.time, selectedPeriod)}`
@@ -855,7 +871,8 @@ export default function AssetDetailPage() {
                 </div>
                 <div>
                   <h1 className="text-2xl font-black text-white">{asset.name}</h1>
-                  <p className="text-gray-500 font-medium">{asset.symbol}</p>
+                  <p className="text-gray-500 font-medium">{asset.symbol}</p>{isFund && asset.quoteAsOf && <p className="text-xs text-gray-400 mt-1" title={asset.quoteSource}>NAV {asset.nativePrice?.toFixed(4)} THB · {asset.quoteAsOf}</p>}
+                  {!isFund && fundPortfolioId && trades.some(t=>t.portfolioId===fundPortfolioId&&t.asset===symbol) && <StockSplitButton symbol={symbol} portfolioId={fundPortfolioId} from={trades.filter(t=>t.portfolioId===fundPortfolioId&&t.asset===symbol).map(t=>t.date.slice(0,10)).sort()[0]} language={language} />}
                 </div>
               </div>} price={<div className="flex flex-col items-end">
             <AnimatePresence mode="wait">
@@ -881,7 +898,7 @@ export default function AssetDetailPage() {
               <span className="text-sm text-gray-500 mt-1 font-medium">{t("approx")} {formatMoney(livePrice, "THB", THB_RATE)}</span>
             )}
             {isThaiAsset && currency === "USD" && (
-              <span className="text-sm text-gray-500 mt-1 font-medium">{t("approx")} {formatMoney(livePrice, "USD", 1 / THB_RATE)}</span>
+              <span className="text-sm text-gray-500 mt-1 font-medium">{t("approx")} {formatMoney(livePrice, "USD", isFund ? 1 : 1 / THB_RATE)}</span>
             )}
             {dateLabel && <span className="text-xs text-gray-500 mt-0.5">{dateLabel}</span>}
           </div>} symbol={asset.symbol} handlePreviousAsset={handlePreviousAsset} handleNextAsset={handleNextAsset} canGoPrevious={canGoPrevious} canGoNext={canGoNext}/>
@@ -913,7 +930,7 @@ export default function AssetDetailPage() {
                       <div className="text-[11px] text-gray-500 mt-0.5">≈ {formatMoney(livePrice, "THB", THB_RATE)}</div>
                     )}
                     {(isThaiAsset && currency === "USD") && (
-                      <div className="text-[11px] text-gray-500 mt-0.5">≈ {formatMoney(livePrice, "USD", 1 / THB_RATE)}</div>
+                      <div className="text-[11px] text-gray-500 mt-0.5">≈ {formatMoney(livePrice, "USD", isFund ? 1 : 1 / THB_RATE)}</div>
                     )}
                     <div className={cn("text-[11px] font-bold mt-1", isPositive ? "text-[#4EDEA3]" : "text-[#FFB4AB]")}>
                       {isPositive ? "+" : ""}{changePct.toFixed(2)}%
@@ -945,7 +962,7 @@ export default function AssetDetailPage() {
                   <div className="text-[11px] text-gray-500 opacity-70">≈ {formatMoney(totalValue, "THB", THB_RATE)}</div>
                 )}
                 {(isThaiAsset && currency === "USD") && (
-                  <div className="text-[11px] text-gray-500 opacity-70">≈ {formatMoney(totalValue, "USD", 1 / THB_RATE)}</div>
+                  <div className="text-[11px] text-gray-500 opacity-70">≈ {formatMoney(totalValue, "USD", isFund ? 1 : 1 / THB_RATE)}</div>
                 )}
               </StatCard>
 
@@ -966,7 +983,7 @@ export default function AssetDetailPage() {
                   <div className="text-[11px] text-gray-500 opacity-70">≈ {isProfit ? "+" : ""}{formatMoney(profit, "THB", THB_RATE)}</div>
                 )}
                 {(isThaiAsset && currency === "USD") && (
-                  <div className="text-[11px] text-gray-500 opacity-70">≈ {isProfit ? "+" : ""}{formatMoney(profit, "USD", 1 / THB_RATE)}</div>
+                  <div className="text-[11px] text-gray-500 opacity-70">≈ {isProfit ? "+" : ""}{formatMoney(profit, "USD", isFund ? 1 : 1 / THB_RATE)}</div>
                 )}
               </StatCard>
             </div>
