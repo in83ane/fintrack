@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { createPortal } from 'react-dom';
 import { ArrowLeft, Plus } from 'lucide-react';
 import { useApp } from '@/src/context/AppContext';
 import { supabase } from '@/src/lib/supabase';
@@ -9,6 +10,23 @@ import { cashflowCategoryKey, formatCashflowMoney } from '@/src/lib/cashflow-sel
 import { expenseCategories, spendingByCategory, summarizeTracker, type ExpenseLine, type ExpenseTracker, type TrackerChoice } from '@/src/lib/expense-tracking';
 import { useLedgerActions } from '@/src/components/LedgerActions';
 import { TrackerForm } from './TrackerForm';
+
+type SkipNotice = {
+  key: string; trackerId: string; activityId: string; previous?: TrackerChoice['decision']; message: string;
+};
+
+function SkipToast({notice, dismiss, undo, busy, label}: {
+  notice: SkipNotice; dismiss: (key: string)=>void; undo: (notice: SkipNotice)=>void; busy: boolean; label: string;
+}) {
+  useEffect(()=>{
+    const timer = window.setTimeout(()=>dismiss(notice.key),5000);
+    return ()=>window.clearTimeout(timer);
+  },[notice.key,dismiss]);
+  return <div className="flex items-center gap-2 rounded-xl bg-foreground px-4 py-3 text-sm text-background shadow-lg">
+    <span role="status" className="min-w-0 break-words">{notice.message}</span><span aria-hidden="true">·</span>
+    <button className="shrink-0 rounded-lg bg-primary px-3 py-1.5 font-semibold text-primary-foreground" disabled={busy} onClick={()=>undo(notice)}>{label}</button>
+  </div>;
+}
 
 function ActivityList({title,rows,empty,render}: {title:string;rows:ExpenseLine[];empty:string;render:(row:ExpenseLine)=>React.ReactNode}) {
   const {language} = useApp();
@@ -31,6 +49,9 @@ function TrackerWorkspace({owner}:{owner:string}) {
   const [trackers,setTrackers] = useState<ExpenseTracker[]>([]);
   const [ready,setReady] = useState(false), [error,setError] = useState(''), [retry,setRetry] = useState(0);
   const [selected,setSelected] = useState(''), [edit,setEdit] = useState<ExpenseTracker|null>(null);
+  const [notices,setNotices] = useState<SkipNotice[]>([]);
+  const dismiss = useCallback((key: string)=>setNotices(list=>list.filter(n=>n.key!==key)),[]);
+  const totalRef = useRef<HTMLParagraphElement>(null);
   const [busy,setBusy] = useState(false), [removing,setRemoving] = useState(false);
   useEffect(()=>{
     let live = true;
@@ -70,13 +91,49 @@ function TrackerWorkspace({owner}:{owner:string}) {
     if (error || !data) throw Error(error?.message || txt('Could not save','บันทึกไม่สำเร็จ'));
     setTrackers(prev=>exists?prev.map(item=>item.id===id?{...draft,choices:item.choices}:item):[...prev,{...draft,choices}]);setSelected(id);setRemoving(false);
   }
-  async function choose(id:string, decision:TrackerChoice['decision']) {
+  function applyChoice(trackerId:string, activityId:string, decision?:TrackerChoice['decision']) {
+    setTrackers(prev=>prev.map(item=>{
+      if (item.id!==trackerId) return item;
+      const choices = (item.choices || []).filter(c=>c.activity_id!==activityId);
+      if (decision) choices.push({activity_id:activityId,decision});
+      return {...item,choices};
+    }));
+  }
+  async function choose(row:ExpenseLine, action:'include'|'remove'|'unrelated') {
     if (!current || busy) return;
+    const trackerId = current.id, activityId = row.id;
+    const decision = action==='include' ? 'include' : 'skip';
+    const previous = current.choices?.find(c=>c.activity_id===activityId)?.decision;
+    const total = totalRef.current;
     setBusy(true);setError('');
     try {
-      const {error}=await supabase.from('expense_tracker_choices').upsert({tracker_id:current.id,activity_id:id,decision},{onConflict:'tracker_id,activity_id'});
+      const {error}=await supabase.from('expense_tracker_choices').upsert({tracker_id:trackerId,activity_id:activityId,decision},{onConflict:'tracker_id,activity_id'});
       if(error) throw Error(error.message);
-      setTrackers(prev=>prev.map(item=>item.id===current.id?{...item,choices:[...(item.choices || []).filter(choice=>choice.activity_id!==id),{activity_id:id,decision}]}:item));
+      applyChoice(trackerId,activityId,decision);
+      const name = row.label || noComment;
+      const amount = money(row.minor);
+      const notice = { key:crypto.randomUUID(),trackerId,activityId,previous,message:txt(`Skipped ${name} ${amount}`,`ข้าม ${name} ${amount} แล้ว`) };
+      setNotices(list=>{
+        const others = list.filter(n=>n.trackerId!==trackerId || n.activityId!==activityId);
+        return decision==='skip' ? [...others,notice] : others;
+      });
+      if (action==='remove' && total?.isConnected) {
+        total.animate([{backgroundColor:'var(--color-primary)',color:'var(--color-primary-foreground)'},{backgroundColor:'transparent',color:'var(--color-foreground)'}],
+          {duration:800,easing:'ease-out'});
+      }
+    } catch(e) {setError(e instanceof Error?e.message:String(e));} finally {setBusy(false);}
+  }
+  async function undoSkip(notice:SkipNotice) {
+    if (busy) return;
+    setBusy(true);setError('');
+    try {
+      const table = supabase.from('expense_tracker_choices');
+      const query = notice.previous ? table.update({decision:notice.previous}) : table.delete();
+      const {data,error} = await query.eq('tracker_id',notice.trackerId).eq('activity_id',notice.activityId).eq('decision','skip').select('activity_id').maybeSingle();
+      if (error) throw Error(error.message);
+      if (data) applyChoice(notice.trackerId,notice.activityId,notice.previous);
+      else setRetry(value=>value+1);
+      dismiss(notice.key);
     } catch(e) {setError(e instanceof Error?e.message:String(e));} finally {setBusy(false);}
   }
   async function remove() {
@@ -84,11 +141,11 @@ function TrackerWorkspace({owner}:{owner:string}) {
     try {
       const {error}=await supabase.from('expense_trackers').delete().eq('id',current.id).eq('user_id',owner).select('id').single();
       if(error) throw Error(error.message);
-      setTrackers(prev=>prev.filter(item=>item.id!==current.id));setSelected('');setRemoving(false);
+      setNotices(list=>list.filter(n=>n.trackerId!==current.id));setTrackers(prev=>prev.filter(item=>item.id!==current.id));setSelected('');setRemoving(false);
     } catch(e) {setError(e instanceof Error?e.message:String(e));} finally {setBusy(false);}
   }
   const line = (row:ExpenseLine)=> <><div className="min-w-32 flex-1"><p className="break-words text-sm">{row.label||noComment}</p><p className="text-xs text-muted">{row.day}</p></div><span className="text-sm tabular-nums">{money(row.minor)}</span></>;
-  const choice = (row:ExpenseLine,decision:TrackerChoice['decision'])=><button disabled={busy} className="ledger-control" onClick={()=>void choose(row.id,decision)}>{decision==='include'?txt('Include','เพิ่มเข้าหัวข้อ'):txt('Skip','ข้าม')}</button>;
+  const choice = (row:ExpenseLine,action:'include'|'remove'|'unrelated')=><button disabled={busy} className="ledger-control" onClick={()=>void choose(row,action)}>{action==='include'?txt('Include','เพิ่มเข้าหัวข้อ'):action==='remove'?txt('Remove','เอาออก'):txt('Not relevant','ไม่เกี่ยว')}</button>;
   return <div className="app-page-container mx-auto max-w-6xl space-y-6 py-6 pb-28">
     <Link href="/ledger" className="inline-flex items-center gap-2 text-sm text-muted hover:text-foreground"><ArrowLeft size={16}/>Ledger</Link>
     <header className="flex flex-wrap items-end justify-between gap-4"><div><h1 className="text-2xl font-semibold">{txt('Spending trackers','ติดตามค่าใช้จ่าย')}</h1><p className="mt-1 text-sm text-muted">{txt('See all Ledger expenses by category, or open a tracker for a closer look.','ดูรายจ่ายทั้งหมดจาก Ledger แยกตามหมวด หรือเลือกหัวข้อเพื่อดูเฉพาะเรื่องที่สนใจ')}</p></div>
@@ -120,18 +177,21 @@ function TrackerWorkspace({owner}:{owner:string}) {
       </section> :
       <section key={current.id} className="min-w-0 rounded-xl border border-border p-4 sm:p-6">
         <div className="flex items-start justify-between gap-3"><h2 className="break-words text-xl font-semibold">{current.name}</h2><button className="ledger-control" onClick={()=>setEdit(current)}>{t('edit')}</button></div>
-        <p className="mt-5 text-sm text-muted">{txt('Total spent','ใช้จ่ายสะสม')}</p><p className="break-words text-3xl font-semibold tabular-nums">{money(summary.totalMinor)}</p>
+        <p className="mt-5 text-sm text-muted">{txt('Total spent','ใช้จ่ายสะสม')}</p><p ref={totalRef} className="w-fit max-w-full break-words rounded-md text-3xl font-semibold tabular-nums">{money(summary.totalMinor)}</p>
         <p className="mb-5 mt-2 text-sm text-muted">{txt('Before Ledger','ยอดเก่า')} {money(summary.openingMinor)} + Ledger {money(summary.ledgerMinor)}</p>
         {!!summary.missing && <p role="status" className="text-sm text-warning">{txt('Entries missing a usable amount or FX rate','รายการที่ยังรวมไม่ได้เพราะขาดยอดหรืออัตราแลกเปลี่ยน')} · {summary.missing}</p>}
         {!!summary.openingItems.length && <details className="border-t border-border py-4 text-sm"><summary className="cursor-pointer font-semibold">{txt('Opening balances','ที่มาของยอดเก่า')}</summary>{summary.openingItems.map(item=><div key={item.id} className="mt-2 flex justify-between gap-3"><span>{item.name}</span><span>{money(item.minor)}</span></div>)}</details>}
         <h3 className="border-t border-border pt-4 text-sm font-semibold">{txt('Ledger spending by comment','ค่าใช้จ่ายใน Ledger แยกตามคอมเมนต์')}</h3>
         <ul className="my-3 space-y-2">{summary.groups.map(group=><li key={group.label} className="flex justify-between gap-3 text-sm"><span className="break-words">{group.label||noComment} <span className="text-muted">× {group.count}</span></span><span className="shrink-0 tabular-nums">{money(group.minor)}</span></li>)}</ul>
         {!summary.rows.length && <p className="mb-4 text-sm text-muted">{txt('No matching expenses yet.','ยังไม่มีรายจ่ายที่ตรงกับหัวข้อนี้')}</p>}
-        <ActivityList title={txt('Included Ledger entries','รายการ Ledger ที่นับแล้ว')} rows={summary.rows} empty={txt('No entries','ยังไม่มีรายการ')} render={row=><>{line(row)}{!!current.keywords.length && choice(row,'skip')}</>}/>
-        {!!current.keywords.length && <><ActivityList title={txt('Other entries in this category to review','แนะนำให้ตรวจ · รายการอื่นในหมวดเดียวกัน')} rows={summary.suggestions} empty={txt('Nothing to review','ไม่มีรายการรอตรวจ')} render={row=><>{line(row)}{choice(row,'include')}{choice(row,'skip')}</>}/>
+        <ActivityList title={txt('Included Ledger entries','รายการ Ledger ที่นับแล้ว')} rows={summary.rows} empty={txt('No entries','ยังไม่มีรายการ')} render={row=><>{line(row)}{!!current.keywords.length && choice(row,'remove')}</>}/>
+        {!!current.keywords.length && <><ActivityList title={txt('Other entries in this category to review','แนะนำให้ตรวจ · รายการอื่นในหมวดเดียวกัน')} rows={summary.suggestions} empty={txt('Nothing to review','ไม่มีรายการรอตรวจ')} render={row=><>{line(row)}{choice(row,'include')}{choice(row,'unrelated')}</>}/>
         <ActivityList title={txt('Skipped entries','รายการที่ข้ามไว้')} rows={summary.skipped} empty={txt('No skipped entries','ยังไม่มีรายการที่ข้าม')} render={row=><>{line(row)}{choice(row,'include')}</>}/></>}
         <div className="mt-3 border-t border-border pt-3 text-sm">{removing ? <div className="space-y-2"><p>{txt('Remove this tracker and its opening balance? Its Ledger entries stay available.','ลบหัวข้อนี้พร้อมยอดตั้งต้นไหม? รายการเดิมยังดูได้ใน Ledger')}</p><button disabled={busy} className="ledger-control danger" onClick={()=>void remove()}>{t('delete')}</button> <button className="ledger-control" onClick={()=>setRemoving(false)}>{t('cancel')}</button></div> : <button className="text-muted hover:text-foreground" onClick={()=>setRemoving(true)}>{txt('Remove tracker','ลบหัวข้อ')}</button>}</div>
       </section>}</div>}
+    {!!notices.length && createPortal(<div className="pointer-events-none fixed inset-x-3 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-[160] mx-auto flex max-h-[40vh] max-w-fit flex-col gap-2 overflow-auto sm:bottom-20">
+      {notices.map(notice=><div key={notice.key} className="pointer-events-auto"><SkipToast notice={notice} dismiss={dismiss} undo={undoSkip} busy={busy} label={txt('Undo','เลิกทำ')}/></div>)}
+    </div>,document.body)}
     {edit && <TrackerForm initial={edit} categories={categories.includes(edit.category) ? categories : [...categories,edit.category]} trackers={trackers} onSave={save} onClose={()=>setEdit(null)}/>}
   </div>;
 }
