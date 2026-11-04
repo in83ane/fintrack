@@ -28,15 +28,17 @@ export interface Trade {
   type: "BUY" | "SELL" | "DIVIDEND" | "IMPORT" | "SHORT" | "COVER";
   amountUSD: number;
   date: string;
+  createdAt?: string;
   rateAtTime: number;
   currency: string;
   originalAmount?: number;
   shares?: number;
   pricePerUnit?: number;
   fees?: number;
+  includeFees?: boolean;
   fxRateTHB?: number;
   costMethod?: 'SPECIFIC_LOT' | 'PROPORTIONAL';
-  closeMode?: 'SPECIFIC_LOT' | 'PROPORTIONAL';
+  closeMode?: 'SPECIFIC_LOT' | 'PROPORTIONAL' | 'FIFO' | 'COMPRESSED_FIFO';
   lotSelections?: { lotId: string; qty: string }[];
   sourceBucketId?: string;
   brokerageAccountId?: string;
@@ -227,6 +229,8 @@ export interface Portfolio {
   color: string;
   isDefault: boolean;
   kind: 'trading' | 'cash_management';
+  importCostMethod?: 'PROPORTIONAL' | 'FIFO' | 'COMPRESSED_FIFO';
+  costIncludeFees?: boolean;
 }
 
 export interface BrokerageAccount {
@@ -325,6 +329,7 @@ interface AppState {
   activePortfolio: Portfolio | null;
   isAllPortfolios: boolean;
   selectPortfolio: (id: string | null) => void;
+  applyImportedCostPolicy: (portfolioId: string, policy: import('@/src/lib/import-cost-policy').ImportCostPolicy) => void;
   createPortfolio: (name: string, color?: string) => Promise<Portfolio | null>;
   renamePortfolio: (id: string, name: string, color?: string) => Promise<boolean>;
   brokerageAccounts: BrokerageAccount[];
@@ -2252,6 +2257,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         color: record.color,
         isDefault: record.is_default,
         kind: record.kind || 'trading',
+        importCostMethod: record.import_cost_method || undefined,
+        costIncludeFees: record.cost_include_fees ?? true,
       }));
 
       nextPortfolios.sort((a, b) => {
@@ -2481,8 +2488,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               type: t.type,
               amountUSD: t.amount_usd,
               date: t.execution_date,
+              createdAt: t.created_at,
               rateAtTime: t.exchange_rate_at_time || 1,
               fees: Number(t.fees || 0),
+              includeFees: t.portfolios?.cost_include_fees !== false,
               costMethod: t.cost_basis_sales?.method,
               closeMode: t.cost_basis_sales?.request?.closeMode,
               lotSelections: t.cost_basis_sales?.selections,
@@ -4095,6 +4104,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       activePortfolio,
       isAllPortfolios,
       selectPortfolio,
+      applyImportedCostPolicy: (id, policy) => setPortfolios(previous => previous.map(portfolio =>
+        portfolio.id === id ? { ...portfolio, importCostMethod: policy.method, costIncludeFees: policy.includeFees } : portfolio)),
       createPortfolio,
       renamePortfolio,
       brokerageAccounts,

@@ -1,6 +1,6 @@
 export type TradeHistoryRow = {
   row: number; symbol: string; date: string; type: 'BUY' | 'SELL' | 'DIVIDEND';
-  shares: number; price: number; fees: number; currency: 'USD' | 'THB'; broker?: string;
+  shares: number; price: number; fees: number; currency: 'USD' | 'THB'; broker?: string; grossAmount?: number;
 };
 
 /** Treat spreadsheet dates as calendar days, independent of browser timezone. */
@@ -27,10 +27,11 @@ export function tradeHistoryPayload(rows: TradeHistoryRow[], thbRate: number, ba
     const rate = row.currency === 'THB' ? thbRate : 1;
     if (!date || !Number.isFinite(rate) || rate <= 0 || !Number.isFinite(row.price) || row.price <= 0
       || !Number.isFinite(row.fees) || row.fees < 0 || !Number.isFinite(row.shares)
+      || (row.grossAmount !== undefined && (!Number.isFinite(row.grossAmount) || row.grossAmount <= 0))
       || (row.type === 'DIVIDEND' ? row.shares !== 0 : row.shares <= 0)) {
       throw new Error(`Invalid trade or exchange rate at row ${row.row}`);
     }
     return { row: row.row, symbol: row.symbol, date, type: row.type, quantity: String(row.shares),
-      price: String(row.price), fees: String(row.fees), currency: row.currency, rate: String(rate), ...(basisDate ? {basisDate} : {}) };
+      price: String(row.price), fees: String(row.fees), currency: row.currency, rate: String(rate), ...(basisDate ? {basisDate} : {}), ...(row.grossAmount !== undefined ? {gross: String(row.grossAmount)} : {}) };
   });
 }

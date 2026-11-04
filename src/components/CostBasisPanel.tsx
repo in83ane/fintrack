@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from 'react';
 import { useExecutionFxInput } from '@/src/hooks/useExecutionFxInput';
-import { Decimal as D, proportionalCuts } from '@/src/lib/cost-basis-ledger';
+import { allocateImportSale } from '@/src/lib/import-cost-policy';
+import { Decimal as D } from '@/src/lib/cost-basis-ledger';
 import { supabase } from '@/src/lib/supabase';
 import { useApp } from '@/src/context/AppContext';
 import { Modal } from './Modal';
@@ -11,16 +12,22 @@ import { motion, useReducedMotion } from 'motion/react';
 
 type Lot = { id: string; date: string; qty: string; remaining: string; cost: string; originalCost: string };
 type Allocation = { sellId: string; lotId: string; date: string; qtyClosed: string; costPerShare: string; sellPrice: string; realizedPnl: string };
-type Snapshot = { lots: Lot[]; allocations: Allocation[]; invested: string; realized: string; fingerprint: string };
+type Snapshot = { lots: Lot[]; allocations: Allocation[]; invested: string; realized: string; fingerprint: string; includeFees?: boolean };
+function closeModeLabel(mode?: string) {
+  if (mode === 'COMPRESSED_FIFO') return 'รวมไม้รายวัน · FIFO';
+  if (mode === 'FIFO') return 'FIFO';
+  return mode === 'PROPORTIONAL' ? 'เฉลี่ยทุกไม้' : 'เลือกไม้เอง';
+}
 const z = () => D.from('0');
 const sum = (values: string[]) => values.reduce((a,b) => a.add(D.from(b)),z());
 const money = (v: D | string) => `$${(typeof v === 'string' ? D.from(v) : v).toFixed(2)}`;
 const inputClass = 'w-full rounded-lg border border-foreground/10 bg-black/30 p-2 text-sm text-foreground';
 export function CostBasisPanel({ symbol, portfolioId, market }: { symbol: string; portfolioId: string; market: number }) {
- const { trades, brokerageAccounts, exchangeRates } = useApp();
+ const { trades, brokerageAccounts, exchangeRates, portfolios } = useApp();
+ const brokerMethod=portfolios.find(p=>p.id===portfolioId)?.importCostMethod;
  const reduceMotion=useReducedMotion();
  const [snapshot,setSnapshot] = useState<Snapshot | null>(null);
- const [mode,setMode] = useState<'SPECIFIC_LOT'|'PROPORTIONAL'>('SPECIFIC_LOT');
+ const [mode,setMode] = useState<'SPECIFIC_LOT'|'PROPORTIONAL'>(brokerMethod?'PROPORTIONAL':'SPECIFIC_LOT');
  const [quantity,setQuantity] = useState('');
  // null follows the quote until first edit; an empty string is an intentional edit.
  const [price,setPrice] = useState<string | null>(null);
@@ -40,6 +47,7 @@ export function CostBasisPanel({ symbol, portfolioId, market }: { symbol: string
   return()=>{cancelled=true;};
  },[portfolioId,symbol,ledgerRevision]);
  const held=snapshot?.lots.filter(l=>D.from(l.remaining).cmp(z())>0)||[];
+ const cutsForSale=(value:string)=>allocateImportSale(held,value,brokerMethod||'PROPORTIONAL');
  const heldQty=sum(held.map(l=>l.remaining)), cost=sum(held.map(l=>l.cost));
  const realized=D.from(snapshot?.realized || '0'), invested=D.from(snapshot?.invested || '0');
  const unrealized=D.from(String(market > 0 ? market : 0)).mul(heldQty).sub(cost), total=realized.add(unrealized);
@@ -48,7 +56,7 @@ export function CostBasisPanel({ symbol, portfolioId, market }: { symbol: string
  const fillProportional=(value:string)=>{
   setQuantity(value);setSelection({});setError('');
   if(!value)return;
-  try{setSelection(Object.fromEntries(proportionalCuts(held,value).map(c=>[c.lotId,c.qty])));}
+  try{setSelection(Object.fromEntries(cutsForSale(value).map(c=>[c.lotId,c.qty])));}
   catch(e){setError((e as Error).message);}
  };
  const review=async(all=false,lotId?:string)=>{
@@ -56,12 +64,12 @@ export function CostBasisPanel({ symbol, portfolioId, market }: { symbol: string
   try{
    if(!/^\d+(\.\d+)?$/.test(effectivePrice)||D.from(effectivePrice).cmp(z())<=0)throw Error('กรุณาระบุราคาขายมากกว่า 0');
    if(Object.values(selection).some(q=>q && D.from(q).cmp(z())<0))throw Error('จำนวนที่ปิดต้องไม่ติดลบ');
-   const selections=all?held.map(l=>({lotId:l.id,qty:l.remaining})):mode==='PROPORTIONAL'?proportionalCuts(held,quantity):Object.entries(selection).filter(([id,q])=>(!lotId||id===lotId)&&q && D.from(q).cmp(z())>0).map(([lotId,qty])=>({lotId,qty}));
+   const selections=all?held.map(l=>({lotId:l.id,qty:l.remaining})):mode==='PROPORTIONAL'?cutsForSale(quantity):Object.entries(selection).filter(([id,q])=>(!lotId||id===lotId)&&q && D.from(q).cmp(z())>0).map(([lotId,qty])=>({lotId,qty}));
    const qty=all?heldQty.toFixed(6):sum(selections.map(s=>s.qty)).toFixed(6);
    if(selections.some(s=>D.from(s.qty).cmp(D.from(D.from(s.qty).toFixed(6)))))throw Error('จำนวนหุ้นรองรับทศนิยมไม่เกิน 6 ตำแหน่ง');
    if(!chosenAccount)throw Error('เลือกบัญชีเงินสดสำหรับรับเงิน');
    // Both modes post explicit lot allocations. No per-symbol accounting setting.
-   const sale={id:crypto.randomUUID(),quantity:qty,price_at_execution:effectivePrice,fees:fee,fx,method:'SPECIFIC_LOT',closeMode:mode,selections,accountId:chosenAccount.id};
+   const sale={id:crypto.randomUUID(),quantity:qty,price_at_execution:effectivePrice,fees:fee,fx,method:'SPECIFIC_LOT',closeMode:mode==='PROPORTIONAL'?(brokerMethod||'PROPORTIONAL'):mode,selections,accountId:chosenAccount.id};
    const {data,error}=await supabase.rpc('cost_basis_preview',{p_port:portfolioId,p_symbol:symbol,p_sale:sale});if(error)throw error;
    setPreview({...data,sale});setConfirmation('');
   }catch(e){setError((e as Error).message);}finally{lock.current=false;setBusy(false);}
@@ -79,7 +87,7 @@ export function CostBasisPanel({ symbol, portfolioId, market }: { symbol: string
  const percent=(v:D,base:D)=>base.cmp(z())?v.div(base).mul(D.from('100')).toFixed(2):'0.00';
  const pnlColor=(v:D)=>v.cmp(z())>=0?'text-gain':'text-loss';
  const rowInput="flex-1 min-w-0 rounded-lg border border-border bg-black/40 px-2 py-1.5 text-xs font-bold text-foreground outline-none ";
- const previewAverage=(()=>{try{if(mode!=='PROPORTIONAL'||!quantity||!snapshot)return null;const cuts=proportionalCuts(held,quantity);const soldCost=sum(cuts.map(c=>{const l=held.find(l=>l.id===c.lotId)!;return D.from(l.cost).div(D.from(l.remaining)).mul(D.from(c.qty)).toFixed(24);}));const q=D.from(quantity),left=heldQty.sub(q);return {pnl:D.from(effectivePrice).mul(q).sub(soldCost).sub(D.from(fee)),left,avg:left.cmp(z())?cost.sub(soldCost).div(left):z()};}catch{return null;}})();
+ const previewAverage=(()=>{try{if(mode!=='PROPORTIONAL'||!quantity||!snapshot)return null;const cuts=cutsForSale(quantity);const soldCost=sum(cuts.map(c=>{const l=held.find(l=>l.id===c.lotId)!;return D.from(l.cost).div(D.from(l.remaining)).mul(D.from(c.qty)).toFixed(24);}));const q=D.from(quantity),left=heldQty.sub(q);return {pnl:D.from(effectivePrice).mul(q).sub(soldCost).sub(D.from(snapshot.includeFees===false?'0':fee)),left,avg:left.cmp(z())?cost.sub(soldCost).div(left):z()};}catch{return null;}})();
  return <div aria-busy={!snapshot&&!error} className="bg-gain/5 border border-gain/30 rounded-2xl p-4 space-y-4 min-h-[380px] sm:min-h-[340px]">
   <div className="flex justify-between items-center"><h3 className="text-sm font-black text-foreground">Live P&L สถานะปัจจุบัน</h3><div className="flex items-center gap-2"><span className="text-xs font-bold text-gray-400">MKT Price: {money(String(market))}</span><span className={`text-xs font-bold px-2 py-1 rounded-full ${unrealized.cmp(z())>=0?'bg-gain text-black':'bg-loss text-black'}`}>{!snapshot?'กำลังโหลด':held.length===0?'ยังไม่มีหุ้น':unrealized.cmp(z())>=0?'✓ กำลังทำกำไร':'กำลังขาดทุน'}</span></div></div>
   {error&&<p role="alert" className="text-xs text-loss">{error}</p>}
@@ -94,18 +102,19 @@ export function CostBasisPanel({ symbol, portfolioId, market }: { symbol: string
   </div>:<motion.div initial={{opacity:reduceMotion?1:0}} animate={{opacity:1}} transition={{duration:reduceMotion?0:0.18}} className="space-y-4">
   <div className="flex flex-col sm:flex-row gap-4 sm:items-center"><div className="flex-1"><label className="block text-xs font-bold text-gray-500 mb-1">ราคาที่ขายได้จริง (Manual Sell Price)</label><input className="w-full bg-black/40 border border-primary/30 rounded-xl px-4 py-3 text-lg font-black text-foreground outline-none " value={effectivePrice} onChange={e=>setPrice(e.target.value)} placeholder={market>0?String(market):'รอราคาตลาด'} onBlur={()=>{if(price!==null&&!price.trim())setPrice(null);}} /></div><div className="flex-1"><div className={`text-4xl font-black ${pnlColor(unrealized)}`}>{market>0?signed(unrealized):'—'} <span className="text-lg">({unrealized.cmp(z())>=0?'+':''}{percent(unrealized,cost)}%)</span></div><p className="text-xs text-gray-500 mt-1">กำไรหุ้นที่ถืออยู่ · % ของต้นทุนที่เหลือ {money(cost)}</p></div></div>
   <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500"><span>Realized <span className={pnlColor(realized)}>{signed(realized)}</span></span><span>Total <span className={pnlColor(total)}>{signed(total)}</span> ({percent(total,invested)}% ของเงินลงทุน {money(invested)})</span><span>ถืออยู่ {qtyText(heldQty.toFixed(6))||'0'} หุ้น · avg {heldQty.cmp(z())?money(cost.div(heldQty)):'$0.00'}</span></div>
+  <p className="text-xs text-gray-400">{snapshot.includeFees===false?'ต้นทุนและกำไร/ขาดทุนไม่รวมค่าธรรมเนียม ตามการตั้งค่าพอร์ต':'ต้นทุนและกำไร/ขาดทุนรวมค่าธรรมเนียม'}{brokerMethod?` · ${brokerMethod}`:''}</p>
   <div className="rounded-xl border border-foreground/10 bg-black/20 p-3">
-   <div className="flex items-center justify-between gap-2 mb-2"><span className="text-xs font-bold text-gray-400">ปิดบางส่วน / ตัดกำไรตามไม้</span><div role="group" aria-label="เลือกโหมดปิดไม้" className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-warning/30 bg-black/40 p-1">{(['SPECIFIC_LOT','PROPORTIONAL'] as const).map(m=><button key={m} disabled={busy} aria-pressed={mode===m} className={`min-h-8 rounded-md px-3 py-1.5 text-xs font-bold transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-black disabled:cursor-not-allowed disabled:opacity-50 ${mode===m?'bg-primary text-black shadow-sm':'text-gray-300 hover:bg-foreground/10 hover:text-foreground'}`} onClick={()=>{setMode(m);if(m==='PROPORTIONAL')fillProportional(quantity);}}>{m==='SPECIFIC_LOT'?'เลือกไม้เอง':'เฉลี่ย'}</button>)}</div><span className="text-xs text-gray-500">ใช้ราคาขายด้านบน</span></div>
-   {mode==='PROPORTIONAL'&&<><div className="flex items-center gap-2 rounded-lg bg-foreground/[0.03] p-2 mb-2"><span className="text-xs font-bold text-info">ขายรวม</span><input className={rowInput} placeholder={`สูงสุด ${qtyText(heldQty.toFixed(6))}`} value={quantity} onChange={e=>fillProportional(e.target.value)} /><span className="text-xs text-gray-500">/{qtyText(heldQty.toFixed(6))}</span><button disabled={busy||!previewAverage} className="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-black disabled:opacity-40" onClick={()=>void review()}>ปิดเฉลี่ย</button></div>{previewAverage&&<p className="text-xs text-gray-500 mb-2">avg cost {money(cost.div(heldQty))} · realized {signed(previewAverage.pnl)} · เหลือ {qtyText(previewAverage.left.toFixed(6))||'0'} หุ้น @ {money(previewAverage.avg)}</p>}</>}
+   <div className="flex items-center justify-between gap-2 mb-2"><span className="text-xs font-bold text-gray-400">ปิดบางส่วน / ตัดกำไรตามไม้</span><div role="group" aria-label="เลือกโหมดปิดไม้" className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-warning/30 bg-black/40 p-1">{(['SPECIFIC_LOT','PROPORTIONAL'] as const).map(m=><button key={m} disabled={busy} aria-pressed={mode===m} className={`min-h-8 rounded-md px-3 py-1.5 text-xs font-bold transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-black disabled:cursor-not-allowed disabled:opacity-50 ${mode===m?'bg-primary text-black shadow-sm':'text-gray-300 hover:bg-foreground/10 hover:text-foreground'}`} onClick={()=>{setMode(m);if(m==='PROPORTIONAL')fillProportional(quantity);}}>{m==='SPECIFIC_LOT'?'เลือกไม้เอง':brokerMethod&&brokerMethod!=='PROPORTIONAL'?'ตามวิธีพอร์ต':'เฉลี่ย'}</button>)}</div><span className="text-xs text-gray-500">ใช้ราคาขายด้านบน</span></div>
+   {mode==='PROPORTIONAL'&&<><div className="flex items-center gap-2 rounded-lg bg-foreground/[0.03] p-2 mb-2"><span className="text-xs font-bold text-info">ขายรวม</span><input className={rowInput} placeholder={`สูงสุด ${qtyText(heldQty.toFixed(6))}`} value={quantity} onChange={e=>fillProportional(e.target.value)} /><span className="text-xs text-gray-500">/{qtyText(heldQty.toFixed(6))}</span><button disabled={busy||!previewAverage} className="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-black disabled:opacity-40" onClick={()=>void review()}>{brokerMethod&&brokerMethod!=='PROPORTIONAL'?'ปิดตามวิธีพอร์ต':'ปิดเฉลี่ย'}</button></div>{previewAverage&&<p className="text-xs text-gray-500 mb-2">avg cost {money(cost.div(heldQty))} · realized {signed(previewAverage.pnl)} · เหลือ {qtyText(previewAverage.left.toFixed(6))||'0'} หุ้น @ {money(previewAverage.avg)}</p>}</>}
    <div className="space-y-2">{snapshot.lots.map((l,i)=><div key={l.id} className="flex items-center gap-2 rounded-lg bg-foreground/[0.03] p-2"><span className="text-xs font-bold text-info">ไม้ {i+1}</span><input disabled={busy||D.from(l.remaining).cmp(z())===0} className={rowInput+(mode==='PROPORTIONAL'?' text-opacity-50':'')} placeholder={`สูงสุด ${qtyText(l.remaining)||'0'}`} value={selection[l.id]||''} onChange={e=>{setMode('SPECIFIC_LOT');setSelection({...selection,[l.id]:e.target.value});setError('');}} /><span className="text-xs text-gray-500">/{qtyText(l.remaining)||'0'}</span><button disabled={busy||mode==='PROPORTIONAL'||!selection[l.id]||D.from(l.remaining).cmp(z())===0} onClick={()=>void review(false,l.id)} className="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-black disabled:opacity-40">{D.from(l.remaining).cmp(z())===0?'ปิดครบ':'ปิดไม้'}</button></div>)}</div>
-   {snapshot.allocations.length>0&&<div className="mt-3 pt-3 border-t border-foreground/10"><p className="text-xs font-bold text-gray-500 mb-2">ปิดไปแล้ว</p>{snapshot.allocations.map(a=><details key={`${a.sellId}:${a.lotId}`} className="text-xs font-bold text-gray-400 mb-2"><summary className="flex justify-between cursor-pointer list-none" title={`${new Date(a.date).toLocaleString('th-TH')} · ต้นทุน/หุ้น ${money(a.costPerShare)}`}><span>ไม้ {snapshot.lots.findIndex(l=>l.id===a.lotId)+1}{trades.find(t=>t.dbId===a.sellId)?.closeMode==='PROPORTIONAL'?' · เฉลี่ย':''} · {qtyText(a.qtyClosed)} @ {money(a.sellPrice)}</span><span className={pnlColor(D.from(a.realizedPnl))}>{signed(D.from(a.realizedPnl))}</span></summary><p className="mt-1 text-gray-500">{new Date(a.date).toLocaleString('th-TH')} · ต้นทุนต่อหุ้น {money(a.costPerShare)} · {trades.find(t=>t.dbId===a.sellId)?.closeMode==='PROPORTIONAL'?'เฉลี่ย':'เลือกไม้เอง'}</p></details>)}</div>}
+   {snapshot.allocations.length>0&&<div className="mt-3 pt-3 border-t border-foreground/10"><p className="text-xs font-bold text-gray-500 mb-2">ปิดไปแล้ว</p>{snapshot.allocations.map(a=><details key={`${a.sellId}:${a.lotId}`} className="text-xs font-bold text-gray-400 mb-2"><summary className="flex justify-between cursor-pointer list-none" title={`${new Date(a.date).toLocaleString('th-TH')} · ต้นทุน/หุ้น ${money(a.costPerShare)}`}><span>ไม้ {snapshot.lots.findIndex(l=>l.id===a.lotId)+1}{trades.find(t=>t.dbId===a.sellId)?.closeMode==='PROPORTIONAL'?' · เฉลี่ย':''} · {qtyText(a.qtyClosed)} @ {money(a.sellPrice)}</span><span className={pnlColor(D.from(a.realizedPnl))}>{signed(D.from(a.realizedPnl))}</span></summary><p className="mt-1 text-gray-500">{new Date(a.date).toLocaleString('th-TH')} · ต้นทุนต่อหุ้น {money(a.costPerShare)} · {closeModeLabel(trades.find(t=>t.dbId===a.sellId)?.closeMode)}</p></details>)}</div>}
   </div>
   <button disabled={busy||!held.length} onClick={()=>void review(true)} className="w-full py-3 rounded-xl border border-loss/30 bg-loss/5 text-loss font-black text-xs disabled:opacity-40 flex justify-center items-center gap-2"><ShieldAlert size={16}/> ปิด/ทำกำไรทั้งหมด {market>0?signed(unrealized):''}</button>
   <p className="text-center text-xs font-bold text-gray-500">คำสั่งนี้ขายทุกไม้ที่ถืออยู่ของหุ้นนี้ในพอร์ตที่เลือก</p>
   </motion.div>}
   {preview&&confirmationSummary&&<Modal isOpen title={`ยืนยันขาย ${symbol}`} onClose={()=>!busy&&setPreview(null)}>
    <div className="space-y-4 text-sm text-gray-300">
-    <p>โหมด: {confirmationSummary.closedAll?'ปิดทุกไม้':preview.sale.closeMode==='PROPORTIONAL'?'เฉลี่ยทุกไม้':'เลือกไม้เอง'} · ขาย {qtyText(preview.sale.quantity)} หุ้น<br/>ราคา {money(preview.sale.price_at_execution)} · ค่าธรรมเนียม {money(preview.sale.fees)}</p>
+    <p>โหมด: {confirmationSummary.closedAll?'ปิดทุกไม้':closeModeLabel(preview.sale.closeMode)} · ขาย {qtyText(preview.sale.quantity)} หุ้น<br/>ราคา {money(preview.sale.price_at_execution)} · ค่าธรรมเนียม {money(preview.sale.fees)}</p>
     <div className="flex justify-between gap-3"><span>Proceeds สุทธิ</span><span className="text-right tabular-nums">{money(D.from(preview.sale.quantity).mul(D.from(preview.sale.price_at_execution)).sub(D.from(preview.sale.fees)))}</span></div>
     <div className="flex justify-between gap-3"><span>Realized P&L ครั้งนี้</span><span className={`text-right tabular-nums ${pnlColor(confirmationSummary.current)}`}>{signed(confirmationSummary.current)}</span></div>
     {preview.after.allocations.filter(a=>a.sellId===preview.sale.id).map(a=><div key={a.lotId} className="flex justify-between gap-3"><span>ไม้ {snapshot!.lots.findIndex(l=>l.id===a.lotId)+1}: {qtyText(a.qtyClosed)} หุ้น · ต้นทุน/หุ้น {money(a.costPerShare)}</span><span className={`text-right tabular-nums shrink-0 ${pnlColor(D.from(a.realizedPnl))}`}>P&L {signed(D.from(a.realizedPnl))}</span></div>)}

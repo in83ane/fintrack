@@ -77,6 +77,8 @@ export interface Portfolio {
   color: string;
   is_default: boolean;
   kind: 'trading' | 'cash_management';
+  import_cost_method?: 'PROPORTIONAL' | 'FIFO' | 'COMPRESSED_FIFO' | null;
+  cost_include_fees?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -324,7 +326,7 @@ export const db = {
     getAll: async (userId: string, portfolioId?: string | null, range?: { from: number; to: number }) => {
       let query = supabase
         .from('trades')
-        .select('*, cost_basis_sales(method,selections,request)')
+        .select('*, cost_basis_sales(method,selections,request), portfolios(cost_include_fees)')
         .eq('user_id', userId)
         .order('execution_date', { ascending: false });
       if (portfolioId) query = query.eq('portfolio_id', portfolioId);
