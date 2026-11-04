@@ -9,7 +9,7 @@ function moduleUrl(path, imports={}) {
 }
 const fx=moduleUrl('src/lib/fx.ts',{'./cost-basis-ledger':moduleUrl('src/lib/cost-basis-ledger.ts')});
 const cash=moduleUrl('src/lib/cashflow-selectors.ts',{'./fx':fx});
-const {summarizeTracker,parseKeywords}=await import(moduleUrl('src/lib/expense-tracking.ts',{'./cashflow-selectors':cash}));
+const {summarizeTracker,spendingByCategory,parseKeywords}=await import(moduleUrl('src/lib/expense-tracking.ts',{'./cashflow-selectors':cash}));
 const game={id:'game',name:'PUBG',category:'entertainment',keywords:parseKeywords('PUBG, pubg'),opening_amount:500,currency:'THB',opening_fx:34};
 const whole={...game,id:'whole',name:'Entertainment',keywords:[],opening_amount:100};
 const topups=['เติม pubg | Paid from: Games','พับจี','Cinema','Paid from: PUBG wallet','PUBG','PUBG','PUBG'];
@@ -29,4 +29,14 @@ assert.equal(calc(whole).rows.length,5);
 assert.equal(calc(restored,rows.filter(r=>r.id!=='1')).totalMinor,62000);
 assert.equal(calc(restored,rows.map(r=>r.id==='1'?{...r,category:'food'}:r)).totalMinor,62000);
 assert.equal(calc(game,[]).totalMinor,50000);
+
+const categories = rules => Object.fromEntries(spendingByCategory(rows,rules,'THB',{THB:40}).map(g => [g.key,g]));
+assert.equal(categories([]).entertainment.totalMinor,27000,'show the whole Ledger category with no saved tracker');
+assert.equal(categories([]).food.totalMinor,5000,'show categories that have never been tracked');
+const secondGame = {...game,id:'another',opening_amount:25};
+const all = categories([skip,secondGame,whole]);
+assert.equal(all.entertainment.rows.length,5,'overlapping topics and skipped suggestions never remove or duplicate a Ledger expense');
+assert.equal(all.entertainment.openingMinor,62500);
+assert.equal(all.entertainment.totalMinor,89500);
+assert.equal(categories([{...game,category:'Hobby'}]).hobby.totalMinor,50000,'historical spending is visible ahead of the first Ledger entry');
 console.log('PASS opening amounts, category rollup, comment normalization, skip/restore, exclusions, edits, deletions and FX.');

@@ -17,14 +17,47 @@ export function parseKeywords(value: string) {
 }
 export function summarizeTracker(tracker: ExpenseTracker, records: readonly CashflowRecord[], trackers: readonly ExpenseTracker[], rates: Record<string,number>) {
   const category = cashflowCategoryKey(tracker.category);
+  const keywords = tracker.keywords.map(normalizeComment);
+  const openings = [tracker, ...(!keywords.length ? trackers.filter(item => item.id !== tracker.id && item.keywords.length && cashflowCategoryKey(item.category) === category) : [])];
+  return summarizeExpenses(records.filter(record => isLedgerExpense(record) && cashflowCategoryKey(record.category) === category),
+    tracker.currency, rates, openings, keywords, tracker.choices);
+}
+
+function isLedgerExpense(record: CashflowRecord) {
+  return !record.isTransfer && (record.type === 'EXPENSE' || record.type === 'WITHDRAW');
+}
+
+export function spendingByCategory(records: readonly CashflowRecord[], trackers: readonly ExpenseTracker[], currency: ExpenseTracker['currency'], rates: Record<string,number>) {
+  const categories = new Map<string,{ key: string; label: string; records: CashflowRecord[]; openings: ExpenseTracker[] }>();
+  function category(label?: string) {
+    const key = cashflowCategoryKey(label);
+    let group = categories.get(key);
+    if (!group) {
+      group = { key, label: label?.trim() || 'other', records: [], openings: [] };
+      categories.set(key,group);
+    }
+    return group;
+  }
+  for (const record of records) {
+    if (isLedgerExpense(record)) category(record.category).records.push(record);
+  }
+  for (const tracker of trackers) {
+    if (tracker.opening_amount > 0) category(tracker.category).openings.push(tracker);
+  }
+  return [...categories.values()].map(group => ({
+    key: group.key, label: expenseCategories.includes(group.key) ? group.key : group.label,
+    ...summarizeExpenses(group.records,currency,rates,group.openings),
+  })).sort((a,b) => b.totalMinor - a.totalMinor || a.key.localeCompare(b.key));
+}
+
+function summarizeExpenses(records: readonly CashflowRecord[], currency: ExpenseTracker['currency'], rates: Record<string,number>,
+  openings: readonly ExpenseTracker[], keywords: string[] = [], decisions: TrackerChoice[] = []) {
   const groups = new Map<string, { label: string; minor: number; count: number }>();
   const rows: ExpenseLine[] = [], suggestions: ExpenseLine[] = [], skipped: ExpenseLine[] = [];
-  const choices = new Map(tracker.choices?.map(choice => [choice.activity_id, choice.decision]));
-  const keywords = tracker.keywords.map(normalizeComment);
-  const scope = { currency: tracker.currency, exchangeRates: rates };
+  const choices = new Map(decisions.map(choice => [choice.activity_id, choice.decision]));
+  const scope = { currency, exchangeRates: rates };
   let ledgerMinor = 0, missing = 0;
   for (const record of records) {
-    if (record.isTransfer || !['EXPENSE','WITHDRAW'].includes(record.type) || cashflowCategoryKey(record.category) !== category) continue;
     // Ledger appends the source wallet after the user's comment.
     const label = (record.note || '').replace(/(?:^|\s+\|\s+)Paid from: .+$/iu,'').trim();
     const key = normalizeComment(label);
@@ -44,8 +77,7 @@ export function summarizeTracker(tracker: ExpenseTracker, records: readonly Cash
     ledgerMinor += money.minor;
     rows.push(line);
   }
-  // Category-wide trackers include item openings once. Their own opening is the unitemized balance.
-  const openingItems = [tracker, ...(!keywords.length ? trackers.filter(item => item.id !== tracker.id && item.keywords.length && cashflowCategoryKey(item.category) === category) : [])]
+  const openingItems = openings
     .filter(item => item.opening_amount > 0).map(item => ({
       id: item.id, name: item.name, minor: transactionMoney({ type: 'EXPENSE',date:'',originalAmount:item.opening_amount,currency:item.currency,fxRateTHB:item.opening_fx },scope)!.minor,
     }));

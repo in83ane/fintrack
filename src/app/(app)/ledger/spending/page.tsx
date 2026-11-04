@@ -6,7 +6,7 @@ import { useApp } from '@/src/context/AppContext';
 import { supabase } from '@/src/lib/supabase';
 import { readAll } from '@/src/lib/financial-snapshot';
 import { cashflowCategoryKey, formatCashflowMoney } from '@/src/lib/cashflow-selectors';
-import { expenseCategories, summarizeTracker, type ExpenseLine, type ExpenseTracker, type TrackerChoice } from '@/src/lib/expense-tracking';
+import { expenseCategories, spendingByCategory, summarizeTracker, type ExpenseLine, type ExpenseTracker, type TrackerChoice } from '@/src/lib/expense-tracking';
 import { useLedgerActions } from '@/src/components/LedgerActions';
 import { TrackerForm } from './TrackerForm';
 
@@ -52,13 +52,16 @@ function TrackerWorkspace({owner}:{owner:string}) {
     }
     void load();return ()=>{live=false;};
   },[owner,retry]);
-  const current = trackers.find(item=>item.id===selected) || trackers[0];
+  const current = trackers.find(item=>item.id===selected);
   const ledger = useMemo(()=>cashActivities.filter(row=>!pending.includes('cash:'+row.id)),[cashActivities,pending]);
+  const overviewCurrency = currency === 'USD' ? 'USD' : 'THB';
+  const overview = useMemo(()=>spendingByCategory(ledger,trackers,overviewCurrency,exchangeRates),[ledger,trackers,overviewCurrency,exchangeRates]);
+  const overviewMoney = (minor:number)=>formatCashflowMoney(minor,overviewCurrency);
   const summary = useMemo(()=>current ? summarizeTracker(current,ledger,trackers,exchangeRates) : null,[current,ledger,trackers,exchangeRates]);
   const categories = [...new Set([...expenseCategories,...customCategories.filter(c=>c.type==='EXPENSE').map(c=>c.label),...cashActivities.filter(c=>!c.isTransfer && ['EXPENSE','WITHDRAW'].includes(c.type)).map(c=>c.category),...trackers.map(rule=>rule.category)].filter(Boolean))];
   const money = (minor:number)=>formatCashflowMoney(minor,current?.currency || 'THB');
   const noComment = txt('No comment','ไม่มีคอมเมนต์');
-  const start = ()=>setEdit({id:crypto.randomUUID(),name:'',category:categories.includes('entertainment')?'entertainment':categories[0],keywords:[],opening_amount:0,currency:currency==='USD'?'USD':'THB',opening_fx:exchangeRates.THB});
+  const start = (category = 'entertainment')=>setEdit({id:crypto.randomUUID(),name:'',category,keywords:[],opening_amount:0,currency:currency==='USD'?'USD':'THB',opening_fx:exchangeRates.THB});
   async function save(draft:ExpenseTracker) {
     const {id,choices,...fields} = draft;
     const exists = trackers.some(item=>item.id===id);
@@ -81,20 +84,40 @@ function TrackerWorkspace({owner}:{owner:string}) {
     try {
       const {error}=await supabase.from('expense_trackers').delete().eq('id',current.id).eq('user_id',owner).select('id').single();
       if(error) throw Error(error.message);
-      setTrackers(prev=>prev.filter(item=>item.id!==current.id));setRemoving(false);
+      setTrackers(prev=>prev.filter(item=>item.id!==current.id));setSelected('');setRemoving(false);
     } catch(e) {setError(e instanceof Error?e.message:String(e));} finally {setBusy(false);}
   }
   const line = (row:ExpenseLine)=> <><div className="min-w-32 flex-1"><p className="break-words text-sm">{row.label||noComment}</p><p className="text-xs text-muted">{row.day}</p></div><span className="text-sm tabular-nums">{money(row.minor)}</span></>;
   const choice = (row:ExpenseLine,decision:TrackerChoice['decision'])=><button disabled={busy} className="ledger-control" onClick={()=>void choose(row.id,decision)}>{decision==='include'?txt('Include','เพิ่มเข้าหัวข้อ'):txt('Skip','ข้าม')}</button>;
   return <div className="app-page-container mx-auto max-w-6xl space-y-6 py-6 pb-28">
     <Link href="/ledger" className="inline-flex items-center gap-2 text-sm text-muted hover:text-foreground"><ArrowLeft size={16}/>Ledger</Link>
-    <header className="flex flex-wrap items-end justify-between gap-4"><div><h1 className="text-2xl font-semibold">{txt('Spending trackers','ติดตามค่าใช้จ่าย')}</h1><p className="mt-1 text-sm text-muted">{txt('Track spending on one thing or a whole category over time.','ดูว่าใช้เงินกับอะไรไปแล้วเท่าไหร่ แยกเป็นหัวข้อหรือดูทั้งหมวด')}</p></div>
-      <button className="ledger-control primary" disabled={!ready || !isDataLoaded} onClick={start}><Plus size={16}/>{txt('New tracker','สร้างหัวข้อ')}</button></header>
+    <header className="flex flex-wrap items-end justify-between gap-4"><div><h1 className="text-2xl font-semibold">{txt('Spending trackers','ติดตามค่าใช้จ่าย')}</h1><p className="mt-1 text-sm text-muted">{txt('See all Ledger expenses by category, or open a tracker for a closer look.','ดูรายจ่ายทั้งหมดจาก Ledger แยกตามหมวด หรือเลือกหัวข้อเพื่อดูเฉพาะเรื่องที่สนใจ')}</p></div>
+      <button className="ledger-control primary" disabled={!ready || !isDataLoaded} onClick={()=>start(current?.category)}><Plus size={16}/>{txt('New tracker','สร้างหัวข้อ')}</button></header>
     {error && <div role="alert" className="rounded-lg border border-border p-3 text-sm">{error} {!ready && <button className="ledger-control" onClick={()=>setRetry(retry+1)}>{txt('Retry','ลองอีกครั้ง')}</button>}</div>}
-    {!ready || !isDataLoaded ? !error && <p role="status" className="py-6 text-muted">{dataLoadError || txt('Loading spending history…','กำลังโหลดประวัติค่าใช้จ่าย…')}</p>
-    : !current || !summary ? <section className="rounded-xl border border-border p-6"><h2 className="font-semibold">{txt('What would you like to track?','อยากติดตามค่าใช้จ่ายอะไร?')}</h2><p className="mt-2 max-w-xl text-sm text-muted">{txt('For game top-ups, choose Entertainment and enter PUBG as the comment keyword. Existing matches appear as soon as you save.','เช่น อยากรู้ว่าเติมเกมไปเท่าไหร่ ให้สร้างหัวข้อ เลือกหมวดความบันเทิง แล้วใส่คำค้น PUBG ระบบจะรวมประวัติที่ตรงให้ตั้งแต่ครั้งแรก')}</p></section>
+    {!isDataLoaded ? <p role="status" className="py-6 text-muted">{dataLoadError || txt('Loading spending history…','กำลังโหลดประวัติค่าใช้จ่าย…')}</p>
     : <div className="grid items-start gap-6 md:grid-cols-[minmax(13rem,1fr)_minmax(0,3fr)]">
-      <nav aria-label={txt('Trackers','หัวข้อที่ติดตาม')} className="space-y-1">{trackers.map(item=><button key={item.id} className={'block w-full rounded-lg border px-3 py-2 text-left '+(item.id===current.id?'border-primary bg-surface':'border-transparent hover:bg-surface')} aria-pressed={item.id===current.id} onClick={()=>{setSelected(item.id);setRemoving(false);}}><span className="block break-words font-medium">{item.name}</span><span className="text-xs text-muted">{t(expenseCategories.includes(cashflowCategoryKey(item.category)) ? cashflowCategoryKey(item.category) : item.category)} · {item.keywords.length ? item.keywords.join(', ') : txt('Entire category','ทั้งหมวด')}</span></button>)}</nav>
+      <nav aria-label={txt('Spending views','เลือกมุมมองค่าใช้จ่าย')} className="space-y-1">
+        <button className={'block w-full rounded-lg border px-3 py-2 text-left font-semibold '+(!current?'border-primary bg-surface':'border-transparent hover:bg-surface')} aria-pressed={!current} onClick={()=>{setSelected('');setRemoving(false);}}>{txt('All categories','ภาพรวมทุกหมวด')}</button>
+        {!!trackers.length && <p className="px-3 pt-4 text-xs text-muted">{txt('My trackers','หัวข้อที่ติดตาม')}</p>}
+        {trackers.map(item=><button key={item.id} className={'block w-full rounded-lg border px-3 py-2 text-left '+(item.id===current?.id?'border-primary bg-surface':'border-transparent hover:bg-surface')} aria-pressed={item.id===current?.id} onClick={()=>{setSelected(item.id);setRemoving(false);}}><span className="block break-words font-medium">{item.name}</span><span className="text-xs text-muted">{t(expenseCategories.includes(cashflowCategoryKey(item.category)) ? cashflowCategoryKey(item.category) : item.category)} · {item.keywords.length ? item.keywords.join(', ') : txt('Entire category','ทั้งหมวด')}</span></button>)}
+      </nav>
+      {!current || !summary ? <section className="min-w-0 rounded-xl border border-border p-4 sm:p-6">
+        <h2 className="text-xl font-semibold">{txt('Spending by category','รายจ่ายแยกตามหมวด')}</h2>
+        <p className="mt-4 text-sm text-muted">{ready ? txt('Total spent','ใช้จ่ายสะสม') : txt('From Ledger','จาก Ledger')}</p>
+        <p className="text-3xl font-semibold tabular-nums">{overviewMoney(overview.reduce((sum,g)=>sum+g.totalMinor,0))}</p>
+        <p className="mt-1 mb-4 text-sm text-muted">{txt('Ledger','จาก Ledger')} {overviewMoney(overview.reduce((sum,g)=>sum+g.ledgerMinor,0))}{ready && <> · {txt('Before Ledger','ยอดเก่า')} {overviewMoney(overview.reduce((sum,g)=>sum+g.openingMinor,0))}</>}</p>
+        {!overview.length && <p className="border-t border-border py-4 text-sm text-muted">{txt('Expenses will appear here when you record them in Ledger.','เมื่อบันทึกรายจ่ายใน Ledger หมวดและยอดจะปรากฏที่นี่อัตโนมัติ')}</p>}
+        {overview.map(group=><details key={group.key} className="border-t border-border py-3">
+          <summary className="cursor-pointer"><span className="inline-flex w-[calc(100%-1.5rem)] items-baseline justify-between gap-3 align-middle"><strong className="break-words">{t(group.label)}</strong><span className="shrink-0 font-semibold tabular-nums">{overviewMoney(group.totalMinor)}</span></span></summary>
+          <div className="mt-3 space-y-3 pl-3 text-sm"><p className="text-muted">{txt('Ledger entries','รายการจาก Ledger')} · {group.rows.length} · {overviewMoney(group.ledgerMinor)}</p>
+            <ul className="space-y-1">{group.groups.map(g=><li key={g.label} className="flex justify-between gap-3"><span className="break-words">{g.label || noComment} <span className="text-muted">× {g.count}</span></span><span className="tabular-nums">{overviewMoney(g.minor)}</span></li>)}</ul>
+            {!!group.openingItems.length && <div><p className="text-muted">{txt('Opening balances','ยอดเก่าตามหัวข้อ')}</p>{group.openingItems.map(item=><p key={item.id} className="flex justify-between gap-3"><span>{item.name}</span><span>{overviewMoney(item.minor)}</span></p>)}</div>}
+            {!!group.missing && <p className="text-warning">{txt('Missing an amount or exchange rate','รายการที่ขาดยอดหรืออัตราแลกเปลี่ยน')} · {group.missing}</p>}
+            <ActivityList title={txt('Ledger history','ประวัติใน Ledger')} rows={group.rows} empty={txt('No entries','ยังไม่มีรายการ')} render={row=><><span className="min-w-24 flex-1 break-words">{row.label||noComment}<small className="block text-muted">{row.day}</small></span><span>{overviewMoney(row.minor)}</span></>}/>
+            <button className="ledger-control" disabled={!ready} onClick={()=>start(group.label)}><Plus size={14}/>{txt('Track a topic in this category','ติดตามหัวข้อในหมวดนี้')}</button>
+          </div>
+        </details>)}
+      </section> :
       <section key={current.id} className="min-w-0 rounded-xl border border-border p-4 sm:p-6">
         <div className="flex items-start justify-between gap-3"><h2 className="break-words text-xl font-semibold">{current.name}</h2><button className="ledger-control" onClick={()=>setEdit(current)}>{t('edit')}</button></div>
         <p className="mt-5 text-sm text-muted">{txt('Total spent','ใช้จ่ายสะสม')}</p><p className="break-words text-3xl font-semibold tabular-nums">{money(summary.totalMinor)}</p>
@@ -108,7 +131,7 @@ function TrackerWorkspace({owner}:{owner:string}) {
         {!!current.keywords.length && <><ActivityList title={txt('Other entries in this category to review','แนะนำให้ตรวจ · รายการอื่นในหมวดเดียวกัน')} rows={summary.suggestions} empty={txt('Nothing to review','ไม่มีรายการรอตรวจ')} render={row=><>{line(row)}{choice(row,'include')}{choice(row,'skip')}</>}/>
         <ActivityList title={txt('Skipped entries','รายการที่ข้ามไว้')} rows={summary.skipped} empty={txt('No skipped entries','ยังไม่มีรายการที่ข้าม')} render={row=><>{line(row)}{choice(row,'include')}</>}/></>}
         <div className="mt-3 border-t border-border pt-3 text-sm">{removing ? <div className="space-y-2"><p>{txt('Remove this tracker and its opening balance? Its Ledger entries stay available.','ลบหัวข้อนี้พร้อมยอดตั้งต้นไหม? รายการเดิมยังดูได้ใน Ledger')}</p><button disabled={busy} className="ledger-control danger" onClick={()=>void remove()}>{t('delete')}</button> <button className="ledger-control" onClick={()=>setRemoving(false)}>{t('cancel')}</button></div> : <button className="text-muted hover:text-foreground" onClick={()=>setRemoving(true)}>{txt('Remove tracker','ลบหัวข้อ')}</button>}</div>
-      </section></div>}
-    {edit && <TrackerForm initial={edit} categories={categories} trackers={trackers} onSave={save} onClose={()=>setEdit(null)}/>}
+      </section>}</div>}
+    {edit && <TrackerForm initial={edit} categories={categories.includes(edit.category) ? categories : [...categories,edit.category]} trackers={trackers} onSave={save} onClose={()=>setEdit(null)}/>}
   </div>;
 }
