@@ -302,6 +302,7 @@ export interface CustomCategory {
 }
 
 interface AppState {
+  currentUserId: string | null;
   language: Language;
   currency: Currency;
   setLanguage: (lang: Language) => void;
@@ -4078,7 +4079,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AppContext.Provider value={{ 
+    <AppContext.Provider value={{
+      currentUserId: user?.id ?? null,
       language, 
       currency, 
       setLanguage, 

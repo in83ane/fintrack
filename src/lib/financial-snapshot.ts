@@ -3,7 +3,7 @@ import { MemoryResource } from './memory-resource';
 
 // Read every page before publishing a snapshot. Filtering a capped All response
 // would otherwise omit a selected portfolio's older records.
-async function readAll<T, R extends {data: T[] | null; error: unknown}>(reader: (range: {from:number;to:number}) => Promise<R>): Promise<R> {
+export async function readAll<T, R extends {data: T[] | null; error: unknown}>(reader: (range: {from:number;to:number}) => Promise<R>): Promise<R> {
   const size = 500;
   let result = await reader({from:0,to:size-1});
   if (result.error || !result.data || result.data.length < size) return result;

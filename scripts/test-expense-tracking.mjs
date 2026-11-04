@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import ts from 'typescript';
+function moduleUrl(path, imports={}) {
+  let source=readFileSync(path,'utf8');
+  for(const [name,url] of Object.entries(imports)) source=source.replace("'" + name + "'",JSON.stringify(url));
+  const {outputText}=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}});
+  return 'data:text/javascript;base64,'+Buffer.from(outputText).toString('base64');
+}
+const fx=moduleUrl('src/lib/fx.ts',{'./cost-basis-ledger':moduleUrl('src/lib/cost-basis-ledger.ts')});
+const cash=moduleUrl('src/lib/cashflow-selectors.ts',{'./fx':fx});
+const {summarizeTracker,parseKeywords}=await import(moduleUrl('src/lib/expense-tracking.ts',{'./cashflow-selectors':cash}));
+const game={id:'game',name:'PUBG',category:'entertainment',keywords:parseKeywords('PUBG, pubg'),opening_amount:500,currency:'THB',opening_fx:34};
+const whole={...game,id:'whole',name:'Entertainment',keywords:[],opening_amount:100};
+const topups=['เติม pubg | Paid from: Games','พับจี','Cinema','Paid from: PUBG wallet','PUBG','PUBG','PUBG'];
+const rows=topups.map((note,i)=>({id:String(i),date:'2026-01-01',note,type:i===4?'INCOME':'EXPENSE',category:i===5?'food':'Entertainment',originalAmount:50,currency:'THB',isTransfer:i===6}));
+rows.push({...rows[0],id:'usd',note:'ＰＵＢＧ',originalAmount:2,currency:'USD',rateAtTime:35});
+const calc=(tracker,records=rows)=>summarizeTracker(tracker,records,[game,whole],{THB:40});
+const original=calc(game);
+assert.equal(original.totalMinor,62000);
+assert.deepEqual(original.suggestions.map(row=>row.id),['1','2','3']);
+assert.deepEqual(original.rows.map(row=>row.label),['เติม pubg','ＰＵＢＧ']);
+const skip={...game,choices:[{activity_id:'1',decision:'skip'}]};
+assert.deepEqual(calc(skip).skipped.map(row=>row.id),['1']);
+const restored={...game,choices:[{activity_id:'1',decision:'include'}]};
+assert.equal(calc(restored).totalMinor,67000);
+assert.equal(calc(whole).totalMinor,87000);
+assert.equal(calc(whole).rows.length,5);
+assert.equal(calc(restored,rows.filter(r=>r.id!=='1')).totalMinor,62000);
+assert.equal(calc(restored,rows.map(r=>r.id==='1'?{...r,category:'food'}:r)).totalMinor,62000);
+assert.equal(calc(game,[]).totalMinor,50000);
+console.log('PASS opening amounts, category rollup, comment normalization, skip/restore, exclusions, edits, deletions and FX.');

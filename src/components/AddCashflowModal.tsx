@@ -1,4 +1,5 @@
 "use client";
+import {expenseCategories} from '@/src/lib/expense-tracking';
 import { focusWithoutScroll } from "@/src/lib/scroll-lock";
 import { splitBucketMoney } from '@/src/lib/bucket-command';
 import { bucketNativeAmount } from '@/src/lib/native-money';
@@ -150,7 +151,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
 
   // All categories (preset + any previously used custom ones) 
   const incomePresets = ["salary", "freelance", "investment", "dividend", "gift", "rental", "other"];
-  const expensePresets = ["food", "transport", "utilities", "entertainment", "shopping", "health", "education", "investment", "other"];
+  const expensePresets = expenseCategories;
   const depositPresets = ["salary", "investment", "other"];
   const withdrawPresets = ["food", "transport", "utilities", "entertainment", "investment", "other"];
 
