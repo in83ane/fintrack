@@ -32,7 +32,7 @@ function ActivityList({title,rows,empty,render}: {title:string;rows:ExpenseLine[
   const {language} = useApp();
   const [limit,setLimit] = useState(20);
   return <details className="border-t border-border py-4"><summary className="cursor-pointer text-sm font-semibold">{title} <span className="ml-1 text-muted tabular-nums">{rows.length}</span></summary>
-    {rows.length ? <><ul className="mt-2 divide-y divide-border">{rows.slice(0,limit).map(row=><li key={row.id} className="spending-activity-row flex flex-wrap items-center gap-2 py-2">{render(row)}</li>)}</ul>
+    {rows.length ? <><ul className="mt-2 divide-y divide-border">{rows.slice(0,limit).map(row=><li key={row.id} className="flex flex-wrap items-center gap-2 py-2">{render(row)}</li>)}</ul>
       {rows.length>limit && <button className="ledger-control" onClick={()=>setLimit(limit+30)}>{language==='th'?'ดูเพิ่ม':'Show more'}</button>}</> : <p className="mt-3 text-sm text-muted">{empty}</p>}
   </details>;
 }
@@ -144,7 +144,15 @@ function TrackerWorkspace({owner}:{owner:string}) {
       setNotices(list=>list.filter(n=>n.trackerId!==current.id));setTrackers(prev=>prev.filter(item=>item.id!==current.id));setSelected('');setRemoving(false);
     } catch(e) {setError(e instanceof Error?e.message:String(e));} finally {setBusy(false);}
   }
-  const line = (row:ExpenseLine)=> <><div className="min-w-32 flex-1"><p className="break-words text-sm">{row.label||noComment}</p><p className="text-xs text-muted">{row.day}</p></div><span className="text-sm tabular-nums">{money(row.minor)}</span></>;
+  function line(row:ExpenseLine, actions?:React.ReactNode) {
+    return <><div className="min-w-32 flex-1"><p className="break-words text-sm">{row.label||noComment}</p><p className="text-xs text-muted">{row.day}</p></div>
+      <div className="spending-row-end ml-auto flex items-center">
+        <span className="whitespace-nowrap text-sm tabular-nums">{money(row.minor)}</span>
+        {actions && <div className="spending-action-slot"><div className="min-w-0 overflow-clip">
+          <div className="flex w-max items-center gap-2 p-1 pl-2">{actions}</div>
+        </div></div>}
+      </div></>;
+  }
   function choice(row:ExpenseLine, action:'include'|'remove'|'unrelated') {
     if (action==='unrelated') return <button disabled={busy} className="ledger-control" onClick={()=>void choose(row,action)}>{txt('Not relevant','ไม่เกี่ยว')}</button>;
     const add = action==='include';
@@ -193,9 +201,9 @@ function TrackerWorkspace({owner}:{owner:string}) {
         <h3 className="border-t border-border pt-4 text-sm font-semibold">{txt('Ledger spending by comment','ค่าใช้จ่ายใน Ledger แยกตามคอมเมนต์')}</h3>
         <ul className="my-3 space-y-2">{summary.groups.map(group=><li key={group.label} className="flex justify-between gap-3 text-sm"><span className="break-words">{group.label||noComment} <span className="text-muted">× {group.count}</span></span><span className="shrink-0 tabular-nums">{money(group.minor)}</span></li>)}</ul>
         {!summary.rows.length && <p className="mb-4 text-sm text-muted">{txt('No matching expenses yet.','ยังไม่มีรายจ่ายที่ตรงกับหัวข้อนี้')}</p>}
-        <ActivityList title={txt('Included Ledger entries','รายการ Ledger ที่นับแล้ว')} rows={summary.rows} empty={txt('No entries','ยังไม่มีรายการ')} render={row=><>{line(row)}{!!current.keywords.length && choice(row,'remove')}</>}/>
-        {!!current.keywords.length && <><ActivityList title={txt('Other entries in this category to review','แนะนำให้ตรวจ · รายการอื่นในหมวดเดียวกัน')} rows={summary.suggestions} empty={txt('Nothing to review','ไม่มีรายการรอตรวจ')} render={row=><>{line(row)}{choice(row,'include')}{choice(row,'unrelated')}</>}/>
-        <ActivityList title={txt('Skipped entries','รายการที่ข้ามไว้')} rows={summary.skipped} empty={txt('No skipped entries','ยังไม่มีรายการที่ข้าม')} render={row=><>{line(row)}{choice(row,'include')}</>}/></>}
+        <ActivityList title={txt('Included Ledger entries','รายการ Ledger ที่นับแล้ว')} rows={summary.rows} empty={txt('No entries','ยังไม่มีรายการ')} render={row=>line(row,!!current.keywords.length && choice(row,'remove'))}/>
+        {!!current.keywords.length && <><ActivityList title={txt('Other entries in this category to review','แนะนำให้ตรวจ · รายการอื่นในหมวดเดียวกัน')} rows={summary.suggestions} empty={txt('Nothing to review','ไม่มีรายการรอตรวจ')} render={row=>line(row,<>{choice(row,'include')}{choice(row,'unrelated')}</>)}/>
+        <ActivityList title={txt('Skipped entries','รายการที่ข้ามไว้')} rows={summary.skipped} empty={txt('No skipped entries','ยังไม่มีรายการที่ข้าม')} render={row=>line(row,choice(row,'include'))}/></>}
         <div className="mt-3 border-t border-border pt-3 text-sm">{removing ? <div className="space-y-2"><p>{txt('Remove this tracker and its opening balance? Its Ledger entries stay available.','ลบหัวข้อนี้พร้อมยอดตั้งต้นไหม? รายการเดิมยังดูได้ใน Ledger')}</p><button disabled={busy} className="ledger-control danger" onClick={()=>void remove()}>{t('delete')}</button> <button className="ledger-control" onClick={()=>setRemoving(false)}>{t('cancel')}</button></div> : <button className="text-muted hover:text-foreground" onClick={()=>setRemoving(true)}>{txt('Remove tracker','ลบหัวข้อ')}</button>}</div>
       </section>}</div>}
     {!!notices.length && createPortal(<div className="pointer-events-none fixed inset-x-3 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-[160] mx-auto flex max-h-[40vh] max-w-fit flex-col gap-2 overflow-auto sm:bottom-20">

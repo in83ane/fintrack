@@ -129,7 +129,8 @@ html.light-mode { --scrim:rgba(20,26,40,.35); }
 .ledger-toast.show { transform:none; opacity:1; visibility:visible; transition-delay:0s; }
 @media (hover: hover) and (pointer: fine) {
   .spending-row-action { width: 2rem; height: 2rem; }
-  .spending-activity-row:not(:hover):not(:focus-within) .spending-row-action { opacity: 0; pointer-events: none; }
+  .spending-action-slot { display: grid; grid-template-columns: 0fr; opacity: 0; pointer-events: none; transition: grid-template-columns 180ms ease-out, opacity 140ms ease-out; }
+  .spending-row-end:is(:hover, :focus-within) .spending-action-slot { grid-template-columns: 1fr; opacity: 1; pointer-events: auto; }
 }
 .transition-overlay { position:fixed; inset:0; z-index:120; pointer-events:none; display:flex; align-items:center; justify-content:center; padding:24px; }
 .transition-scrim { position:absolute; inset:0; background:var(--scrim); opacity:0; visibility:hidden; transition:opacity calc(200ms * var(--m)),visibility 0s calc(200ms * var(--m)); }
@@ -140,6 +141,7 @@ html.light-mode { --scrim:rgba(20,26,40,.35); }
 .transition-drawer { position:absolute; right:0; top:0; bottom:0; width:380px; max-width:100%; padding:28px; transform:translateX(104%); transition:transform calc(200ms * var(--m)) cubic-bezier(.4,0,1,1),visibility 0s calc(200ms * var(--m)); }
 .transition-drawer.open { transform:none; visibility:visible; pointer-events:auto; transition:transform calc(320ms * var(--m)) cubic-bezier(.22,1,.36,1); }
 .transition-drawer .overlay-body { flex:1; }
+@media (prefers-reduced-motion: reduce) { .spending-action-slot { transition: none; } }
 @media(max-width:1023px) { .ledger-actbar { left:50%; max-width:calc(100vw - 24px); bottom:calc(88px + env(safe-area-inset-bottom)); } .ledger-toast { bottom:calc(160px + env(safe-area-inset-bottom)); } }
 @media(prefers-reduced-motion:reduce) { .sidebar-rail, .sidebar-rail *, .ledger-page *, .transition-overlay *, .ledger-actbar,.ledger-toast { animation-duration:.01ms!important; animation-delay:0ms!important; transition-duration:.01ms!important; transition-delay:0ms!important; } }
 
