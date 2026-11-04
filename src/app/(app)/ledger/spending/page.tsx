@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, Plus } from 'lucide-react';
+import { ArrowLeft, Plus, X } from 'lucide-react';
 import { useApp } from '@/src/context/AppContext';
 import { supabase } from '@/src/lib/supabase';
 import { readAll } from '@/src/lib/financial-snapshot';
@@ -22,9 +22,9 @@ function SkipToast({notice, dismiss, undo, busy, label}: {
     const timer = window.setTimeout(()=>dismiss(notice.key),5000);
     return ()=>window.clearTimeout(timer);
   },[notice.key,dismiss]);
-  return <div className="flex items-center gap-2 rounded-xl bg-foreground px-4 py-3 text-sm text-background shadow-lg">
+  return <div className="flex items-center gap-2 rounded-xl border border-white/15 bg-[#343940] px-4 py-3 text-sm text-[#fff] shadow-lg">
     <span role="status" className="min-w-0 break-words">{notice.message}</span><span aria-hidden="true">·</span>
-    <button className="shrink-0 rounded-lg bg-primary px-3 py-1.5 font-semibold text-primary-foreground" disabled={busy} onClick={()=>undo(notice)}>{label}</button>
+    <button className="shrink-0 rounded-lg bg-white/10 px-3 py-1.5 font-semibold hover:bg-white/20 focus-visible:outline-2" disabled={busy} onClick={()=>undo(notice)}>{label}</button>
   </div>;
 }
 
@@ -32,7 +32,7 @@ function ActivityList({title,rows,empty,render}: {title:string;rows:ExpenseLine[
   const {language} = useApp();
   const [limit,setLimit] = useState(20);
   return <details className="border-t border-border py-4"><summary className="cursor-pointer text-sm font-semibold">{title} <span className="ml-1 text-muted tabular-nums">{rows.length}</span></summary>
-    {rows.length ? <><ul className="mt-2 divide-y divide-border">{rows.slice(0,limit).map(row=><li key={row.id} className="flex flex-wrap items-center gap-2 py-2">{render(row)}</li>)}</ul>
+    {rows.length ? <><ul className="mt-2 divide-y divide-border">{rows.slice(0,limit).map(row=><li key={row.id} className="spending-activity-row flex flex-wrap items-center gap-2 py-2">{render(row)}</li>)}</ul>
       {rows.length>limit && <button className="ledger-control" onClick={()=>setLimit(limit+30)}>{language==='th'?'ดูเพิ่ม':'Show more'}</button>}</> : <p className="mt-3 text-sm text-muted">{empty}</p>}
   </details>;
 }
@@ -145,7 +145,16 @@ function TrackerWorkspace({owner}:{owner:string}) {
     } catch(e) {setError(e instanceof Error?e.message:String(e));} finally {setBusy(false);}
   }
   const line = (row:ExpenseLine)=> <><div className="min-w-32 flex-1"><p className="break-words text-sm">{row.label||noComment}</p><p className="text-xs text-muted">{row.day}</p></div><span className="text-sm tabular-nums">{money(row.minor)}</span></>;
-  const choice = (row:ExpenseLine,action:'include'|'remove'|'unrelated')=><button disabled={busy} className="ledger-control" onClick={()=>void choose(row,action)}>{action==='include'?txt('Include','เพิ่มเข้าหัวข้อ'):action==='remove'?txt('Remove','เอาออก'):txt('Not relevant','ไม่เกี่ยว')}</button>;
+  function choice(row:ExpenseLine, action:'include'|'remove'|'unrelated') {
+    if (action==='unrelated') return <button disabled={busy} className="ledger-control" onClick={()=>void choose(row,action)}>{txt('Not relevant','ไม่เกี่ยว')}</button>;
+    const add = action==='include';
+    const label = add ? txt('Include','เพิ่มเข้าหัวข้อ') : txt('Remove','เอาออก');
+    const Icon = add ? Plus : X;
+    return <button type="button" aria-label={label} title={label} disabled={busy} onClick={()=>void choose(row,action)}
+      className="spending-row-action inline-flex size-11 shrink-0 items-center justify-center rounded-md text-muted hover:bg-foreground/10 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary">
+      <Icon size={17} aria-hidden="true"/>
+    </button>;
+  }
   return <div className="app-page-container mx-auto max-w-6xl space-y-6 py-6 pb-28">
     <Link href="/ledger" className="inline-flex items-center gap-2 text-sm text-muted hover:text-foreground"><ArrowLeft size={16}/>Ledger</Link>
     <header className="flex flex-wrap items-end justify-between gap-4"><div><h1 className="text-2xl font-semibold">{txt('Spending trackers','ติดตามค่าใช้จ่าย')}</h1><p className="mt-1 text-sm text-muted">{txt('See all Ledger expenses by category, or open a tracker for a closer look.','ดูรายจ่ายทั้งหมดจาก Ledger แยกตามหมวด หรือเลือกหัวข้อเพื่อดูเฉพาะเรื่องที่สนใจ')}</p></div>
