@@ -170,6 +170,11 @@ function TrackerWorkspace({owner}:{owner:string}) {
       <Icon size={17} aria-hidden="true"/>
     </button>;
   }
+  function selectionHighlight() {
+    return <motion.span layoutId="tracker-selection" aria-hidden="true"
+      className="pointer-events-none absolute inset-0 rounded-lg border border-primary bg-surface"
+      transition={reducedMotion ? {duration:0} : {type:'spring',stiffness:420,damping:24,mass:0.7}}/>;
+  }
   return <div className="app-page-container mx-auto max-w-6xl space-y-6 py-6 pb-28">
     <Link href="/ledger" className="inline-flex items-center gap-2 text-sm text-muted hover:text-foreground"><ArrowLeft size={16}/>Ledger</Link>
     <header className="flex flex-wrap items-end justify-between gap-4"><div><h1 className="text-2xl font-semibold">{txt('Income & spending trackers','ติดตามรายรับ–รายจ่าย')}</h1><p className="mt-1 text-sm text-muted">{txt('See your Ledger by category, or track a topic in more detail.','ดูรายการจาก Ledger แยกตามหมวด หรือเลือกติดตามเฉพาะเรื่องที่สนใจ')}</p></div>
@@ -195,11 +200,15 @@ function TrackerWorkspace({owner}:{owner:string}) {
     {error && <div role="alert" className="rounded-lg border border-border p-3 text-sm">{error} {!ready && <button className="ledger-control" onClick={()=>setRetry(retry+1)}>{txt('Retry','ลองอีกครั้ง')}</button>}</div>}
     {!isDataLoaded ? <p role="status" className="py-6 text-muted">{dataLoadError || txt('Loading Ledger history…','กำลังโหลดประวัติ Ledger…')}</p>
     : <div className="grid items-start gap-6 md:grid-cols-[minmax(13rem,1fr)_minmax(0,3fr)]">
-      <nav aria-label={txt('Tracker views','เลือกมุมมองการติดตาม')} className="space-y-1">
-        <button className={'block w-full rounded-lg border px-3 py-2 text-left font-semibold '+(!current?'border-primary bg-surface':'border-transparent hover:bg-surface')} aria-pressed={!current} onClick={()=>{setSelected('');setRemoving(false);}}>{txt('All categories','ภาพรวมทุกหมวด')}</button>
+      <LayoutGroup id={`${tabGroupId}-views-${kind}`}><nav aria-label={txt('Tracker views','เลือกมุมมองการติดตาม')} className="space-y-1">
+        <button className={'relative block min-h-11 w-full rounded-lg border border-transparent px-3 py-2 text-left font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary '+(!current?'':'hover:bg-surface')} aria-pressed={!current} onClick={()=>{setSelected('');setRemoving(false);}}>
+          {!current && selectionHighlight()}<span className="relative">{txt('All categories','ภาพรวมทุกหมวด')}</span>
+        </button>
         {!!visibleTrackers.length && <p className="px-3 pt-4 text-xs text-muted">{txt('My trackers','หัวข้อที่ติดตาม')}</p>}
-        {visibleTrackers.map(item=><button key={item.id} className={'block w-full rounded-lg border px-3 py-2 text-left '+(item.id===current?.id?'border-primary bg-surface':'border-transparent hover:bg-surface')} aria-pressed={item.id===current?.id} onClick={()=>{setSelected(item.id);setRemoving(false);}}><span className="block break-words font-medium">{item.name}</span><span className="text-xs text-muted">{t(presets.includes(cashflowCategoryKey(item.category)) ? cashflowCategoryKey(item.category) : item.category)} · {item.keywords.length ? item.keywords.join(', ') : txt('Entire category','ทั้งหมวด')}</span></button>)}
-      </nav>
+        {visibleTrackers.map(item=><button key={item.id} className={'relative block min-h-11 w-full rounded-lg border border-transparent px-3 py-2 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary '+(item.id===current?.id?'':'hover:bg-surface')} aria-pressed={item.id===current?.id} onClick={()=>{setSelected(item.id);setRemoving(false);}}>
+          {item.id===current?.id && selectionHighlight()}<span className="relative block break-words font-medium">{item.name}</span><span className="relative text-xs text-muted">{t(presets.includes(cashflowCategoryKey(item.category)) ? cashflowCategoryKey(item.category) : item.category)} · {item.keywords.length ? item.keywords.join(', ') : txt('Entire category','ทั้งหมวด')}</span>
+        </button>)}
+      </nav></LayoutGroup>
       {!current || !summary ? <section className="min-w-0 rounded-xl border border-border p-4 sm:p-6">
         <h2 className="text-xl font-semibold">{income ? txt('Income by category','รายรับแยกตามหมวด') : txt('Spending by category','รายจ่ายแยกตามหมวด')}</h2>
         <p className="mt-4 text-sm text-muted">{ready ? (income ? txt('Total received','รายรับสะสม') : txt('Total spent','ใช้จ่ายสะสม')) : txt('From Ledger','จาก Ledger')}</p>
