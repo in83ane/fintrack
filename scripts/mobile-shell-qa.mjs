@@ -45,6 +45,7 @@ let cfg=readFileSync(path.join(dir,'next.config.mjs'),'utf8');
 cfg=cfg.replace('Object.assign(config.resolve.alias,','Object.assign(config.resolve.alias,'+JSON.stringify({'@/src/components/AddCashflowModal$':path.join(dir,'noop.tsx'),'@/src/components/PriceAlertManager$':path.join(dir,'noop.tsx')})+',');
 write('next.config.mjs',cfg);
 let context=readFileSync(path.join(dir,'context.tsx'),'utf8').replace('totalInvested:0,','totalInvested:0,totalProfit:0,totalAssetsValue:0,brokerageCashTotal:0,marketData:{},');
+context=context.replace("language:'en'", "language:"+JSON.stringify(process.env.QA_LANG==='th'?'th':'en')).replace('translations.en[k]', "translations["+JSON.stringify(process.env.QA_LANG==='th'?'th':'en')+"][k]").replace('netWorthHistory:empty', "netWorthHistory:[{date:'2026-11-05',value:6016}]").replace('formatMoney:v=>String(v)', "formatMoney:v=>'฿'+Number(v*33.723).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})");
 write('context.tsx',context);
 const base='http://localhost:3112';let serverLog='';
 const server=spawn(process.execPath,[path.join(repo,'node_modules/next/dist/bin/next'),'dev','-p','3112'],{cwd:dir,stdio:['ignore','pipe','pipe'],windowsHide:true});
@@ -53,7 +54,7 @@ const browser=await chromium.launch({executablePath:'C:\\Program Files (x86)\\Mi
 const errors=[];
 try {
  for(let i=0;i<120;i++){try{await fetch(base+'/dashboard');break;}catch{await new Promise(r=>setTimeout(r,500));}}
- for(const width of [320,393,768,1024,1440]) {
+ for(const width of [320,393,415,768,1024,1440]) {
   const page=await browser.newPage({viewport:{width,height:852},isMobile:width<1024,hasTouch:width<1024,reducedMotion:'reduce'});
   page.on('pageerror',e=>errors.push(e.message));
   for(const route of ['dashboard','cashflow']) {
@@ -62,28 +63,40 @@ try {
    await page.waitForTimeout(500);
    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),width+' '+route+' overflow');
    assert(await page.locator('main').evaluate(e=>e.getBoundingClientRect().width)>width-(width<1024?10:300),'content width');
-   await page.screenshot({path:path.join(out,'populated-'+route+'-'+width+'.png')});
+   if(route==='dashboard'&&width<640) {
+     const manage=page.getByRole('button',{name:/^(Manage portfolio|จัดการพอร์ต)$/});
+     const plot=page.locator('.dashboard-net-worth-plot');
+     assert((await plot.boundingBox()).y+(await plot.boundingBox()).height<720,'chart must appear on first mobile screen');
+     await manage.click();
+     await page.locator('#dashboard-portfolio-actions').getByRole('button',{name:/Import Excel|นำเข้า Excel/}).click();
+     await page.getByRole('dialog').waitFor();
+     await page.keyboard.press('Escape');
+     await page.getByRole('dialog').waitFor({state:'hidden'});
+     await manage.click();
+   }
+   await page.evaluate(()=>window.scrollTo(0,0));
+   await page.screenshot({path:path.join(out,(process.env.QA_LANG==='th'?'th-':'')+'populated-'+route+'-'+width+'.png')});
   }
   if(width<1024) {
-   await page.getByRole('button',{name:'Open menu',exact:true}).click();
-   const dialog=page.getByRole('dialog',{name:'Main menu'});
+   await page.getByRole('button',{name:/^(Open menu|เปิดเมนู)$/}).click();
+   const dialog=page.getByRole('dialog',{name:/^(Main menu|เมนูหลัก)$/});
    await dialog.waitFor();
    assert(await dialog.evaluate(e=>e.contains(document.activeElement)),'focus inside drawer');
    await page.keyboard.press('Escape');
    await dialog.waitFor({state:'hidden'});
-   assert(await page.getByRole('button',{name:'Open menu',exact:true}).evaluate(e=>e===document.activeElement),'focus restored');
-   await page.getByRole('button',{name:'Menu',exact:true}).click();
+   assert(await page.getByRole('button',{name:/^(Open menu|เปิดเมนู)$/}).evaluate(e=>e===document.activeElement),'focus restored');
+   await page.getByRole('button',{name:/^(Menu|เมนู)$/}).click();
    await dialog.getByRole('link',{name:'PLAN',exact:true}).click();
    await page.waitForURL('**/plan');
    await dialog.waitFor({state:'hidden'});
-   await page.getByRole('button',{name:'Open menu',exact:true}).click();
+   await page.getByRole('button',{name:/^(Open menu|เปิดเมนู)$/}).click();
    await page.mouse.click(width-8,200);
    await dialog.waitFor({state:'hidden'});
-   await page.getByRole('button',{name:'Open menu',exact:true}).click();
+   await page.getByRole('button',{name:/^(Open menu|เปิดเมนู)$/}).click();
    await page.setViewportSize({width:1200,height:852});
    await dialog.waitFor({state:'hidden'});
    assert(await page.evaluate(()=>document.documentElement.style.overflow!=='hidden'),'resize unlocks scroll');
-  } else { assert.equal(await page.getByRole('navigation',{name:'Mobile navigation'}).isVisible(),false); }
+  } else { assert.equal(await page.getByRole('navigation',{name:/^(Mobile navigation|เมนูมือถือ)$/}).isVisible(),false); }
   await page.close();
  }
  assert.deepEqual(errors,[]);

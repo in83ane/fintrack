@@ -5,7 +5,7 @@ import { layout } from './skeleton-layout';
 
 import { FinanceIcon } from "@/src/components/FinanceIcon";
 import React, { useState, useMemo, useRef, useCallback } from "react";
-import { TrendingUp, TrendingDown, Plus, Briefcase, Wallet, BarChart3, ArrowUpRight, ArrowDownLeft, Download, Upload, FileSpreadsheet, CheckCircle2, CircleAlert, Info } from "lucide-react";
+import { TrendingUp, TrendingDown, Plus, Briefcase, Wallet, BarChart3, ArrowUpRight, ArrowDownLeft, Download, Upload, FileSpreadsheet, CheckCircle2, CircleAlert, Info, ChevronDown } from "lucide-react";
 import { motion } from "motion/react";
 import { cn } from "@/src/lib/utils";
 import { useApp } from "@/src/context/AppContext";
@@ -164,6 +164,7 @@ export default function DashboardView({loading:forceLoading=false}:{loading?:boo
   const [isAddAssetOpen, setIsAddAssetOpen] = useState(false);
   const [isAddCashflowOpen, setIsAddCashflowOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [showPortfolioActions, setShowPortfolioActions] = useState(false);
   const [importStatus, setImportStatus] = useState<ImportStatus>({ type: 'idle', message: '' });
   const [importRows, setImportRows] = useState<StockImportRow[]>([]);
   const [importErrors, setImportErrors] = useState<string[]>([]);
@@ -465,27 +466,26 @@ export default function DashboardView({loading:forceLoading=false}:{loading?:boo
       <div className={layout.container}>
 
       {/* ─── Greeting ─────────────────────────────────────────────────── */}
-      <motion.div initial={false} animate={{ opacity: 1, y: 0 }}>
+      <motion.div initial={false} animate={{ opacity: 1, y: 0 }} className="dashboard-heading">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#4EDEA3]">{selectedBrokerLabel}</p>
             <h1 className="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
               {language === 'th' ? 'ภาพรวมการลงทุน' : 'Investment overview'}
             </h1>
           </div>
-          <div className="flex items-center gap-2 text-xs text-gray-400">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#4EDEA3]" />
-            {language === 'th' ? 'อัปเดตตามพอร์ตที่เลือก' : 'Shown for the selected portfolio'}
+          <div className="flex min-w-0 items-center gap-2 text-xs text-muted">
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+            <span className="truncate">{selectedBrokerLabel}</span>
           </div>
         </div>
-        <p className="mt-1 text-xs text-gray-500">
+        <p className="mt-1 hidden text-xs text-muted sm:block">
           {language === 'th' ? 'เพิ่มสินทรัพย์ทีละรายการ หรือนำเข้าจากไฟล์ Excel ได้ในไม่กี่ขั้นตอน' : 'Add investments one at a time or import an Excel file in a few steps.'}
         </p>
       </motion.div>
 
       {/* ─── Empty State ──────────────────────────────────────────────── */}
       {isEmpty && (
-        <motion.div initial={false} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-[#172522] via-[#151a19] to-[#171827] p-6 sm:p-8">
+        <motion.div initial={false} animate={{ opacity: 1, y: 0 }} className="dashboard-empty relative overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-[#172522] via-[#151a19] to-[#171827] p-6 sm:p-8">
           <div className="pointer-events-none absolute -right-12 -top-16 h-56 w-56 rounded-full bg-[#4EDEA3]/10 blur-3xl" />
           <div className="relative grid gap-5 sm:grid-cols-[1fr_auto] sm:items-end">
             <div>
@@ -501,25 +501,6 @@ export default function DashboardView({loading:forceLoading=false}:{loading?:boo
         </motion.div>
       )}
 
-      {/* ─── Quick Stats (4 cards) ─────────────────────────────────── */}
-      <motion.div initial={false} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className={layout.kpis}>
-        {[
-          { label: language === 'th' ? 'สินทรัพย์' : 'Assets', value: activePositions.toString(), icon: <Briefcase size={16} />, color: '#ADC6FF', onClick: () => router.push('/portfolio') },
-          { label: language === 'th' ? 'กำไร/ขาดทุน' : "P/L", value: `${totalUnrealizedPL >= 0 ? '+' : ''}${formatMoney(totalUnrealizedPL)}`, icon: <BarChart3 size={16} />, color: totalUnrealizedPL >= 0 ? '#4EDEA3' : '#FFB4AB', onClick: () => router.push('/portfolio') },
-          { label: language === 'th' ? 'เงินในกระเป๋า' : 'Buckets', value: formatMoney(totalBucketValue), icon: <Wallet size={16} />, color: '#E9C349', onClick: () => router.push('/budget') },
-          { label: language === 'th' ? 'เดือนนี้' : 'This Month', value: formatCashflowMoney(monthSummary.netMinor, currency, true), icon: <TrendingUp size={16} />, color: monthNet >= 0 ? '#4EDEA3' : '#FFB4AB', onClick: () => router.push('/cashflow') },
-        ].map((stat, i) => (
-          <motion.button key={i} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={stat.onClick}
-            className="bg-surface/50 backdrop-blur-xl rounded-2xl p-4 border border-border text-left hover:border-white/10 transition-all group">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${stat.color}15`, color: stat.color }}>{stat.icon}</div>
-            </div>
-            <div className="text-lg font-bold text-white tracking-tight truncate">{isDataLoaded?stat.value:<Sk.Line height={28} width="70%"/>}</div>
-            <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">{stat.label}</div>
-          </motion.button>
-        ))}
-      </motion.div>
-
       {/* ─── Net Worth Hero + Chart ───────────────────────────────── */}
       <motion.div
         initial={false}
@@ -527,16 +508,24 @@ export default function DashboardView({loading:forceLoading=false}:{loading?:boo
         transition={{ delay: 0.1 }}
         data-net-worth-card className={layout.hero}
       >
-        <div className="flex flex-col sm:flex-row justify-between items-start gap-3 relative z-10">
+        <div className="dashboard-hero-heading flex flex-col sm:flex-row justify-between items-start gap-3 relative z-10">
           <div className="space-y-1">
             <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{t("totalNetWorth")}</span>
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tighter text-white leading-none">
               {isDataLoaded?<span data-net-worth-total data-value={currentNetWorth}>{netWorthHistory.length ? <MoneyValue value={currentNetWorth*(currency==='USD'?1:exchangeRates[currency])} cur={currency} symbol decimalClass="text-[0.5em] text-gray-300"/> : '—'}</span>:<Sk.Line height="1em" width={230}/>}
             </h1>
-            <p className="text-[10px] text-muted">{activePortfolio?.name || (language === 'th' ? 'ทุกพอร์ต' : 'All portfolios')} · {included.assets ? 'assets' : 'assets excluded'} · {included.cash ? 'broker cash' : 'cash excluded'} · {included.buckets ? 'buckets' : 'buckets excluded'}</p>
+            <p className="text-[10px] text-muted">{[
+              included.assets && (language === 'th' ? 'สินทรัพย์' : 'Assets'),
+              included.cash && (language === 'th' ? 'เงินสดโบรกเกอร์' : 'Broker cash'),
+              included.buckets && (language === 'th' ? 'กระเป๋า' : 'Buckets'),
+            ].filter(Boolean).join(' · ') || (language === 'th' ? 'ไม่มีแหล่งเงินที่เลือก' : 'No sources selected')}</p>
 
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="dashboard-actions">
+          <button type="button" aria-expanded={showPortfolioActions} aria-controls="dashboard-portfolio-actions" onClick={() => setShowPortfolioActions(value => !value)} className="dashboard-actions-toggle flex w-full items-center justify-between text-sm font-medium text-foreground sm:hidden">
+            {language === 'th' ? 'จัดการพอร์ต' : 'Manage portfolio'}<ChevronDown size={18} className={showPortfolioActions ? 'rotate-180' : ''}/>
+          </button>
+          <div id="dashboard-portfolio-actions" className={cn('dashboard-action-buttons flex-wrap items-center gap-2 sm:flex', showPortfolioActions ? 'grid grid-cols-2' : 'hidden')}>
             <button
               onClick={() => setIsAddAssetOpen(true)}
               className="px-4 py-2 bg-white/5 text-[#ADC6FF] border border-[#ADC6FF]/30 rounded-xl font-black text-xs flex items-center gap-1.5 hover:bg-[#ADC6FF]/10 transition-all"
@@ -553,7 +542,7 @@ export default function DashboardView({loading:forceLoading=false}:{loading?:boo
               onClick={() => router.push('/budget')}
               className="px-4 py-2 bg-[#E9C349]/10 text-[#E9C349] border border-[#E9C349]/30 rounded-xl font-black text-xs flex items-center gap-1.5 hover:bg-[#E9C349]/20 transition-all"
             >
-              <Wallet size={14} /> {t("distribute") || "Distribute"}
+              <Wallet size={14} /> {language === 'th' ? 'จัดสรรเงิน' : 'Distribute'}
             </button>
             <button
               onClick={() => setIsImportOpen(true)}
@@ -561,6 +550,7 @@ export default function DashboardView({loading:forceLoading=false}:{loading?:boo
             >
               <FileSpreadsheet size={14} /> {language === 'th' ? 'นำเข้า Excel' : 'Import Excel'}
             </button>
+          </div>
           </div>
         </div>
         <div className="nw-period-row">
@@ -573,8 +563,8 @@ export default function DashboardView({loading:forceLoading=false}:{loading?:boo
                 <button type="button" aria-label={language === 'th' ? 'การเปลี่ยนแปลงยอดสุทธิ' : 'About net worth change'} title={language === 'th' ? 'รวมรายรับ รายจ่าย และเงินที่ฝาก/ถอนในช่วงนี้ ไม่ใช่ผลตอบแทนการลงทุน' : 'Includes income, expenses, and deposits/withdrawals during this period. This is not investment return.'} aria-describedby="net-worth-change-info" className="text-muted"><Info size={13}/></button>
                 <span id="net-worth-change-info" role="tooltip" className="pointer-events-none absolute left-0 top-full z-20 hidden w-64 rounded-lg border border-border bg-background p-2 text-xs text-muted group-hover:block group-focus-within:block">{language === 'th' ? 'รวมรายรับ รายจ่าย และเงินที่ฝาก/ถอนในช่วงนี้ ไม่ใช่ผลตอบแทนการลงทุน' : 'Includes income, expenses, and deposits/withdrawals during this period. This is not investment return.'}</span>
               </span>
-              <span className="text-gray-500 text-[10px] font-medium uppercase">
-                Rate: 1 USD = {Number.isFinite(exchangeRates[currency]) ? exchangeRates[currency].toLocaleString('en-US', { maximumFractionDigits: 4 }) : '—'} {currency}
+              <span className="dashboard-rate text-muted text-[10px] font-medium uppercase">
+                {language === 'th' ? 'อัตราแลกเปลี่ยน' : 'Rate'}: 1 USD = {Number.isFinite(exchangeRates[currency]) ? exchangeRates[currency].toLocaleString('en-US', { maximumFractionDigits: 4 }) : '—'} {currency}
               </span>
               {activePositions > 0 && isDataLoaded && <span className="rounded-full border border-border px-2 py-0.5 text-[10px] text-muted">{language === 'th' ? 'ผลตอบแทน' : 'Return'} {formatPercent(netWorthReturnPct, 1)}</span>}
             </div>
@@ -584,9 +574,28 @@ export default function DashboardView({loading:forceLoading=false}:{loading?:boo
           </div>
         </div>
         {chart.failed&&<p role="status" className="text-xs text-muted">{language==='th'?'คำนวณช่วงเวลานี้ไม่สำเร็จ ลองเลือกอีกครั้ง':'Could not calculate this range. Please select another range and retry.'}</p>}
-        <div className="h-40 sm:h-44 min-w-0" style={{ minHeight: 160 }}>
+        <div className="dashboard-net-worth-plot h-40 sm:h-44 min-w-0" style={{ minHeight: 160 }}>
           {isDataLoaded?<NetWorthSparkline data={chart.data} formatMoney={formatMoney} t={t} language={language} valueScale={currency==='USD'?1:exchangeRates[currency]} periodLabel={periodLabel} dim={chart.dim} />:<Sk.Chart height="100%"/>}
         </div>
+      </motion.div>
+
+      {/* ─── Quick Stats (4 cards) ─────────────────────────────────── */}
+      <motion.div initial={false} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className={layout.kpis}>
+        {[
+          { label: language === 'th' ? 'สินทรัพย์' : 'Assets', value: activePositions.toString(), icon: <Briefcase size={16} />, color: '#ADC6FF', onClick: () => router.push('/portfolio') },
+          { label: language === 'th' ? 'กำไร/ขาดทุน' : "P/L", value: `${totalUnrealizedPL >= 0 ? '+' : ''}${formatMoney(totalUnrealizedPL)}`, icon: <BarChart3 size={16} />, color: totalUnrealizedPL >= 0 ? '#4EDEA3' : '#FFB4AB', onClick: () => router.push('/portfolio') },
+          { label: language === 'th' ? 'เงินในกระเป๋า' : 'Buckets', value: formatMoney(totalBucketValue), icon: <Wallet size={16} />, color: '#E9C349', onClick: () => router.push('/budget') },
+          { label: language === 'th' ? 'เดือนนี้' : 'This Month', value: formatCashflowMoney(monthSummary.netMinor, currency, true), icon: <TrendingUp size={16} />, color: monthNet >= 0 ? '#4EDEA3' : '#FFB4AB', onClick: () => router.push('/cashflow') },
+        ].map((stat, i) => (
+          <motion.button key={i} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={stat.onClick}
+            className="dashboard-stat bg-surface/50 rounded-2xl p-4 border border-border text-left hover:border-white/10 transition-all group">
+            <div className="dashboard-stat-icon flex items-center gap-2 mb-2">
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${stat.color}15`, color: stat.color }}>{stat.icon}</div>
+            </div>
+            <div className="dashboard-stat-value text-lg font-bold text-white tracking-tight truncate">{isDataLoaded?stat.value:<Sk.Line height={28} width="70%"/>}</div>
+            <div className="dashboard-stat-label text-xs font-medium text-muted">{stat.label}</div>
+          </motion.button>
+        ))}
       </motion.div>
 
       {/* ─── Main Grid: P/L Metrics + Cashflow + Top Movers ─────── */}
