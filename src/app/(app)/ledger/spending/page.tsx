@@ -171,9 +171,12 @@ function TrackerWorkspace({owner}:{owner:string}) {
     </button>;
   }
   function selectionHighlight() {
-    return <motion.span layoutId="tracker-selection" aria-hidden="true"
-      className="pointer-events-none absolute inset-0 rounded-lg border border-primary bg-surface"
-      transition={reducedMotion ? {duration:0} : {type:'spring',stiffness:420,damping:24,mass:0.7}}/>;
+    return <><motion.span layoutId="tracker-selection" aria-hidden="true"
+      className="pointer-events-none absolute inset-0 z-0 rounded-lg bg-surface"
+      transition={reducedMotion ? {duration:0} : {type:'spring',stiffness:420,damping:30,mass:0.7}}/>
+      <motion.span aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 rounded-lg border border-primary"
+        initial={{opacity:0}} animate={{opacity:1}} transition={reducedMotion ? {duration:0} : {duration:0.15,delay:0.18}}/>
+    </>;
   }
   return <div className="app-page-container mx-auto max-w-6xl space-y-6 py-6 pb-28">
     <Link href="/ledger" className="inline-flex items-center gap-2 text-sm text-muted hover:text-foreground"><ArrowLeft size={16}/>Ledger</Link>
@@ -200,13 +203,13 @@ function TrackerWorkspace({owner}:{owner:string}) {
     {error && <div role="alert" className="rounded-lg border border-border p-3 text-sm">{error} {!ready && <button className="ledger-control" onClick={()=>setRetry(retry+1)}>{txt('Retry','ลองอีกครั้ง')}</button>}</div>}
     {!isDataLoaded ? <p role="status" className="py-6 text-muted">{dataLoadError || txt('Loading Ledger history…','กำลังโหลดประวัติ Ledger…')}</p>
     : <div className="grid items-start gap-6 md:grid-cols-[minmax(13rem,1fr)_minmax(0,3fr)]">
-      <LayoutGroup id={`${tabGroupId}-views-${kind}`}><nav aria-label={txt('Tracker views','เลือกมุมมองการติดตาม')} className="space-y-1">
+      <LayoutGroup id={`${tabGroupId}-views-${kind}`}><nav aria-label={txt('Tracker views','เลือกมุมมองการติดตาม')} className="isolate space-y-1">
         <button className={'relative block min-h-11 w-full rounded-lg border border-transparent px-3 py-2 text-left font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary '+(!current?'':'hover:bg-surface')} aria-pressed={!current} onClick={()=>{setSelected('');setRemoving(false);}}>
-          {!current && selectionHighlight()}<span className="relative">{txt('All categories','ภาพรวมทุกหมวด')}</span>
+          {!current && selectionHighlight()}<span className="relative z-10">{txt('All categories','ภาพรวมทุกหมวด')}</span>
         </button>
         {!!visibleTrackers.length && <p className="px-3 pt-4 text-xs text-muted">{txt('My trackers','หัวข้อที่ติดตาม')}</p>}
         {visibleTrackers.map(item=><button key={item.id} className={'relative block min-h-11 w-full rounded-lg border border-transparent px-3 py-2 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary '+(item.id===current?.id?'':'hover:bg-surface')} aria-pressed={item.id===current?.id} onClick={()=>{setSelected(item.id);setRemoving(false);}}>
-          {item.id===current?.id && selectionHighlight()}<span className="relative block break-words font-medium">{item.name}</span><span className="relative text-xs text-muted">{t(presets.includes(cashflowCategoryKey(item.category)) ? cashflowCategoryKey(item.category) : item.category)} · {item.keywords.length ? item.keywords.join(', ') : txt('Entire category','ทั้งหมวด')}</span>
+          {item.id===current?.id && selectionHighlight()}<span className="relative z-10 block break-words font-medium">{item.name}</span><span className="relative z-10 text-xs text-muted">{t(presets.includes(cashflowCategoryKey(item.category)) ? cashflowCategoryKey(item.category) : item.category)} · {item.keywords.length ? item.keywords.join(', ') : txt('Entire category','ทั้งหมวด')}</span>
         </button>)}
       </nav></LayoutGroup>
       {!current || !summary ? <section className="min-w-0 rounded-xl border border-border p-4 sm:p-6">

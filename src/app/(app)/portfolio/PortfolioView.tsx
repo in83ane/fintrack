@@ -2382,10 +2382,10 @@ export default function PortfolioView({ loading: forceLoading = false }: { loadi
     brokerageCashBalances,
     recordBrokerageCashMovement,
     moneyBuckets,
-    assets,
+    portfolioAssets: assets,
     marketQuotes,
     saveAssetPreferences,
-    trades,
+    portfolioTrades: trades,
     isDataLoaded,
     addAsset,
     addTrade,
@@ -2516,11 +2516,10 @@ export default function PortfolioView({ loading: forceLoading = false }: { loadi
   }, [sidebarBrokers, syncBrokers]);
 
   const effectiveBrokerageAccounts = useMemo(() => {
-    if (activePortfolio?.kind === "trading") {
-      return brokerageAccounts;
-    }
+    // The board owns every broker; `broker` filters its visible rows below.
+    // A selected broker must never erase balances from the comparison chips.
     return allBrokerageAccounts.length > 0 ? allBrokerageAccounts : brokerageAccounts;
-  }, [activePortfolio, brokerageAccounts, allBrokerageAccounts]);
+  }, [brokerageAccounts, allBrokerageAccounts]);
 
   const cashCards = useMemo(() => portfolioCashCards(effectiveBrokerageAccounts, brokerageCashBalances), [effectiveBrokerageAccounts, brokerageCashBalances]);
 
@@ -3001,7 +3000,7 @@ export default function PortfolioView({ loading: forceLoading = false }: { loadi
   const presenceKey = 'fintrack.portfolio.has-holdings.v1:' + (activePortfolio?.id || 'all');
   const [lastPresence, setLastPresence] = useState<boolean | null>(null);
   useEffect(() => { try { const saved = localStorage.getItem(presenceKey); setLastPresence(saved === null ? null : saved === 'true'); } catch { setLastPresence(null); } }, [presenceKey]);
-  useEffect(() => { if (!forceLoading && ready && isDataLoaded) { try { localStorage.setItem(presenceKey, String(appHoldings.length > 0)); } catch {} } }, [forceLoading, ready, isDataLoaded, presenceKey, appHoldings]);
+  useEffect(() => { if (!forceLoading && ready && isDataLoaded) { try { localStorage.setItem(presenceKey, String(appHoldings.some(h=>broker==='all'||h.brokerId===broker))); } catch {} } }, [forceLoading, ready, isDataLoaded, presenceKey, appHoldings, broker]);
 
   const marketTab: Market | null = tab === "US" || tab === "TH" || tab === "GOLD" || tab === "FUND" ? tab : null;
 

@@ -6,19 +6,20 @@ const compile = text => ts.transpileModule(text, { compilerOptions: { module: ts
 const url = text => `data:text/javascript;base64,${Buffer.from(text).toString('base64')}`;
 const ledgerUrl = url(compile(read('../src/lib/cost-basis-ledger.ts')));
 const resolve = path => url(compile(read(path)).replaceAll("'./cost-basis-ledger'", JSON.stringify(ledgerUrl)));
-const { projectLotPosition } = await import(resolve('../src/lib/trade-lots.ts'));
+const { projectLotPosition, projectNativeLotPosition } = await import(resolve('../src/lib/trade-lots.ts'));
+const { assetAllocation } = await import(resolve('../src/lib/instrument-metadata.ts'));
 const { valuePortfolio } = await import(resolve('../src/lib/fx.ts'));
-const source = read('../src/app/(app)/portfolio/page.tsx');
+const source = read('../src/app/(app)/portfolio/PortfolioView.tsx');
 const start = source.indexOf('  const appHoldings = useMemo(');
 const end = source.indexOf('\n  useEffect(', start);
 assert.ok(start > 0 && end > start);
-const project = new Function('useMemo', 'assets', 'trades', 'activePortfolio', 'marketQuotes', 'sidebarBrokers', 'projectLotPosition', compile(source.slice(start, end)) + '\nreturn appHoldings;');
+const project = new Function('useMemo', 'assets', 'trades', 'activePortfolio', 'marketQuotes', 'sidebarBrokers', 'projectLotPosition', 'projectNativeLotPosition', 'assetAllocation', 'exchangeRates', compile(source.slice(start, end)) + '\nreturn appHoldings;');
 const assets = [{ id: 'one', portfolioId: 'p', symbol: 'OPAQUE', name: 'Holding', shares: 2, avgCost: 100, currentPrice: 150, valueUSD: 300, allocation: 'Equities' }];
 const trades = [{ id: 1, portfolioId: 'p', type: 'IMPORT', asset: 'OPAQUE', shares: 2, pricePerUnit: 100, amountUSD: 200, currency: 'USD', originalAmount: 200, date: '2026-10-13' }];
 const before = JSON.stringify({ assets, trades });
 for (const active of [undefined, { id: 'p' }]) {
   for (const history of [[], trades]) {
-    const holdings = project(f => f(), assets, history, active, {}, [{ id: 'p' }], projectLotPosition);
+    const holdings = project(f => f(), assets, history, active, {}, [{ id: 'p' }], projectLotPosition, projectNativeLotPosition, assetAllocation, {THB:33.53});
     assert.equal(holdings.length, 1);
     assert.equal(holdings[0].currency, 'USD');
     assert.equal(holdings[0].price, 150);

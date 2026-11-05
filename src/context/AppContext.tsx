@@ -5,6 +5,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { flushSync } from 'react-dom';
 import { transitionTheme, type ThemeOrigin } from '@/src/lib/theme-transition';
 import { afterFinancialWrite, financialSnapshots, readFinancialSnapshot, scopeFinancialSnapshot } from '@/src/lib/financial-snapshot';
+import { portfolioAsset, portfolioTrade, replacePortfolioScope } from '@/src/lib/portfolio-projection';
 import { MemoryResource } from '@/src/lib/memory-resource';
 import { getNetWorthRange, getNetWorthSeries, type NetWorthScope, type NetWorthPoint } from '@/src/lib/net-worth-series';
 import { STALE_TTL } from '@/src/lib/loading-policy';
@@ -323,6 +324,8 @@ interface AppState {
   allocations: Allocation[];
   updateAllocation: (label: string, value: number) => void;
   assets: Asset[];
+  portfolioAssets: Asset[];
+  portfolioTrades: Trade[];
   marketQuotes: Record<string, MarketQuote>;
   saveAssetPreferences: (portfolioId: string, symbol: string, preferences: { isFavorite?: boolean; sortOrder?: number }) => Promise<boolean>;
   portfolios: Portfolio[];
@@ -1796,6 +1799,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [trades, setTrades] = useState<Trade[]>(defaultTrades);
   const [allocations, setAllocations] = useState<Allocation[]>(defaultAllocations);
   const [assets, setAssets] = useState<Asset[]>(defaultAssets);
+  const [portfolioSnapshot, setPortfolioSnapshot] = useState<{assets:Asset[];trades:Trade[]}>({assets:[],trades:[]});
   const [marketQuotes, setMarketQuotes] = useState<Record<string, MarketQuote>>({});
   const assetsRef = React.useRef<Asset[]>(assets);
   useEffect(() => {
@@ -2292,6 +2296,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       draftCache.current.invalidate();
       setIsDataLoaded(false);
       loadedUser.current = owner;
+      setPortfolioSnapshot({assets:[],trades:[]});
     }
     if (lastFinancialRevision.current !== financialRevision) {
       financialSnapshots.invalidate();
@@ -2317,6 +2322,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       deletedAssetSymbols.current.clear();
       setDataPortfolioId(activePortfolioId);
       try {
+        setPortfolioSnapshot({
+          assets: (snapshot[0].data || []).filter(a=>a.is_active!==false).map(portfolioAsset),
+          trades: (snapshot[1].data || []).map(portfolioTrade),
+        });
         const cashManagementPortfolioId = portfolios.find(portfolio => portfolio.kind === 'cash_management')?.id || null;
         const selectedPortfolio = portfolios.find(portfolio => portfolio.id === activePortfolioId);
         const tradingPortfolioId = selectedPortfolio?.kind === 'trading' ? activePortfolioId : null;
@@ -2370,31 +2379,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           activeAssets.forEach(a => {
             const symbolKey = a.symbol.toUpperCase();
             const quantity = a.quantity || 0;
-            const currentPrice = a.current_price || a.avg_purchase_price || (quantity > 0 ? (a.value_usd || 0) / quantity : 0);
-            const nextAsset = {
-                id: a.id,
-                name: a.name,
-                symbol: a.symbol,
-                valueUSD: (() => {
-                  if (currentPrice && quantity) return currentPrice * quantity;
-                  if (a.avg_purchase_price && quantity) return a.avg_purchase_price * quantity;
-                  return a.value_usd || 0;
-                })(),
-                change: a.change_percentage || 0,
-                allocation: assetAllocation(a.allocation, a.asset_type, a.symbol),
-                currency: a.currency || undefined, nativePrice: a.native_price || undefined,
-                quoteAsOf: a.quote_as_of || undefined, quoteSource: a.quote_source || undefined,
-                dayChangeNative: a.native_day_change ?? null,
-                shares: quantity,
-                avgCost: a.avg_purchase_price || 0,
-                currentPrice,
-                isFavorite: a.is_favorite,
-                sortOrder: a.sort_order,
-                portfolioPreferences: a.portfolio_id ? { [a.portfolio_id]: { isFavorite: a.is_favorite, sortOrder: a.sort_order } } : {},
-                is_active: a.is_active,
-                portfolioId: a.portfolio_id || undefined,
-                brokerageAccountId: a.brokerage_account_id || undefined,
-              };
+            const nextAsset = portfolioAsset(a);
             const existing = uniqueAssetsMap.get(symbolKey);
             // The all-portfolios view is an aggregate. Keep one row per symbol
             // and combine its quantity/cost/value instead of silently keeping
@@ -2476,38 +2461,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (tradesData) {
-          setTrades(tradesData.map(t => {
-            // Extract source bucket ID from notes if present
-            let sourceBucketId: string | undefined = undefined;
-            if (t.notes && t.notes.startsWith("Source Wallet ID: ")) {
-              sourceBucketId = t.notes.replace("Source Wallet ID: ", "").trim();
-            }
-
-            return {
-              id: parseInt(t.id.split('-')[0], 16) || Date.now(), // Fallback for old trade ID system if needed
-              asset: t.symbol,
-              type: t.type,
-              amountUSD: t.amount_usd,
-              date: t.execution_date,
-              createdAt: t.created_at,
-              rateAtTime: t.exchange_rate_at_time || 1,
-              fees: Number(t.fees || 0),
-              includeFees: t.portfolios?.cost_include_fees !== false,
-              costMethod: t.cost_basis_sales?.method,
-              closeMode: t.cost_basis_sales?.request?.closeMode,
-              lotSelections: t.cost_basis_sales?.selections,
-              fxRateTHB: Number(t.tags?.find((tag: string) => tag.startsWith('FX USD/THB '))?.slice(11)) || undefined,
-              currency: t.currency || 'USD',
-              originalAmount: t.original_amount || undefined,
-              shares: t.quantity || 0,
-              pricePerUnit: t.price_at_execution || 0,
-              sourceBucketId: sourceBucketId,
-              brokerageAccountId: t.brokerage_account_id || undefined,
-              tag: (t.tags && t.tags.length > 0) ? t.tags[0] : undefined,
-              dbId: t.id,
-              portfolioId: t.portfolio_id || undefined,
-            };
-          }));
+          setTrades(tradesData.map(portfolioTrade));
         } else {
           setTrades([]);
         }
@@ -3021,16 +2975,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, [activePortfolioId, dataPortfolioId, trades, dcaPositions, isDataLoaded]);
 
+  // Portfolio's broker chips always value the complete account. Overlay the
+  // loaded scope for immediate trades/edits; never replace other brokers with it.
+  const loadedTradingScope = portfolios.find(p=>p.id===dataPortfolioId)?.kind==='trading' ? dataPortfolioId! : null;
+  const portfolioTrades = React.useMemo(()=>!user ? trades :
+    dataPortfolioId === activePortfolioId ? replacePortfolioScope(portfolioSnapshot.trades,trades,loadedTradingScope) : portfolioSnapshot.trades,
+    [user,trades,dataPortfolioId,activePortfolioId,loadedTradingScope,portfolioSnapshot]);
+  const portfolioAssets = React.useMemo(()=>{
+    if (!user) return assets;
+    if (dataPortfolioId !== activePortfolioId) return portfolioSnapshot.assets;
+    if (loadedTradingScope) return replacePortfolioScope(portfolioSnapshot.assets,assets,loadedTradingScope);
+    // All-mode assets can combine identical symbols. Preserve per-broker units
+    // and carry only the current preferences from those aggregate display rows.
+    return portfolioSnapshot.assets.map(asset=>{
+      const current=assets.find(row=>row.symbol===asset.symbol);
+      const preferences=asset.portfolioId ? current?.portfolioPreferences?.[asset.portfolioId] : undefined;
+      return preferences ? {...asset,...preferences} : asset;
+    });
+  },[user,assets,dataPortfolioId,activePortfolioId,loadedTradingScope,portfolioSnapshot]);
+
   const marketQuotesRef = useRef(marketQuotes);
-  const fundSymbolKey = React.useMemo(() => assets.filter(a => a.allocation === 'Funds').map(a => a.symbol.toUpperCase()).sort().join(','), [assets]);
+  const fundSymbolKey = React.useMemo(() => portfolioAssets.filter(a => a.allocation === 'Funds').map(a => a.symbol.toUpperCase()).sort().join(','), [portfolioAssets]);
   marketQuotesRef.current = marketQuotes;
 
   // Fetch Live Market Data and persist prices to Supabase.  Depend on the
   // symbol list, not the asset objects themselves, so a newly executed trade
   // receives a quote immediately without creating a price-update loop.
   const marketSymbolKey = React.useMemo(
-    () => [...new Set([...assets.map(asset => asset.symbol), ...trades.map(trade => trade.asset)])].map(symbol => symbol.toUpperCase()).sort().join('|'),
-    [assets, trades]
+    () => [...new Set([...portfolioAssets.map(asset => asset.symbol), ...portfolioTrades.map(trade => trade.asset)])].map(symbol => symbol.toUpperCase()).sort().join('|'),
+    [portfolioAssets, portfolioTrades]
   );
   useEffect(() => {
     if (!isDataLoaded || dataPortfolioId !== activePortfolioId) return;
@@ -4100,6 +4073,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       allocations,
       updateAllocation: isAllPortfolios ? blockAllPortfolioMutation : updateAllocation,
       assets,
+      portfolioAssets,
+      portfolioTrades,
       marketQuotes,
       portfolios,
       activePortfolioId,
