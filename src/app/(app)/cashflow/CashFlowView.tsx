@@ -18,11 +18,11 @@ import { AddCashflowModal } from '@/src/components/AddCashflowModal';
 import { AllocationSurface } from '@/src/components/AllocationSurface';
 import { ChartReveal } from '@/src/components/ChartReveal';
 import { ChartFrame, DataTable, type DataRow } from '@/src/components/cashflow/ChartFrame';
+import { FlowBreakdown } from '@/src/components/cashflow/FlowBreakdown';
 import { decimal } from '@/src/lib/fx';
 import { type CashflowScope, type FlowNode, displayCashflowCategory, formatCashflowMoney, getBudgetStatus, getCashflowSummary, getCategoryBreakdown, getDailySeries, getFlowGraph, getMonthlySeries, getNetWorthIncludedSources, getUpcomingRecurring, localCashflowDay, monthBounds, toMinor } from '@/src/lib/cashflow-selectors';
 
 const chartLoading = () => <Sk.Root name="cashflow-chart"><Sk.Chart height={256}/></Sk.Root>;
-const FlowChart = dynamic(() => import('@/src/components/cashflow/charts').then(m => m.FlowChart), { ssr: false, loading: ()=><Sk.Chart height={420}/> });
 const MonthlyChart = dynamic(() => import('@/src/components/cashflow/charts').then(m => m.MonthlyChart), { ssr: false, loading: chartLoading });
 const SavingsChart = dynamic(() => import('@/src/components/cashflow/charts').then(m => m.SavingsChart), { ssr: false, loading: chartLoading });
 const BalanceChart = dynamic(() => import('@/src/components/cashflow/charts').then(m => m.BalanceChart), { ssr: false, loading: chartLoading });
@@ -181,16 +181,23 @@ export default function CashFlowView({loading:forceLoading=false}:{loading?:bool
         { label: text('Inflow subtotal', 'รวมเงินเข้า'), values: [m(summary.inflowMinor)], subtotal: true },
         { label: text('Expenses', 'รายจ่าย'), values: [m(summary.expenseMinor)] }, { label: text('Invested', 'ลงทุน'), values: [m(summary.investedMinor)] },
         { label: text('Outflow subtotal', 'รวมเงินออก'), values: [m(summary.outflowMinor)], subtotal: true },
-        { label: summary.netMinor < 0 ? text('Overspent', 'ใช้เกินรายรับ') : text('Saved', 'ออม'), values: [m(summary.netMinor, true)], subtotal: true },
+        { label: category ? text('Selected net flow', 'ยอดสุทธิที่เลือก') : summary.netMinor < 0 ? text('Overspent', 'ใช้เกินรายรับ') : text('Saved', 'ออม'), values: [m(summary.netMinor, true)], subtotal: true },
       ];
       const grouped: DataRow[] = [];
       const tableGroups = [
-        { title:text('Income / investment proceeds','รายรับ / เงินจากการขายลงทุน'), rows:graph.nodes.filter(n => n.layer===0 && n.kind!=='reconciliation').map(n=>({name:n.name,minor:n.minor})), total:summary.inflowMinor },
-        { title:text('Wallets · recorded inflows','กระเป๋า · เงินเข้าที่บันทึก'), rows:result.wallets.map(w=>({name:w.name,minor:summary.entries.filter(e=>e.walletId===w.id && (e.kind==='income'||e.kind==='proceeds')).reduce((s,e)=>s+e.minor,0)})).concat([{name:text('Unassigned wallet','ไม่ระบุกระเป๋า'),minor:summary.entries.filter(e=>e.walletId==='unassigned' && (e.kind==='income'||e.kind==='proceeds')).reduce((s,e)=>s+e.minor,0)}]), total:summary.inflowMinor },
-        { title:text('Expenses','รายจ่าย'), rows:graph.nodes.filter(n=>n.kind==='expense').map(n=>({name:n.name,minor:n.minor})), total:summary.expenseMinor },
-        { title:text('Invested','ลงทุน'), rows:summary.entries.filter(e=>e.kind==='invested').map(e=>({name:e.record.note||e.record.type,minor:e.minor})), total:summary.investedMinor },
+        { title:text('Income / investment proceeds','รายรับ / เงินจากการขายลงทุน'), rows:graph.nodes.filter(n => n.layer===0 && n.kind!=='reconciliation').map(n=>({name:n.name,minor:n.minor})), total:summary.inflowMinor, base:summary.inflowMinor },
+        { title:text('Wallets · recorded inflows','กระเป๋า · เงินเข้าที่บันทึก'), rows:result.wallets.map(w=>({name:w.name,minor:summary.entries.filter(e=>e.walletId===w.id && (e.kind==='income'||e.kind==='proceeds')).reduce((s,e)=>s+e.minor,0)})).concat([{name:text('Unassigned wallet','ไม่ระบุกระเป๋า'),minor:summary.entries.filter(e=>e.walletId==='unassigned' && (e.kind==='income'||e.kind==='proceeds')).reduce((s,e)=>s+e.minor,0)}]), total:summary.inflowMinor, base:summary.inflowMinor },
+        { title:text('Expenses','รายจ่าย'), rows:graph.nodes.filter(n=>n.kind==='expense').map(n=>({name:n.name,minor:n.minor})), total:summary.expenseMinor, base:category ? summary.outflowMinor : summary.inflowMinor },
+        { title:text('Invested','ลงทุน'), rows:summary.entries.filter(e=>e.kind==='invested').map(e=>({name:e.record.note||e.record.type,minor:e.minor})), total:summary.investedMinor, base:category ? summary.outflowMinor : summary.inflowMinor },
       ];
-      for(const group of tableGroups){grouped.push({label:group.title,values:['',''],subtotal:true});group.rows.forEach(row=>grouped.push({label:row.name,values:[m(row.minor),`${(row.minor/Math.max(summary.inflowMinor,1)*100).toFixed(1)}%`]}));grouped.push({label:`${group.title} · ${text('subtotal','รวม')}`,values:[m(group.total),''],subtotal:true});}
+      for (const group of tableGroups) {
+        grouped.push({label:group.title,values:['',''],subtotal:true});
+        for (const row of group.rows) {
+          const percent = group.base > 0 ? `${(row.minor / group.base * 100).toFixed(1)}%` : '—';
+          grouped.push({label:row.name,values:[m(row.minor),percent]});
+        }
+        grouped.push({label:`${group.title} · ${text('subtotal','รวม')}`,values:[m(group.total),''],subtotal:true});
+      }
       grouped.push(...totalsTable.map(row => ({ ...row, values: [...row.values, ''] })));
       const portfolioValue = assets.reduce((s, asset) => s.add(decimal(asset.valueUSD)), decimal(0));
       const basis = assets.reduce((s, asset) => s.add(decimal(asset.avgCost || 0).mul(decimal(asset.shares || 0))), decimal(0));
@@ -215,10 +222,10 @@ export default function CashFlowView({loading:forceLoading=false}:{loading?:bool
         </section>
         <div className="flex flex-wrap items-start justify-between gap-3"><div className="text-xs"><span className="rounded-full border border-border px-3 py-1.5">{text('Net worth', 'มูลค่าสุทธิ')} <b className="ml-2 tabular-nums">{!isDataLoaded ? '…' : hidden ? '••••••' : worth === undefined ? '—' : formatMoney(worth)}</b></span><p className="mt-2 max-w-2xl text-[10px] text-muted">{scopeLabel} · {text('Dashboard valuation currency', 'สกุลเงินตามแดชบอร์ด')}: {currency}</p></div><button className="flex items-center gap-2 text-xs text-muted" title={text('Score starts at 50. Savings: +15 at 20%, +8 at 10%. Investment ratio: +15 at 15%, +8 at 5%. Expenses ≤ half income: +10. Portfolio return: +10 at 10%, +5 if nonnegative. Buckets: +5. Positive realized profit: +5. Capped at 100; selected period and investment toggle apply.', 'เริ่มที่ 50 คะแนน เพิ่มตามการออม การลงทุน การคุมรายจ่าย ผลตอบแทนพอร์ต กระเป๋า และกำไรที่รับรู้ สูงสุด 100 ตามช่วงที่เลือก')}><svg data-chart="ring" viewBox="0 0 40 40" className="h-9 w-9 -rotate-90"><circle cx="20" cy="20" r="16" fill="none" stroke="currentColor" opacity={.2} strokeWidth="3"/><circle data-chart-ring cx="20" cy="20" r="16" pathLength="100" fill="none" stroke={green} strokeWidth="3" strokeDasharray={`${isDataLoaded && summary.hasActivity ? score : 0} 100`}/></svg>{text('Financial health', 'สุขภาพการเงิน')} {isDataLoaded && summary.hasActivity ? `${score}/100` : '—'}<CircleHelp size={13}/></button></div>
 
-        {(view === 'overview' || view === 'flow') && <ChartFrame id="cashflow-flow" title={text('Where your money flows', 'เงินของคุณไหลไปที่ไหน')} description="Three layers: income sources, actual wallets, expenses and investments. Exact reconciliation is available in the table." period={periodLabel} headers={[text('Section / item', 'ส่วน / รายการ'), text('Amount', 'จำนวน'), '%']} rows={grouped} hiddenAmounts={hidden} action={graph.smallCategoryCount > 0 ? <button className={control} onClick={() => setExpandedCategories(v => !v)}>{expandedCategories ? text('Collapse Other', 'ย่ออื่น ๆ') : text('Expand Other', 'ขยายอื่น ๆ')}</button> : undefined}>
-          {!isDataLoaded ? loading('h-[420px]') : !summary.hasActivity ? empty('h-[420px]') : <FlowChart {...chartProps} graph={graph} onSelect={chooseNode}/>}
-          {summary.hasActivity && <div className="mt-4 grid grid-cols-3 gap-4 border-t border-border pt-4 text-xs">{[[text('Inflow', 'เงินเข้า'), summary.inflowMinor, green], [text('Outflow', 'เงินออก'), summary.outflowMinor, red], [summary.netMinor < 0 ? text('Overspent', 'ใช้เกินรายรับ') : text('Saved', 'ออม'), summary.netMinor, summary.netMinor < 0 ? red : green]].map(([label, amount, color]) => <div key={String(label)}><p className="text-muted">{label}</p><p className="mt-1 break-all font-semibold tabular-nums" style={{ color: String(color) }}>{m(Number(amount), label === text('Saved', 'ออม') || label === text('Overspent', 'ใช้เกินรายรับ'))}</p></div>)}</div>}
-          {graph.reconciliationMinor > 0 && <p className="mt-3 text-[11px] text-muted">{text('Dashed links show opening balances or wallet transfers without paired endpoints. They are excluded from income and the footer. Saved is the period net; wallet attribution of saved money is derived.', 'เส้นประแสดงยอดเดิมหรือเงินโอนที่ไม่มีคู่เชื่อม ไม่รวมในรายรับหรือยอดสรุป การแบ่งเงินออมต่อกระเป๋าเป็นค่าคำนวณ')}</p>}
+        {(view === 'overview' || view === 'flow') && <ChartFrame id="cashflow-flow" title={text('Where your money flows', 'เงินของคุณไหลไปที่ไหน')} description="Two ranked lists: where income came from, and where it went (expenses, investments, saved). Exact reconciliation is available in the table." period={periodLabel} headers={[text('Section / item', 'ส่วน / รายการ'), text('Amount', 'จำนวน'), '%']} rows={grouped} hiddenAmounts={hidden} action={graph.smallCategoryCount > 0 ? <button className={control} onClick={() => setExpandedCategories(v => !v)}>{expandedCategories ? text('Collapse Other', 'ย่ออื่น ๆ') : text('Expand Other', 'ขยายอื่น ๆ')}</button> : undefined}>
+          {!isDataLoaded ? <div className={layout.flow}>{[0, 1].map(i => <div key={i}>{loading()}</div>)}</div> : !summary.hasActivity ? empty() : <FlowBreakdown className={layout.flow} focused={!!category} nodes={graph.nodes} totals={summary} format={m} text={text} onSelect={chooseNode}/>}
+          {summary.hasActivity && !category && <div className="mt-6 grid grid-cols-3 gap-4 border-t border-border pt-5 text-xs">{[[text('Inflow', 'เงินเข้า'), summary.inflowMinor, green], [text('Outflow', 'เงินออก'), summary.outflowMinor, red], [summary.netMinor < 0 ? text('Overspent', 'ใช้เกินรายรับ') : text('Saved', 'ออม'), summary.netMinor, summary.netMinor < 0 ? red : green]].map(([label, amount, color]) => <div key={String(label)}><p className="text-muted">{label}</p><p className="mt-1 break-all font-semibold tabular-nums" style={{ color: String(color) }}>{m(Number(amount), label === text('Saved', 'ออม') || label === text('Overspent', 'ใช้เกินรายรับ'))}</p></div>)}</div>}
+          {isDataLoaded && !category && summary.netMinor >= 0 && graph.reconciliationMinor > 0 && <p className="mt-4 text-[11px] text-muted">{text('Not counted above: ', 'ไม่รวมในรายการข้างบน: ')}{m(graph.reconciliationMinor)} {text('of opening balance or wallet transfers without a matching pair. Saved is the period net.', 'เป็นยอดเดิมหรือเงินโอนระหว่างกระเป๋าที่ยังจับคู่ไม่ได้ ส่วน "ออม" คือยอดสุทธิของช่วงนี้')}</p>}
         </ChartFrame>}
 
         {(view === 'overview' || view === 'trends') && <>
