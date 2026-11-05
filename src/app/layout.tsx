@@ -17,6 +17,8 @@ const notoSansThai = Noto_Sans_Thai({
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#0f1013",
   // The app is responsive at the device width.  Keep browser zoom available
   // for accessibility instead of forcing users to compensate for a layout.
   maximumScale: 5,

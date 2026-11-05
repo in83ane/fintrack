@@ -6,7 +6,7 @@ import { GlideGroup, GlidingIndicator } from './GlidingIndicator';
 import { Sk } from './skeleton';
 import { useFxRate } from '@/src/hooks/useFxRate';
 import { PRICE_ALERT_EVENT } from '@/src/lib/price-alerts';
-import { Bell, Globe, ChevronDown, Plus, Check, Layers, Pencil } from "lucide-react";
+import { Bell, Globe, ChevronDown, Plus, Check, Layers, Pencil, Menu } from "lucide-react";
 import { useApp, Language, Currency, AppNotification } from "@/src/context/AppContext";
 import { cn } from "@/src/lib/utils";
 import { AnimatePresence, motion } from "motion/react";
@@ -25,7 +25,7 @@ function formatTimeAgo(time: Date, t: (key: string) => string): string {
   return t("hoursAgo").replace("{n}", String(diffHr));
 }
 
-export function TopBar() {
+export function TopBar({ onOpenMenu }: { onOpenMenu?: () => void }) {
   const fx = useFxRate();
   const { language, setLanguage, currency, setCurrency, t, userProfile, isDataLoaded, notifications, notificationUnread, notificationHasMore, notificationError, notificationLoading, loadMoreNotifications, refreshNotifications, markNotificationRead, clearNotifications, portfolios, activePortfolio, isAllPortfolios, selectPortfolio, createPortfolio, renamePortfolio } = useApp();
   const [avatarReady, setAvatarReady] = React.useState(false);
@@ -121,15 +121,16 @@ export function TopBar() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 flex h-[var(--topbar-h)] w-full min-w-0 items-center justify-between gap-3 border-b border-border bg-surface/80 px-4 backdrop-blur-md lg:px-12">
+      <header className="app-topbar sticky top-0 z-50 flex w-full min-w-0 items-center justify-between gap-2 border-b border-border bg-surface px-3 lg:bg-surface/80 lg:px-12 lg:backdrop-blur-md">
         <div className="flex min-w-0 shrink items-center gap-2 lg:gap-8">
-          <h2 className="hidden truncate text-sm font-bold uppercase tracking-wide text-white md:block">
+          <button type="button" onClick={onOpenMenu} aria-label={language === 'th' ? 'เปิดเมนู' : 'Open menu'} aria-controls="mobile-navigation" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-foreground hover:bg-surface-2 lg:hidden"><Menu size={22}/></button>
+          <h2 className="hidden truncate text-sm font-bold uppercase tracking-wide text-white lg:block">
               {pageTitle}
           </h2>
           <div id="topbar-price-portal" className="hidden items-center gap-3 xl:flex"></div>
         </div>
 
-        <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5 sm:gap-3">
+        <div className="flex min-w-0 items-center justify-end gap-1 sm:gap-3">
           <div className="relative hidden xl:block" ref={portfolioMenuRef}>
             <div
               className={cn(
@@ -247,11 +248,12 @@ export function TopBar() {
           <div className="relative" ref={langMenuRef}>
             <div
               className={cn(
-                "box-border flex h-9 shrink-0 items-center rounded-full border border-border bg-white/5 hover:bg-white/10 transition-all",
+                "box-border flex h-11 shrink-0 items-center rounded-full border border-border bg-white/5 hover:bg-white/10 transition-all lg:h-9",
                 showLangMenu && "border-[#ADC6FF]/40 bg-white/10"
               )}
             >
               <button
+                aria-label={language === 'th' ? 'เลือกภาษา' : 'Choose language'}
                 onClick={() => setShowLangMenu(!showLangMenu)}
                 className="flex h-full items-center gap-1.5 rounded-full px-3 leading-none"
               >
@@ -302,13 +304,13 @@ export function TopBar() {
             </div>
           </div>
           {/* Currency Selector - Capsule Toggle */}
-          <GlideGroup><div className="relative flex h-9 shrink-0 items-center rounded-full border border-border bg-white/5 p-1 box-border">
+          <GlideGroup><div className="relative flex h-11 shrink-0 items-center rounded-full border border-border bg-white/5 p-1 box-border lg:h-9">
             {currencies.map((curr) => (
               <button
                 key={curr}
                 onClick={() => setCurrency(curr)}
                 className={cn(
-                  "relative isolate z-10 flex h-full items-center justify-center rounded-full px-3 text-[10px] font-black uppercase tracking-wide transition-colors",
+                  "relative isolate z-10 flex h-full min-w-11 items-center justify-center rounded-full px-3 text-[10px] font-black uppercase tracking-wide transition-colors lg:min-w-0",
                   currency === curr ? "text-[#00332b]" : "text-gray-500 hover:text-white"
                 )}
               >
@@ -323,7 +325,7 @@ export function TopBar() {
                 aria-label={t('notifications')}
                 aria-expanded={showNotifMenu}
                 onClick={() => { setShowNotifMenu(!showNotifMenu); setShowProfileMenu(false); setShowLangMenu(false); }}
-                className="text-gray-400 hover:text-white transition-colors relative flex items-center h-full p-1"
+                className="text-gray-400 hover:text-white transition-colors relative flex h-11 w-11 items-center justify-center lg:h-8 lg:w-8"
               >
                 <Bell size={18} className={notificationUnread > 0 ? 'animate-[wiggle_0.5s_ease-in-out]' : ''} />
                 {notificationUnread > 0 && (
@@ -339,7 +341,7 @@ export function TopBar() {
                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    className="absolute top-full right-12 mt-4 w-80 bg-background border border-border rounded-2xl shadow-2xl shadow-black/40 overflow-hidden z-[60]"
+                    className="absolute top-full right-0 mt-4 w-80 max-w-[calc(100vw-24px)] bg-background border border-border rounded-2xl shadow-2xl shadow-black/40 overflow-hidden z-[60]"
                   >
                     <div className="px-4 py-3 border-b border-border flex items-center justify-between">
                       <span className="text-sm font-bold text-white uppercase tracking-wide">{t("notifications")}</span>
@@ -401,9 +403,9 @@ export function TopBar() {
             </div>
 
             <div ref={profileMenuRef}>
-              <div
+              <button type="button" aria-label={language === 'th' ? 'บัญชีผู้ใช้' : 'Account menu'} aria-expanded={showProfileMenu}
                 onClick={() => { setShowProfileMenu(!showProfileMenu); setShowNotifMenu(false); setShowLangMenu(false); }}
-                className="w-8 h-8 rounded-full border border-[#ADC6FF]/20 overflow-hidden bg-white/5 flex items-center justify-center relative group cursor-pointer"
+                className="w-11 h-11 lg:w-8 lg:h-8 rounded-full border border-[#ADC6FF]/20 overflow-hidden bg-white/5 flex items-center justify-center relative group cursor-pointer"
               >
                 {(!isDataLoaded || (!!userProfile?.avatarUrl && !avatarReady && !avatarFailed)) && <span className="absolute inset-0"><Sk.Circle width={32}/></span>}
                 {userProfile?.avatarUrl && !avatarFailed ? (
@@ -425,7 +427,7 @@ export function TopBar() {
                 <div className={`absolute inset-0 items-center justify-center text-xs font-black text-[#ADC6FF] ${isDataLoaded && (!userProfile?.avatarUrl || avatarFailed) ? 'flex' : 'hidden'}`}>
                    {userProfile?.initials || "US"}
                 </div>
-              </div>
+              </button>
 
               <AnimatePresence>
                 {showProfileMenu && (

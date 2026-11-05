@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { LayoutDashboard, Wallet, Settings, HelpCircle, User, PiggyBank, Monitor, ReceiptText, CalendarDays, ArrowRightLeft, Plus, Check, Layers, Pencil, ChevronDown, Target } from "lucide-react";
+import { LayoutDashboard, Wallet, Settings, HelpCircle, User, PiggyBank, Monitor, ReceiptText, CalendarDays, ArrowRightLeft, Plus, Check, Layers, Pencil, ChevronDown, Target, X } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 import { useApp } from "@/src/context/AppContext";
 import Link from "next/link";
@@ -12,9 +12,10 @@ import { SettingsModal } from "@/src/components/SettingsModal";
 import { motion } from 'motion/react';
 import { GlideGroup, GlidingIndicator } from './GlidingIndicator';
 
-interface SidebarProps { onClose?: () => void; }
+interface SidebarProps { onClose?: () => void; mobile?: boolean; }
 
-export function Sidebar({ onClose }: SidebarProps) {
+export function Sidebar({ onClose, mobile = false }: SidebarProps) {
+  const portfolioListId = React.useId();
   const { t, language, portfolios, activePortfolio, isAllPortfolios, selectPortfolio, createPortfolio, renamePortfolio } = useApp();
   // Bucket is a cash-management workspace, not an investment broker.  Keep it
   // in the Bucket navigation item and show only tradeable broker portfolios in
@@ -60,7 +61,9 @@ export function Sidebar({ onClose }: SidebarProps) {
     { icon: Settings, label: t("settings"), href: "/settings" },
   ];
 
-  const sidebarClasses = "sidebar-rail fixed left-0 top-0 z-[60] flex h-screen w-[var(--sidebar-w)] flex-col border-r border-border bg-background py-6";
+  const sidebarClasses = cn("sidebar-rail flex-col border-r border-border bg-background py-6", mobile
+    ? "sidebar-mobile relative flex h-full"
+    : "fixed left-0 top-0 z-[60] hidden h-dvh w-[var(--sidebar-w)] lg:flex");
 
   const handleLogout = async () => {
     // Clear all local storage data related to user session to prevent data bleeding
@@ -103,6 +106,7 @@ export function Sidebar({ onClose }: SidebarProps) {
 
   return (
     <aside className={sidebarClasses}>
+      {mobile && <button type="button" autoFocus onClick={onClose} aria-label={language === 'th' ? 'ปิดเมนู' : 'Close menu'} className="absolute right-2 top-2 z-10 flex h-11 w-11 items-center justify-center rounded-xl text-muted hover:bg-surface-2 hover:text-foreground"><X size={20}/></button>}
       <div className="sidebar-brand px-6 mb-8">
         <Link href="/dashboard" onClick={onClose} className="flex items-center gap-3 group">
           <div className="w-9 h-9 bg-primary/20 rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 group-hover:scale-105 transition-transform">
@@ -129,7 +133,7 @@ export function Sidebar({ onClose }: SidebarProps) {
               isPortfolioSectionOpen && "border-[#ADC6FF]/40 bg-white/[0.06]"
             )}
             aria-expanded={isPortfolioSectionOpen}
-            aria-controls="portfolio-list"
+            aria-controls={portfolioListId}
           >
             <span
               className={cn(
@@ -154,7 +158,7 @@ export function Sidebar({ onClose }: SidebarProps) {
 
           {isPortfolioSectionOpen && (
             <div
-              id="portfolio-list"
+              id={portfolioListId}
               className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 rounded-2xl border border-border bg-background p-2 shadow-2xl shadow-black/40"
             >
               <div className="max-h-64 space-y-1 overflow-y-auto custom-scrollbar">
@@ -285,7 +289,7 @@ export function Sidebar({ onClose }: SidebarProps) {
         </a>
 
         <button
-          onClick={() => setIsSettingsOpen(true)}
+          onClick={() => { onClose?.(); setIsSettingsOpen(true); }}
           className="flex items-center gap-2.5 text-gray-500 px-4 py-2.5 hover:text-white transition-all w-full text-left"
         >
           <Settings size={16} />

@@ -18,7 +18,19 @@
 .nw-periods [data-range-indicator] { position:absolute; left:2px; top:2px; height:calc(100% - 4px); width:calc((100% - 4px)/5); border-radius:999px; background:var(--gain); pointer-events:none; }
 .nw-periods button { position:relative; width:20%; border-radius:999px; padding:0; font-size:11px; line-height:22px; font-weight:700; color:var(--color-muted); cursor:pointer; }
 .nw-periods button[aria-pressed=true] { color:var(--color-primary-foreground); }
-@media(max-width:639px) { .nw-tip-parts { display:none; } .nw-periods { width:154px; } }
+@media(max-width:639px) {
+  .nw-tip-parts { display:none; }
+  .nw-period-row { flex-direction:column; align-items:stretch; margin-top:16px; }
+  .nw-period-copy { width:100%; overflow-x:auto; }
+  .nw-periods { width:100%; height:48px; }
+  .nw-periods button { min-width:0; height:44px; line-height:44px; }
+}
+@media(pointer:coarse) and (min-width:640px) {
+  .nw-period-row { flex-wrap:wrap; }
+  .nw-period-copy { max-width:100%; overflow-x:auto; }
+  .nw-periods { width:244px; height:48px; }
+  .nw-periods button { height:44px; line-height:44px; }
+}
 @media(prefers-reduced-motion:reduce) { .nw-tooltip,.nw-periods [data-range-indicator] { transition:none !important; } }
 
 .nw-line-head { offset-rotate:0deg; offset-anchor:0px 0px; offset-position:0px 0px; pointer-events:none; }

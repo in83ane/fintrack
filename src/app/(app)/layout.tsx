@@ -13,6 +13,7 @@ import { AddCashflowModal } from "@/src/components/AddCashflowModal";
 import { Plus } from "lucide-react";
 import { installChartMotion, replayVisibleCharts } from '@/src/lib/chart-motion';
 import { useApp } from '@/src/context/AppContext';
+import { MobileNavigation } from '@/src/components/MobileNavigation';
 
 export default function AppLayout({
   children,
@@ -20,6 +21,7 @@ export default function AppLayout({
   children: React.ReactNode;
 }) {
   const [isAddCashflowOpen, setIsAddCashflowOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const pathname = usePathname();
   const { currency } = useApp();
 
@@ -27,11 +29,11 @@ export default function AppLayout({
   useEffect(() => replayVisibleCharts(), [currency]);
 
   return (
-    <div className="flex min-h-screen min-w-0">
+    <div className="app-shell flex min-h-dvh min-w-0">
       <Sidebar />
       
-      <div className="relative ml-[var(--sidebar-w)] min-w-0 flex-1 pb-0">
-        <TopBar />
+      <div className="app-shell-content relative min-w-0 flex-1 lg:ml-[var(--sidebar-w)]">
+        <TopBar onOpenMenu={() => setMenuOpen(true)} />
         <main data-page-content className="min-w-0">
           <ErrorBoundary>
             <RouteViewport>{children}</RouteViewport>
@@ -53,7 +55,8 @@ export default function AppLayout({
         onClose={() => setIsAddCashflowOpen(false)} 
       />
 
-      <BottomNav />
+      <BottomNav onOpenMenu={() => setMenuOpen(true)} menuOpen={menuOpen} />
+      <MobileNavigation open={menuOpen} onClose={() => setMenuOpen(false)} />
       <PriceAlertManager />
       <OfflineIndicator />
     </div>
