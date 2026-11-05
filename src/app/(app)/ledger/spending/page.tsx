@@ -1,5 +1,6 @@
 "use client";
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { LayoutGroup, motion, useReducedMotion } from 'motion/react';
 import Link from 'next/link';
 import { createPortal } from 'react-dom';
 import { ArrowDownLeft, ArrowLeft, ArrowUpRight, Plus, X } from 'lucide-react';
@@ -47,6 +48,8 @@ function TrackerWorkspace({owner}:{owner:string}) {
   const {pending} = useLedgerActions();
   const txt = (en:string,th:string) => language==='th'?th:en;
   const [kind,setKind] = useState<TrackerKind>('EXPENSE');
+  const tabGroupId = useId();
+  const reducedMotion = useReducedMotion();
   const income = kind === 'INCOME';
   const presets = income ? incomeCategories : expenseCategories;
   const [trackers,setTrackers] = useState<ExpenseTracker[]>([]);
@@ -172,18 +175,21 @@ function TrackerWorkspace({owner}:{owner:string}) {
     <header className="flex flex-wrap items-end justify-between gap-4"><div><h1 className="text-2xl font-semibold">{txt('Income & spending trackers','ติดตามรายรับ–รายจ่าย')}</h1><p className="mt-1 text-sm text-muted">{txt('See your Ledger by category, or track a topic in more detail.','ดูรายการจาก Ledger แยกตามหมวด หรือเลือกติดตามเฉพาะเรื่องที่สนใจ')}</p></div>
       <button className="ledger-control primary" disabled={!ready || !isDataLoaded} onClick={()=>start(current?.category)}><Plus size={16}/>{txt('New tracker','สร้างหัวข้อ')}</button></header>
     <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-border pb-3">
-      <div role="group" aria-label={txt('Tracker type','ประเภทที่ติดตาม')} className="flex shrink-0 gap-5">
+      <LayoutGroup id={tabGroupId}><div role="group" aria-label={txt('Tracker type','ประเภทที่ติดตาม')} className="flex shrink-0 gap-5">
         {(['EXPENSE','INCOME'] as const).map(value=>{
           const active = kind===value;
           const Icon = value==='INCOME' ? ArrowDownLeft : ArrowUpRight;
           return <button key={value} type="button" aria-pressed={active} disabled={busy}
             onClick={()=>{setKind(value);setSelected('');setRemoving(false);setEdit(null);}}
-            className={'inline-flex min-h-11 items-center gap-2 border-b-2 px-1 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary disabled:cursor-wait disabled:opacity-50 '+(active?'border-primary text-foreground':'border-transparent text-muted hover:border-border hover:text-foreground')}>
-            <Icon size={17} aria-hidden="true" className={active ? (value==='INCOME'?'text-gain':'text-loss') : ''}/>
+            className={'relative inline-flex min-h-11 items-center gap-2 px-1 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary disabled:cursor-wait disabled:opacity-50 '+(active?'text-foreground':'text-muted hover:text-foreground')}>
+            <Icon size={17} aria-hidden="true" style={active ? {color:value==='INCOME'?'var(--gain)':'var(--loss)'} : undefined}/>
             {value==='INCOME'?txt('Income','รายรับ'):txt('Expenses','รายจ่าย')}
+            {active && <motion.span layoutId="tracker-underline" aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 rounded-full"
+              style={{backgroundColor:value==='INCOME'?'var(--gain)':'var(--loss)'}}
+              transition={reducedMotion ? {duration:0} : {type:'spring',stiffness:420,damping:24,mass:0.7}}/>}
           </button>;
         })}
-      </div>
+      </div></LayoutGroup>
       {income && <p className="min-w-0 basis-64 flex-1 text-xs leading-relaxed text-muted">{txt('Includes income and deposits recorded in Ledger. Transfers between your accounts are excluded.','รวมรายรับและเงินฝากที่บันทึกใน Ledger ไม่นับเงินโอนระหว่างบัญชี')}</p>}
     </div>
     {error && <div role="alert" className="rounded-lg border border-border p-3 text-sm">{error} {!ready && <button className="ledger-control" onClick={()=>setRetry(retry+1)}>{txt('Retry','ลองอีกครั้ง')}</button>}</div>}

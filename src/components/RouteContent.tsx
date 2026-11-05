@@ -41,11 +41,15 @@ function Entered({ children, path }: { children: React.ReactNode; path: string }
 }
 
 export function RouteContent({ children }: { children: React.ReactNode }) {
+  const committedPath = usePathname();
+  // Next keeps higher-level templates mounted for nested route changes (for
+  // example /ledger -> /ledger/spending). Reset presentation on the committed
+  // pathname, never on the requested destination while the old page is visible.
+  return <CommittedRouteContent key={committedPath} committedPath={committedPath}>{children}</CommittedRouteContent>;
+}
+
+function CommittedRouteContent({ children, committedPath }: { children: React.ReactNode; committedPath: string }) {
   const path = useNavigationPathname();
-  const routerPath = usePathname();
-  // A template is the identity of one committed Next segment, not the requested
-  // location. Never label a still-mounted outgoing page as its destination.
-  const committedPath = useRef(routerPath).current;
   const { isDataLoaded, dataLoadError } = useApp();
   const navigation = usePageNavigation();
   const destinationReady = useDestinationReady();
