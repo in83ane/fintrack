@@ -35,7 +35,7 @@ import {
   SlidersHorizontal,
   RotateCcw,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from "framer-motion";
 import { cn } from "@/src/lib/utils";
 import { useApp } from "@/src/context/AppContext";
 import { orderHoldings, moveHoldingBefore, toggleHoldingSort, filterHoldings, type HoldingSort, type HoldingSortField } from '@/src/lib/holding-order';
@@ -2475,6 +2475,8 @@ export default function PortfolioView({ loading: forceLoading = false }: { loadi
 
   const [broker, setBroker] = useState<string>("all");
   const [tab, setTab] = useState<TabKey>("all");
+  const marketTabGroupId = React.useId();
+  const reducedMotion = useReducedMotion();
   const display: Cur = "THB";
   const [hide, setHide] = useState(false);
   const [sort, setSort] = useState<"value" | "profit" | "name">("value");
@@ -3083,33 +3085,25 @@ export default function PortfolioView({ loading: forceLoading = false }: { loadi
               </button>
             </div>
 
-            <div className="flex items-center gap-5 overflow-x-auto border-b border-white/[0.08]" role="tablist" aria-label="ประเภทสินทรัพย์">
-              <button
-                role="tab"
-                aria-selected={tab === "all"}
-                onClick={() => setTab("all")}
-                className={cn(
-                  "shrink-0 border-b-2 px-1 py-3 text-sm font-medium transition-colors",
-                  tab === "all" ? "border-[#BBD2C5] text-white" : "border-transparent text-gray-400 hover:text-white"
-                )}
-              >
-                ทั้งหมด
-              </button>
-              {TABS.map((t) => (
+            <LayoutGroup id={marketTabGroupId}><motion.div layoutScroll className="flex items-center gap-5 overflow-x-auto border-b border-white/[0.08]" role="tablist" aria-label="ประเภทสินทรัพย์">
+              {[{key:'all' as const,label:'ทั้งหมด'},...TABS].map((t) => (
                 <button
                   key={t.key}
                   role="tab"
                   aria-selected={tab === t.key}
                   onClick={() => setTab(t.key)}
                   className={cn(
-                    "shrink-0 border-b-2 px-1 py-3 text-sm font-medium transition-colors",
-                    tab === t.key ? "border-[#BBD2C5] text-white" : "border-transparent text-gray-400 hover:text-white"
+                    "relative min-h-11 shrink-0 px-1 py-3 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#BBD2C5]",
+                    tab === t.key ? "text-white" : "text-gray-400 hover:text-white"
                   )}
                 >
                   {t.label}
+                  {tab === t.key && <motion.span layoutId="market-tab-underline" aria-hidden="true"
+                    className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-[#BBD2C5]"
+                    transition={reducedMotion ? {duration:0} : {type:'spring',stiffness:420,damping:24,mass:0.7}}/>}
                 </button>
               ))}
-            </div>
+            </motion.div></LayoutGroup>
 
             {tab === "all" && (
               <div className="flex flex-wrap items-center justify-between gap-3 pt-3">
