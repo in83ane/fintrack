@@ -7,7 +7,7 @@ import { useApp } from '@/src/context/AppContext';
 import { supabase } from '@/src/lib/supabase';
 import { readAll } from '@/src/lib/financial-snapshot';
 import { cashflowCategoryKey, formatCashflowMoney } from '@/src/lib/cashflow-selectors';
-import { expenseCategories, spendingByCategory, summarizeTracker, type ExpenseLine, type ExpenseTracker, type TrackerChoice } from '@/src/lib/expense-tracking';
+import { expenseCategories, incomeCategories, trackerKind, isLedgerTrackerRecord, type TrackerKind, spendingByCategory, summarizeTracker, type ExpenseLine, type ExpenseTracker, type TrackerChoice } from '@/src/lib/expense-tracking';
 import { useLedgerActions } from '@/src/components/LedgerActions';
 import { TrackerForm } from './TrackerForm';
 
@@ -46,6 +46,9 @@ function TrackerWorkspace({owner}:{owner:string}) {
   const {language,t,cashActivities,customCategories,exchangeRates,currency,isDataLoaded,dataLoadError} = useApp();
   const {pending} = useLedgerActions();
   const txt = (en:string,th:string) => language==='th'?th:en;
+  const [kind,setKind] = useState<TrackerKind>('EXPENSE');
+  const income = kind === 'INCOME';
+  const presets = income ? incomeCategories : expenseCategories;
   const [trackers,setTrackers] = useState<ExpenseTracker[]>([]);
   const [ready,setReady] = useState(false), [error,setError] = useState(''), [retry,setRetry] = useState(0);
   const [selected,setSelected] = useState(''), [edit,setEdit] = useState<ExpenseTracker|null>(null);
@@ -59,7 +62,7 @@ function TrackerWorkspace({owner}:{owner:string}) {
       setReady(false);setError('');
       try {
         const [rules,links] = await Promise.all([
-          readAll(range=>Promise.resolve(supabase.from('expense_trackers').select('id,name,category,keywords,opening_amount,currency,opening_fx').eq('user_id',owner).order('created_at').order('id').range(range.from,range.to))),
+          readAll(range=>Promise.resolve(supabase.from('expense_trackers').select('id,name,category,keywords,opening_amount,currency,opening_fx,kind').eq('user_id',owner).order('created_at').order('id').range(range.from,range.to))),
           readAll(range=>Promise.resolve(supabase.from('expense_tracker_choices').select('tracker_id,activity_id,decision').order('tracker_id').order('activity_id').range(range.from,range.to))),
         ]);
         if (rules.error || links.error) throw Error((rules.error || links.error)!.message);
@@ -73,20 +76,21 @@ function TrackerWorkspace({owner}:{owner:string}) {
     }
     void load();return ()=>{live=false;};
   },[owner,retry]);
-  const current = trackers.find(item=>item.id===selected);
+  const visibleTrackers = trackers.filter(item=>trackerKind(item)===kind);
+  const current = visibleTrackers.find(item=>item.id===selected);
   const ledger = useMemo(()=>cashActivities.filter(row=>!pending.includes('cash:'+row.id)),[cashActivities,pending]);
   const overviewCurrency = currency === 'USD' ? 'USD' : 'THB';
-  const overview = useMemo(()=>spendingByCategory(ledger,trackers,overviewCurrency,exchangeRates),[ledger,trackers,overviewCurrency,exchangeRates]);
+  const overview = useMemo(()=>spendingByCategory(ledger,trackers,overviewCurrency,exchangeRates,kind),[ledger,trackers,overviewCurrency,exchangeRates,kind]);
   const overviewMoney = (minor:number)=>formatCashflowMoney(minor,overviewCurrency);
   const summary = useMemo(()=>current ? summarizeTracker(current,ledger,trackers,exchangeRates) : null,[current,ledger,trackers,exchangeRates]);
-  const categories = [...new Set([...expenseCategories,...customCategories.filter(c=>c.type==='EXPENSE').map(c=>c.label),...cashActivities.filter(c=>!c.isTransfer && ['EXPENSE','WITHDRAW'].includes(c.type)).map(c=>c.category),...trackers.map(rule=>rule.category)].filter(Boolean))];
+  const categories = [...new Set([...presets,...customCategories.filter(c=>c.type===kind).map(c=>c.label),...cashActivities.filter(c=>isLedgerTrackerRecord(c,kind)).map(c=>c.category),...visibleTrackers.map(rule=>rule.category)].filter(Boolean))];
   const money = (minor:number)=>formatCashflowMoney(minor,current?.currency || 'THB');
   const noComment = txt('No comment','ไม่มีคอมเมนต์');
-  const start = (category = 'entertainment')=>setEdit({id:crypto.randomUUID(),name:'',category,keywords:[],opening_amount:0,currency:currency==='USD'?'USD':'THB',opening_fx:exchangeRates.THB});
+  const start = (category = income ? 'salary' : 'entertainment')=>setEdit({kind,id:crypto.randomUUID(),name:'',category,keywords:[],opening_amount:0,currency:currency==='USD'?'USD':'THB',opening_fx:exchangeRates.THB});
   async function save(draft:ExpenseTracker) {
-    const {id,choices,...fields} = draft;
+    const {id,choices,kind:draftKind,...fields} = draft;
     const exists = trackers.some(item=>item.id===id);
-    const query = exists ? supabase.from('expense_trackers').update(fields).eq('id',id).eq('user_id',owner) : supabase.from('expense_trackers').insert({...fields,id,user_id:owner});
+    const query = exists ? supabase.from('expense_trackers').update(fields).eq('id',id).eq('user_id',owner) : supabase.from('expense_trackers').insert({...fields,kind:draftKind ?? 'EXPENSE',id,user_id:owner});
     const {data,error} = await query.select('id').single();
     if (error || !data) throw Error(error?.message || txt('Could not save','บันทึกไม่สำเร็จ'));
     setTrackers(prev=>exists?prev.map(item=>item.id===id?{...draft,choices:item.choices}:item):[...prev,{...draft,choices}]);setSelected(id);setRemoving(false);
@@ -165,22 +169,24 @@ function TrackerWorkspace({owner}:{owner:string}) {
   }
   return <div className="app-page-container mx-auto max-w-6xl space-y-6 py-6 pb-28">
     <Link href="/ledger" className="inline-flex items-center gap-2 text-sm text-muted hover:text-foreground"><ArrowLeft size={16}/>Ledger</Link>
-    <header className="flex flex-wrap items-end justify-between gap-4"><div><h1 className="text-2xl font-semibold">{txt('Spending trackers','ติดตามค่าใช้จ่าย')}</h1><p className="mt-1 text-sm text-muted">{txt('See all Ledger expenses by category, or open a tracker for a closer look.','ดูรายจ่ายทั้งหมดจาก Ledger แยกตามหมวด หรือเลือกหัวข้อเพื่อดูเฉพาะเรื่องที่สนใจ')}</p></div>
+    <header className="flex flex-wrap items-end justify-between gap-4"><div><h1 className="text-2xl font-semibold">{txt('Income & spending trackers','ติดตามรายรับ–รายจ่าย')}</h1><p className="mt-1 text-sm text-muted">{txt('See your Ledger by category, or track a topic in more detail.','ดูรายการจาก Ledger แยกตามหมวด หรือเลือกติดตามเฉพาะเรื่องที่สนใจ')}</p></div>
       <button className="ledger-control primary" disabled={!ready || !isDataLoaded} onClick={()=>start(current?.category)}><Plus size={16}/>{txt('New tracker','สร้างหัวข้อ')}</button></header>
+    <div role="group" aria-label={txt('Tracker type','ประเภทที่ติดตาม')} className="flex w-fit gap-1 rounded-xl border border-border p-1">{(['EXPENSE','INCOME'] as const).map(value=><button key={value} type="button" aria-pressed={kind===value} disabled={busy} onClick={()=>{setKind(value);setSelected('');setRemoving(false);setEdit(null);}} className={'min-h-11 rounded-lg px-5 text-sm font-semibold '+(kind===value?'bg-primary text-primary-foreground':'text-muted hover:bg-surface')}>{value==='INCOME'?txt('Income','รายรับ'):txt('Expenses','รายจ่าย')}</button>)}</div>
+    {income && <p className="text-xs text-muted">{txt('Includes income and deposits recorded in Ledger. Transfers between your accounts are excluded.','รวมรายรับและเงินฝากที่บันทึกใน Ledger ไม่นับเงินโอนระหว่างบัญชี')}</p>}
     {error && <div role="alert" className="rounded-lg border border-border p-3 text-sm">{error} {!ready && <button className="ledger-control" onClick={()=>setRetry(retry+1)}>{txt('Retry','ลองอีกครั้ง')}</button>}</div>}
-    {!isDataLoaded ? <p role="status" className="py-6 text-muted">{dataLoadError || txt('Loading spending history…','กำลังโหลดประวัติค่าใช้จ่าย…')}</p>
+    {!isDataLoaded ? <p role="status" className="py-6 text-muted">{dataLoadError || txt('Loading Ledger history…','กำลังโหลดประวัติ Ledger…')}</p>
     : <div className="grid items-start gap-6 md:grid-cols-[minmax(13rem,1fr)_minmax(0,3fr)]">
-      <nav aria-label={txt('Spending views','เลือกมุมมองค่าใช้จ่าย')} className="space-y-1">
+      <nav aria-label={txt('Tracker views','เลือกมุมมองการติดตาม')} className="space-y-1">
         <button className={'block w-full rounded-lg border px-3 py-2 text-left font-semibold '+(!current?'border-primary bg-surface':'border-transparent hover:bg-surface')} aria-pressed={!current} onClick={()=>{setSelected('');setRemoving(false);}}>{txt('All categories','ภาพรวมทุกหมวด')}</button>
-        {!!trackers.length && <p className="px-3 pt-4 text-xs text-muted">{txt('My trackers','หัวข้อที่ติดตาม')}</p>}
-        {trackers.map(item=><button key={item.id} className={'block w-full rounded-lg border px-3 py-2 text-left '+(item.id===current?.id?'border-primary bg-surface':'border-transparent hover:bg-surface')} aria-pressed={item.id===current?.id} onClick={()=>{setSelected(item.id);setRemoving(false);}}><span className="block break-words font-medium">{item.name}</span><span className="text-xs text-muted">{t(expenseCategories.includes(cashflowCategoryKey(item.category)) ? cashflowCategoryKey(item.category) : item.category)} · {item.keywords.length ? item.keywords.join(', ') : txt('Entire category','ทั้งหมวด')}</span></button>)}
+        {!!visibleTrackers.length && <p className="px-3 pt-4 text-xs text-muted">{txt('My trackers','หัวข้อที่ติดตาม')}</p>}
+        {visibleTrackers.map(item=><button key={item.id} className={'block w-full rounded-lg border px-3 py-2 text-left '+(item.id===current?.id?'border-primary bg-surface':'border-transparent hover:bg-surface')} aria-pressed={item.id===current?.id} onClick={()=>{setSelected(item.id);setRemoving(false);}}><span className="block break-words font-medium">{item.name}</span><span className="text-xs text-muted">{t(presets.includes(cashflowCategoryKey(item.category)) ? cashflowCategoryKey(item.category) : item.category)} · {item.keywords.length ? item.keywords.join(', ') : txt('Entire category','ทั้งหมวด')}</span></button>)}
       </nav>
       {!current || !summary ? <section className="min-w-0 rounded-xl border border-border p-4 sm:p-6">
-        <h2 className="text-xl font-semibold">{txt('Spending by category','รายจ่ายแยกตามหมวด')}</h2>
-        <p className="mt-4 text-sm text-muted">{ready ? txt('Total spent','ใช้จ่ายสะสม') : txt('From Ledger','จาก Ledger')}</p>
+        <h2 className="text-xl font-semibold">{income ? txt('Income by category','รายรับแยกตามหมวด') : txt('Spending by category','รายจ่ายแยกตามหมวด')}</h2>
+        <p className="mt-4 text-sm text-muted">{ready ? (income ? txt('Total received','รายรับสะสม') : txt('Total spent','ใช้จ่ายสะสม')) : txt('From Ledger','จาก Ledger')}</p>
         <p className="text-3xl font-semibold tabular-nums">{overviewMoney(overview.reduce((sum,g)=>sum+g.totalMinor,0))}</p>
         <p className="mt-1 mb-4 text-sm text-muted">{txt('Ledger','จาก Ledger')} {overviewMoney(overview.reduce((sum,g)=>sum+g.ledgerMinor,0))}{ready && <> · {txt('Before Ledger','ยอดเก่า')} {overviewMoney(overview.reduce((sum,g)=>sum+g.openingMinor,0))}</>}</p>
-        {!overview.length && <p className="border-t border-border py-4 text-sm text-muted">{txt('Expenses will appear here when you record them in Ledger.','เมื่อบันทึกรายจ่ายใน Ledger หมวดและยอดจะปรากฏที่นี่อัตโนมัติ')}</p>}
+        {!overview.length && <p className="border-t border-border py-4 text-sm text-muted">{income ? txt('Income recorded in Ledger appears here automatically.','เมื่อบันทึกรายรับใน Ledger หมวดและยอดจะปรากฏที่นี่อัตโนมัติ') : txt('Expenses will appear here when you record them in Ledger.','เมื่อบันทึกรายจ่ายใน Ledger หมวดและยอดจะปรากฏที่นี่อัตโนมัติ')}</p>}
         {overview.map(group=><details key={group.key} className="border-t border-border py-3">
           <summary className="cursor-pointer"><span className="inline-flex w-[calc(100%-1.5rem)] items-baseline justify-between gap-3 align-middle"><strong className="break-words">{t(group.label)}</strong><span className="shrink-0 font-semibold tabular-nums">{overviewMoney(group.totalMinor)}</span></span></summary>
           <div className="mt-3 space-y-3 pl-3 text-sm"><p className="text-muted">{txt('Ledger entries','รายการจาก Ledger')} · {group.rows.length} · {overviewMoney(group.ledgerMinor)}</p>
@@ -194,13 +200,13 @@ function TrackerWorkspace({owner}:{owner:string}) {
       </section> :
       <section key={current.id} className="min-w-0 rounded-xl border border-border p-4 sm:p-6">
         <div className="flex items-start justify-between gap-3"><h2 className="break-words text-xl font-semibold">{current.name}</h2><button className="ledger-control" onClick={()=>setEdit(current)}>{t('edit')}</button></div>
-        <p className="mt-5 text-sm text-muted">{txt('Total spent','ใช้จ่ายสะสม')}</p><p ref={totalRef} className="w-fit max-w-full break-words rounded-md text-3xl font-semibold tabular-nums">{money(summary.totalMinor)}</p>
+        <p className="mt-5 text-sm text-muted">{(income ? txt('Total received','รายรับสะสม') : txt('Total spent','ใช้จ่ายสะสม'))}</p><p ref={totalRef} className="w-fit max-w-full break-words rounded-md text-3xl font-semibold tabular-nums">{money(summary.totalMinor)}</p>
         <p className="mb-5 mt-2 text-sm text-muted">{txt('Before Ledger','ยอดเก่า')} {money(summary.openingMinor)} + Ledger {money(summary.ledgerMinor)}</p>
         {!!summary.missing && <p role="status" className="text-sm text-warning">{txt('Entries missing a usable amount or FX rate','รายการที่ยังรวมไม่ได้เพราะขาดยอดหรืออัตราแลกเปลี่ยน')} · {summary.missing}</p>}
         {!!summary.openingItems.length && <details className="border-t border-border py-4 text-sm"><summary className="cursor-pointer font-semibold">{txt('Opening balances','ที่มาของยอดเก่า')}</summary>{summary.openingItems.map(item=><div key={item.id} className="mt-2 flex justify-between gap-3"><span>{item.name}</span><span>{money(item.minor)}</span></div>)}</details>}
-        <h3 className="border-t border-border pt-4 text-sm font-semibold">{txt('Ledger spending by comment','ค่าใช้จ่ายใน Ledger แยกตามคอมเมนต์')}</h3>
+        <h3 className="border-t border-border pt-4 text-sm font-semibold">{income ? txt('Ledger income by comment','รายรับใน Ledger แยกตามคอมเมนต์') : txt('Ledger spending by comment','ค่าใช้จ่ายใน Ledger แยกตามคอมเมนต์')}</h3>
         <ul className="my-3 space-y-2">{summary.groups.map(group=><li key={group.label} className="flex justify-between gap-3 text-sm"><span className="break-words">{group.label||noComment} <span className="text-muted">× {group.count}</span></span><span className="shrink-0 tabular-nums">{money(group.minor)}</span></li>)}</ul>
-        {!summary.rows.length && <p className="mb-4 text-sm text-muted">{txt('No matching expenses yet.','ยังไม่มีรายจ่ายที่ตรงกับหัวข้อนี้')}</p>}
+        {!summary.rows.length && <p className="mb-4 text-sm text-muted">{income ? txt('No matching income yet.','ยังไม่มีรายรับที่ตรงกับหัวข้อนี้') : txt('No matching expenses yet.','ยังไม่มีรายจ่ายที่ตรงกับหัวข้อนี้')}</p>}
         <ActivityList title={txt('Included Ledger entries','รายการ Ledger ที่นับแล้ว')} rows={summary.rows} empty={txt('No entries','ยังไม่มีรายการ')} render={row=>line(row,!!current.keywords.length && choice(row,'remove'))}/>
         {!!current.keywords.length && <><ActivityList title={txt('Other entries in this category to review','แนะนำให้ตรวจ · รายการอื่นในหมวดเดียวกัน')} rows={summary.suggestions} empty={txt('Nothing to review','ไม่มีรายการรอตรวจ')} render={row=>line(row,<>{choice(row,'include')}{choice(row,'unrelated')}</>)}/>
         <ActivityList title={txt('Skipped entries','รายการที่ข้ามไว้')} rows={summary.skipped} empty={txt('No skipped entries','ยังไม่มีรายการที่ข้าม')} render={row=>line(row,choice(row,'include'))}/></>}

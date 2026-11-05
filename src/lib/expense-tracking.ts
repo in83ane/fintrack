@@ -1,9 +1,13 @@
 import { cashflowCategoryKey, localCashflowDay, transactionMoney, type CashflowRecord } from './cashflow-selectors';
 
 export const expenseCategories = ['food', 'transport', 'utilities', 'entertainment', 'shopping', 'health', 'education', 'investment', 'other'];
+export const incomeCategories = ['salary', 'freelance', 'investment', 'dividend', 'gift', 'rental', 'other'];
+export type TrackerKind = 'EXPENSE' | 'INCOME';
+export const trackerKind = (tracker: ExpenseTracker): TrackerKind => tracker.kind ?? 'EXPENSE';
 export type TrackerChoice = { activity_id: string; decision: 'include' | 'skip' };
 export type ExpenseLine = { id: string; day: string; label: string; minor: number };
 export type ExpenseTracker = {
+  kind?: TrackerKind;
   choices?: TrackerChoice[];
   id: string; name: string; category: string; keywords: string[];
   opening_amount: number; currency: 'THB' | 'USD'; opening_fx: number;
@@ -18,16 +22,17 @@ export function parseKeywords(value: string) {
 export function summarizeTracker(tracker: ExpenseTracker, records: readonly CashflowRecord[], trackers: readonly ExpenseTracker[], rates: Record<string,number>) {
   const category = cashflowCategoryKey(tracker.category);
   const keywords = tracker.keywords.map(normalizeComment);
-  const openings = [tracker, ...(!keywords.length ? trackers.filter(item => item.id !== tracker.id && item.keywords.length && cashflowCategoryKey(item.category) === category) : [])];
-  return summarizeExpenses(records.filter(record => isLedgerExpense(record) && cashflowCategoryKey(record.category) === category),
+  const kind = trackerKind(tracker);
+  const openings = [tracker, ...(!keywords.length ? trackers.filter(item => trackerKind(item) === kind && item.id !== tracker.id && item.keywords.length && cashflowCategoryKey(item.category) === category) : [])];
+  return summarizeExpenses(records.filter(record => isLedgerTrackerRecord(record,kind) && cashflowCategoryKey(record.category) === category),
     tracker.currency, rates, openings, keywords, tracker.choices);
 }
 
-function isLedgerExpense(record: CashflowRecord) {
-  return !record.isTransfer && (record.type === 'EXPENSE' || record.type === 'WITHDRAW');
+export function isLedgerTrackerRecord(record: CashflowRecord, kind: TrackerKind) {
+  return !record.isTransfer && (kind === 'INCOME' ? ['INCOME','DEPOSIT'] : ['EXPENSE','WITHDRAW']).includes(record.type);
 }
 
-export function spendingByCategory(records: readonly CashflowRecord[], trackers: readonly ExpenseTracker[], currency: ExpenseTracker['currency'], rates: Record<string,number>) {
+export function spendingByCategory(records: readonly CashflowRecord[], trackers: readonly ExpenseTracker[], currency: ExpenseTracker['currency'], rates: Record<string,number>, kind: TrackerKind = 'EXPENSE') {
   const categories = new Map<string,{ key: string; label: string; records: CashflowRecord[]; openings: ExpenseTracker[] }>();
   function category(label?: string) {
     const key = cashflowCategoryKey(label);
@@ -39,13 +44,13 @@ export function spendingByCategory(records: readonly CashflowRecord[], trackers:
     return group;
   }
   for (const record of records) {
-    if (isLedgerExpense(record)) category(record.category).records.push(record);
+    if (isLedgerTrackerRecord(record,kind)) category(record.category).records.push(record);
   }
   for (const tracker of trackers) {
-    if (tracker.opening_amount > 0) category(tracker.category).openings.push(tracker);
+    if (trackerKind(tracker) === kind && tracker.opening_amount > 0) category(tracker.category).openings.push(tracker);
   }
   return [...categories.values()].map(group => ({
-    key: group.key, label: expenseCategories.includes(group.key) ? group.key : group.label,
+    key: group.key, label: (kind === 'INCOME' ? incomeCategories : expenseCategories).includes(group.key) ? group.key : group.label,
     ...summarizeExpenses(group.records,currency,rates,group.openings),
   })).sort((a,b) => b.totalMinor - a.totalMinor || a.key.localeCompare(b.key));
 }

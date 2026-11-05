@@ -40,3 +40,29 @@ assert.equal(all.entertainment.openingMinor,62500);
 assert.equal(all.entertainment.totalMinor,89500);
 assert.equal(categories([{...game,category:'Hobby'}]).hobby.totalMinor,50000,'historical spending is visible ahead of the first Ledger entry');
 console.log('PASS opening amounts, category rollup, comment normalization, skip/restore, exclusions, edits, deletions and FX.');
+
+const incomeTopic = {...game,id:'income-topic',kind:'INCOME',name:'Design work',category:'freelance',keywords:['design'],opening_amount:1000};
+const incomeWhole = {...incomeTopic,id:'income-whole',keywords:[],opening_amount:200};
+const expenseSameCategory = {...game,id:'expense-same',category:'freelance',opening_amount:9000};
+const incoming = [
+ {id:'in',date:'2026-11-01',type:'INCOME',category:'freelance',note:'DESIGN logo',originalAmount:400,currency:'THB'},
+ {id:'deposit',date:'2026-11-02',type:'DEPOSIT',category:'freelance',note:'design website',originalAmount:2,currency:'USD',rateAtTime:35},
+ {id:'suggestion',date:'2026-11-03',type:'INCOME',category:'freelance',note:'งานออกแบบ',originalAmount:50,currency:'THB'},
+ {id:'transfer',date:'2026-11-04',type:'INCOME',category:'freelance',note:'design',originalAmount:999,currency:'THB',isTransfer:true},
+ {id:'expense',date:'2026-11-04',type:'EXPENSE',category:'freelance',note:'design',originalAmount:600,currency:'THB'},
+];
+const rules = [incomeTopic,incomeWhole,expenseSameCategory];
+const received = summarizeTracker(incomeTopic,incoming,rules,{THB:40});
+assert.equal(received.ledgerMinor,47000,'income + deposits use transaction FX');
+assert.equal(received.totalMinor,147000,'received + historical income');
+assert.deepEqual(received.suggestions.map(r=>r.id),['suggestion']);
+assert.equal(summarizeTracker(incomeWhole,incoming,rules,{THB:40}).totalMinor,172000,'category includes income topic openings only');
+assert.equal(spendingByCategory(incoming,rules,'THB',{THB:40},'INCOME')[0].totalMinor,172000,'overview never includes expense opening balances');
+assert.equal(spendingByCategory(incoming,rules,'THB',{THB:40})[0].totalMinor,960000,'expense mode remains separate');
+const skippedIncome={...incomeTopic,choices:[{activity_id:'in',decision:'skip'}]};
+assert.equal(summarizeTracker(skippedIncome,incoming,rules,{THB:40}).totalMinor,107000);
+assert.equal(summarizeTracker({...incomeTopic,choices:[{activity_id:'suggestion',decision:'include'}]},incoming,rules,{THB:40}).totalMinor,152000);
+assert.equal(summarizeTracker(incomeTopic,incoming.filter(r=>r.id!=='in'),rules,{THB:40}).totalMinor,107000);
+assert.equal(summarizeTracker(incomeTopic,incoming.map(r=>r.id==='in'?{...r,type:'EXPENSE'}:r),rules,{THB:40}).totalMinor,107000,'Ledger direction edits remove income automatically');
+assert.equal(spendingByCategory(incoming,[],'THB',{THB:40},'INCOME')[0].totalMinor,52000,'all income available without creating topics');
+console.log('PASS income directions, transfers, category isolation, openings, multi-currency, skip/include and Ledger edits.');
