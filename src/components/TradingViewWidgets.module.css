@@ -1,0 +1,16 @@
+.widget {
+  background-color: #363636;
+}
+
+.recessed {
+  background-color: #181818;
+}
+
+/* The embed supplies its own dark theme. Match its default document color
+   scheme so the browser does not paint an opaque white iframe canvas when
+   FinTrack's root uses color-scheme: dark. Transparent widgets then show
+   the charcoal surface above without changing market gain/loss colors. */
+.widget iframe {
+  color-scheme: normal;
+  background-color: transparent;
+}

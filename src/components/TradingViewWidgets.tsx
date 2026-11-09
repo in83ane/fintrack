@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef } from "react";
+import styles from "./TradingViewWidgets.module.css";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Direct TradingView Widget Embedder
@@ -14,9 +15,10 @@ import React, { useEffect, useRef } from "react";
 interface TradingViewWidgetProps {
   scriptSrc: string;
   config: Record<string, any>;
+  surface?: "panel" | "recessed";
 }
 
-function TradingViewWidget({ scriptSrc, config }: TradingViewWidgetProps) {
+function TradingViewWidget({ scriptSrc, config, surface = "panel" }: TradingViewWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -51,7 +53,7 @@ function TradingViewWidget({ scriptSrc, config }: TradingViewWidgetProps) {
   return (
     <div
       ref={containerRef}
-      className="tradingview-widget-container"
+      className={`tradingview-widget-container ${styles.widget} ${surface === "recessed" ? styles.recessed : ""}`}
       style={{ height: "100%", width: "100%" }}
     />
   );
@@ -62,6 +64,7 @@ function TradingViewWidget({ scriptSrc, config }: TradingViewWidgetProps) {
 export function TickerTapeWidget() {
   return (
     <TradingViewWidget
+      surface="recessed"
       scriptSrc="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js"
       config={{
         symbols: [
@@ -87,6 +90,7 @@ export function TickerTapeWidget() {
 export function AdvancedChartWidget({ symbol = "OANDA:XAUUSD", interval = "60" }: { symbol?: string; interval?: string }) {
   return (
     <TradingViewWidget
+      surface="recessed"
       scriptSrc="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js"
       config={{
         autosize: true,
@@ -100,7 +104,7 @@ export function AdvancedChartWidget({ symbol = "OANDA:XAUUSD", interval = "60" }
         calendar: false,
         hide_side_toolbar: false,
         support_host: "https://www.tradingview.com",
-        backgroundColor: "rgba(0, 0, 0, 0)",
+        backgroundColor: "#181818",
       }}
     />
   );
