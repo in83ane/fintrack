@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import crypto from "crypto";
 import { oauthAuthOptions, oauthRequestOrigin } from "@/src/lib/oauth-pkce";
+import { nativeBrowserStart, NATIVE_OAUTH_COOKIE, nativeCookieOptions } from "@/src/lib/native-oauth";
 import {
   sanitizeEmail,
   sanitizeString,
@@ -779,6 +780,7 @@ export async function signOutAction(): Promise<void> {
 
 export interface GoogleAuthData {
   csrfToken: string;
+  native?: boolean;
   deviceFingerprint?: string;
   securityNonce?: string;
   lang?: "th" | "en";
@@ -808,15 +810,24 @@ export async function initiateGoogleAuth(data: GoogleAuthData): Promise<ActionRe
     const requestHeaders = await headers();
     const origin = oauthRequestOrigin(requestHeaders.get('origin'),
       requestHeaders.get('x-forwarded-host') || requestHeaders.get('host'));
+    const cookieStore = await cookies();
+    // A cancelled native window can leave its routing cookie in Safari.
+    // Starting a regular web login must always restore the normal web flow.
+    if (data.native !== true) {
+      cookieStore.set(NATIVE_OAUTH_COOKIE, '', {
+        ...nativeCookieOptions(process.env.NODE_ENV === 'production'), maxAge: 0,
+      });
+    }
     const oauth = createClient(getSupabaseUrl(), getSupabaseAnonKey(), {
-      auth: oauthAuthOptions(await cookies(), process.env.NODE_ENV === 'production'),
+      auth: oauthAuthOptions(cookieStore, process.env.NODE_ENV === 'production'),
     });
     const { data: authorization, error } = await oauth.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: `${origin}/auth/callback`, skipBrowserRedirect: true },
     });
     if (error || !authorization.url) return { success: false, errorCode: 'OAUTH_START_FAILED' };
-    return { success: true, redirectUrl: authorization.url };
+    return { success: true, redirectUrl: data.native === true
+      ? nativeBrowserStart(origin, authorization.url) : authorization.url };
   } catch {
     return { success: false, errorCode: 'OAUTH_START_FAILED' };
   }

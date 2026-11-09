@@ -3,10 +3,23 @@ import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { getSupabaseUrl, getSupabaseAnonKey } from '@/src/lib/env';
 import { oauthAuthOptions, OAUTH_VERIFIER_COOKIE } from '@/src/lib/oauth-pkce';
+import { isOAuthNonce, NATIVE_OAUTH_COOKIE, nativeCookieOptions, nativeCallback } from '@/src/lib/native-oauth';
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const store = await cookies();
+  const nativeState = store.get(NATIVE_OAUTH_COOKIE)?.value;
+  if (nativeState) {
+    store.set(NATIVE_OAUTH_COOKIE, '', { ...nativeCookieOptions(process.env.NODE_ENV === 'production'), maxAge: 0 });
+    if (isOAuthNonce(nativeState)) {
+      // Return to the ASWebAuthenticationSession that started this request.
+      // The app then visits this route with its own PKCE cookie to exchange.
+      const response = NextResponse.redirect(nativeCallback(nativeState, params), 302);
+      response.headers.set('Cache-Control', 'no-store');
+      response.headers.set('Referrer-Policy', 'no-referrer');
+      return response;
+    }
+  }
   const auth = oauthAuthOptions(store, process.env.NODE_ENV === 'production');
   const fail = (reason: string) => {
     auth.storage.removeItem(OAUTH_VERIFIER_COOKIE);

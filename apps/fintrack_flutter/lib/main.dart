@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'navigation_policy.dart';
+import 'native_oauth.dart';
 
 const _background = Color(0xff0f1013);
 const _url = String.fromEnvironment(
@@ -52,6 +53,8 @@ class FinTrackBrowser extends StatefulWidget {
 }
 
 class _FinTrackBrowserState extends State<FinTrackBrowser> {
+  static const _authChannel = MethodChannel('app.fintrack/auth');
+  bool _authPending = false;
   InAppWebViewController? _controller;
   WebViewEnvironment? _environment;
   Uri? _start;
@@ -104,6 +107,48 @@ class _FinTrackBrowserState extends State<FinTrackBrowser> {
   Future<void> _syncHistory(InAppWebViewController controller) async {
     final back = await controller.canGoBack();
     if (mounted) setState(() => _canGoBack = back);
+  }
+
+  Future<Map<String, String>> _googleAuth(List<dynamic> arguments) async {
+    if (_authPending ||
+        !(Platform.isMacOS || Platform.isIOS) ||
+        arguments.length != 1 ||
+        arguments.first is! String ||
+        _start == null) {
+      return {'status': 'error'};
+    }
+    final current = await _controller?.getUrl();
+    final uri = Uri.tryParse(current?.toString() ?? '');
+    if (uri == null || uri.origin != _start!.origin || uri.path != '/login') {
+      return {'status': 'error'};
+    }
+    _authPending = true;
+    try {
+      final state = createOAuthState();
+      final start = nativeAuthStart(arguments.first as String, _start!, state);
+      final verifier = await CookieManager.instance().getCookie(
+        url: WebUri(_start!.origin),
+        name: 'fintrack-oauth-code-verifier',
+      );
+      if (verifier == null || !matchesAppVerifier(start, verifier.value)) {
+        return {'status': 'error'};
+      }
+      final callback = await _authChannel.invokeMethod<String>('authenticate', {
+        'url': start.toString(),
+      });
+      if (callback == null) return {'status': 'cancelled'};
+      final target = nativeAuthCallback(callback, _start!, state);
+      await _controller?.loadUrl(
+        urlRequest: URLRequest(url: WebUri(target.toString())),
+      );
+      return {'status': 'success'};
+    } on PlatformException catch (error) {
+      return {'status': error.code == 'CANCELLED' ? 'cancelled' : 'error'};
+    } catch (_) {
+      return {'status': 'error'};
+    } finally {
+      _authPending = false;
+    }
   }
 
   Future<void> _openExternal(Uri uri) async {
@@ -179,6 +224,10 @@ class _FinTrackBrowserState extends State<FinTrackBrowser> {
                 webViewEnvironment: _environment,
                 initialUrlRequest: URLRequest(url: WebUri(_start.toString())),
                 initialSettings: InAppWebViewSettings(
+                  applicationNameForUserAgent:
+                      Platform.isMacOS || Platform.isIOS
+                      ? 'FinTrackNative/1.1'
+                      : '',
                   javaScriptEnabled: true,
                   domStorageEnabled: true,
                   useShouldOverrideUrlLoading: true,
@@ -189,7 +238,13 @@ class _FinTrackBrowserState extends State<FinTrackBrowser> {
                   allowsBackForwardNavigationGestures: true,
                   transparentBackground: false,
                 ),
-                onWebViewCreated: (controller) => _controller = controller,
+                onWebViewCreated: (controller) {
+                  _controller = controller;
+                  controller.addJavaScriptHandler(
+                    handlerName: 'fintrackGoogleAuth',
+                    callback: _googleAuth,
+                  );
+                },
                 onProgressChanged: (_, progress) {
                   if (mounted) setState(() => _progress = progress / 100);
                 },

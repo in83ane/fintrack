@@ -785,8 +785,13 @@ function LoginContent() {
     }
 
     try {
+      const bridge = (window as Window & { flutter_inappwebview?: {
+        callHandler: (name: string, url: string) => Promise<{ status: string }>;
+      } }).flutter_inappwebview;
+      const native = /FinTrackNative\/1\.1\b/.test(navigator.userAgent) && !!bridge;
       const result = await initiateGoogleAuth({
         csrfToken: token,
+        native,
         deviceFingerprint,
         securityNonce,
         lang,
@@ -812,6 +817,13 @@ function LoginContent() {
 
       // The server has stored the PKCE verifier in an HttpOnly cookie.
       if (!result.redirectUrl) throw new Error("OAUTH_URL_MISSING");
+      if (native && bridge) {
+        const response = await bridge.callHandler('fintrackGoogleAuth', result.redirectUrl);
+        if (response.status === 'cancelled') return;
+        if (response.status !== 'success') throw new Error('NATIVE_OAUTH_FAILED');
+        // Native code loads the HTTPS callback directly into this WebView.
+        return;
+      }
       window.location.assign(result.redirectUrl);
     } catch (err: unknown) {
       setError(t.errorGoogle);
