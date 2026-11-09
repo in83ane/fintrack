@@ -1,0 +1,50 @@
+name: Build FinTrack for Apple
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/fintrack_flutter/**'
+      - '.github/workflows/apple-build.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  apple:
+    runs-on: macos-15
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: apps/fintrack_flutter
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.9'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+      - name: Build macOS application
+        run: flutter build macos --release
+      - name: Package macOS installer
+        run: |
+          mkdir -p build/installer
+          ditto build/macos/Build/Products/Release/FinTrack.app build/installer/FinTrack.app
+          ln -s /Applications build/installer/Applications
+          codesign --verify --deep --strict build/installer/FinTrack.app
+          lipo -archs build/installer/FinTrack.app/Contents/MacOS/FinTrack
+          hdiutil create -volname FinTrack -srcfolder build/installer -ov -format UDZO build/FinTrack-macOS.dmg
+          shasum -a 256 build/FinTrack-macOS.dmg > build/FinTrack-macOS.dmg.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FinTrack-macOS
+          path: |
+            apps/fintrack_flutter/build/FinTrack-macOS.dmg
+            apps/fintrack_flutter/build/FinTrack-macOS.dmg.sha256
+          if-no-files-found: error
+      - name: Verify iPhone compilation (installation needs personal signing)
+        run: flutter build ios --release --no-codesign
