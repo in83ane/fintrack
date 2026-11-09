@@ -26,6 +26,7 @@ import {
   type ActionResult,
 } from "./actions";
 import { useApp } from "@/src/context/AppContext";
+import { getNativeAuthBridge, signInWithNativeBridge } from '@/src/lib/native-auth-bridge';
 
 // ─── Security Utilities ───────────────────────────────────────────────────
 
@@ -785,10 +786,8 @@ function LoginContent() {
     }
 
     try {
-      const bridge = (window as Window & { flutter_inappwebview?: {
-        callHandler: (name: string, url: string) => Promise<{ status: string }>;
-      } }).flutter_inappwebview;
-      const native = /FinTrackNative\/1\.1\b/.test(navigator.userAgent) && !!bridge;
+      const bridge = await getNativeAuthBridge(window as Parameters<typeof getNativeAuthBridge>[0]);
+      const native = bridge !== null;
       const result = await initiateGoogleAuth({
         csrfToken: token,
         native,
@@ -818,7 +817,7 @@ function LoginContent() {
       // The server has stored the PKCE verifier in an HttpOnly cookie.
       if (!result.redirectUrl) throw new Error("OAUTH_URL_MISSING");
       if (native && bridge) {
-        const response = await bridge.callHandler('fintrackGoogleAuth', result.redirectUrl);
+        const response = await signInWithNativeBridge(bridge, result.redirectUrl);
         if (response.status === 'cancelled') return;
         if (response.status !== 'success') throw new Error('NATIVE_OAUTH_FAILED');
         // Native code loads the HTTPS callback directly into this WebView.
@@ -826,6 +825,13 @@ function LoginContent() {
       }
       window.location.assign(result.redirectUrl);
     } catch (err: unknown) {
+      if (err instanceof Error && err.message === 'NATIVE_APP_UPDATE_REQUIRED') {
+        setError(lang === 'th'
+          ? 'กรุณาอัปเดตแอป FinTrack เป็นรุ่น 1.1.1 แล้วเปิดแอปใหม่เพื่อเข้าสู่ระบบด้วย Google'
+          : 'Update FinTrack to version 1.1.1 and reopen the app to sign in with Google.');
+        setErrorCode('NATIVE_APP_UPDATE_REQUIRED');
+        return;
+      }
       setError(t.errorGoogle);
       setErrorCode("OAUTH_START_FAILED");
     } finally {

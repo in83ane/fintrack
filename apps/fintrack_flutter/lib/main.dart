@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:async';
+import 'dart:collection';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -47,7 +49,8 @@ class FinTrackApp extends StatelessWidget {
 }
 
 class FinTrackBrowser extends StatefulWidget {
-  const FinTrackBrowser({super.key});
+  const FinTrackBrowser({super.key, this.onWebViewReady});
+  final ValueChanged<InAppWebViewController>? onWebViewReady;
   @override
   State<FinTrackBrowser> createState() => _FinTrackBrowserState();
 }
@@ -119,7 +122,10 @@ class _FinTrackBrowserState extends State<FinTrackBrowser> {
     }
     final current = await _controller?.getUrl();
     final uri = Uri.tryParse(current?.toString() ?? '');
-    if (uri == null || uri.origin != _start!.origin || uri.path != '/login') {
+    if (uri == null ||
+        uri.scheme != 'https' ||
+        uri.origin != _start!.origin ||
+        uri.path != '/login') {
       return {'status': 'error'};
     }
     _authPending = true;
@@ -148,6 +154,26 @@ class _FinTrackBrowserState extends State<FinTrackBrowser> {
       return {'status': 'error'};
     } finally {
       _authPending = false;
+    }
+  }
+
+  Future<void> _interceptGoogle(Uri provider) async {
+    try {
+      final start = nativeStartFromProvider(provider, _start!);
+      final result = await _googleAuth([start.toString()]);
+      if (result['status'] == 'error') {
+        throw const FormatException('Native sign-in failed');
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Could not start Google sign-in. Reload FinTrack and try again.',
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -192,7 +218,7 @@ class _FinTrackBrowserState extends State<FinTrackBrowser> {
         surfaceTintColor: Colors.transparent,
         toolbarHeight: 44,
         title: const Text(
-          'FinTrack',
+          'FinTrack · $nativeAppVersion',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
         leading: _canGoBack
@@ -221,6 +247,15 @@ class _FinTrackBrowserState extends State<FinTrackBrowser> {
           children: [
             if (_ready)
               InAppWebView(
+                initialUserScripts: UnmodifiableListView([
+                  if (Platform.isMacOS || Platform.isIOS)
+                    UserScript(
+                      source:
+                          "Object.defineProperty(window, '__fintrackNative', {value: Object.freeze({version: '$nativeAppVersion'}), writable: false});",
+                      injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+                      forMainFrameOnly: true,
+                    ),
+                ]),
                 webViewEnvironment: _environment,
                 initialUrlRequest: URLRequest(url: WebUri(_start.toString())),
                 initialSettings: InAppWebViewSettings(
@@ -244,6 +279,29 @@ class _FinTrackBrowserState extends State<FinTrackBrowser> {
                     handlerName: 'fintrackGoogleAuth',
                     callback: _googleAuth,
                   );
+                  controller.addJavaScriptHandler(
+                    handlerName: 'fintrackCapabilities',
+                    callback: (_) async {
+                      if (!(Platform.isMacOS || Platform.isIOS)) {
+                        return {'nativeGoogle': false};
+                      }
+                      try {
+                        final available = await _authChannel.invokeMethod<bool>(
+                          'isAvailable',
+                        );
+                        return {
+                          'nativeGoogle': available == true,
+                          'version': nativeAppVersion,
+                        };
+                      } catch (_) {
+                        return {
+                          'nativeGoogle': false,
+                          'version': nativeAppVersion,
+                        };
+                      }
+                    },
+                  );
+                  widget.onWebViewReady?.call(controller);
                 },
                 onProgressChanged: (_, progress) {
                   if (mounted) setState(() => _progress = progress / 100);
@@ -274,6 +332,11 @@ class _FinTrackBrowserState extends State<FinTrackBrowser> {
                   }
                   final uri = Uri.tryParse(action.request.url.toString());
                   if (uri == null) return NavigationActionPolicy.CANCEL;
+                  if ((Platform.isMacOS || Platform.isIOS) &&
+                      isGoogleProviderNavigation(uri)) {
+                    unawaited(_interceptGoogle(uri));
+                    return NavigationActionPolicy.CANCEL;
+                  }
                   final target = navigationTarget(uri, _start!);
                   if (target == NavigationTarget.internal) {
                     return NavigationActionPolicy.ALLOW;
@@ -286,6 +349,11 @@ class _FinTrackBrowserState extends State<FinTrackBrowser> {
                 onCreateWindow: (controller, action) async {
                   final uri = Uri.tryParse(action.request.url.toString());
                   if (uri != null) {
+                    if ((Platform.isMacOS || Platform.isIOS) &&
+                        isGoogleProviderNavigation(uri)) {
+                      unawaited(_interceptGoogle(uri));
+                      return false;
+                    }
                     final target = navigationTarget(uri, _start!);
                     if (target == NavigationTarget.internal) {
                       await controller.loadUrl(urlRequest: action.request);

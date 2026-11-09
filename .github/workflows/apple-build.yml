@@ -28,6 +28,9 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
+      - name: Verify real macOS WebView and native auth bridge
+        timeout-minutes: 12
+        run: flutter test integration_test/native_bridge_test.dart -d macos
       - name: Build macOS application
         run: flutter build macos --release
       - name: Package macOS installer

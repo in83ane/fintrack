@@ -85,7 +85,7 @@ Outgoing-network sandbox entitlements are included. Developer signing/notarizati
 ## Device checks still required before general use
 
 - Email/password login, relaunch/session persistence, logout and account switching on each target.
-- **Google OAuth on macOS/iOS (1.1.0):** uses Apple's ASWebAuthenticationSession and returns a single-use code to the app. The app validates state and its PKCE challenge, then exchanges the code using its own HttpOnly verifier cookie. No session tokens enter the platform channel or JavaScript. The deployed website must include the matching native start/callback support. Verify account selection, cancellation, relaunch, and logout on a physical device. Android/Windows Google handoff is not implemented yet.
+- **Google OAuth on macOS/iOS (1.1.1):** uses Apple's ASWebAuthenticationSession and returns a single-use code to the app. The app validates state and its PKCE challenge, then exchanges the code using its own HttpOnly verifier cookie. No session tokens enter the platform channel or JavaScript. The deployed website must include the matching native start/callback support. Verify account selection, cancellation, relaunch, and logout on a physical device. Android/Windows Google handoff is not implemented yet.
 - Excel/PDF file selection, native export/download saving, keyboard behavior, screen reader and physical touch testing. Downloads currently offer to open the page in the browser; the browser may require a separate login. Blob exports are not saved natively yet.
 - Native push, biometrics, offline financial edits, deep links and automatic native binary updates are not implemented.
 - iOS/macOS builds and physical-device behavior must be verified on Apple hardware; the Windows build does not prove them.

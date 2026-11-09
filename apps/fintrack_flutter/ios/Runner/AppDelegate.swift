@@ -13,6 +13,7 @@ import AuthenticationServices
   }
 
   private func authenticate(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+    if call.method == "isAvailable" { result(true); return }
     guard call.method == "authenticate" else {
       result(FlutterMethodNotImplemented)
       return

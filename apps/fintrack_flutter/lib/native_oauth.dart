@@ -4,7 +4,41 @@ import 'dart:math';
 import 'package:crypto/crypto.dart';
 
 const nativeOAuthScheme = 'app.fintrack.oauth';
+const nativeAppVersion = '1.1.1';
+const nativeProviderHost = String.fromEnvironment(
+  'FINTRACK_AUTH_HOST',
+  defaultValue: 'sbojwnbwfepdvtsmzvwc.supabase.co',
+);
 final _noncePattern = RegExp(r'^[A-Za-z0-9_-]{43}$');
+
+bool isGoogleProviderNavigation(Uri uri) =>
+    uri.host == nativeProviderHost &&
+    uri.path == '/auth/v1/authorize' &&
+    uri.queryParameters['provider'] == 'google';
+
+Uri nativeStartFromProvider(Uri provider, Uri app) {
+  if (!isGoogleProviderNavigation(provider) ||
+      provider.scheme != 'https' ||
+      provider.hasPort ||
+      provider.userInfo.isNotEmpty ||
+      provider.fragment.isNotEmpty ||
+      provider.queryParameters['code_challenge_method'] != 's256' ||
+      provider.queryParametersAll['code_challenge']?.length != 1 ||
+      !_noncePattern.hasMatch(
+        provider.queryParameters['code_challenge'] ?? '',
+      ) ||
+      provider.queryParameters['redirect_to'] !=
+          app.resolve('/auth/callback').toString()) {
+    throw const FormatException('Invalid Google authorization request');
+  }
+  return app
+      .resolve('/auth/native/start')
+      .replace(
+        queryParameters: {
+          'challenge': provider.queryParameters['code_challenge']!,
+        },
+      );
+}
 
 String createOAuthState() => base64Url
     .encode(List<int>.generate(32, (_) => Random.secure().nextInt(256)))

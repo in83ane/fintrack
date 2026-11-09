@@ -12,6 +12,40 @@ void main() {
       .encode(sha256.convert(utf8.encode(verifier)).bytes)
       .replaceAll('=', '');
   final start = '${app.origin}/auth/native/start?challenge=$challenge';
+  test(
+    'legacy web navigation is captured and cannot open a normal browser tab',
+    () {
+      final provider = Uri.https(nativeProviderHost, '/auth/v1/authorize', {
+        'provider': 'google',
+        'code_challenge': challenge,
+        'code_challenge_method': 's256',
+        'redirect_to': app.resolve('/auth/callback').toString(),
+      });
+      expect(isGoogleProviderNavigation(provider), isTrue);
+      expect(nativeStartFromProvider(provider, app).toString(), start);
+      for (final invalid in [
+        provider.replace(scheme: 'http'),
+        provider.replace(host: 'evil.example'),
+        provider.replace(
+          queryParameters: {
+            ...provider.queryParameters,
+            'redirect_to': 'https://evil.example/auth/callback',
+          },
+        ),
+        provider.replace(
+          queryParameters: {
+            ...provider.queryParameters,
+            'code_challenge_method': 'plain',
+          },
+        ),
+      ]) {
+        expect(
+          () => nativeStartFromProvider(invalid, app),
+          throwsFormatException,
+        );
+      }
+    },
+  );
   test('native flow binds challenge to the HttpOnly app verifier', () {
     final uri = nativeAuthStart(start, app, state);
     expect(uri.queryParameters['state'], state);
