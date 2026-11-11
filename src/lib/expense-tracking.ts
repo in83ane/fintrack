@@ -1,6 +1,6 @@
 import { cashflowCategoryKey, localCashflowDay, transactionMoney, type CashflowRecord } from './cashflow-selectors';
 
-export const expenseCategories = ['food', 'transport', 'utilities', 'entertainment', 'shopping', 'health', 'education', 'investment', 'other'];
+export const expenseCategories = ['food', 'transport', 'utilities', 'entertainment', 'shopping', 'health', 'education', 'coffee', 'travel', 'investment', 'other'];
 export const incomeCategories = ['salary', 'freelance', 'investment', 'dividend', 'gift', 'rental', 'other'];
 export type TrackerKind = 'EXPENSE' | 'INCOME';
 export const trackerKind = (tracker: ExpenseTracker): TrackerKind => tracker.kind ?? 'EXPENSE';

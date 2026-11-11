@@ -153,7 +153,7 @@ export function AddCashflowModal({ isOpen, onClose, presetType, presetBucketId }
   const incomePresets = ["salary", "freelance", "investment", "dividend", "gift", "rental", "other"];
   const expensePresets = expenseCategories;
   const depositPresets = ["salary", "investment", "other"];
-  const withdrawPresets = ["food", "transport", "utilities", "entertainment", "investment", "other"];
+  const withdrawPresets = ["food", "transport", "utilities", "entertainment", "coffee", "travel", "investment", "other"];
 
   const currentPresets = type === "INCOME" ? incomePresets
     : type === "EXPENSE" ? expensePresets
